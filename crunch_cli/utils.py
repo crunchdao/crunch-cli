@@ -43,14 +43,6 @@ class CustomSession(requests.Session):
         return response
 
 
-def validate_project_full_name(ctx, param, value):
-    if re.match(r"^[\w-]+\/[\w-]+$", value):
-        return value
-    else:
-        raise click.BadParameter(
-            "must be formatted like: <userLogin>/<projectName>")
-
-
 def change_root():
     while True:
         current = os.getcwd()
@@ -75,7 +67,7 @@ def _read_crunchdao_file(name: str):
         return fd.read()
 
 
-def read_project_full_name():
+def read_project_name():
     return _read_crunchdao_file(constants.PROJECT_FILE)
 
 

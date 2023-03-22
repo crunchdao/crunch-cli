@@ -11,6 +11,7 @@ from . import constants
 session = None
 debug = False
 
+
 @click.group()
 @click.option("--debug", "enable_debug", envvar="DEBUG", is_flag=True)
 @click.option("--api-base-url", envvar="API_BASE_URL", required=True)
@@ -28,22 +29,21 @@ def cli(
 @cli.command()
 @click.option("--token", "clone_token", required=True, help="clone token")
 @click.option("--version", "version_number", required=False, type=int, help="version number to clone")
-@click.argument("project_full_name", required=True, callback=utils.validate_project_full_name)
+@click.argument("project_name", required=True)
 @click.argument("directory", default="{projectName}")
 def clone(
     clone_token: str,
     version_number: str,
-    project_full_name: str,
+    project_name: str,
     directory: str,
 ):
-    _, project_name = project_full_name.split("/")
     directory = directory.replace("{projectName}", project_name)
 
     if os.path.exists(directory):
         print(f"{directory}: already exists")
         raise click.Abort()
 
-    push_token = session.post(f"/v1/projects/{project_full_name}/tokens", json={
+    push_token = session.post(f"/v1/projects/{project_name}/tokens", json={
         "type": "PERMANENT",
         "cloneToken": clone_token
     }).json()
@@ -55,14 +55,14 @@ def clone(
     project_file_path = os.path.join(
         dot_crunchdao_path, constants.PROJECT_FILE)
     with open(project_file_path, "w") as fd:
-        fd.write(project_full_name)
+        fd.write(project_name)
 
     token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
     with open(token_file_path, "w") as fd:
         fd.write(push_token['plain'])
 
     code_tar = io.BytesIO(
-        session.get(f"/v1/projects/{project_full_name}/clone", params={
+        session.get(f"/v1/projects/{project_name}/clone", params={
             "pushToken": push_token['plain'],
             "versionNumber": version_number,
         }).content
@@ -90,7 +90,7 @@ def push(
 ):
     utils.change_root()
 
-    project_full_name = utils.read_project_full_name()
+    project_name = utils.read_project_name()
     push_token = utils.read_token()
 
     matches = gitignorefile.Cache()
@@ -120,7 +120,7 @@ def push(
 
         with open(tmp.name, "rb") as fd:
             version = session.post(
-                f"/v1/projects/{project_full_name}/versions",
+                f"/v1/projects/{project_name}/versions",
                 data={
                     "message": message,
                     "pushToken": push_token,
