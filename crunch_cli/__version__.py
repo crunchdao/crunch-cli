@@ -1,0 +1,6 @@
+__title__ = 'crunch'
+__description__ = 'crunch - CLI of the CrunchDAO Platform'
+__version__ = '0.0.1'
+__author__ = 'Enzo CACERES'
+__author_email__ = 'enzo.caceres@crunchdao.com'
+__url__ = 'https://github.com/crunchdao/crunch-cli'
