@@ -36,7 +36,7 @@ def clone(
     project_full_name: str,
     directory: str,
 ):
-    user_login, project_name = project_full_name.split("/")
+    _, project_name = project_full_name.split("/")
     directory = directory.replace("{projectName}", project_name)
 
     if os.path.exists(directory):
