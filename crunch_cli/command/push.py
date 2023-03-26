@@ -7,9 +7,6 @@ import gitignorefile
 from .. import utils
 from .. import constants
 
-session = None
-debug = False
-
 
 def push(
     session: requests.Session,

@@ -52,5 +52,15 @@ def push(
     )
 
 
+@cli.command()
+@click.option("-m", "--main-file", default="main.py")
+def test(
+    main_file: str
+):
+    command.test(
+        main_file=main_file
+    )
+
+
 if __name__ == '__main__':
     cli()
