@@ -1,12 +1,7 @@
 import click
-import os
-import tarfile
-import io
-import tempfile
-import gitignorefile
 
 from . import utils
-from . import constants
+from . import command
 
 session = None
 debug = False
@@ -37,50 +32,13 @@ def clone(
     project_name: str,
     directory: str,
 ):
-    directory = directory.replace("{projectName}", project_name)
-
-    if os.path.exists(directory):
-        print(f"{directory}: already exists")
-        raise click.Abort()
-
-    push_token = session.post(f"/v1/projects/{project_name}/tokens", json={
-        "type": "PERMANENT",
-        "cloneToken": clone_token
-    }).json()
-
-    dot_crunchdao_path = os.path.join(
-        directory, constants.DOT_CRUNCHDAO_DIRECTORY)
-    os.makedirs(dot_crunchdao_path)
-
-    project_file_path = os.path.join(
-        dot_crunchdao_path, constants.PROJECT_FILE)
-    with open(project_file_path, "w") as fd:
-        fd.write(project_name)
-
-    token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
-    with open(token_file_path, "w") as fd:
-        fd.write(push_token['plain'])
-
-    code_tar = io.BytesIO(
-        session.get(f"/v1/projects/{project_name}/clone", params={
-            "pushToken": push_token['plain'],
-            "versionNumber": version_number,
-        }).content
+    command.clone(
+        session,
+        clone_token=clone_token,
+        version_number=version_number,
+        project_name=project_name,
+        directory=directory
     )
-
-    tar = tarfile.open(fileobj=code_tar)
-    for member in tar.getmembers():
-        path = os.path.join(directory, member.name)
-        print(f"extract {path}")
-
-        fileobj = tar.extractfile(member)
-        with open(path, "wb") as fd:
-            fd.write(fileobj.read())
-
-    print("\n---")
-    print(f"your project is available at: {directory}")
-    print(f" - cd {directory}")
-    print(f" - crunchdao-cli run")
 
 
 @cli.command()
@@ -88,50 +46,10 @@ def clone(
 def push(
     message: str
 ):
-    utils.change_root()
-
-    project_name = utils.read_project_name()
-    push_token = utils.read_token()
-
-    matches = gitignorefile.Cache()
-
-    with tempfile.NamedTemporaryFile(prefix="version-", suffix=".tar") as tmp:
-        with tarfile.open(fileobj=tmp, mode="w") as tar:
-            for root, dirs, files in os.walk(".", topdown=False):
-                if root.startswith("./"):
-                    root = root[2:]
-                elif root == ".":
-                    root = ""
-
-                for file in files:
-                    file = os.path.join(root, file)
-
-                    ignored = False
-                    for ignore in constants.IGNORED_FILES:
-                        if ignore in file:
-                            ignored = True
-                            break
-
-                    if ignored or matches(file):
-                        continue
-
-                    print(f"compress {file}")
-                    tar.add(file)
-
-        with open(tmp.name, "rb") as fd:
-            version = session.post(
-                f"/v1/projects/{project_name}/versions",
-                data={
-                    "message": message,
-                    "pushToken": push_token,
-                },
-                files={
-                    "tarFile": ('code.tar', fd, "application/x-tar")
-                }
-            ).json()
-
-    print("\n---")
-    print(f"version #{version['number']} uploaded!")
+    command.push(
+        session,
+        message=message
+    )
 
 
 if __name__ == '__main__':
