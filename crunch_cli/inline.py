@@ -9,24 +9,6 @@ from . import command
 
 class _Inline:
 
-    def call_data_process(self) -> typing.Union[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
-        pass
-
-    def call_train(self) -> pandas.DataFrame:
-        pass
-
-    def call_infer(self) -> pandas.DataFrame:
-        pass
-
-
-class _NoOpInline(_Inline):
-
-    def __init__(self):
-        print("no inline available outside of a notebook")
-
-
-class _JupyterInline(_Inline):
-
     def __init__(self, module: typing.Any):
         self.module = module
 
@@ -95,7 +77,4 @@ class _JupyterInline(_Inline):
 
 
 def load(module: typing.Any):
-    if utils.is_notebook():
-        return _JupyterInline(module)
-
-    return _NoOpInline()
+    return _Inline(module)
