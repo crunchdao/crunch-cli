@@ -1,4 +1,5 @@
 import click
+import os
 
 from . import utils
 from . import command
@@ -30,14 +31,18 @@ def cli(
 @cli.command(help="Setup a workspace directory with the latest version of you code.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
 @click.option("--version", "version_number", required=False, type=int, help="Version number to clone. (latest if not specified)")
+@click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.argument("project-name", required=True)
 @click.argument("directory", default="{projectName}")
 def setup(
     clone_token: str,
     version_number: str,
+    no_data: bool,
     project_name: str,
     directory: str,
 ):
+    directory = directory.replace("{projectName}", project_name)
+
     command.setup(
         session,
         clone_token=clone_token,
@@ -45,6 +50,15 @@ def setup(
         project_name=project_name,
         directory=directory
     )
+
+    if not no_data:
+        os.chdir(directory)
+        command.download(session, force=True)
+
+    print("\n---")
+    print(f"your project in the directory `{directory}`:")
+    print(f" - cd {directory}")
+    print(f" - crunch --help")
 
 
 @cli.command(help="Send the new version of your code.")
@@ -63,9 +77,18 @@ def push(
 def test(
     main_file: str
 ):
+    utils.change_root()
+
     command.test(
         main_file=main_file
     )
+
+
+@cli.command(help="Download the data locally.")
+def download():
+    utils.change_root()
+
+    command.download(session)
 
 
 if __name__ == '__main__':

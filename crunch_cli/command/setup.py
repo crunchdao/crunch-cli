@@ -13,8 +13,6 @@ def setup(
     project_name: str,
     directory: str,
 ):
-    directory = directory.replace("{projectName}", project_name)
-
     if os.path.exists(directory):
         print(f"{directory}: already exists")
         raise click.Abort()
@@ -52,8 +50,3 @@ def setup(
         fileobj = tar.extractfile(member)
         with open(path, "wb") as fd:
             fd.write(fileobj.read())
-
-    print("\n---")
-    print(f"your project in the directory `{directory}`:")
-    print(f" - cd {directory}")
-    print(f" - crunch --help")

@@ -56,8 +56,6 @@ def test(
         datefmt='%H:%M:%S',
     )
 
-    utils.change_root()
-
     logging.info('running local test')
     logging.warn("internet access isn't restricted, no check will be done")
     logging.info("")
