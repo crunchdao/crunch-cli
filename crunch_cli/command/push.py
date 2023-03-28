@@ -3,6 +3,7 @@ import tarfile
 import tempfile
 import requests
 import gitignorefile
+import urllib.parse
 
 from .. import utils
 from .. import constants
@@ -10,7 +11,8 @@ from .. import constants
 
 def push(
     session: requests.Session,
-    message: str
+    message: str,
+    web_base_url: str = None,
 ):
     utils.change_root()
 
@@ -56,3 +58,7 @@ def push(
 
     print("\n---")
     print(f"version #{version['number']} uploaded!")
+
+    if web_base_url is not None:
+        url = urllib.parse.urljoin(web_base_url, f"/project/versions/{version['number']}")
+        print(f"check your version: {url}")
