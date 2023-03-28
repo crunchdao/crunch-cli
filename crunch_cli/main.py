@@ -8,8 +8,8 @@ debug = False
 
 
 @click.group()
-@click.option("--debug", "enable_debug", envvar="DEBUG", is_flag=True)
-@click.option("--api-base-url", envvar="API_BASE_URL", required=True)
+@click.option("--debug", "enable_debug", envvar="DEBUG", is_flag=True, help="Enable debug output.")
+@click.option("--api-base-url", envvar="API_BASE_URL", required=True, help="Set the API base url.")
 def cli(
     enable_debug: bool,
     api_base_url: str,
@@ -21,10 +21,10 @@ def cli(
     session = utils.CustomSession(api_base_url, debug)
 
 
-@cli.command()
-@click.option("--token", "clone_token", required=True, help="clone token")
-@click.option("--version", "version_number", required=False, type=int, help="version number to clone")
-@click.argument("project_name", required=True)
+@cli.command(help="Setup a workspace directory with the latest version of you code.")
+@click.option("--token", "clone_token", required=True, help="Clone token to use.")
+@click.option("--version", "version_number", required=False, type=int, help="Version number to clone. (latest if not specified)")
+@click.argument("project-name", required=True)
 @click.argument("directory", default="{projectName}")
 def setup(
     clone_token: str,
@@ -41,8 +41,8 @@ def setup(
     )
 
 
-@cli.command()
-@click.option("-m", "--message", prompt=True, default="")
+@cli.command(help="Send the new version of your code.")
+@click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 def push(
     message: str
 ):
@@ -52,8 +52,8 @@ def push(
     )
 
 
-@cli.command()
-@click.option("-m", "--main-file", default="main.py")
+@cli.command(help="Test your code locally.")
+@click.option("-m", "--main-file", default="main.py", show_default=True, help="Entrypoint of your code.")
 def test(
     main_file: str
 ):
