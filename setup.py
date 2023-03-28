@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 about = {}
 here = os.path.abspath(os.path.dirname(__file__))
@@ -23,7 +23,7 @@ setup(
     author=about['__author__'],
     author_email=about['__author_email__'],
     url=about['__url__'],
-    packages=['crunch_cli'],
+    packages=find_packages(),
     include_package_data=True,
     python_requires=">=3",
     install_requires=requirements,
