@@ -26,13 +26,13 @@ def cli(
 @click.option("--version", "version_number", required=False, type=int, help="version number to clone")
 @click.argument("project_name", required=True)
 @click.argument("directory", default="{projectName}")
-def clone(
+def setup(
     clone_token: str,
     version_number: str,
     project_name: str,
     directory: str,
 ):
-    command.clone(
+    command.setup(
         session,
         clone_token=clone_token,
         version_number=version_number,

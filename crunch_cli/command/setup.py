@@ -6,7 +6,7 @@ import requests
 
 from .. import constants
 
-def clone(
+def setup(
     session: requests.Session,
     clone_token: str,
     version_number: str,
