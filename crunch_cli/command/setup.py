@@ -54,6 +54,6 @@ def setup(
             fd.write(fileobj.read())
 
     print("\n---")
-    print(f"your project is available at: {directory}")
+    print(f"your project in the directory `{directory}`:")
     print(f" - cd {directory}")
-    print(f" - crunchdao-cli run")
+    print(f" - crunch --help")
