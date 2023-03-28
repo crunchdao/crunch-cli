@@ -1,7 +1,7 @@
 import click
 
 from . import utils
-import crunch_cli.command as command
+from . import command
 
 session = None
 debug = False
