@@ -56,9 +56,10 @@ def setup(
         command.download(session, force=True)
 
     print("\n---")
-    print(f"your project in the directory `{directory}`:")
-    print(f" - cd {directory}")
-    print(f" - crunch --help")
+    print(f"Success! Your environment has been correctly setup.")
+    print(f"Next recommended actions:")
+    print(f" - To get inside your workspace directory, run: cd {directory}")
+    print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
 
 
 @cli.command(help="Send the new version of your code.")
@@ -66,10 +67,16 @@ def setup(
 def push(
     message: str
 ):
-    command.push(
+    version = command.push(
         session,
         message=message
     )
+
+    print("\n---")
+    print(f"Version #{version['number']} succesfully uploaded!")
+
+    url = session.format_web_url(f"/project/versions/{version['number']}")
+    print(f"Find it on your dashboard: {url}")
 
 
 @cli.command(help="Test your code locally.")

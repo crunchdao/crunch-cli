@@ -64,7 +64,7 @@ def get_data_urls(
 
 
 def _download(url: str, path: str, force: bool):
-    logging.info(f"download %s from %s", path, cut_url(url))
+    print(f"download {path} from {cut_url(url)}")
 
     with requests.get(url, stream=True) as response:
         response.raise_for_status()
@@ -75,12 +75,12 @@ def _download(url: str, path: str, force: bool):
         exists = os.path.exists(path)
         if not force and exists:
             if file_length is None:
-                logging.info(f"already exists: skip since unknown size")
+                print(f"already exists: skip since unknown size")
                 return
 
             stat = os.stat(path)
             if stat.st_size == file_length:
-                logging.info(f"already exists: file length match")
+                print(f"already exists: file length match")
                 return
 
         with open(path, 'wb') as fd, tqdm.tqdm(total=file_length, unit='iB', unit_scale=True, leave=False) as progress:

@@ -53,8 +53,4 @@ def push(
                 }
             ).json()
 
-    print("\n---")
-    print(f"version #{version['number']} uploaded!")
-
-    url = session.format_web_url(f"/project/versions/{version['number']}")
-    print(f"check your version: {url}")
+    return version
