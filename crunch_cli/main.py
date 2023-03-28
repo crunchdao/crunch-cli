@@ -1,7 +1,7 @@
 import click
 import os
 
-from . import utils
+from . import utils, constants
 from . import command
 
 session = None
@@ -64,31 +64,57 @@ def setup(
 
 @cli.command(help="Send the new version of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
+@click.option("-m", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 def push(
-    message: str
+    message: str,
+    main_file_path: str
 ):
-    version = command.push(
-        session,
-        message=message
-    )
+    utils.change_root()
 
-    print("\n---")
-    print(f"Version #{version['number']} succesfully uploaded!")
+    converted = False
+    if not os.path.exists(main_file_path):
+        print(f"missing {main_file_path}")
 
-    url = session.format_web_url(f"/project/versions/{version['number']}")
-    print(f"Find it on your dashboard: {url}")
+        file_name, _ = os.path.splitext(os.path.basename(main_file_path))
+        dirpath = os.path.dirname(main_file_path)
+        path_without_extension = os.path.join(dirpath, file_name)
+
+        notebook_file_path = f"{path_without_extension}.ipynb"
+
+        if not os.path.exists(notebook_file_path):
+            raise click.Abort()
+
+        main_file_path = constants.CONVERTED_MAIN_PY
+        command.convert(notebook_file_path, main_file_path)
+        converted = True
+
+    try:
+        version = command.push(
+            session,
+            message=message,
+            main_file_path=main_file_path
+        )
+
+        print("\n---")
+        print(f"Version #{version['number']} succesfully uploaded!")
+
+        url = session.format_web_url(f"/project/versions/{version['number']}")
+        print(f"Find it on your dashboard: {url}")
+    finally:
+        if converted:
+            os.unlink(main_file_path)
 
 
 @cli.command(help="Test your code locally.")
-@click.option("-m", "--main-file", default="main.py", show_default=True, help="Entrypoint of your code.")
+@click.option("-m", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 def test(
-    main_file: str
+    main_file_path: str
 ):
     utils.change_root()
 
     command.test(
         session,
-        main_file=main_file
+        main_file_path=main_file_path
     )
 
 
@@ -97,6 +123,22 @@ def download():
     utils.change_root()
 
     command.download(session)
+
+
+@cli.command(help="Convert a notebook to a python script.")
+@click.option("-o", "--override", is_flag=True, help="Force overwrite of the python file.")
+@click.argument("notebook-file-path", required=True)
+@click.argument("python-file-path", default="main.py")
+def convert(
+    override: bool,
+    notebook_file_path: str,
+    python_file_path: str,
+):
+    command.convert(
+        notebook_file_path=notebook_file_path,
+        python_file_path=python_file_path,
+        override=override,
+    )
 
 
 if __name__ == '__main__':

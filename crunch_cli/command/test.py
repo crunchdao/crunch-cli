@@ -10,7 +10,7 @@ from .download import download
 
 def test(
     session: utils.CustomSession,
-    main_file: str,
+    main_file_path: str,
 ):
     coloredlogs.install(
         level=logging.INFO,
@@ -22,7 +22,7 @@ def test(
     logging.warn("internet access isn't restricted, no check will be done")
     logging.info("")
 
-    spec = importlib.util.spec_from_file_location("user_code", main_file)
+    spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
 
     sys.path.insert(0, os.getcwd())

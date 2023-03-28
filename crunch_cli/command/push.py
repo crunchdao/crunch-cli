@@ -10,9 +10,8 @@ from .. import constants
 def push(
     session: utils.CustomSession,
     message: str,
+    main_file_path: str,
 ):
-    utils.change_root()
-
     project_name = utils.read_project_name()
     push_token = utils.read_token()
 
@@ -46,6 +45,7 @@ def push(
                 f"/v1/projects/{project_name}/versions",
                 data={
                     "message": message,
+                    "mainFilePath": main_file_path,
                     "pushToken": push_token,
                 },
                 files={

@@ -3,3 +3,4 @@ requests
 gitignorefile
 coloredlogs
 tqdm
+astor
