@@ -3,6 +3,7 @@ import click
 import typing
 import requests
 import tqdm
+import logging
 
 from .. import utils
 from .. import constants
@@ -63,7 +64,7 @@ def get_data_urls(
 
 
 def _download(url: str, path: str, force: bool):
-    print(f"download {path} from {cut_url(url)}")
+    logging.info(f"download %s from %s", path, cut_url(url))
 
     with requests.get(url, stream=True) as response:
         response.raise_for_status()
@@ -74,12 +75,12 @@ def _download(url: str, path: str, force: bool):
         exists = os.path.exists(path)
         if not force and exists:
             if file_length is None:
-                print(f"already exists: {path} (skip since unknown size)")
+                logging.info(f"already exists: skip since unknown size")
                 return
 
             stat = os.stat(path)
             if stat.st_size == file_length:
-                print(f"already exists: {path} (file length match)")
+                logging.info(f"already exists: file length match")
                 return
 
         with open(path, 'wb') as fd, tqdm.tqdm(total=file_length, unit='iB', unit_scale=True, leave=False) as progress:

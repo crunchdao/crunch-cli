@@ -1,12 +1,12 @@
 
 import requests
 import urllib
-import re
 import json
 import traceback
 import click
 import os
 import urllib.parse
+import pandas
 
 from . import constants
 
@@ -95,3 +95,30 @@ def read_project_name():
 
 def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
+
+
+def is_notebook() -> bool:
+    # https://stackoverflow.com/a/39662359/7292958
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter notebook or qtconsole
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
+
+
+def read(path: str) -> pandas.DataFrame:
+    if path.endswith(".parquet"):
+        return pandas.read_parquet(path)
+    return pandas.read_csv(path)
+
+
+def write(dataframe: pandas.DataFrame, path: str) -> None:
+    if path.endswith(".parquet"):
+        dataframe.to_parquet(path)
+    else:
+        dataframe.to_csv(path)

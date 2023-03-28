@@ -80,6 +80,7 @@ def test(
     utils.change_root()
 
     command.test(
+        session,
         main_file=main_file
     )
 
