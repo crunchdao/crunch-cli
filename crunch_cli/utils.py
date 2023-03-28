@@ -6,6 +6,7 @@ import json
 import traceback
 import click
 import os
+import urllib.parse
 
 from . import constants
 
@@ -13,25 +14,34 @@ from . import constants
 class CustomSession(requests.Session):
     # https://stackoverflow.com/a/51026159/7292958
 
-    def __init__(self, base_url=None, debug=False):
+    def __init__(self, web_base_url=None, api_base_url=None, debug=False):
         super().__init__()
-        self.base_url = base_url
+        self.web_base_url = web_base_url
+        self.api_base_url = api_base_url
         self.debug = debug
 
     def request(self, method, url, *args, **kwargs):
         response = super().request(
             method,
-            urllib.parse.urljoin(self.base_url, url),
+            urllib.parse.urljoin(self.api_base_url, url),
             *args,
             **kwargs
         )
 
         status_code = response.status_code
         if status_code != 200:
-            print(f"{method} {url}: {status_code}")
-
             try:
-                print(json.dumps(response.json(), indent=4))
+                error = response.json()
+
+                if error.get("code") == "INVALID_PROJECT_TOKEN" and error.get("message") == "invalid project token":
+                    print("your token seems to have expired or is invalid")
+                    self.print_recopy_command()
+                elif error.get("code") == "ENTITY_NOT_FOUND" and error.get("message", "").startswith("no user found with username"):
+                    print("user not found, did you rename yourself?")
+                    self.print_recopy_command()
+                else:
+                    print(f"{method} {url}: {status_code}")
+                    print(json.dumps(error, indent=4))
             except:
                 print(response.text)
 
@@ -41,6 +51,18 @@ class CustomSession(requests.Session):
             raise click.Abort()
 
         return response
+
+    def format_web_url(self, path: str):
+        return urllib.parse.urljoin(
+            self.web_base_url,
+            path
+        )
+
+    def print_recopy_command(self):
+        print("---")
+        print("please follow this link to copy and paster your new cloning command:")
+        print(self.format_web_url('/project'))
+        print("")
 
 
 def change_root():

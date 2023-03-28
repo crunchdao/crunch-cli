@@ -5,26 +5,26 @@ from . import command
 
 session = None
 debug = False
-web_base_url = None
 
 
 @click.group()
 @click.option("--debug", "enable_debug", envvar="DEBUG", is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar="API_BASE_URL", required=True, help="Set the API base url.")
-@click.option("--web-base-url", "web_base_url_value", envvar="WEB_BASE_URL", help="Set the Web base url.")
+@click.option("--web-base-url", envvar="WEB_BASE_URL", required=True, help="Set the Web base url.")
 def cli(
     enable_debug: bool,
     api_base_url: str,
-    web_base_url_value: str,
+    web_base_url: str,
 ):
     global debug
     debug = enable_debug
 
     global session
-    session = utils.CustomSession(api_base_url, debug)
-    
-    global web_base_url
-    web_base_url = web_base_url_value
+    session = utils.CustomSession(
+        web_base_url,
+        api_base_url,
+        debug
+    )
 
 
 @cli.command(help="Setup a workspace directory with the latest version of you code.")
@@ -54,8 +54,7 @@ def push(
 ):
     command.push(
         session,
-        message=message,
-        web_base_url=web_base_url
+        message=message
     )
 
 
