@@ -43,7 +43,7 @@ def convert(
         tree = ast.parse(source)
 
         for node in tree.body:
-            if isinstance(node, (ast.Import, ast.FunctionDef)):
+            if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef)):
                 valid += 1
                 module.body.append(node)
 
