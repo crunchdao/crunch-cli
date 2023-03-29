@@ -33,8 +33,6 @@ def test(
     infer_handler = ensure.is_function(module, "infer")
 
     x_train_path, y_train_path, x_test_path = download(session)
-    model_path = os.path.join(constants.DOT_DATA_DIRECTORY, "model.csv")
-    prediction_path = os.path.join(constants.DOT_DATA_DIRECTORY, "prediction.csv")
 
     x_train = utils.read(x_train_path)
     y_train = utils.read(y_train_path)
@@ -47,6 +45,8 @@ def test(
     logging.warn('handler: train(%s, %s)', x_train_path, y_train_path)
     model = train_handler(x_train, y_train)
     model = ensure.return_train(model)
+    
+    model_path = os.path.join(constants.DOT_DATA_DIRECTORY, f"model.{utils.guess_extension(model)}")
     utils.write(model, model_path)
 
     logging.warn('model_path=%s', model_path)
@@ -55,6 +55,8 @@ def test(
     logging.warn('handler: infer(%s, %s)', model_path, x_test_path)
     prediction = infer_handler(model, x_test)
     prediction = ensure.return_infer(prediction)
+    
+    prediction_path = os.path.join(constants.DOT_DATA_DIRECTORY, "prediction.csv")
     utils.write(prediction, prediction_path)
 
     logging.warn('prediction_path=%s', prediction_path)

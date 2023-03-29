@@ -40,8 +40,6 @@ def return_data_process(result) -> typing.Tuple[pandas.DataFrame, pandas.DataFra
 
 
 def return_train(result) -> pandas.DataFrame:
-    is_dataframe(result, "model")
-
     return result
 
 

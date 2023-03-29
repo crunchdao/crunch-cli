@@ -7,6 +7,8 @@ import click
 import os
 import urllib.parse
 import pandas
+import typing
+import joblib
 
 from . import constants
 
@@ -97,14 +99,27 @@ def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
-def read(path: str) -> pandas.DataFrame:
-    if path.endswith(".parquet"):
-        return pandas.read_parquet(path)
-    return pandas.read_csv(path)
+def read(path: str, dataframe=True) -> typing.Union[pandas.DataFrame, typing.Any]:
+    if dataframe:
+        if path.endswith(".parquet"):
+            return pandas.read_parquet(path)
+        return pandas.read_csv(path)
+
+    return joblib.load(path)
 
 
-def write(dataframe: pandas.DataFrame, path: str) -> None:
-    if path.endswith(".parquet"):
-        dataframe.to_parquet(path)
-    else:
-        dataframe.to_csv(path)
+def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str) -> None:
+    if isinstance(dataframe, pandas.DataFrame):
+        if path.endswith(".parquet"):
+            dataframe.to_parquet(path)
+        else:
+            dataframe.to_csv(path)
+
+    joblib.dump(dataframe, path)
+
+
+def guess_extension(dataframe: typing.Union[pandas.DataFrame, typing.Any]):
+    if isinstance(dataframe, pandas.DataFrame):
+        return "parquet"
+
+    return "joblib"

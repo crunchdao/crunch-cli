@@ -4,3 +4,4 @@ gitignorefile
 coloredlogs
 tqdm
 astor
+joblib
