@@ -95,11 +95,7 @@ def push(
             main_file_path=main_file_path
         )
 
-        print("\n---")
-        print(f"Version #{version['number']} succesfully uploaded!")
-
-        url = session.format_web_url(f"/project/versions/{version['number']}")
-        print(f"Find it on your dashboard: {url}")
+        command.push_summary(version, session)
     finally:
         if converted:
             os.unlink(main_file_path)

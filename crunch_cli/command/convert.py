@@ -4,21 +4,16 @@ import ast
 import astor
 import re
 import click
+import typing
 
 from .. import constants
 
-def convert(
-    notebook_file_path: str,
-    python_file_path: str,
-    override: bool = False,
-):
-    with open(notebook_file_path) as fd:
-        notebook = json.load(fd)
 
+def convert_cells(cells: typing.List[typing.Any]):
     module = ast.Module()
     module.body = []
 
-    for cell in notebook.get("cells", []):
+    for cell in cells:
         cell_id = cell["metadata"]["id"]
 
         def log(message):
@@ -29,7 +24,7 @@ def convert(
             log(f"skip since not code: {cell_type}")
             continue
 
-        source = "".join(
+        source = "\n".join(
             line
             for line in cell["source"]
             if not re.match(r"^\s*?(!|%|#)", line)
@@ -52,7 +47,15 @@ def convert(
         else:
             log(f"used {valid}/{len(tree.body)} node(s)")
 
-    source = astor.to_source(module)
+    return astor.to_source(module)
+
+
+def convert_cells_to_file(
+    cells: typing.List[typing.Any],
+    python_file_path: str,
+    override: bool = False,
+):
+    source = convert_cells(cells)
 
     if python_file_path != constants.CONVERTED_MAIN_PY and not override and os.path.exists(python_file_path):
         override = click.prompt(
@@ -67,3 +70,18 @@ def convert(
 
     with open(python_file_path, "w") as fd:
         fd.write(source)
+
+
+def convert(
+    notebook_file_path: str,
+    python_file_path: str,
+    override: bool = False,
+):
+    with open(notebook_file_path) as fd:
+        notebook = json.load(fd)
+
+    convert_cells_to_file(
+        notebook.get("cells", []),
+        python_file_path,
+        override
+    )

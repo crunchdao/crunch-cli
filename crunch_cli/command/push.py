@@ -54,3 +54,11 @@ def push(
             ).json()
 
     return version
+
+
+def push_summary(version, session: utils.CustomSession):
+    print("\n---")
+    print(f"Version #{version['number']} succesfully uploaded!")
+
+    url = session.format_web_url(f"/project/versions/{version['number']}")
+    print(f"Find it on your dashboard: {url}")
