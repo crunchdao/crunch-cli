@@ -13,8 +13,8 @@ def convert_cells(cells: typing.List[typing.Any]):
     module = ast.Module()
     module.body = []
 
-    for cell in cells:
-        cell_id = cell["metadata"]["id"]
+    for index, cell in enumerate(cells):
+        cell_id = cell["metadata"].get("id") or f"cell_{index}"
 
         def log(message):
             print(f"convert {cell_id} {message}")
