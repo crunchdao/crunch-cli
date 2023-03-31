@@ -47,9 +47,10 @@ def push(
                     "message": message,
                     "mainFilePath": main_file_path,
                     "pushToken": push_token,
+                    "notebook": False
                 },
                 files={
-                    "tarFile": ('code.tar', fd, "application/x-tar")
+                    "file": ('code.tar', fd, "application/x-tar")
                 }
             ).json()
 
