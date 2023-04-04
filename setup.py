@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 about = {}
 here = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(here, 'crunch_cli', '__version__.py')) as f:
+with open(os.path.join(here, 'crunch', '__version__.py')) as f:
     exec(f.read(), about)
 
 with open('requirements.txt') as fd:
@@ -29,7 +29,7 @@ setup(
     install_requires=requirements,
     zip_safe=False,
     entry_points={
-        'console_scripts': ['crunch=crunch_cli.main:cli'],
+        'console_scripts': ['crunch=crunch.main:cli'],
     },
     classifiers=[
         'Intended Audience :: Developers',

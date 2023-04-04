@@ -7,7 +7,7 @@ init:
 install: init
 	$(PIP) install -e .
 
-uninstall: init
+uninstall:
 	$(PIP) uninstall crunch
 
 build:
