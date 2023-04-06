@@ -17,7 +17,7 @@ def push(
 
     matches = gitignorefile.Cache()
 
-    with tempfile.NamedTemporaryFile(prefix="version-", suffix=".tar") as tmp:
+    with tempfile.NamedTemporaryFile(prefix="submission-", suffix=".tar") as tmp:
         with tarfile.open(fileobj=tmp, mode="w") as tar:
             for root, dirs, files in os.walk(".", topdown=False):
                 if root.startswith("./"):
@@ -41,8 +41,8 @@ def push(
                     tar.add(file)
 
         with open(tmp.name, "rb") as fd:
-            version = session.post(
-                f"/v1/projects/{project_name}/versions",
+            submission = session.post(
+                f"/v1/projects/{project_name}/submissions",
                 data={
                     "message": message,
                     "mainFilePath": main_file_path,
@@ -54,12 +54,12 @@ def push(
                 }
             ).json()
 
-    return version
+    return submission
 
 
-def push_summary(version, session: utils.CustomSession):
+def push_summary(submission, session: utils.CustomSession):
     print("\n---")
-    print(f"Version #{version['number']} succesfully uploaded!")
+    print(f"submission #{submission['number']} succesfully uploaded!")
 
-    url = session.format_web_url(f"/project/versions/{version['number']}")
+    url = session.format_web_url(f"/project/submissions/{submission['number']}")
     print(f"Find it on your dashboard: {url}")

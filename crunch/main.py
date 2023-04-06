@@ -28,15 +28,15 @@ def cli(
     )
 
 
-@cli.command(help="Setup a workspace directory with the latest version of you code.")
+@cli.command(help="Setup a workspace directory with the latest submission of you code.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
-@click.option("--version", "version_number", required=False, type=int, help="Version number to clone. (latest if not specified)")
+@click.option("--submission", "submission_number", required=False, type=int, help="Submission number to clone. (latest if not specified)")
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.argument("project-name", required=True)
 @click.argument("directory", default="{projectName}")
 def setup(
     clone_token: str,
-    version_number: str,
+    submission_number: str,
     no_data: bool,
     project_name: str,
     directory: str,
@@ -46,7 +46,7 @@ def setup(
     command.setup(
         session,
         clone_token=clone_token,
-        version_number=version_number,
+        submission_number=submission_number,
         project_name=project_name,
         directory=directory
     )
@@ -62,7 +62,7 @@ def setup(
     print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
 
 
-@cli.command(help="Send the new version of your code.")
+@cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("-m", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 def push(
@@ -89,13 +89,13 @@ def push(
         converted = True
 
     try:
-        version = command.push(
+        submission = command.push(
             session,
             message=message,
             main_file_path=main_file_path
         )
 
-        command.push_summary(version, session)
+        command.push_summary(submission, session)
     finally:
         if converted:
             os.unlink(main_file_path)

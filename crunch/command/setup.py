@@ -9,7 +9,7 @@ from .. import constants
 def setup(
     session: requests.Session,
     clone_token: str,
-    version_number: str,
+    submission_number: str,
     project_name: str,
     directory: str,
 ):
@@ -38,7 +38,7 @@ def setup(
     code_tar = io.BytesIO(
         session.get(f"/v1/projects/{project_name}/clone", params={
             "pushToken": push_token['plain'],
-            "versionNumber": version_number,
+            "submissionNumber": submission_number,
         }).content
     )
 

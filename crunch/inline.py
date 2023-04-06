@@ -101,13 +101,13 @@ class _Inline:
                 main_file_path
             )
 
-            version = command.push(
+            submission = command.push(
                 self.session,
                 click.prompt("Message", default="", show_default=False),
                 main_file_path
             )
 
-            command.push_summary(version, self.session)
+            command.push_summary(submission, self.session)
         finally:
             now = os.getcwd()
             if before != now:
