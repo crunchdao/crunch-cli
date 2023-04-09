@@ -79,43 +79,6 @@ class _Inline:
 
         return self.prediction
 
-    def push(self) -> pandas.DataFrame:
-        codes = self.module.In
-
-        before = os.getcwd()
-        try:
-            utils.change_root()
-
-            main_file_path = constants.CONVERTED_MAIN_PY
-            command.convert_cells_to_file(
-                [
-                    {
-                        "metadata": {
-                            "id": f"cell_{index}"
-                        },
-                        "cell_type": "code",
-                        "source": code.split("\n")
-                    }
-                    for index, code in enumerate(codes)
-                ],
-                main_file_path
-            )
-
-            submission = command.push(
-                self.session,
-                click.prompt("Message", default="", show_default=False),
-                main_file_path
-            )
-
-            command.push_summary(submission, self.session)
-        finally:
-            now = os.getcwd()
-            if before != now:
-                try:
-                    os.chdir(before)
-                except:
-                    print(f"chdir could not go back to {before}")
-
 
 def load(module: typing.Any):
     return _Inline(module)
