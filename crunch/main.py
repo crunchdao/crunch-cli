@@ -64,10 +64,12 @@ def setup(
 
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
-@click.option("-m", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
+@click.option("-e", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
+@click.option("-s", "--model-directory", "model_directory_path", default="model", show_default=True, help="Directory where your model is stored.")
 def push(
     message: str,
-    main_file_path: str
+    main_file_path: str,
+    model_directory_path: str,
 ):
     utils.change_root()
 
@@ -92,7 +94,8 @@ def push(
         submission = command.push(
             session,
             message=message,
-            main_file_path=main_file_path
+            main_file_path=main_file_path,
+            model_directory_path=model_directory_path,
         )
 
         command.push_summary(submission, session)
