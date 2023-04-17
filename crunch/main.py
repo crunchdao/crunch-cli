@@ -65,7 +65,7 @@ def setup(
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("-e", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
-@click.option("-s", "--model-directory", "model_directory_path", default="model", show_default=True, help="Directory where your model is stored.")
+@click.option("-s", "--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 def push(
     message: str,
     main_file_path: str,
