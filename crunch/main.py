@@ -106,14 +106,17 @@ def push(
 
 @cli.command(help="Test your code locally.")
 @click.option("-m", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
+@click.option("-s", "--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 def test(
-    main_file_path: str
+    main_file_path: str,
+    model_directory_path: str,
 ):
     utils.change_root()
 
     command.test(
         session,
-        main_file_path=main_file_path
+        main_file_path=main_file_path,
+        model_directory_path=model_directory_path,
     )
 
 

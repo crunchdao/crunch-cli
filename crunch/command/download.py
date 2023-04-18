@@ -34,7 +34,11 @@ def get_data_urls(
     data_directory: str
 ) -> typing.Tuple[typing.Dict[str, str], str, str, str]:
     current_crunch = session.get("/v1/crunches/@current").json()
-    urls = session.get(f"/v1/crunches/{current_crunch['number']}/data").json()
+    data_release = session.get(f"/v1/crunches/{current_crunch['number']}/data-release").json()
+
+    embargo = data_release["embargo"]
+    moon_column_name = data_release["moonColumnName"]
+    urls = data_release["dataUrls"]
 
     x_train_url = urls["xTrain"]
     x_train_path = os.path.join(
@@ -60,7 +64,14 @@ def get_data_urls(
         x_test_path: x_test_url,
     }
 
-    return data_urls, x_train_path, y_train_path, x_test_path
+    return (
+        embargo,
+        moon_column_name,
+        data_urls,
+        x_train_path,
+        y_train_path,
+        x_test_path
+    )
 
 
 def _download(url: str, path: str, force: bool):
@@ -95,11 +106,22 @@ def download(
 ):
     os.makedirs(constants.DOT_DATA_DIRECTORY, exist_ok=True)
 
-    data_urls, x_train_path, y_train_path, x_test_path = get_data_urls(
-        session, constants.DOT_DATA_DIRECTORY
-    )
+    (
+        embargo,
+        moon_column_name,
+        data_urls,
+        x_train_path,
+        y_train_path,
+        x_test_path
+    ) = get_data_urls(session, constants.DOT_DATA_DIRECTORY)
 
     for path, url in data_urls.items():
         _download(url, path, force)
 
-    return x_train_path, y_train_path, x_test_path
+    return (
+        embargo,
+        moon_column_name,
+        x_train_path,
+        y_train_path,
+        x_test_path
+    )
