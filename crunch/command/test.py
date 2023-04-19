@@ -50,6 +50,9 @@ def test(
     moons = x_test[moon_column_name].unique()
     moons.sort()
 
+    for dataframe in [x_train, y_train, x_test]:
+        dataframe.set_index(moon_column_name, drop=True, inplace=True)
+
     os.makedirs(model_directory_path, exist_ok=True)
 
     predictions: typing.List[pandas.DataFrame] = []
@@ -58,9 +61,9 @@ def test(
         logging.warn('---')
         logging.warn('moon: %s (%s/%s)', moon, index + 1, len(moons))
 
-        x_train_loop = x_train[x_train[moon_column_name] < moon - embargo]
-        y_train_loop = y_train[y_train[moon_column_name] < moon - embargo]
-        x_test_loop = x_test[x_test[moon_column_name] == moon]
+        x_train_loop = x_train[x_train.index < moon - embargo].reset_index()
+        y_train_loop = y_train[y_train.index < moon - embargo].reset_index()
+        x_test_loop = x_test[x_test.index == moon].reset_index()
     
         logging.warn('handler: data_process(%s, %s, %s)', x_train_path, y_train_path, x_test_path)
         result = data_process_handler(x_train_loop, y_train_loop, x_test_loop)
