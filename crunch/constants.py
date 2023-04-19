@@ -1,5 +1,5 @@
 DOT_CRUNCHDAO_DIRECTORY = ".crunchdao"
-DOT_DATA_DIRECTORY = ".data"
+DOT_DATA_DIRECTORY = "data"
 TOKEN_FILE = "token"
 PROJECT_FILE = "project"
 DOT_GITIGNORE_FILE = ".gitignore"
