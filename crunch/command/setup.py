@@ -46,6 +46,8 @@ def setup(
     for member in tar.getmembers():
         path = os.path.join(directory, member.name)
         print(f"extract {path}")
+        
+        os.makedirs(os.path.dirname(path), exist_ok=True)
 
         fileobj = tar.extractfile(member)
         with open(path, "wb") as fd:
