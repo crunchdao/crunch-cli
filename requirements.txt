@@ -5,3 +5,5 @@ coloredlogs
 tqdm
 astor
 joblib
+pyarrow
+pandas
