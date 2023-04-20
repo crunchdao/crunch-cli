@@ -70,5 +70,6 @@ def run(
     utils.write(prediction, prediction_path)
 
     logging.warn('prediction_path=%s', prediction_path)
+    logging.warn('local test succesfully run!')
 
     return prediction
