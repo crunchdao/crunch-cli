@@ -124,7 +124,7 @@ def test(
         session,
         main_file_path=main_file_path,
         model_directory_path=model_directory_path,
-        train_frequency=not no_force_first_train,
+        force_first_train=not no_force_first_train,
         train_frequency=train_frequency,
     )
 
