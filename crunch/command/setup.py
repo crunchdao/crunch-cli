@@ -12,6 +12,7 @@ def setup(
     submission_number: str,
     project_name: str,
     directory: str,
+    model_directory: str,
 ):
     if os.path.exists(directory):
         print(f"{directory}: already exists")
@@ -52,3 +53,6 @@ def setup(
         fileobj = tar.extractfile(member)
         with open(path, "wb") as fd:
             fd.write(fileobj.read())
+    
+    path = os.path.join(directory, model_directory)
+    os.makedirs(path, exist_ok=True)

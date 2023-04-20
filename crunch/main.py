@@ -32,6 +32,7 @@ def cli(
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
 @click.option("--submission", "submission_number", required=False, type=int, help="Submission number to clone. (latest if not specified)")
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
+@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 @click.argument("project-name", required=True)
 @click.argument("directory", default="{projectName}")
 def setup(
@@ -40,6 +41,7 @@ def setup(
     no_data: bool,
     project_name: str,
     directory: str,
+    model_directory_path: str,
 ):
     directory = directory.replace("{projectName}", project_name)
 
@@ -48,7 +50,8 @@ def setup(
         clone_token=clone_token,
         submission_number=submission_number,
         project_name=project_name,
-        directory=directory
+        directory=directory,
+        model_directory=model_directory_path,
     )
 
     if not no_data:
