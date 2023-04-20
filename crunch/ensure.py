@@ -39,10 +39,6 @@ def return_data_process(result) -> typing.Tuple[pandas.DataFrame, pandas.DataFra
     return result
 
 
-def return_train(result) -> pandas.DataFrame:
-    return result
-
-
 def return_infer(result) -> pandas.DataFrame:
     is_dataframe(result, "prediction")
 

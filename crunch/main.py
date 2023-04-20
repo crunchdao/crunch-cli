@@ -68,7 +68,7 @@ def setup(
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("-e", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
-@click.option("-s", "--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 def push(
     message: str,
     main_file_path: str,
@@ -109,10 +109,14 @@ def push(
 
 @cli.command(help="Test your code locally.")
 @click.option("-m", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
-@click.option("-s", "--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
+@click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
 def test(
     main_file_path: str,
     model_directory_path: str,
+    no_force_first_train: bool,
+    train_frequency: int,
 ):
     utils.change_root()
 
@@ -120,6 +124,8 @@ def test(
         session,
         main_file_path=main_file_path,
         model_directory_path=model_directory_path,
+        train_frequency=not no_force_first_train,
+        train_frequency=train_frequency,
     )
 
 
