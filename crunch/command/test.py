@@ -2,7 +2,6 @@ import os
 import importlib
 import sys
 import logging
-import coloredlogs
 
 from .. import utils,tester
 
@@ -14,16 +13,6 @@ def test(
     force_first_train: bool,
     train_frequency: int,
 ):
-    coloredlogs.install(
-        level=logging.INFO,
-        fmt='%(asctime)s %(message)s',
-        datefmt='%H:%M:%S',
-    )
-
-    logging.info('running local test')
-    logging.warn("internet access isn't restricted, no check will be done")
-    logging.info("")
-
     spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
 

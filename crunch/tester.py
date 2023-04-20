@@ -3,10 +3,27 @@ import logging
 import typing
 import pandas
 import requests
+import psutil
+import coloredlogs
+import time
 
 from . import utils, constants, ensure
 from . import command
 
+def _get_process_memory() -> int:
+    process = psutil.Process(os.getpid())
+    mem_info = process.memory_info()
+    return mem_info.rss
+
+def format_bytes(bytes: int):
+    suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+    suffix_index = 0
+
+    while bytes >= 1024 and suffix_index < 8:
+        bytes /= 1024
+        suffix_index += 1
+
+    return f"{bytes:,.2f} {suffixes[suffix_index]}"
 
 def run(
     module: typing.Any,
@@ -15,6 +32,19 @@ def run(
     force_first_train: bool,
     train_frequency: int,
 ):
+    coloredlogs.install(
+        level=logging.INFO,
+        fmt='%(asctime)s %(message)s',
+        datefmt='%H:%M:%S',
+    )
+
+    logging.info('running local test')
+    logging.warn("internet access isn't restricted, no check will be done")
+    logging.info("")
+
+    memory_before = _get_process_memory()
+    start = time.time()
+
     data_process_handler = ensure.is_function(module, "data_process")
     train_handler = ensure.is_function(module, "train")
     infer_handler = ensure.is_function(module, "infer")
@@ -70,6 +100,12 @@ def run(
     utils.write(prediction, prediction_path)
 
     logging.warn('prediction_path=%s', prediction_path)
+    
+    logging.warn('duration: time=%s', time.strftime("%H:%M:%S", time.gmtime(time.time() - start)))
+
+    memory_after = _get_process_memory()
+    logging.warn('memory: before="%s" after="%s" consumed="%s"', format_bytes(memory_before), format_bytes(memory_after), format_bytes(memory_after - memory_before))
+
     logging.warn('local test succesfully run!')
 
     return prediction

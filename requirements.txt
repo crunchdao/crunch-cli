@@ -7,3 +7,4 @@ astor
 joblib
 pyarrow
 pandas
+psutil
