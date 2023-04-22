@@ -9,7 +9,7 @@ debug = False
 
 
 @click.group()
-@click.option("--debug", "enable_debug", envvar="DEBUG", is_flag=True, help="Enable debug output.")
+@click.option("--debug", "enable_debug", envvar="CRUNCH_DEBUG", is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar="API_BASE_URL", required=True, help="Set the API base url.")
 @click.option("--web-base-url", envvar="WEB_BASE_URL", required=True, help="Set the Web base url.")
 def cli(
