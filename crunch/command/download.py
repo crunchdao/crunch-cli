@@ -31,10 +31,13 @@ def get_extension(url: str):
 
 def get_data_urls(
     session: utils.CustomSession,
-    data_directory: str
+    data_directory: str,
+    push_token: str,
 ) -> typing.Tuple[typing.Dict[str, str], str, str, str]:
     current_crunch = session.get("/v1/crunches/@current").json()
-    data_release = session.get(f"/v1/crunches/{current_crunch['number']}/data-release").json()
+    data_release = session.get(f"/v1/crunches/{current_crunch['number']}/data-release", params={
+        "pushToken": push_token
+    }).json()
 
     embargo = data_release["embargo"]
     moon_column_name = data_release["moonColumnName"]
@@ -104,6 +107,8 @@ def download(
     session: utils.CustomSession,
     force=False,
 ):
+    push_token = utils.read_token()
+
     os.makedirs(constants.DOT_DATA_DIRECTORY, exist_ok=True)
 
     (
@@ -113,7 +118,7 @@ def download(
         x_train_path,
         y_train_path,
         x_test_path
-    ) = get_data_urls(session, constants.DOT_DATA_DIRECTORY)
+    ) = get_data_urls(session, constants.DOT_DATA_DIRECTORY, push_token)
 
     for path, url in data_urls.items():
         _download(url, path, force)
