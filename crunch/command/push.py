@@ -116,11 +116,4 @@ def push_summary(submission, session: utils.CustomSession):
     url = session.format_web_url(
         f"/project/submissions/{submission['number']}")
     print(f"Find it on your dashboard: {url}")
-
-    model = submission.get("model")
-    if model:
-        print("\n")
-        print(f"model #{model['number']} succesfully uploaded!")
-
-        url = session.format_web_url(f"/project/models/{model['number']}")
-        print(f"Find it on your dashboard: {url}")
+    
