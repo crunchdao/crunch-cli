@@ -63,7 +63,7 @@ class CustomSession(requests.Session):
     def print_recopy_command(self):
         print("---")
         print("please follow this link to copy and paste your new setup command:")
-        print(self.format_web_url('/project'))
+        print(self.format_web_url('/submit?tab=cli'))
         print("")
 
 
