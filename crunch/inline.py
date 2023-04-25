@@ -37,7 +37,7 @@ class _Inline:
         return x_train, y_train, x_test
 
     def test(self, force_first_train=True, train_frequency=1):
-        tester.run(
+        return tester.run(
             self.module,
             self.session,
             self.model_directory,
