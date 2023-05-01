@@ -12,10 +12,12 @@ debug = False
 @click.option("--debug", "enable_debug", envvar="CRUNCH_DEBUG", is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar="API_BASE_URL", required=True, help="Set the API base url.")
 @click.option("--web-base-url", envvar="WEB_BASE_URL", required=True, help="Set the Web base url.")
+@click.option("--notebook", is_flag=True, help="Tell the CLI you are running the command while inside a notebook.")
 def cli(
     enable_debug: bool,
     api_base_url: str,
     web_base_url: str,
+    notebook: bool,
 ):
     global debug
     debug = enable_debug
@@ -24,7 +26,8 @@ def cli(
     session = utils.CustomSession(
         web_base_url,
         api_base_url,
-        debug
+        debug,
+        notebook,
     )
 
 

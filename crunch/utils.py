@@ -16,11 +16,12 @@ from . import constants
 class CustomSession(requests.Session):
     # https://stackoverflow.com/a/51026159/7292958
 
-    def __init__(self, web_base_url=None, api_base_url=None, debug=False):
+    def __init__(self, web_base_url=None, api_base_url=None, debug=False, notebook=False):
         super().__init__()
         self.web_base_url = web_base_url
         self.api_base_url = api_base_url
         self.debug = debug
+        self.notebook = notebook
 
     def request(self, method, url, *args, **kwargs):
         response = super().request(
@@ -61,9 +62,11 @@ class CustomSession(requests.Session):
         )
 
     def print_recopy_command(self):
+        tab = "notebook" if self.notebook else "cli"
+
         print("---")
         print("please follow this link to copy and paste your new setup command:")
-        print(self.format_web_url('/submit?tab=cli'))
+        print(self.format_web_url(f'/submit?tab={tab}'))
         print("")
 
 
