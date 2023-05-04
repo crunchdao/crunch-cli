@@ -45,7 +45,6 @@ def run(
     memory_before = _get_process_memory()
     start = time.time()
 
-    data_process_handler = ensure.is_function(module, "data_process")
     train_handler = ensure.is_function(module, "train")
     infer_handler = ensure.is_function(module, "infer")
 
@@ -77,19 +76,14 @@ def run(
         logging.warn('---')
         logging.warn('loop: moon=%s train=%s (%s/%s)', moon, train, index + 1, len(moons))
 
-        x_train_loop = x_train[x_train.index < moon - embargo].reset_index()
-        y_train_loop = y_train[y_train.index < moon - embargo].reset_index()
-        x_test_loop = x_test[x_test.index == moon].reset_index()
-
-        logging.warn('handler: data_process(%s, %s, %s)', x_train_path, y_train_path, x_test_path)
-        result = data_process_handler(x_train_loop, y_train_loop, x_test_loop)
-        x_train_loop, y_train_loop, x_test_loop = ensure.return_data_process(result)
-
         if train:
             logging.warn('handler: train(%s, %s, %s)', x_train_path, y_train_path, model_directory_path)
+            x_train_loop = x_train[x_train.index < moon - embargo].reset_index()
+            y_train_loop = y_train[y_train.index < moon - embargo].reset_index()
             train_handler(x_train_loop, y_train_loop, model_directory_path)
 
         logging.warn('handler: infer(%s, %s)', model_directory_path, x_test_path)
+        x_test_loop = x_test[x_test.index == moon].reset_index()
         prediction = infer_handler(model_directory_path, x_test_loop)
         prediction = ensure.return_infer(prediction)
 
