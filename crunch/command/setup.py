@@ -3,8 +3,20 @@ import os
 import tarfile
 import io
 import requests
+import shutil
 
 from .. import constants
+
+
+def _check_if_already_exists(directory: str, force: bool):
+    if os.path.exists(directory):
+        if force:
+            print(f"{directory}: deleting")
+            shutil.rmtree(directory)
+        else:
+            print(f"{directory}: already exists (use --force to override)")
+            raise click.Abort()
+
 
 def setup(
     session: requests.Session,
@@ -13,10 +25,9 @@ def setup(
     project_name: str,
     directory: str,
     model_directory: str,
+    force: bool,
 ):
-    if os.path.exists(directory):
-        print(f"{directory}: already exists")
-        raise click.Abort()
+    _check_if_already_exists(directory, force)
 
     push_token = session.post(f"/v1/projects/{project_name}/tokens", json={
         "type": "PERMANENT",
@@ -47,12 +58,12 @@ def setup(
     for member in tar.getmembers():
         path = os.path.join(directory, member.name)
         print(f"extract {path}")
-        
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
         fileobj = tar.extractfile(member)
         with open(path, "wb") as fd:
             fd.write(fileobj.read())
-    
+
     path = os.path.join(directory, model_directory)
     os.makedirs(path, exist_ok=True)
