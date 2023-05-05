@@ -26,6 +26,7 @@ def setup(
     directory: str,
     model_directory: str,
     force: bool,
+    no_model: bool,
 ):
     _check_if_already_exists(directory, force)
 
@@ -51,6 +52,7 @@ def setup(
         session.get(f"/v1/projects/{project_name}/clone", params={
             "pushToken": push_token['plain'],
             "submissionNumber": submission_number,
+            "includeModel": not no_model,
         }).content
     )
 
