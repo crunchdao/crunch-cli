@@ -1,17 +1,17 @@
-import click
 import os
 
-from . import utils, constants
-from . import command
+import click
+
+from . import command, constants, utils
 
 session = None
 debug = False
 
 
 @click.group()
-@click.option("--debug", "enable_debug", envvar="CRUNCH_DEBUG", is_flag=True, help="Enable debug output.")
-@click.option("--api-base-url", envvar="API_BASE_URL", required=True, help="Set the API base url.")
-@click.option("--web-base-url", envvar="WEB_BASE_URL", required=True, help="Set the Web base url.")
+@click.option("--debug", "enable_debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
+@click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
+@click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
 @click.option("--notebook", is_flag=True, help="Tell the CLI you are running the command while inside a notebook.")
 def cli(
     enable_debug: bool,
@@ -76,7 +76,7 @@ def setup(
 
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
-@click.option("-e", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
+@click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 def push(
     message: str,
@@ -117,7 +117,7 @@ def push(
 
 
 @cli.command(help="Test your code locally.")
-@click.option("-m", "--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
+@click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 @click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
 @click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
@@ -146,7 +146,7 @@ def download():
 
 
 @cli.command(help="Convert a notebook to a python script.")
-@click.option("-o", "--override", is_flag=True, help="Force overwrite of the python file.")
+@click.option("--override", is_flag=True, help="Force overwrite of the python file.")
 @click.argument("notebook-file-path", required=True)
 @click.argument("python-file-path", default="main.py")
 def convert(

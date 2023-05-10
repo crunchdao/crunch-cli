@@ -1,9 +1,10 @@
-import click
-import os
-import tarfile
 import io
-import requests
+import os
 import shutil
+import tarfile
+
+import click
+import requests
 
 from .. import constants
 
@@ -35,12 +36,10 @@ def setup(
         "cloneToken": clone_token
     }).json()
 
-    dot_crunchdao_path = os.path.join(
-        directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+    dot_crunchdao_path = os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
     os.makedirs(dot_crunchdao_path)
 
-    project_file_path = os.path.join(
-        dot_crunchdao_path, constants.PROJECT_FILE)
+    project_file_path = os.path.join(dot_crunchdao_path, constants.PROJECT_FILE)
     with open(project_file_path, "w") as fd:
         fd.write(project_name)
 

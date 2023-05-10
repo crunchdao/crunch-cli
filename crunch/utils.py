@@ -1,14 +1,14 @@
-
-import requests
-import urllib
 import json
-import traceback
-import click
 import os
-import urllib.parse
-import pandas
+import traceback
 import typing
+import urllib
+import urllib.parse
+
+import click
 import joblib
+import pandas
+import requests
 
 from . import constants
 

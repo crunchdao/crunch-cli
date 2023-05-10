@@ -1,10 +1,10 @@
 import os
 import tarfile
 import tempfile
+
 import gitignorefile
 
-from .. import utils
-from .. import constants
+from .. import constants, utils
 
 
 def _list_files(
@@ -113,7 +113,6 @@ def push_summary(submission, session: utils.CustomSession):
     print("\n---")
     print(f"submission #{submission['number']} succesfully uploaded!")
 
-    url = session.format_web_url(
-        f"/project/submissions/{submission['number']}")
+    url = session.format_web_url(f"/project/submissions/{submission['number']}")
     print(f"Find it on your dashboard: {url}")
     

@@ -1,12 +1,12 @@
-import typing
-import pandas
-import os
-import click
-import sys
 import logging
+import os
+import sys
+import typing
 
-from . import utils, ensure, constants
-from . import command, tester
+import click
+import pandas
+
+from . import command, constants, tester, utils
 
 
 class _Inline:
@@ -16,9 +16,9 @@ class _Inline:
         self.model_directory = model_directory
 
         self.session = utils.CustomSession(
-            os.environ["WEB_BASE_URL"],
-            os.environ["API_BASE_URL"],
-            bool(os.environ.get("DEBUG", "False")),
+            os.environ.get(constants.WEB_BASE_URL_ENV_VAR, constants.WEB_BASE_URL_DEFAULT),
+            os.environ.get(constants.API_BASE_URL_ENV_VAR, constants.API_BASE_URL_DEFAULT),
+            bool(os.environ.get(constants.DEBUG_ENV_VAR, "False")),
         )
 
         print(f"loaded inline runner with module: {module}")
@@ -38,12 +38,7 @@ class _Inline:
 
         return x_train, y_train, x_test
 
-    def test(
-            self,
-            force_first_train=True,
-            train_frequency=1,
-            raise_abort=False
-        ):
+    def test(self, force_first_train=True, train_frequency=1, raise_abort=False):
         try:
             return tester.run(
                 self.module,

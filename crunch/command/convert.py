@@ -1,10 +1,11 @@
-import os
-import json
 import ast
-import astor
+import json
+import os
 import re
-import click
 import typing
+
+import astor
+import click
 
 from .. import constants
 

@@ -1,7 +1,8 @@
 import logging
-import pandas
-import click
 import typing
+
+import click
+import pandas
 
 
 def is_function(module, name: str):

@@ -1,12 +1,11 @@
 import os
-import click
 import typing
+
+import click
 import requests
 import tqdm
-import logging
 
-from .. import utils
-from .. import constants
+from .. import constants, utils
 
 
 def cut_url(url: str):

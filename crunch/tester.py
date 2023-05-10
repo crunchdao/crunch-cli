@@ -1,14 +1,15 @@
-import os
 import logging
-import typing
-import pandas
-import requests
-import psutil
-import coloredlogs
+import os
 import time
+import typing
 
-from . import utils, constants, ensure
-from . import command
+import coloredlogs
+import pandas
+import psutil
+import requests
+
+from . import command, constants, ensure, utils
+
 
 def _get_process_memory() -> int:
     process = psutil.Process(os.getpid())

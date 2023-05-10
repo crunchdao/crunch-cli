@@ -1,9 +1,9 @@
-import os
 import importlib
-import sys
 import logging
+import os
+import sys
 
-from .. import utils,tester
+from .. import tester, utils
 
 
 def test(
