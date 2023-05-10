@@ -3,9 +3,11 @@
 import os
 from setuptools import setup, find_packages
 
+package = "crunch"
+
 about = {}
 here = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(here, 'crunch', '__version__.py')) as f:
+with open(os.path.join(here, package, '__version__.py')) as f:
     exec(f.read(), about)
 
 with open('requirements.txt') as fd:
@@ -24,6 +26,12 @@ setup(
     author_email=about['__author_email__'],
     url=about['__url__'],
     packages=find_packages(),
+    package_data={
+        package: [
+            "demo-project/*",
+            "demo-project/.*",
+        ]
+    },
     include_package_data=True,
     python_requires=">=3",
     install_requires=requirements,

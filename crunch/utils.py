@@ -10,7 +10,7 @@ import joblib
 import pandas
 import requests
 
-from . import constants
+from . import constants, api
 
 
 class CustomSession(requests.Session):
@@ -35,18 +35,23 @@ class CustomSession(requests.Session):
         if status_code != 200:
             try:
                 error = response.json()
+            except:
+                print(response.text)
+            else:
+                code = error.get("code", "")
+                message = error.get("message", "")
 
-                if error.get("code") == "INVALID_PROJECT_TOKEN" and error.get("message") == "invalid project token":
+                if code == "INVALID_PROJECT_TOKEN" and message == "invalid project token":
                     print("your token seems to have expired or is invalid")
                     self.print_recopy_command()
-                elif error.get("code") == "ENTITY_NOT_FOUND" and error.get("message", "").startswith("no user found with username"):
+                elif code == "ENTITY_NOT_FOUND" and message.startswith("no user found with username"):
                     print("user not found, did you rename yourself?")
                     self.print_recopy_command()
+                elif code == "NEVER_SUBMITTED":
+                    raise api.NeverSubmittedException(message)
                 else:
                     print(f"{method} {url}: {status_code}")
                     print(json.dumps(error, indent=4))
-            except:
-                print(response.text)
 
             if self.debug:
                 traceback.print_stack()
