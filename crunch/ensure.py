@@ -21,4 +21,11 @@ def is_dataframe(input, name: str):
 def return_infer(result) -> pandas.DataFrame:
     is_dataframe(result, "prediction")
 
+    expected = ["id", "date", "value"]
+    got: typing.List[str] = list(result.columns)
+
+    if got != expected:
+        logging.error(f"prediction expected columns: `{expected}` but got `{got}`")
+        raise click.Abort()
+
     return result

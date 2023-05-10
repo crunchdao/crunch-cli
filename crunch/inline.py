@@ -1,7 +1,9 @@
 import typing
 import pandas
 import os
+import click
 import sys
+import logging
 
 from . import utils, ensure, constants
 from . import command, tester
@@ -36,14 +38,27 @@ class _Inline:
 
         return x_train, y_train, x_test
 
-    def test(self, force_first_train=True, train_frequency=1):
-        return tester.run(
-            self.module,
-            self.session,
-            self.model_directory,
-            force_first_train,
-            train_frequency,
-        )
+    def test(
+            self,
+            force_first_train=True,
+            train_frequency=1,
+            raise_abort=False
+        ):
+        try:
+            return tester.run(
+                self.module,
+                self.session,
+                self.model_directory,
+                force_first_train,
+                train_frequency,
+            )
+        except click.Abort as abort:
+            logging.error(f"aborted")
+
+            if raise_abort:
+                raise abort
+
+            return None
 
 
 def load(module_or_module_name: typing.Any, model_directory=constants.DEFAULT_MODEL_DIRECTORY):
