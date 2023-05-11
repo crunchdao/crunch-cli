@@ -92,7 +92,7 @@ def change_root():
 def _read_crunchdao_file(name: str):
     path = os.path.join(constants.DOT_CRUNCHDAO_DIRECTORY, name)
     if not os.path.exists(path):
-        print(f"{path}: not found")
+        print(f"{path}: not found, are you in a project directory?")
         raise click.Abort()
 
     with open(path) as fd:

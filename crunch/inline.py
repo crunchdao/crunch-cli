@@ -48,7 +48,7 @@ class _Inline:
                 train_frequency,
             )
         except click.Abort as abort:
-            logging.error(f"aborted")
+            logging.error(f"Aborted!")
 
             if raise_abort:
                 raise abort
