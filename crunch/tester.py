@@ -83,9 +83,9 @@ def run(
             y_train_loop = y_train[y_train.index < moon - embargo].reset_index()
             train_handler(x_train_loop, y_train_loop, model_directory_path)
 
-        logging.warn('handler: infer(%s, %s)', model_directory_path, x_test_path)
+        logging.warn('handler: infer(%s, %s)', x_test_path, model_directory_path)
         x_test_loop = x_test[x_test.index == moon].reset_index()
-        prediction = infer_handler(model_directory_path, x_test_loop)
+        prediction = infer_handler(x_test_loop, model_directory_path)
         prediction = ensure.return_infer(prediction)
 
         predictions.append(prediction)
