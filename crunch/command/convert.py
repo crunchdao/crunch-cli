@@ -39,7 +39,7 @@ def convert_cells(cells: typing.List[typing.Any]):
         tree = ast.parse(source)
 
         for node in tree.body:
-            if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef)):
+            if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef)):
                 valid += 1
                 module.body.append(node)
 
