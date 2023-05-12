@@ -6,3 +6,7 @@ class CrunchApiException(Exception):
 
 class NeverSubmittedException(CrunchApiException):
     pass
+
+
+class CurrentCrunchNotFoundException(CrunchApiException):
+    pass

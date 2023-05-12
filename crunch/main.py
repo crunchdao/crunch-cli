@@ -2,7 +2,7 @@ import os
 
 import click
 
-from . import command, constants, utils
+from . import command, constants, utils, api
 
 session = None
 debug = False
@@ -65,7 +65,11 @@ def setup(
 
     if not no_data:
         os.chdir(directory)
-        command.download(session, force=True)
+
+        try:
+            command.download(session, force=True)
+        except api.CurrentCrunchNotFoundException:
+            command.download_no_data_available()
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -142,7 +146,10 @@ def test(
 def download():
     utils.change_root()
 
-    command.download(session)
+    try:
+        command.download(session)
+    except api.CurrentCrunchNotFoundException:
+        command.download_no_data_available()
 
 
 @cli.command(help="Convert a notebook to a python script.")

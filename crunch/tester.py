@@ -7,8 +7,9 @@ import coloredlogs
 import pandas
 import psutil
 import requests
+import click
 
-from . import command, constants, ensure, utils
+from . import command, constants, ensure, utils, api
 
 
 def _get_process_memory() -> int:
@@ -49,13 +50,17 @@ def run(
     train_handler = ensure.is_function(module, "train")
     infer_handler = ensure.is_function(module, "infer")
 
-    (
-        embargo,
-        moon_column_name,
-        x_train_path,
-        y_train_path,
-        x_test_path
-    ) = command.download(session)
+    try:
+        (
+            embargo,
+            moon_column_name,
+            x_train_path,
+            y_train_path,
+            x_test_path
+        ) = command.download(session)
+    except api.CurrentCrunchNotFoundException:
+        command.download_no_data_available()
+        raise click.Abort()
 
     x_train = utils.read(x_train_path)
     y_train = utils.read(y_train_path)

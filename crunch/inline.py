@@ -6,7 +6,7 @@ import typing
 import click
 import pandas
 
-from . import command, constants, tester, utils
+from . import command, constants, tester, utils, api
 
 
 class _Inline:
@@ -24,13 +24,17 @@ class _Inline:
         print(f"loaded inline runner with module: {module}")
     
     def load_data(self) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
-        (
-            _,
-            _,
-            x_train_path,
-            y_train_path,
-            x_test_path
-        ) = command.download(self.session)
+        try:
+            (
+                _,
+                _,
+                x_train_path,
+                y_train_path,
+                x_test_path
+            ) = command.download(self.session)
+        except api.CurrentCrunchNotFoundException:
+            command.download_no_data_available()
+            raise click.Abort()
 
         x_train = utils.read(x_train_path)
         y_train = utils.read(y_train_path)

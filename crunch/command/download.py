@@ -1,5 +1,6 @@
 import os
 import typing
+import datetime
 
 import click
 import requests
@@ -129,3 +130,14 @@ def download(
         y_train_path,
         x_test_path
     )
+
+def download_no_data_available():
+    today = datetime.date.today()
+    
+    print("\n---")
+
+    # competition lunch
+    if today <= datetime.date(2023, 5, 16):
+        print("The data will be released on May 16th, 2023, 05.00 PM CET")
+    else:
+        print("No data is available yet")

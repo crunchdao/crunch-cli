@@ -14,7 +14,7 @@ from .. import api, constants
 def _check_if_already_exists(directory: str, force: bool):
     if os.path.exists(directory):
         if force:
-            print(f"{directory}: deleting")
+            print(f"delete {directory}")
             shutil.rmtree(directory)
         else:
             print(f"{directory}: already exists (use --force to override)")

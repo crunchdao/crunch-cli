@@ -49,6 +49,8 @@ class CustomSession(requests.Session):
                     self.print_recopy_command()
                 elif code == "NEVER_SUBMITTED":
                     raise api.NeverSubmittedException(message)
+                elif code == "CURRENT_CRUNCH_NOT_FOUND":
+                    raise api.CurrentCrunchNotFoundException(message)
                 else:
                     print(f"{method} {url}: {status_code}")
                     print(json.dumps(error, indent=4))
