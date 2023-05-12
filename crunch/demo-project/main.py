@@ -22,15 +22,14 @@ def train(
     the model under the model_directiory_path, as in the example below.
     Note: You can use other serialization methods than joblib.dump(), as
     long as it matches what reads the model in infer().
-    
+
     Args:
         X_train, y_train: the data to train the model.
         model_directory_path: the path to save your updated model
-    
+
     Returns:
         None
     """
-    X_train = X_train[X_train.columns[:10]]
 
     # basic xgboost regressor
     model = xgb.XGBRegressor(
@@ -44,7 +43,7 @@ def train(
 
     # training the model
     print("training...")
-    model.fit(X_train.iloc[:,2:], y_train.iloc[:,2:])
+    model.fit(X_train.iloc[:, 2:], y_train.iloc[:, 2:])
 
     # make sure that the train function correctly save the trained model
     # in the model_directory_path
@@ -63,7 +62,7 @@ def infer(
     it to produce your inference on the current date.
     It is mandatory to send your inferences with the ids so the system
     can match it correctly.
-    
+
     Args:
         model_directory_path: the path to the directory to the directory in wich we will be saving your updated model.
         X_test: the independant  variables of the current date passed to your model.
@@ -71,12 +70,10 @@ def infer(
     Returns:
         A dataframe (date, id, value) with the inferences of your model for the current date.
     """
-    
-    X_test = X_test[X_test.columns[:10]]
 
     # loading the model saved by the train function at previous iteration
     model = joblib.load(Path(model_directory_path) / "model.joblib")
-    
+
     # creating the predicted label dataframe with correct dates and ids
     y_test_predicted = X_test[["date", "id"]].copy()
     y_test_predicted["value"] = model.predict(X_test.iloc[:, 2:])
