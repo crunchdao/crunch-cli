@@ -91,22 +91,26 @@ def change_root():
             raise click.Abort()
 
 
-def _read_crunchdao_file(name: str):
+def _read_crunchdao_file(name: str, raise_if_missing: bool):
     path = os.path.join(constants.DOT_CRUNCHDAO_DIRECTORY, name)
+
     if not os.path.exists(path):
-        print(f"{path}: not found, are you in a project directory?")
-        raise click.Abort()
+        if raise_if_missing:
+            print(f"{path}: not found, are you in a project directory?")
+            raise click.Abort()
+        
+        return None
 
     with open(path) as fd:
         return fd.read()
 
 
 def read_project_name():
-    return _read_crunchdao_file(constants.PROJECT_FILE)
+    return _read_crunchdao_file(constants.PROJECT_FILE, True)
 
 
-def read_token():
-    return _read_crunchdao_file(constants.TOKEN_FILE)
+def read_token(raise_if_missing=False):
+    return _read_crunchdao_file(constants.TOKEN_FILE, raise_if_missing)
 
 
 def read(path: str, dataframe=True) -> typing.Union[pandas.DataFrame, typing.Any]:
