@@ -3,6 +3,7 @@ DOT_DATA_DIRECTORY = "data"
 TOKEN_FILE = "token"
 PROJECT_FILE = "project"
 DOT_GITIGNORE_FILE = ".gitignore"
+REQUIREMENTS_TXT = "requirements.txt"
 CONVERTED_MAIN_PY = "__converted_main.py"
 DEFAULT_MODEL_DIRECTORY = "resources"
 

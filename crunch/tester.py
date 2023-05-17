@@ -27,6 +27,20 @@ def format_bytes(bytes: int):
 
     return f"{bytes:,.2f} {suffixes[suffix_index]}"
 
+_logged_installed = False
+def install_logger():
+    global _logged_installed
+    if _logged_installed:
+        return
+    
+    coloredlogs.install(
+        level=logging.INFO,
+        fmt='%(asctime)s %(message)s',
+        datefmt='%H:%M:%S',
+    )
+
+    _logged_installed = True
+
 def run(
     module: typing.Any,
     session: requests.Session,
@@ -34,11 +48,7 @@ def run(
     force_first_train: bool,
     train_frequency: int,
 ):
-    coloredlogs.install(
-        level=logging.INFO,
-        fmt='%(asctime)s %(message)s',
-        datefmt='%H:%M:%S',
-    )
+    install_logger()
 
     logging.info('running local test')
     logging.warn("internet access isn't restricted, no check will be done")

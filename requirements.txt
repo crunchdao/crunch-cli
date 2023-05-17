@@ -8,3 +8,4 @@ joblib
 pyarrow
 pandas
 psutil
+requirements-parser

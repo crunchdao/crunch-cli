@@ -6,7 +6,7 @@ import typing
 import click
 import pandas
 
-from . import command, constants, tester, utils, api
+from . import command, constants, tester, utils, api, library
 
 
 class _Inline:
@@ -22,7 +22,7 @@ class _Inline:
         )
 
         print(f"loaded inline runner with module: {module}")
-    
+
     def load_data(self) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
             (
@@ -43,7 +43,16 @@ class _Inline:
         return x_train, y_train, x_test
 
     def test(self, force_first_train=True, train_frequency=1, raise_abort=False):
+        tester.install_logger()
+
         try:
+            library.scan(
+                self.session,
+                module=self.module
+            )
+
+            logging.warn('')
+
             return tester.run(
                 self.module,
                 self.session,
@@ -65,5 +74,5 @@ def load(module_or_module_name: typing.Any, model_directory=constants.DEFAULT_MO
         module = sys.modules[module_or_module_name]
     else:
         module = module_or_module_name
-    
+
     return _Inline(module, model_directory)

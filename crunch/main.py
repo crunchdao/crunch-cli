@@ -1,8 +1,9 @@
 import os
+import logging
 
 import click
 
-from . import command, constants, utils, api
+from . import command, constants, utils, api, library, tester
 
 session = None
 debug = False
@@ -125,13 +126,20 @@ def push(
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 @click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
 @click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
+@click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
 def test(
     main_file_path: str,
     model_directory_path: str,
     no_force_first_train: bool,
     train_frequency: int,
+    skip_library_check: bool
 ):
     utils.change_root()
+    tester.install_logger()
+
+    if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
+        library.scan(session, requirements_file=constants.REQUIREMENTS_TXT)
+        logging.warn('')
 
     command.test(
         session,

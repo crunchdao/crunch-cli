@@ -7,7 +7,7 @@ import typing
 import astor
 import click
 
-from .. import constants
+from .. import constants, utils
 
 
 def convert_cells(cells: typing.List[typing.Any]):
@@ -25,11 +25,7 @@ def convert_cells(cells: typing.List[typing.Any]):
             log(f"skip since not code: {cell_type}")
             continue
 
-        source = "\n".join(
-            line
-            for line in cell["source"]
-            if not re.match(r"^\s*?(!|%|#)", line)
-        )
+        source = utils.strip_python_special_lines(cell["source"])
 
         if not len(source):
             log(f"skip since empty (without !bash, %magic and #comment)")

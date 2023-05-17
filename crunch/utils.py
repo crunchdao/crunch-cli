@@ -4,6 +4,7 @@ import traceback
 import typing
 import urllib
 import urllib.parse
+import re
 
 import click
 import joblib
@@ -98,7 +99,7 @@ def _read_crunchdao_file(name: str, raise_if_missing: bool):
         if raise_if_missing:
             print(f"{path}: not found, are you in a project directory?")
             raise click.Abort()
-        
+
         return None
 
     with open(path) as fd:
@@ -137,3 +138,11 @@ def guess_extension(dataframe: typing.Union[pandas.DataFrame, typing.Any]):
         return "parquet"
 
     return "joblib"
+
+
+def strip_python_special_lines(lines: typing.List[str]):
+    return "\n".join(
+        line
+        for line in lines
+        if not re.match(r"^\s*?(!|%|#)", line)
+    )
