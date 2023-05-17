@@ -59,7 +59,7 @@ def extract_from_code_cells(cells: typing.List[typing.List[str]]):
         except Exception as exception:
             print(f"ignoring cell #{index + 1}: {str(exception)}")
 
-    return packages - _STANDARD_LIBRARIES
+    return packages
 
 
 def extract_from_notebook_modules(module: typing.Any):
@@ -72,233 +72,32 @@ def extract_from_notebook_modules(module: typing.Any):
     return extract_from_code_cells(cells_and_lines)
 
 
-def find_forbidden(packages: typing.Set[str], session: requests.Session):
-    libraries = session.get("/v1/libraries").json()
+def find_forbidden(packages: typing.Set[str], session: requests.Session, allow_standard: bool):
+    libraries = session.get("/v1/libraries", params={
+        "include": "ALL" if allow_standard else "THIRD_PARTY"
+    }).json()
 
     whitelist = set()
     for library in libraries:
         whitelist.add(library["name"])
-        whitelist.update(library["aliases"])
+        whitelist.update(library.get("aliases", []))
 
     return packages - whitelist
 
 
 def scan(session: requests.Session, module: typing.Any = None, requirements_file: str = None):
-    packages = set()
+    forbidden = set()
 
     if module:
         packages = extract_from_notebook_modules(module)
+        forbidden = find_forbidden(packages, session, True)
     elif requirements_file:
         packages = extract_from_requirements(requirements_file)
+        forbidden = find_forbidden(packages, session, False)
     
-    forbidden = find_forbidden(packages, session)
 
     for package in forbidden:
         logging.error('forbidden library: %s', package)
 
     if not len(forbidden):
         logging.warn('no forbidden library found')
-
-_STANDARD_LIBRARIES = set([
-    "ensurepip",
-    "turtle",
-    "xdrlib",
-    "sunau",
-    "operator",
-    "zlib",
-    "struct",
-    "locale",
-    "filecmp",
-    "ftplib",
-    "traceback",
-    "pathlib",
-    "wave",
-    "compileall",
-    "getopt",
-    "mailcap",
-    "plistlib",
-    "types",
-    "binascii",
-    "concurrent",
-    "tty",
-    "imaplib",
-    "dbm",
-    "site",
-    "test",
-    "textwrap",
-    "zoneinfo",
-    "logging",
-    "poplib",
-    "cgitb",
-    "cmath",
-    "os",
-    "argparse",
-    "webbrowser",
-    "shlex",
-    "stat",
-    "urllib",
-    "optparse",
-    "runpy",
-    "tabnanny",
-    "chunk",
-    "bdb",
-    "codeop",
-    "netrc",
-    "marshal",
-    "tokenize",
-    "enum",
-    "readline",
-    "modulefinder",
-    "signal",
-    "pydoc",
-    "ctypes",
-    "sched",
-    "getpass",
-    "abc",
-    "difflib",
-    "glob",
-    "subprocess",
-    "datetime",
-    "numbers",
-    "socket",
-    "pty",
-    "colorsys",
-    "pdb",
-    "socketserver",
-    "grp",
-    "pipes",
-    "spwd",
-    "asyncio",
-    "smtplib",
-    "nntplib",
-    "curses",
-    "linecache",
-    "msilib",
-    "timeit",
-    "typing",
-    "crypt",
-    "audioop",
-    "email",
-    "__main__",
-    "msvcrt",
-    "distutils",
-    "sysconfig",
-    "token",
-    "shutil",
-    "mailbox",
-    "re",
-    "quopri",
-    "platform",
-    "fcntl",
-    "wsgiref",
-    "keyword",
-    "ast",
-    "weakref",
-    "fileinput",
-    "time",
-    "statistics",
-    "pwd",
-    "gc",
-    "queue",
-    "tomllib",
-    "lzma",
-    "heapq",
-    "gzip",
-    "gettext",
-    "atexit",
-    "aifc",
-    "itertools",
-    "builtins",
-    "stringprep",
-    "code",
-    "unicodedata",
-    "tempfile",
-    "asyncore",
-    "sys",
-    "threading",
-    "uuid",
-    "xml",
-    "fractions",
-    "secrets",
-    "copyreg",
-    "inspect",
-    "winsound",
-    "sqlite3",
-    "sndhdr",
-    "dis",
-    "pickle",
-    "fnmatch",
-    "array",
-    "base64",
-    "asynchat",
-    "rlcompleter",
-    "tkinter",
-    "functools",
-    "contextvars",
-    "math",
-    "decimal",
-    "__future__",
-    "unittest",
-    "doctest",
-    "codecs",
-    "bz2",
-    "trace",
-    "cmd",
-    "py_compile",
-    "imp",
-    "calendar",
-    "graphlib",
-    "_thread",
-    "uu",
-    "selectors",
-    "mimetypes",
-    "csv",
-    "pkgutil",
-    "ssl",
-    "copy",
-    "posix",
-    "telnetlib",
-    "string",
-    "multiprocessing",
-    "select",
-    "pyclbr",
-    "hmac",
-    "random",
-    "shelve",
-    "pickletools",
-    "html",
-    "winreg",
-    "termios",
-    "cgi",
-    "hashlib",
-    "syslog",
-    "importlib",
-    "zipimport",
-    "contextlib",
-    "mmap",
-    "symtable",
-    "errno",
-    "zipapp",
-    "bisect",
-    "reprlib",
-    "ipaddress",
-    "io",
-    "ossaudiodev",
-    "faulthandler",
-    "json",
-    "pprint",
-    "imghdr",
-    "venv",
-    "warnings",
-    "xmlrpc",
-    "dataclasses",
-    "collections",
-    "zipfile",
-    "http",
-    "tracemalloc",
-    "tarfile",
-    "resource",
-    "nis",
-    "configparser",
-    "smtpd",
-])
