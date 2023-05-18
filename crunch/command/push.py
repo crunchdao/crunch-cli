@@ -65,7 +65,7 @@ def push(
     fds = []
 
     try:
-        with tempfile.NamedTemporaryFile(prefix="submission-", suffix=".tar") as tmp:
+        with tempfile.NamedTemporaryFile(prefix="submission-", suffix=".tar", dir=constants.DOT_CRUNCHDAO_DIRECTORY) as tmp:
             with tarfile.open(fileobj=tmp, mode="w") as tar:
                 for file in _list_code_files(model_directory_path):
                     print(f"compress {file}")
