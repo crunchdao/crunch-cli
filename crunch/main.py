@@ -83,10 +83,12 @@ def setup(
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file")
 def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
+    export_path: str,
 ):
     utils.change_root()
 
@@ -113,9 +115,11 @@ def push(
             message=message,
             main_file_path=main_file_path,
             model_directory_path=model_directory_path,
+            export_path=export_path,
         )
 
-        command.push_summary(submission, session)
+        if submission:
+            command.push_summary(submission, session)
     finally:
         if converted:
             os.unlink(main_file_path)

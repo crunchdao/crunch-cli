@@ -1,6 +1,7 @@
 import os
 import tarfile
 import tempfile
+import shutil
 
 import gitignorefile
 
@@ -58,6 +59,7 @@ def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
+    export_path: str = None
 ):
     project_name = utils.read_project_name()
     push_token = utils.read_token()
@@ -71,7 +73,12 @@ def push(
                     print(f"compress {file}")
                     tar.add(file)
 
-            model_files = []
+            fd = open(tmp.name, "rb")
+            fds.append(fd)
+
+            files = [
+                ("codeFile", ('code.tar', fd, "application/x-tar"))
+            ]
 
             for path, name in _list_model_files(model_directory_path):
                 print(f"model {name}")
@@ -79,34 +86,29 @@ def push(
                 fd = open(path, "rb")
                 fds.append(fd)
 
-                model_files.append((name, fd))
+                files.append(("modelFiles", (name, fd)))
 
-            tmp_fd = open(tmp.name, "rb")
-            fds.append(tmp_fd)
+            if export_path:
+                print(f"export {export_path}")
+                shutil.copyfile(tmp.name, export_path)
+            else:
+                print(f"export project/{project_name}")
+                submission = session.post(
+                    f"/v1/projects/{project_name}/submissions",
+                    data={
+                        "message": message,
+                        "mainFilePath": main_file_path,
+                        "modelDirectoryPath": model_directory_path,
+                        "pushToken": push_token,
+                        "notebook": False
+                    },
+                    files=tuple(files)
+                ).json()
 
-            files = [
-                ("codeFile", ('code.tar', tmp_fd, "application/x-tar"))
-            ]
-
-            for model_file in model_files:
-                files.append(("modelFiles", model_file))
-
-            submission = session.post(
-                f"/v1/projects/{project_name}/submissions",
-                data={
-                    "message": message,
-                    "mainFilePath": main_file_path,
-                    "modelDirectoryPath": model_directory_path,
-                    "pushToken": push_token,
-                    "notebook": False
-                },
-                files=tuple(files)
-            ).json()
+                return submission
     finally:
         for fd in fds:
             fd.close()
-
-    return submission
 
 
 def push_summary(submission, session: utils.CustomSession):
