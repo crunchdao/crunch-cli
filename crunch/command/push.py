@@ -73,11 +73,10 @@ def push(
                     print(f"compress {file}")
                     tar.add(file)
 
-            fd = open(tmp.name, "rb")
-            fds.append(fd)
+            tmp.seek(0)
 
             files = [
-                ("codeFile", ('code.tar', fd, "application/x-tar"))
+                ("codeFile", ('code.tar', tmp, "application/x-tar"))
             ]
 
             for path, name in _list_model_files(model_directory_path):
