@@ -50,7 +50,7 @@ def get_data_urls(
     }).json()
 
     embargo = data_release["embargo"]
-    moon_column_name = data_release["moonColumnName"]
+    moon_column_name = data_release["moon"]["columnName"]
     data_files = data_release["dataFiles"]
 
     def get_file(key: str, file_name: str) -> DataFile:
