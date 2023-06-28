@@ -2,6 +2,7 @@ import os
 import tarfile
 import tempfile
 import shutil
+import urllib3
 
 import gitignorefile
 
@@ -92,6 +93,8 @@ def push(
                 shutil.copyfile(tmp.name, export_path)
             else:
                 print(f"export project/{project_name}")
+
+                urllib3.disable_warnings()
                 submission = session.post(
                     f"/v1/projects/{project_name}/submissions",
                     data={
@@ -101,7 +104,8 @@ def push(
                         "pushToken": push_token,
                         "notebook": False
                     },
-                    files=tuple(files)
+                    files=tuple(files),
+                    verify=False
                 ).json()
 
                 return submission
