@@ -21,16 +21,20 @@ def _check_if_already_exists(directory: str, force: bool):
             raise click.Abort()
 
 
-def _setup_demo(directory: str):
-    def read_data(file_name):
-        resource = "/".join(["..", "demo-project", file_name])
-        return pkgutil.get_data(__package__, resource)
+def _read_demo_file(file_name: str):
+    resource = "/".join(["..", "demo-project", file_name])
+    return pkgutil.get_data(__package__, resource)
 
-    files = json.loads(read_data("files.json").decode("utf-8"))
+
+def _setup_demo(directory: str, filter: list = None):
+    files = json.loads(_read_demo_file("files.json").decode("utf-8"))
     for file in files:
+        if filter and file not in filter:
+            continue
+
         print(f"use {file}")
 
-        content = read_data(file)
+        content = _read_demo_file(file)
 
         path = os.path.join(directory, file)
         with open(path, "wb") as fd:

@@ -6,6 +6,7 @@ import shutil
 import gitignorefile
 
 from .. import constants, utils
+from .setup import _setup_demo
 
 
 def _list_files(
@@ -67,6 +68,9 @@ def push(
     fds = []
 
     try:
+        if not os.path.exists(constants.DOT_GITIGNORE_FILE):
+            _setup_demo(".",  [constants.DOT_GITIGNORE_FILE])
+
         with tempfile.NamedTemporaryFile(prefix="submission-", suffix=".tar", dir=constants.DOT_CRUNCHDAO_DIRECTORY) as tmp:
             with tarfile.open(fileobj=tmp, mode="w") as tar:
                 for file in _list_code_files(model_directory_path):
