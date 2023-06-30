@@ -75,23 +75,27 @@ def push(
 
             tmp.seek(0)
 
-            files = [
-                ("codeFile", ('code.tar', tmp, "application/x-tar"))
-            ]
-
-            for path, name in _list_model_files(model_directory_path):
-                print(f"model {name}")
-
-                fd = open(path, "rb")
-                fds.append(fd)
-
-                files.append(("modelFiles", (name, fd)))
-
             if export_path:
                 print(f"export {export_path}")
-                shutil.copyfile(tmp.name, export_path)
+
+                with open(export_path, "wb") as fd:
+                    shutil.copyfileobj(tmp, fd)
             else:
                 print(f"export project/{project_name}")
+
+                files = [
+                    ("codeFile", ('code.tar', tmp, "application/x-tar"))
+                ]
+
+                for path, name in _list_model_files(model_directory_path):
+                    print(f"model {name}")
+
+                    fd = open(path, "rb")
+                    fds.append(fd)
+
+                    files.append(("modelFiles", (name, fd)))
+                    print(f"export project/{project_name}")
+
                 submission = session.post(
                     f"/v1/projects/{project_name}/submissions",
                     data={
@@ -116,4 +120,3 @@ def push_summary(submission, session: utils.CustomSession):
 
     url = session.format_web_url(f"/project/submissions/{submission['number']}")
     print(f"Find it on your dashboard: {url}")
-    
