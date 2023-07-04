@@ -66,21 +66,31 @@ def run(
             moon_column_name,
             x_train_path,
             y_train_path,
-            x_test_path
+            x_test_path,
+            y_test_path
         ) = command.download(session)
     except api.CurrentCrunchNotFoundException:
         command.download_no_data_available()
         raise click.Abort()
 
-    x_train = utils.read(x_train_path)
-    y_train = utils.read(y_train_path)
     x_test = utils.read(x_test_path)
-
     moons = x_test[moon_column_name].unique()
     moons.sort()
 
-    for dataframe in [x_train, y_train, x_test]:
+    full_x = pandas.concat([
+        utils.read(x_train_path),
+        x_test,
+    ])
+
+    full_y = pandas.concat([
+        utils.read(y_train_path),
+        utils.read(y_test_path),
+    ])
+
+    for dataframe in [full_x, full_y]:
         dataframe.set_index(moon_column_name, drop=True, inplace=True)
+
+    del x_test
 
     os.makedirs(model_directory_path, exist_ok=True)
 
@@ -93,14 +103,14 @@ def run(
         logging.warn('loop: moon=%s train=%s (%s/%s)', moon, train, index + 1, len(moons))
 
         if train:
-            logging.warn('handler: train(%s, %s, %s)', x_train_path, y_train_path, model_directory_path)
-            x_train_loop = x_train[x_train.index < moon - embargo].reset_index()
-            y_train_loop = y_train[y_train.index < moon - embargo].reset_index()
-            train_handler(x_train_loop, y_train_loop, model_directory_path)
+            logging.warn('call: train')
+            x_train = full_x[full_x.index < moon - embargo].reset_index()
+            y_train = full_y[full_y.index < moon - embargo].reset_index()
+            train_handler(x_train, y_train, model_directory_path)
 
-        logging.warn('handler: infer(%s, %s)', x_test_path, model_directory_path)
-        x_test_loop = x_test[x_test.index == moon].reset_index()
-        prediction = infer_handler(x_test_loop, model_directory_path)
+        logging.warn('call: infer')
+        x_test = full_x[full_x.index == moon].reset_index()
+        prediction = infer_handler(x_test, model_directory_path)
         prediction = ensure.return_infer(prediction)
 
         predictions.append(prediction)
