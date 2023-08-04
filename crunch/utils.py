@@ -146,3 +146,9 @@ def strip_python_special_lines(lines: typing.List[str]):
         for line in lines
         if not re.match(r"^\s*?(!|%|#)", line)
     )
+
+
+def to_unix_path(input: str):
+    return input\
+        .replace("\\", "/")\
+        .replace("//", "/")

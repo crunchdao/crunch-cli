@@ -12,14 +12,17 @@ from .setup import _setup_demo
 def _list_files(
     directory_path: str,
 ):
-    for root, dirs, files in os.walk(directory_path, topdown=False):
-        if root.startswith(f"{directory_path}/"):
-            root = root[len(directory_path) + 1:]
+    directory_path = f"{directory_path}/"
+    for root, _, files in os.walk(directory_path, topdown=False):
+        root = utils.to_unix_path(root)
+
+        if root.startswith(directory_path):
+            root = root[len(directory_path):]
         elif root == directory_path:
             root = ""
 
         for file in files:
-            file = os.path.join(root, file)
+            file = utils.to_unix_path(os.path.join(root, file))
 
             yield file
 
@@ -29,7 +32,7 @@ def _list_code_files(
 ):
     ignore_files = [
         *constants.IGNORED_FILES,
-        f"{model_directory_path}/".replace("//", "/")
+        utils.to_unix_path(f"{model_directory_path}/")
     ]
 
     matches = gitignorefile.Cache()
@@ -51,7 +54,7 @@ def _list_model_files(
     model_directory_path: str,
 ):
     for name in _list_files(model_directory_path):
-        path = os.path.join(model_directory_path, name)
+        path = utils.to_unix_path(os.path.join(model_directory_path, name))
         yield path, name
 
 
