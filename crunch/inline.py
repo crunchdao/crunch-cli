@@ -26,11 +26,12 @@ class _Inline:
     def load_data(self) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
             (
-                _,
-                _,
+                _, # embargo
+                _, # moon_column_name
                 x_train_path,
                 y_train_path,
-                x_test_path
+                x_test_path,
+                _ # y_test_path
             ) = command.download(self.session)
         except api.CurrentCrunchNotFoundException:
             command.download_no_data_available()

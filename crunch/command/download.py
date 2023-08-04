@@ -70,13 +70,15 @@ def get_data_urls(
     x_train = get_file("xTrain", "X_train")
     y_train = get_file("yTrain", "y_train")
     x_test = get_file("xTest", "X_test")
+    y_test = get_file("yTest", "y_test")
 
     return (
         embargo,
         moon_column_name,
         x_train,
         y_train,
-        x_test
+        x_test,
+        y_test
     )
 
 
@@ -119,19 +121,22 @@ def download(
         moon_column_name,
         x_train,
         y_train,
-        x_test
+        x_test,
+        y_test
     ) = get_data_urls(session, constants.DOT_DATA_DIRECTORY, push_token)
 
     _download(x_train, force)
     _download(y_train, force)
     _download(x_test, force)
+    _download(y_test, force)
 
     return (
         embargo,
         moon_column_name,
         x_train.path,
         y_train.path,
-        x_test.path
+        x_test.path,
+        y_test.path
     )
 
 
