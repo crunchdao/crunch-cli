@@ -9,3 +9,4 @@ pyarrow
 pandas
 psutil
 requirements-parser
+setuptools

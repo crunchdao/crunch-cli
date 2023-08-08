@@ -83,12 +83,14 @@ def setup(
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
-@click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file")
+@click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
+@click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
 def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
     export_path: str,
+    no_pip_freeze: bool,
 ):
     utils.change_root()
 
@@ -116,6 +118,7 @@ def push(
             main_file_path=main_file_path,
             model_directory_path=model_directory_path,
             export_path=export_path,
+            include_installed_packages_version=not no_pip_freeze
         )
 
         if submission:

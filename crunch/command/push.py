@@ -2,6 +2,8 @@ import os
 import tarfile
 import tempfile
 import shutil
+import pkg_resources
+
 
 import gitignorefile
 
@@ -63,10 +65,18 @@ def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
-    export_path: str = None
+    include_installed_packages_version: bool,
+    export_path: str = None,
 ):
     project_name = utils.read_project_name()
     push_token = utils.read_token()
+    
+    installed_packages_version = {}
+    if include_installed_packages_version:
+        installed_packages_version = {
+            package.project_name: package.version
+            for package in pkg_resources.working_set
+        }
 
     fds = []
 
@@ -108,7 +118,11 @@ def push(
                         "mainFilePath": main_file_path,
                         "modelDirectoryPath": model_directory_path,
                         "pushToken": push_token,
-                        "notebook": False
+                        "notebook": False,
+                        **{
+                            f"preferredPackagesVersion[{key}]": value
+                            for key, value in installed_packages_version.items()
+                        }
                     },
                     files=tuple(files)
                 ).json()
