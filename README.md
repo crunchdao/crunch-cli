@@ -41,7 +41,7 @@ Options:
 ## Competition Links
 
 - [CrunchDAO Tournament](https://www.crunchdao.com)
-- [AdiaLab Competition](https://www.crunchdao.com/live/adialab)
+- [ADIA Lab Market Prediction Competition](https://www.crunchdao.com/live/adialab)
 
 ## Contributing
 
