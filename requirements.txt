@@ -10,3 +10,4 @@ pandas
 psutil
 requirements-parser
 setuptools
+packaging

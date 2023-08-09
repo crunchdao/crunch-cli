@@ -10,6 +10,7 @@ import click
 import joblib
 import pandas
 import requests
+import packaging.version
 
 from . import constants, api
 
@@ -152,3 +153,11 @@ def to_unix_path(input: str):
     return input\
         .replace("\\", "/")\
         .replace("//", "/")
+
+
+def is_valid_version(input: str):
+    try:
+        packaging.version.Version(input)
+        return True
+    except:
+        return False
