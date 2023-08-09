@@ -4,7 +4,7 @@ CrunchDAO CLI is a Python library designed for the ADIA Lab Market Prediction Co
 
 ## Installation
 
-Use the [pypi](https://pypi.org/project/crunch-cli/) package manager to install `crunch-cli`.
+Use [pip](https://pypi.org/project/crunch-cli/) to install the `crunch-cli`.
 
 ```bash
 pip install crunch-cli --upgrade
@@ -41,7 +41,7 @@ Options:
 ## Competition Links
 
 - [CrunchDAO Tournament](https://www.crunchdao.com)
-- [AdiaLab Competition](https://www.crunchdao.com/live/adialab)
+- [ADIA Lab Market Prediction Competition](https://www.crunchdao.com/live/adialab)
 
 ## Contributing
 
