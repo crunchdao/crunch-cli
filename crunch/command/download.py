@@ -49,6 +49,11 @@ def get_data_urls(
         "pushToken": push_token
     }).json()
 
+    downloadable = data_release["downloadable"]
+    if not downloadable:
+        print("data is not downloadable")
+        raise click.Abort()
+
     embargo = data_release["embargo"]
     moon_column_name = data_release["moon"]["columnName"]
     data_files = data_release["dataFiles"]
