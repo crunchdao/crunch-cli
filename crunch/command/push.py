@@ -4,7 +4,6 @@ import tempfile
 import shutil
 import pkg_resources
 
-
 import gitignorefile
 
 from .. import constants, utils
@@ -68,7 +67,7 @@ def push(
     include_installed_packages_version: bool,
     export_path: str = None,
 ):
-    project_name = utils.read_project_name()
+    project_info = utils.read_project_info()
     push_token = utils.read_token()
     
     installed_packages_version = {}
@@ -111,9 +110,9 @@ def push(
 
                     files.append(("modelFiles", (name, fd)))
 
-                print(f"export project/{project_name}")
+                print(f"export {project_info.competition_name}:project/{project_info.user_login}")
                 submission = session.post(
-                    f"/v1/projects/{project_name}/submissions",
+                    f"/v2/competitions/{project_info.competition_name}/projects/{project_info.user_login}/submissions",
                     data={
                         "message": message,
                         "mainFilePath": main_file_path,
@@ -128,15 +127,17 @@ def push(
                     files=tuple(files)
                 ).json()
 
+                _print_success(session, project_info, submission)
+
                 return submission
     finally:
         for fd in fds:
             fd.close()
 
 
-def push_summary(submission, session: utils.CustomSession):
+def _print_success(session: utils.CustomSession, project_info: utils.ProjectInfo, submission: dict):
     print("\n---")
     print(f"submission #{submission['number']} succesfully uploaded!")
 
-    url = session.format_web_url(f"/project/submissions/{submission['number']}")
+    url = session.format_web_url(f"/competitions/{project_info.competition_name}/projects/{project_info.user_login}/code?submissionNumber={submission['number']}")
     print(f"Find it on your dashboard: {url}")

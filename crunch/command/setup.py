@@ -8,7 +8,7 @@ import tarfile
 import click
 import requests
 
-from .. import api, constants
+from .. import api, constants, utils
 
 
 def _check_if_already_exists(directory: str, force: bool):
@@ -58,7 +58,8 @@ def setup(
     session: requests.Session,
     clone_token: str,
     submission_number: str,
-    project_name: str,
+    competition_name: str,
+    user_login: str,
     directory: str,
     model_directory: str,
     force: bool,
@@ -66,17 +67,21 @@ def setup(
 ):
     _check_if_already_exists(directory, force)
 
-    push_token = session.post(f"/v1/projects/{project_name}/tokens", json={
-        "type": "PERMANENT",
-        "cloneToken": clone_token
-    }).json()
+    push_token = session.post(
+        f"/v2/competitions/{competition_name}/projects/{user_login}/tokens",
+        json={
+            "type": "PERMANENT",
+            "cloneToken": clone_token
+        }
+    ).json()
 
     dot_crunchdao_path = os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
     os.makedirs(dot_crunchdao_path)
 
-    project_file_path = os.path.join(dot_crunchdao_path, constants.PROJECT_FILE)
-    with open(project_file_path, "w") as fd:
-        fd.write(project_name)
+    utils.write_project_info(utils.ProjectInfo(
+        competition_name,
+        user_login
+    ), directory)
 
     token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
     with open(token_file_path, "w") as fd:
@@ -84,11 +89,14 @@ def setup(
 
     try:
         code_tar = io.BytesIO(
-            session.get(f"/v1/projects/{project_name}/clone", params={
-                "pushToken": push_token['plain'],
-                "submissionNumber": submission_number,
-                "includeModel": not no_model,
-            }).content
+            session.get(
+                f"/v2/competitions/{competition_name}/projects/{user_login}/clone",
+                params={
+                    "pushToken": push_token['plain'],
+                    "submissionNumber": submission_number,
+                    "includeModel": not no_model,
+                }
+            ).content
         )
     except api.NeverSubmittedException:
         _setup_demo(directory)

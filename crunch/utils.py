@@ -5,6 +5,7 @@ import typing
 import urllib
 import urllib.parse
 import re
+import dataclasses
 
 import click
 import joblib
@@ -107,8 +108,42 @@ def _read_crunchdao_file(name: str, raise_if_missing: bool):
         return fd.read()
 
 
-def read_project_name():
-    return _read_crunchdao_file(constants.PROJECT_FILE, True)
+@dataclasses.dataclass()
+class ProjectInfo:
+    competition_name: str
+    user_login: str
+
+
+def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
+    dot_crunchdao_path = os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+
+    old_path = os.path.join(dot_crunchdao_path, constants.OLD_PROJECT_FILE)
+    if os.path.exists(old_path):
+        os.remove(old_path)
+    
+    path = os.path.join(dot_crunchdao_path, constants.PROJECT_FILE)
+    with open(path, "w") as fd:
+        json.dump({
+            "competitionName": info.competition_name,
+            "userLogin": info.user_login,
+        }, fd)
+
+
+def read_project_info() -> ProjectInfo:
+    old_content = _read_crunchdao_file(constants.OLD_PROJECT_FILE, False)
+    if old_content is not None:
+        return ProjectInfo(
+            "adialab",
+            root["userLogin"],
+        )
+    
+    content = _read_crunchdao_file(constants.PROJECT_FILE, True)
+    root = json.loads(content)
+
+    return ProjectInfo(
+        root["competitionName"],
+        root["userLogin"],
+    )
 
 
 def read_token(raise_if_missing=False):

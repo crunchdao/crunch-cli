@@ -39,25 +39,31 @@ def cli(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
-@click.argument("project-name", required=True)
-@click.argument("directory", default="{projectName}")
+@click.argument("competition-name", required=True)
+@click.argument("user-login", required=True)
+@click.argument("directory", default="{competitionName}")
 def setup(
     clone_token: str,
     submission_number: str,
     no_data: bool,
     no_model: bool,
     force: bool,
-    project_name: str,
+    competition_name: str,
+    user_login: str,
     directory: str,
     model_directory_path: str,
 ):
-    directory = directory.replace("{projectName}", project_name)
+    directory = directory\
+        .replace("{competitionName}", competition_name)\
+        .replace("{userLogin}", user_login)\
+        .replace("{projectName}", user_login)
 
     command.setup(
         session,
         clone_token=clone_token,
         submission_number=submission_number,
-        project_name=project_name,
+        competition_name=competition_name,
+        user_login=user_login,
         directory=directory,
         model_directory=model_directory_path,
         force=force,
@@ -112,7 +118,7 @@ def push(
         converted = True
 
     try:
-        submission = command.push(
+        command.push(
             session,
             message=message,
             main_file_path=main_file_path,
@@ -120,9 +126,6 @@ def push(
             export_path=export_path,
             include_installed_packages_version=not no_pip_freeze
         )
-
-        if submission:
-            command.push_summary(submission, session)
     finally:
         if converted:
             os.unlink(main_file_path)
@@ -181,6 +184,7 @@ def convert(
         python_file_path=python_file_path,
         override=override,
     )
+
 
 if __name__ == '__main__':
     cli()
