@@ -38,6 +38,8 @@ def _list_code_files(
     ]
 
     matches = gitignorefile.Cache()
+    parts = tuple(gitignorefile._path_split(os.path.abspath(".")))[:-1]
+    matches._Cache__gitignores[parts] = []
 
     for file in _list_files("."):
         ignored = False
