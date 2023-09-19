@@ -19,12 +19,11 @@ from . import constants, api
 class CustomSession(requests.Session):
     # https://stackoverflow.com/a/51026159/7292958
 
-    def __init__(self, web_base_url=None, api_base_url=None, debug=False, notebook=False):
+    def __init__(self, web_base_url=None, api_base_url=None, debug=False):
         super().__init__()
         self.web_base_url = web_base_url
         self.api_base_url = api_base_url
         self.debug = debug
-        self.notebook = notebook
 
     def request(self, method, url, *args, **kwargs):
         response = super().request(
@@ -44,12 +43,8 @@ class CustomSession(requests.Session):
                 code = error.get("code", "")
                 message = error.get("message", "")
 
-                if code == "INVALID_PROJECT_TOKEN" and message == "invalid project token":
-                    print("your token seems to have expired or is invalid")
-                    self.print_recopy_command()
-                elif code == "ENTITY_NOT_FOUND" and message.startswith("no user found with username"):
-                    print("user not found, did you rename yourself?")
-                    self.print_recopy_command()
+                if code == "INVALID_PROJECT_TOKEN":
+                    raise api.InvalidProjectTokenException(message)
                 elif code == "NEVER_SUBMITTED":
                     raise api.NeverSubmittedException(message)
                 elif code == "CURRENT_CRUNCH_NOT_FOUND":
@@ -70,14 +65,6 @@ class CustomSession(requests.Session):
             self.web_base_url,
             path
         )
-
-    def print_recopy_command(self):
-        tab = "notebook" if self.notebook else "cli"
-
-        print("---")
-        print("please follow this link to copy and paste your new setup command:")
-        print(self.format_web_url(f'/submit?tab={tab}'))
-        print("")
 
 
 def change_root():
@@ -111,7 +98,7 @@ def _read_crunchdao_file(name: str, raise_if_missing: bool):
 @dataclasses.dataclass()
 class ProjectInfo:
     competition_name: str
-    user_login: str
+    user_id: str
 
 
 def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
@@ -125,7 +112,7 @@ def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
     with open(path, "w") as fd:
         json.dump({
             "competitionName": info.competition_name,
-            "userLogin": info.user_login,
+            "userId": info.user_id,
         }, fd)
 
 
@@ -134,7 +121,7 @@ def read_project_info() -> ProjectInfo:
     if old_content is not None:
         return ProjectInfo(
             "adialab",
-            root["userLogin"],
+            root["userId"],
         )
     
     content = _read_crunchdao_file(constants.PROJECT_FILE, True)
@@ -142,7 +129,7 @@ def read_project_info() -> ProjectInfo:
 
     return ProjectInfo(
         root["competitionName"],
-        root["userLogin"],
+        root["userId"],
     )
 
 

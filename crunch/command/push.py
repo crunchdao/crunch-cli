@@ -112,9 +112,9 @@ def push(
 
                     files.append(("modelFiles", (name, fd)))
 
-                print(f"export {project_info.competition_name}:project/{project_info.user_login}")
+                print(f"export {project_info.competition_name}:project/{project_info.user_id}")
                 submission = session.post(
-                    f"/v2/competitions/{project_info.competition_name}/projects/{project_info.user_login}/submissions",
+                    f"/v2/competitions/{project_info.competition_name}/projects/{project_info.user_id}/submissions",
                     data={
                         "message": message,
                         "mainFilePath": main_file_path,
@@ -141,5 +141,5 @@ def _print_success(session: utils.CustomSession, project_info: utils.ProjectInfo
     print("\n---")
     print(f"submission #{submission['number']} succesfully uploaded!")
 
-    url = session.format_web_url(f"/competitions/{project_info.competition_name}/projects/{project_info.user_login}/code?submissionNumber={submission['number']}")
+    url = session.format_web_url(f"/competitions/{project_info.competition_name}/projects/{project_info.user_id}/code?submissionNumber={submission['number']}")
     print(f"Find it on your dashboard: {url}")

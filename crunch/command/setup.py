@@ -59,7 +59,6 @@ def setup(
     clone_token: str,
     submission_number: str,
     competition_name: str,
-    user_login: str,
     directory: str,
     model_directory: str,
     force: bool,
@@ -67,21 +66,34 @@ def setup(
 ):
     _check_if_already_exists(directory, force)
 
-    push_token = session.post(
-        f"/v2/competitions/{competition_name}/projects/{user_login}/tokens",
-        json={
-            "type": "PERMANENT",
-            "cloneToken": clone_token
-        }
-    ).json()
+    try:
+        push_token = session.post(
+            f"/v2/project-tokens/upgrade",
+            json={
+                "cloneToken": clone_token
+            }
+        ).json()
+    except api.InvalidProjectTokenException:
+        print("your token seems to have expired or is invalid")
+        print("---")
+        print("please follow this link to copy and paste your new setup command:")
+        print(session.format_web_url(
+            f'/competitions/{competition_name}/submit'
+        ))
+        print("")
 
-    dot_crunchdao_path = os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+        raise click.Abort()
+
+    dot_crunchdao_path = os.path.join(
+        directory, constants.DOT_CRUNCHDAO_DIRECTORY)
     os.makedirs(dot_crunchdao_path)
 
-    utils.write_project_info(utils.ProjectInfo(
+    project_info = utils.ProjectInfo(
         competition_name,
-        user_login
-    ), directory)
+        push_token["project"]["userId"]
+    )
+
+    utils.write_project_info(project_info, directory)
 
     token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
     with open(token_file_path, "w") as fd:
@@ -90,7 +102,7 @@ def setup(
     try:
         code_tar = io.BytesIO(
             session.get(
-                f"/v2/competitions/{competition_name}/projects/{user_login}/clone",
+                f"/v2/competitions/{competition_name}/projects/{project_info.user_id}/clone",
                 params={
                     "pushToken": push_token['plain'],
                     "submissionNumber": submission_number,

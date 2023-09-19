@@ -1,12 +1,16 @@
-class CrunchApiException(Exception):
+class ApiException(Exception):
 
     def __init__(self, message: str):
         super().__init__(message)
 
 
-class NeverSubmittedException(CrunchApiException):
+class NeverSubmittedException(ApiException):
     pass
 
 
-class CurrentCrunchNotFoundException(CrunchApiException):
+class CurrentCrunchNotFoundException(ApiException):
+    pass
+
+
+class InvalidProjectTokenException(ApiException):
     pass

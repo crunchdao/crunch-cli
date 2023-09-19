@@ -13,12 +13,10 @@ debug = False
 @click.option("--debug", "enable_debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
-@click.option("--notebook", is_flag=True, help="Tell the CLI you are running the command while inside a notebook.")
 def cli(
     enable_debug: bool,
     api_base_url: str,
     web_base_url: str,
-    notebook: bool,
 ):
     global debug
     debug = enable_debug
@@ -28,7 +26,6 @@ def cli(
         web_base_url,
         api_base_url,
         debug,
-        notebook,
     )
 
 
@@ -40,7 +37,6 @@ def cli(
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 @click.argument("competition-name", required=True)
-@click.argument("user-login", required=True)
 @click.argument("directory", default="{competitionName}")
 def setup(
     clone_token: str,
@@ -49,21 +45,17 @@ def setup(
     no_model: bool,
     force: bool,
     competition_name: str,
-    user_login: str,
     directory: str,
     model_directory_path: str,
 ):
     directory = directory\
-        .replace("{competitionName}", competition_name)\
-        .replace("{userLogin}", user_login)\
-        .replace("{projectName}", user_login)
+        .replace("{competitionName}", competition_name)
 
     command.setup(
         session,
         clone_token=clone_token,
         submission_number=submission_number,
         competition_name=competition_name,
-        user_login=user_login,
         directory=directory,
         model_directory=model_directory_path,
         force=force,
