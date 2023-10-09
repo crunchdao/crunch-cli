@@ -141,5 +141,5 @@ def _print_success(session: utils.CustomSession, project_info: utils.ProjectInfo
     print("\n---")
     print(f"submission #{submission['number']} succesfully uploaded!")
 
-    url = session.format_web_url(f"/competitions/{project_info.competition_name}/projects/{project_info.user_id}/code?submissionNumber={submission['number']}")
+    url = session.format_web_url(f"/competitions/{project_info.competition_name}/projects/{project_info.user_id}/submissions/{submission['number']}")
     print(f"Find it on your dashboard: {url}")
