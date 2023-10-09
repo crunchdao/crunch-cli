@@ -81,7 +81,7 @@ def change_root():
             raise click.Abort()
 
 
-def _read_crunchdao_file(name: str, raise_if_missing: bool):
+def _read_crunchdao_file(name: str, raise_if_missing=True):
     path = os.path.join(constants.DOT_CRUNCHDAO_DIRECTORY, name)
 
     if not os.path.exists(path):
@@ -133,8 +133,8 @@ def read_project_info() -> ProjectInfo:
     )
 
 
-def read_token(raise_if_missing=False):
-    return _read_crunchdao_file(constants.TOKEN_FILE, raise_if_missing)
+def read_token():
+    return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
 def read(path: str, dataframe=True) -> typing.Union[pandas.DataFrame, typing.Any]:

@@ -42,10 +42,10 @@ class DataFile:
 def get_data_urls(
     session: utils.CustomSession,
     data_directory: str,
+    competition_name: str,
     push_token: str,
 ) -> typing.Tuple[typing.Dict[str, str], str, str, str]:
-    current_crunch = session.get("/v1/crunches/@current").json()
-    data_release = session.get(f"/v1/crunches/{current_crunch['number']}/data-release", params={
+    data_release = session.get(f"/v2/competitions/{competition_name}/rounds/@current/phases/submission/data-release", params={
         "pushToken": push_token
     }).json()
 
@@ -117,7 +117,8 @@ def download(
     session: utils.CustomSession,
     force=False,
 ):
-    push_token = utils.read_token(raise_if_missing=False)
+    project_info = utils.read_project_info()
+    push_token = utils.read_token()
 
     os.makedirs(constants.DOT_DATA_DIRECTORY, exist_ok=True)
 
@@ -128,7 +129,7 @@ def download(
         y_train,
         x_test,
         y_test
-    ) = get_data_urls(session, constants.DOT_DATA_DIRECTORY, push_token)
+    ) = get_data_urls(session, constants.DOT_DATA_DIRECTORY, project_info.competition_name, push_token)
 
     _download(x_train, force)
     _download(y_train, force)
