@@ -17,6 +17,6 @@ IGNORED_FILES = [
 
 DEBUG_ENV_VAR = "CRUNCH_DEBUG"
 API_BASE_URL_ENV_VAR = "API_BASE_URL"
-API_BASE_URL_DEFAULT = "http://api.adialab.crunchdao.com/"
+API_BASE_URL_DEFAULT = "http://api.hub.crunchdao.com/"
 WEB_BASE_URL_ENV_VAR = "WEB_BASE_URL"
-WEB_BASE_URL_DEFAULT = "https://adialab.crunchdao.com/"
+WEB_BASE_URL_DEFAULT = "https://hub.crunchdao.com/"
