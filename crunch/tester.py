@@ -120,7 +120,12 @@ def run(
         logging.warn('call: infer')
         x_test = full_x[full_x.index == moon].reset_index()
         prediction = infer_handler(x_test, model_directory_path)
-        prediction = ensure.return_infer(prediction)
+        prediction = ensure.return_infer(
+            prediction,
+            id_column_name,
+            moon_column_name,
+            target_column_name
+        )
 
         predictions.append(prediction)
 
