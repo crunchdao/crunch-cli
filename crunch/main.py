@@ -153,11 +153,17 @@ def test(
 
 
 @cli.command(help="Download the data locally.")
-def download():
+@click.option("--round-number", type=int, default="@current")
+def download(
+    round_number: int
+):
     utils.change_root()
 
     try:
-        command.download(session)
+        command.download(
+            session,
+            round_number=round_number
+        )
     except api.CurrentCrunchNotFoundException:
         command.download_no_data_available()
 

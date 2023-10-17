@@ -38,24 +38,26 @@ class DataFile:
     size: int
     signed: bool
 
+    @property
+    def has_size(self):
+        return self.size != -1
+
 
 def get_data_urls(
     session: utils.CustomSession,
+    round_number: typing.Union[int, str],
     data_directory: str,
     competition_name: str,
     push_token: str,
-) -> typing.Tuple[typing.Dict[str, str], str, str, str]:
-    data_release = session.get(f"/v2/competitions/{competition_name}/rounds/@current/phases/submission/data-release", params={
+) -> typing.Tuple[int, typing.Tuple[str, str, str], typing.Tuple[DataFile, DataFile, DataFile, DataFile]]:
+    data_release = session.get(f"/v2/competitions/{competition_name}/rounds/{round_number}/phases/submission/data-release", params={
         "pushToken": push_token
     }).json()
 
-    downloadable = data_release["downloadable"]
-    if not downloadable:
-        print("data is not downloadable")
-        raise click.Abort()
-
     embargo = data_release["embargo"]
-    moon_column_name = data_release["moon"]["columnName"]
+    id_column_name = data_release["columnNames"]["id"]
+    moon_column_name = data_release["columnNames"]["moon"]
+    target_column_name = data_release["columnNames"]["target"]
     data_files = data_release["dataFiles"]
 
     def get_file(key: str, file_name: str) -> DataFile:
@@ -79,16 +81,29 @@ def get_data_urls(
 
     return (
         embargo,
-        moon_column_name,
-        x_train,
-        y_train,
-        x_test,
-        y_test
+        (
+            id_column_name,
+            moon_column_name,
+            target_column_name,
+        ),
+        (
+            x_train,
+            y_train,
+            x_test,
+            y_test
+        )
     )
 
 
 def _download(data_file: DataFile, force: bool):
+    if data_file is None:
+        return
+
     print(f"download {data_file.path} from {cut_url(data_file.url)}")
+
+    if not data_file.has_size:
+        print(f"skip: not given by server")
+        return
 
     exists = os.path.exists(data_file.path)
     if not force and exists:
@@ -115,6 +130,7 @@ def _download(data_file: DataFile, force: bool):
 
 def download(
     session: utils.CustomSession,
+    round_number: int = "@current",
     force=False,
 ):
     project_info = utils.read_project_info()
@@ -124,12 +140,24 @@ def download(
 
     (
         embargo,
-        moon_column_name,
-        x_train,
-        y_train,
-        x_test,
-        y_test
-    ) = get_data_urls(session, constants.DOT_DATA_DIRECTORY, project_info.competition_name, push_token)
+        (
+            id_column_name,
+            moon_column_name,
+            target_column_name,
+        ),
+        (
+            x_train,
+            y_train,
+            x_test,
+            y_test
+        )
+    ) = get_data_urls(
+        session,
+        round_number,
+        constants.DOT_DATA_DIRECTORY,
+        project_info.competition_name,
+        push_token
+    )
 
     _download(x_train, force)
     _download(y_train, force)
@@ -138,11 +166,17 @@ def download(
 
     return (
         embargo,
-        moon_column_name,
-        x_train.path,
-        y_train.path,
-        x_test.path,
-        y_test.path
+        (
+            id_column_name,
+            moon_column_name,
+            target_column_name,
+        ),
+        (
+            x_train.path,
+            y_train.path,
+            x_test.path,
+            y_test.path if y_test.has_size else None
+        )
     )
 
 

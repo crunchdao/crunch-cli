@@ -63,11 +63,17 @@ def run(
     try:
         (
             embargo,
-            moon_column_name,
-            x_train_path,
-            y_train_path,
-            x_test_path,
-            y_test_path
+            (
+                id_column_name,
+                moon_column_name,
+                target_column_name,
+            ),
+            (
+                x_train_path,
+                y_train_path,
+                x_test_path,
+                y_test_path
+            )
         ) = command.download(session)
     except api.CurrentCrunchNotFoundException:
         command.download_no_data_available()
@@ -82,10 +88,13 @@ def run(
         x_test,
     ])
 
-    full_y = pandas.concat([
-        utils.read(y_train_path),
-        utils.read(y_test_path),
-    ])
+    if y_test_path:
+        full_y = pandas.concat([
+            utils.read(y_train_path),
+            utils.read(y_test_path),
+        ])
+    else:
+        full_y = utils.read(y_train_path)
 
     for dataframe in [full_x, full_y]:
         dataframe.set_index(moon_column_name, drop=True, inplace=True)
