@@ -67,6 +67,7 @@ def run(
                 id_column_name,
                 moon_column_name,
                 target_column_name,
+                prediction_column_name,
             ),
             (
                 x_train_path,
@@ -124,7 +125,7 @@ def run(
             prediction,
             id_column_name,
             moon_column_name,
-            target_column_name
+            prediction_column_name,
         )
 
         predictions.append(prediction)

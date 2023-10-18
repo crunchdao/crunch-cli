@@ -153,9 +153,9 @@ def test(
 
 
 @cli.command(help="Download the data locally.")
-@click.option("--round-number", type=int, default="@current")
+@click.option("--round-number", default="@current")
 def download(
-    round_number: int
+    round_number: str
 ):
     utils.change_root()
 

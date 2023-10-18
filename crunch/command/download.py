@@ -43,9 +43,9 @@ class DataFile:
         return self.size != -1
 
 
-def get_data_urls(
+def _get_data_urls(
     session: utils.CustomSession,
-    round_number: typing.Union[int, str],
+    round_number: str,
     data_directory: str,
     competition_name: str,
     push_token: str,
@@ -58,6 +58,7 @@ def get_data_urls(
     id_column_name = data_release["columnNames"]["id"]
     moon_column_name = data_release["columnNames"]["moon"]
     target_column_name = data_release["columnNames"]["target"]
+    prediction_column_name = data_release["columnNames"]["prediction"]
     data_files = data_release["dataFiles"]
 
     def get_file(key: str, file_name: str) -> DataFile:
@@ -85,6 +86,7 @@ def get_data_urls(
             id_column_name,
             moon_column_name,
             target_column_name,
+            prediction_column_name,
         ),
         (
             x_train,
@@ -130,7 +132,7 @@ def _download(data_file: DataFile, force: bool):
 
 def download(
     session: utils.CustomSession,
-    round_number: int = "@current",
+    round_number = "@current",
     force=False,
 ):
     project_info = utils.read_project_info()
@@ -144,6 +146,7 @@ def download(
             id_column_name,
             moon_column_name,
             target_column_name,
+            prediction_column_name,
         ),
         (
             x_train,
@@ -151,7 +154,7 @@ def download(
             x_test,
             y_test
         )
-    ) = get_data_urls(
+    ) = _get_data_urls(
         session,
         round_number,
         constants.DOT_DATA_DIRECTORY,
@@ -170,6 +173,7 @@ def download(
             id_column_name,
             moon_column_name,
             target_column_name,
+            prediction_column_name,
         ),
         (
             x_train.path,

@@ -23,11 +23,16 @@ def return_infer(
     result,
     id_column_name: str,
     moon_column_name: str,
-    value_column_name: str
+    prediction_column_name: str
 ) -> pandas.DataFrame:
     is_dataframe(result, "prediction")
 
-    expected = {id_column_name, moon_column_name, value_column_name}
+    expected = {
+        id_column_name,
+        moon_column_name,
+        prediction_column_name
+    }
+    
     got: typing.Set[str] = set(result.columns)
 
     if got != expected:
