@@ -45,7 +45,13 @@ class _Inline:
 
         return x_train, y_train, x_test
 
-    def test(self, force_first_train=True, train_frequency=1, raise_abort=False):
+    def test(
+        self,
+        force_first_train=True,
+        train_frequency=1,
+        raise_abort=False,
+        round_number="@current"
+    ):
         tester.install_logger()
 
         try:
@@ -62,6 +68,7 @@ class _Inline:
                 self.model_directory,
                 force_first_train,
                 train_frequency,
+                round_number,
             )
         except click.Abort as abort:
             logging.error(f"Aborted!")

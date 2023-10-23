@@ -47,6 +47,7 @@ def run(
     model_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
+    round_number: str,
 ):
     install_logger()
 
@@ -75,7 +76,10 @@ def run(
                 x_test_path,
                 y_test_path
             )
-        ) = command.download(session)
+        ) = command.download(
+            session,
+            round_number=round_number
+        )
     except api.CurrentCrunchNotFoundException:
         command.download_no_data_available()
         raise click.Abort()

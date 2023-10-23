@@ -12,6 +12,7 @@ def test(
     model_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
+    round_number: str,
 ):
     spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
@@ -25,6 +26,7 @@ def test(
         model_directory_path,
         force_first_train,
         train_frequency,
+        round_number,
     )
 
     logging.warn('prediction=\n%s', prediction)
