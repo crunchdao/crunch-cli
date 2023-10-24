@@ -17,23 +17,6 @@ class undefined:
     pass
 
 
-def _get_process_memory() -> int:
-    process = psutil.Process(os.getpid())
-    mem_info = process.memory_info()
-    return mem_info.rss
-
-
-def format_bytes(bytes: int):
-    suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-    suffix_index = 0
-
-    while bytes >= 1024 and suffix_index < 8:
-        bytes /= 1024
-        suffix_index += 1
-
-    return f"{bytes:,.2f} {suffixes[suffix_index]}"
-
-
 _logged_installed = False
 
 
@@ -97,7 +80,7 @@ def run(
     logging.warn("internet access isn't restricted, no check will be done")
     logging.info("")
 
-    memory_before = _get_process_memory()
+    memory_before = utils.get_process_memory()
     start = time.time()
 
     train_function = ensure.is_function(module, "train")
@@ -223,12 +206,12 @@ def run(
         time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
     )
 
-    memory_after = _get_process_memory()
+    memory_after = utils.get_process_memory()
     logging.warn(
         'memory: before="%s" after="%s" consumed="%s"',
-        format_bytes(memory_before),
-        format_bytes(memory_after),
-        format_bytes(memory_after - memory_before)
+        utils.format_bytes(memory_before),
+        utils.format_bytes(memory_after),
+        utils.format_bytes(memory_after - memory_before)
     )
 
     logging.warn('local test succesfully run!')
