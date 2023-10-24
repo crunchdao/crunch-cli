@@ -65,6 +65,14 @@ def _call(function: callable, default_values: dict, specific_values: dict):
     return function(**arguments)
 
 
+def _monkey_patch_display():
+    import builtins
+    
+    name = "display"
+    if not hasattr(builtins, name):
+        setattr(builtins, name, print)
+
+
 def run(
     module: typing.Any,
     session: requests.Session,
@@ -75,6 +83,7 @@ def run(
     has_gpu=False,
 ):
     install_logger()
+    _monkey_patch_display()
 
     logging.info('running local test')
     logging.warn("internet access isn't restricted, no check will be done")
