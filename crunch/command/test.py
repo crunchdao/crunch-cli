@@ -13,6 +13,7 @@ def test(
     force_first_train: bool,
     train_frequency: int,
     round_number: str,
+    has_gpu: bool,
 ):
     spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
@@ -27,6 +28,7 @@ def test(
         force_first_train,
         train_frequency,
         round_number,
+        has_gpu,
     )
 
     logging.warn('prediction=\n%s', prediction)

@@ -2,6 +2,7 @@ import logging
 import os
 import time
 import typing
+import inspect
 
 import coloredlogs
 import pandas
@@ -12,10 +13,15 @@ import click
 from . import command, constants, ensure, utils, api
 
 
+class undefined:
+    pass
+
+
 def _get_process_memory() -> int:
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     return mem_info.rss
+
 
 def format_bytes(bytes: int):
     suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
@@ -27,12 +33,15 @@ def format_bytes(bytes: int):
 
     return f"{bytes:,.2f} {suffixes[suffix_index]}"
 
+
 _logged_installed = False
+
+
 def install_logger():
     global _logged_installed
     if _logged_installed:
         return
-    
+
     coloredlogs.install(
         level=logging.INFO,
         fmt='%(asctime)s %(message)s',
@@ -41,6 +50,38 @@ def install_logger():
 
     _logged_installed = True
 
+
+def _call(function: callable, default_values: dict, specific_values: dict):
+    values = {
+        **default_values,
+        **specific_values
+    }
+
+    def log(message: str):
+        logging.debug(f"{function.__name__}: {message}")
+
+    arguments = {}
+    for name, parameter in inspect.signature(function).parameters.items():
+        name_str = str(parameter)
+        if name_str.startswith("*"):
+            log(f"unsupported parameter: {name_str}")
+            continue
+
+        if parameter.default != inspect.Parameter.empty:
+            log(f"skip param with default value: {name}={parameter.default}")
+            continue
+
+        value = values.get(name, undefined)
+        if value is undefined:
+            log(f"unknown parameter: {name}")
+            value = None
+
+        log(f"set {name}={value.__class__.__name__}")
+        arguments[name] = value
+
+    return function(**arguments)
+
+
 def run(
     module: typing.Any,
     session: requests.Session,
@@ -48,6 +89,7 @@ def run(
     force_first_train: bool,
     train_frequency: int,
     round_number: str,
+    has_gpu=False,
 ):
     install_logger()
 
@@ -58,8 +100,8 @@ def run(
     memory_before = _get_process_memory()
     start = time.time()
 
-    train_handler = ensure.is_function(module, "train")
-    infer_handler = ensure.is_function(module, "infer")
+    train_function = ensure.is_function(module, "train")
+    infer_function = ensure.is_function(module, "infer")
 
     try:
         (
@@ -111,39 +153,83 @@ def run(
     predictions: typing.List[pandas.DataFrame] = []
 
     for index, moon in enumerate(moons):
-        train = (force_first_train and index == 0) or (train_frequency != 0 and moon % train_frequency == 0)
+        train = False
+        if train_frequency != 0 and moon % train_frequency == 0:
+            train = True
+        elif index == 0 and force_first_train:
+            train = True
 
         logging.warn('---')
-        logging.warn('loop: moon=%s train=%s (%s/%s)', moon, train, index + 1, len(moons))
+        logging.warn(
+            'loop: moon=%s train=%s (%s/%s)',
+            moon, train, index + 1, len(moons)
+        )
+
+        default_values = {
+            "number_of_features": len(full_x.columns) - 2,
+            "model_directory_path": model_directory_path,
+            "id_column_name": id_column_name,
+            "moon_column_name": moon_column_name,
+            "target_column_name": target_column_name,
+            "prediction_column_name": prediction_column_name,
+            "moon": moon,
+            "current_moon": moon,
+            "embargo": embargo,
+            "has_gpu": has_gpu,
+            "has_trained": train,
+        }
 
         if train:
             logging.warn('call: train')
             x_train = full_x[full_x.index < moon - embargo].reset_index()
             y_train = full_y[full_y.index < moon - embargo].reset_index()
-            train_handler(x_train, y_train, model_directory_path)
 
-        logging.warn('call: infer')
-        x_test = full_x[full_x.index == moon].reset_index()
-        prediction = infer_handler(x_test, model_directory_path)
-        prediction = ensure.return_infer(
-            prediction,
-            id_column_name,
-            moon_column_name,
-            prediction_column_name,
-        )
+            _call(train_function, default_values, {
+                "X_train": x_train,
+                "x_train": x_train,
+                "Y_train": y_train,
+                "y_train": y_train,
+            })
+
+        if True:
+            logging.warn('call: infer')
+            x_test = full_x[full_x.index == moon].reset_index()
+
+            prediction = _call(infer_function, default_values, {
+                "X_test": x_test,
+                "x_test": x_test,
+            })
+
+            ensure.return_infer(
+                prediction,
+                id_column_name,
+                moon_column_name,
+                prediction_column_name,
+            )
 
         predictions.append(prediction)
 
     prediction = pandas.concat(predictions)
-    prediction_path = os.path.join(constants.DOT_DATA_DIRECTORY, "prediction.csv")
+    prediction_path = os.path.join(
+        constants.DOT_DATA_DIRECTORY,
+        "prediction.csv"
+    )
     utils.write(prediction, prediction_path)
 
     logging.warn('prediction_path=%s', prediction_path)
-    
-    logging.warn('duration: time=%s', time.strftime("%H:%M:%S", time.gmtime(time.time() - start)))
+
+    logging.warn(
+        'duration: time=%s',
+        time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
+    )
 
     memory_after = _get_process_memory()
-    logging.warn('memory: before="%s" after="%s" consumed="%s"', format_bytes(memory_before), format_bytes(memory_after), format_bytes(memory_after - memory_before))
+    logging.warn(
+        'memory: before="%s" after="%s" consumed="%s"',
+        format_bytes(memory_before),
+        format_bytes(memory_after),
+        format_bytes(memory_after - memory_before)
+    )
 
     logging.warn('local test succesfully run!')
 

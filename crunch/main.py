@@ -129,7 +129,8 @@ def push(
 @click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
 @click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
 @click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
-@click.option("--round-number", default="@current")
+@click.option("--round-number", default="@current", help="Change round number to get the data from.")
+@click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
 def test(
     main_file_path: str,
     model_directory_path: str,
@@ -137,6 +138,7 @@ def test(
     train_frequency: int,
     skip_library_check: bool,
     round_number: str,
+    has_gpu: str,
 ):
     utils.change_root()
     tester.install_logger()
@@ -152,6 +154,7 @@ def test(
         force_first_train=not no_force_first_train,
         train_frequency=train_frequency,
         round_number=round_number,
+        has_gpu=has_gpu,
     )
 
 

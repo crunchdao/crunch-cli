@@ -11,9 +11,10 @@ from . import command, constants, tester, utils, api, library
 
 class _Inline:
 
-    def __init__(self, module: typing.Any, model_directory: str):
+    def __init__(self, module: typing.Any, model_directory: str, has_gpu=False):
         self.module = module
         self.model_directory = model_directory
+        self.has_gpu = has_gpu
 
         self.session = utils.CustomSession(
             os.environ.get(constants.WEB_BASE_URL_ENV_VAR, constants.WEB_BASE_URL_DEFAULT),
@@ -69,6 +70,7 @@ class _Inline:
                 force_first_train,
                 train_frequency,
                 round_number,
+                self.has_gpu
             )
         except click.Abort as abort:
             logging.error(f"Aborted!")
