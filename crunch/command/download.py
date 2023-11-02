@@ -55,6 +55,7 @@ def _get_data_urls(
     }).json()
 
     embargo = data_release["embargo"]
+    number_of_features = data_release["numberOfFeatures"]
     id_column_name = data_release["columnNames"]["id"]
     moon_column_name = data_release["columnNames"]["moon"]
     target_column_name = data_release["columnNames"]["target"]
@@ -82,6 +83,7 @@ def _get_data_urls(
 
     return (
         embargo,
+        number_of_features,
         (
             id_column_name,
             moon_column_name,
@@ -142,6 +144,7 @@ def download(
 
     (
         embargo,
+        number_of_features,
         (
             id_column_name,
             moon_column_name,
@@ -169,6 +172,7 @@ def download(
 
     return (
         embargo,
+        number_of_features,
         (
             id_column_name,
             moon_column_name,

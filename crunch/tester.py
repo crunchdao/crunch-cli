@@ -98,6 +98,7 @@ def run(
     try:
         (
             embargo,
+            number_of_features,
             (
                 id_column_name,
                 moon_column_name,
@@ -158,7 +159,7 @@ def run(
         )
 
         default_values = {
-            "number_of_features": len(full_x.columns) - 2,
+            "number_of_features": number_of_features,
             "model_directory_path": model_directory_path,
             "id_column_name": id_column_name,
             "moon_column_name": moon_column_name,
