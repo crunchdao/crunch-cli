@@ -153,8 +153,8 @@ def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str) -> N
             dataframe.to_parquet(path)
         else:
             dataframe.to_csv(path)
-
-    joblib.dump(dataframe, path)
+    else:
+        joblib.dump(dataframe, path)
 
 
 def guess_extension(dataframe: typing.Union[pandas.DataFrame, typing.Any]):
