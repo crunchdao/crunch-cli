@@ -87,7 +87,8 @@ def _read_crunchdao_file(name: str, raise_if_missing=True):
 
     if not os.path.exists(path):
         if raise_if_missing:
-            print(f"{path}: not found, are you in a project directory?")
+            print(f"{path}: not found, are you in the project directory?")
+            print(f"{path}: make sure to `cd <competition>` first")
             raise click.Abort()
 
         return None
