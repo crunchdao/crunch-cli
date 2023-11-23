@@ -11,11 +11,28 @@ import requests
 from .. import api, constants, utils
 
 
+def _dot_crunchdao(directory: str):
+    return os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+
+
+def _delete_tree_if_exists(path: str):
+    if os.path.exists(path):
+        print(f"delete {path}")
+        shutil.rmtree(path)
+
+
 def _check_if_already_exists(directory: str, force: bool):
-    if os.path.exists(directory):
+    if directory == ".":
         if force:
-            print(f"delete {directory}")
-            shutil.rmtree(directory)
+            dot_crunchdao_path = _dot_crunchdao(directory)
+            _delete_tree_if_exists(dot_crunchdao_path)
+        elif len(os.listdir(directory)):
+            print(f"{directory}: directory not empty (use --force to override)")
+            raise click.Abort()
+
+    elif os.path.exists(directory):
+        if force:
+            _delete_tree_if_exists(directory)
         else:
             print(f"{directory}: already exists (use --force to override)")
             raise click.Abort()
@@ -84,9 +101,8 @@ def setup(
 
         raise click.Abort()
 
-    dot_crunchdao_path = os.path.join(
-        directory, constants.DOT_CRUNCHDAO_DIRECTORY)
-    os.makedirs(dot_crunchdao_path)
+    dot_crunchdao_path = _dot_crunchdao(directory)
+    os.makedirs(dot_crunchdao_path, exist_ok=True)
 
     project_info = utils.ProjectInfo(
         competition_name,
