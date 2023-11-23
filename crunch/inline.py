@@ -29,12 +29,10 @@ class _Inline:
             (
                 _, # embargo
                 _, # column names
-                (
-                    x_train_path,
-                    y_train_path,
-                    x_test_path,
-                    _ # y_test_path
-                )
+                x_train_path,
+                y_train_path,
+                x_test_path,
+                _ # y_test_path
             ) = command.download(self.session)
         except api.CurrentCrunchNotFoundException:
             command.download_no_data_available()
