@@ -11,9 +11,10 @@ from . import command, constants, tester, utils, api, library
 
 class _Inline:
 
-    def __init__(self, module: typing.Any, model_directory: str):
+    def __init__(self, module: typing.Any, model_directory: str, has_gpu=False):
         self.module = module
         self.model_directory = model_directory
+        self.has_gpu = has_gpu
 
         self.session = utils.CustomSession(
             os.environ.get(constants.WEB_BASE_URL_ENV_VAR, constants.WEB_BASE_URL_DEFAULT),
@@ -27,11 +28,14 @@ class _Inline:
         try:
             (
                 _, # embargo
-                _, # moon_column_name
-                x_train_path,
-                y_train_path,
-                x_test_path,
-                _ # y_test_path
+                _, # number of features
+                _, # column names
+                (
+                    x_train_path,
+                    y_train_path,
+                    x_test_path,
+                    _ # y_test_path
+                )
             ) = command.download(self.session)
         except api.CurrentCrunchNotFoundException:
             command.download_no_data_available()
@@ -43,7 +47,13 @@ class _Inline:
 
         return x_train, y_train, x_test
 
-    def test(self, force_first_train=True, train_frequency=1, raise_abort=False):
+    def test(
+        self,
+        force_first_train=True,
+        train_frequency=1,
+        raise_abort=False,
+        round_number="@current"
+    ):
         tester.install_logger()
 
         try:
@@ -60,6 +70,8 @@ class _Inline:
                 self.model_directory,
                 force_first_train,
                 train_frequency,
+                round_number,
+                self.has_gpu
             )
         except click.Abort as abort:
             logging.error(f"Aborted!")

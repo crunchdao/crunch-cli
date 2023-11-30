@@ -5,12 +5,14 @@ import typing
 import urllib
 import urllib.parse
 import re
+import dataclasses
 
 import click
 import joblib
 import pandas
 import requests
 import packaging.version
+import psutil
 
 from . import constants, api
 
@@ -18,12 +20,11 @@ from . import constants, api
 class CustomSession(requests.Session):
     # https://stackoverflow.com/a/51026159/7292958
 
-    def __init__(self, web_base_url=None, api_base_url=None, debug=False, notebook=False):
+    def __init__(self, web_base_url=None, api_base_url=None, debug=False):
         super().__init__()
         self.web_base_url = web_base_url
         self.api_base_url = api_base_url
         self.debug = debug
-        self.notebook = notebook
 
     def request(self, method, url, *args, **kwargs):
         response = super().request(
@@ -43,12 +44,8 @@ class CustomSession(requests.Session):
                 code = error.get("code", "")
                 message = error.get("message", "")
 
-                if code == "INVALID_PROJECT_TOKEN" and message == "invalid project token":
-                    print("your token seems to have expired or is invalid")
-                    self.print_recopy_command()
-                elif code == "ENTITY_NOT_FOUND" and message.startswith("no user found with username"):
-                    print("user not found, did you rename yourself?")
-                    self.print_recopy_command()
+                if code == "INVALID_PROJECT_TOKEN":
+                    raise api.InvalidProjectTokenException(message)
                 elif code == "NEVER_SUBMITTED":
                     raise api.NeverSubmittedException(message)
                 elif code == "CURRENT_CRUNCH_NOT_FOUND":
@@ -70,14 +67,6 @@ class CustomSession(requests.Session):
             path
         )
 
-    def print_recopy_command(self):
-        tab = "notebook" if self.notebook else "cli"
-
-        print("---")
-        print("please follow this link to copy and paste your new setup command:")
-        print(self.format_web_url(f'/submit?tab={tab}'))
-        print("")
-
 
 def change_root():
     while True:
@@ -93,12 +82,13 @@ def change_root():
             raise click.Abort()
 
 
-def _read_crunchdao_file(name: str, raise_if_missing: bool):
+def _read_crunchdao_file(name: str, raise_if_missing=True):
     path = os.path.join(constants.DOT_CRUNCHDAO_DIRECTORY, name)
 
     if not os.path.exists(path):
         if raise_if_missing:
-            print(f"{path}: not found, are you in a project directory?")
+            print(f"{path}: not found, are you in the project directory?")
+            print(f"{path}: make sure to `cd <competition>` first")
             raise click.Abort()
 
         return None
@@ -107,12 +97,46 @@ def _read_crunchdao_file(name: str, raise_if_missing: bool):
         return fd.read()
 
 
-def read_project_name():
-    return _read_crunchdao_file(constants.PROJECT_FILE, True)
+@dataclasses.dataclass()
+class ProjectInfo:
+    competition_name: str
+    user_id: str
 
 
-def read_token(raise_if_missing=False):
-    return _read_crunchdao_file(constants.TOKEN_FILE, raise_if_missing)
+def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
+    dot_crunchdao_path = os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+
+    old_path = os.path.join(dot_crunchdao_path, constants.OLD_PROJECT_FILE)
+    if os.path.exists(old_path):
+        os.remove(old_path)
+    
+    path = os.path.join(dot_crunchdao_path, constants.PROJECT_FILE)
+    with open(path, "w") as fd:
+        json.dump({
+            "competitionName": info.competition_name,
+            "userId": info.user_id,
+        }, fd)
+
+
+def read_project_info() -> ProjectInfo:
+    old_content = _read_crunchdao_file(constants.OLD_PROJECT_FILE, False)
+    if old_content is not None:
+        return ProjectInfo(
+            "adialab",
+            root["userId"],
+        )
+    
+    content = _read_crunchdao_file(constants.PROJECT_FILE, True)
+    root = json.loads(content)
+
+    return ProjectInfo(
+        root["competitionName"],
+        root["userId"],
+    )
+
+
+def read_token():
+    return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
 def read(path: str, dataframe=True) -> typing.Union[pandas.DataFrame, typing.Any]:
@@ -130,8 +154,8 @@ def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str) -> N
             dataframe.to_parquet(path)
         else:
             dataframe.to_csv(path)
-
-    joblib.dump(dataframe, path)
+    else:
+        joblib.dump(dataframe, path)
 
 
 def guess_extension(dataframe: typing.Union[pandas.DataFrame, typing.Any]):
@@ -161,3 +185,20 @@ def is_valid_version(input: str):
         return True
     except:
         return False
+
+
+def get_process_memory() -> int:
+    process = psutil.Process(os.getpid())
+    mem_info = process.memory_info()
+    return mem_info.rss
+
+
+def format_bytes(bytes: int):
+    suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+    suffix_index = 0
+
+    while bytes >= 1024 and suffix_index < 8:
+        bytes /= 1024
+        suffix_index += 1
+
+    return f"{bytes:,.2f} {suffixes[suffix_index]}"

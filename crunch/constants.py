@@ -1,7 +1,8 @@
 DOT_CRUNCHDAO_DIRECTORY = ".crunchdao"
 DOT_DATA_DIRECTORY = "data"
 TOKEN_FILE = "token"
-PROJECT_FILE = "project"
+OLD_PROJECT_FILE = "project"
+PROJECT_FILE = "project.json"
 DOT_GITIGNORE_FILE = ".gitignore"
 REQUIREMENTS_TXT = "requirements.txt"
 CONVERTED_MAIN_PY = "__converted_main.py"
@@ -16,6 +17,6 @@ IGNORED_FILES = [
 
 DEBUG_ENV_VAR = "CRUNCH_DEBUG"
 API_BASE_URL_ENV_VAR = "API_BASE_URL"
-API_BASE_URL_DEFAULT = "http://api.adialab.crunchdao.com/"
+API_BASE_URL_DEFAULT = "http://api.hub.crunchdao.com/"
 WEB_BASE_URL_ENV_VAR = "WEB_BASE_URL"
-WEB_BASE_URL_DEFAULT = "https://adialab.crunchdao.com/"
+WEB_BASE_URL_DEFAULT = "https://hub.crunchdao.com/"

@@ -13,12 +13,10 @@ debug = False
 @click.option("--debug", "enable_debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
-@click.option("--notebook", is_flag=True, help="Tell the CLI you are running the command while inside a notebook.")
 def cli(
     enable_debug: bool,
     api_base_url: str,
     web_base_url: str,
-    notebook: bool,
 ):
     global debug
     debug = enable_debug
@@ -28,7 +26,6 @@ def cli(
         web_base_url,
         api_base_url,
         debug,
-        notebook,
     )
 
 
@@ -39,25 +36,26 @@ def cli(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
-@click.argument("project-name", required=True)
-@click.argument("directory", default="{projectName}")
+@click.argument("competition-name", required=True)
+@click.argument("directory", default="{competitionName}")
 def setup(
     clone_token: str,
     submission_number: str,
     no_data: bool,
     no_model: bool,
     force: bool,
-    project_name: str,
+    competition_name: str,
     directory: str,
     model_directory_path: str,
 ):
-    directory = directory.replace("{projectName}", project_name)
+    directory = directory\
+        .replace("{competitionName}", competition_name)
 
     command.setup(
         session,
         clone_token=clone_token,
         submission_number=submission_number,
-        project_name=project_name,
+        competition_name=competition_name,
         directory=directory,
         model_directory=model_directory_path,
         force=force,
@@ -112,7 +110,7 @@ def push(
         converted = True
 
     try:
-        submission = command.push(
+        command.push(
             session,
             message=message,
             main_file_path=main_file_path,
@@ -120,9 +118,6 @@ def push(
             export_path=export_path,
             include_installed_packages_version=not no_pip_freeze
         )
-
-        if submission:
-            command.push_summary(submission, session)
     finally:
         if converted:
             os.unlink(main_file_path)
@@ -134,12 +129,16 @@ def push(
 @click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
 @click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
 @click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
+@click.option("--round-number", default="@current", help="Change round number to get the data from.")
+@click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
 def test(
     main_file_path: str,
     model_directory_path: str,
     no_force_first_train: bool,
     train_frequency: int,
-    skip_library_check: bool
+    skip_library_check: bool,
+    round_number: str,
+    has_gpu: str,
 ):
     utils.change_root()
     tester.install_logger()
@@ -154,15 +153,23 @@ def test(
         model_directory_path=model_directory_path,
         force_first_train=not no_force_first_train,
         train_frequency=train_frequency,
+        round_number=round_number,
+        has_gpu=has_gpu,
     )
 
 
 @cli.command(help="Download the data locally.")
-def download():
+@click.option("--round-number", default="@current")
+def download(
+    round_number: str
+):
     utils.change_root()
 
     try:
-        command.download(session)
+        command.download(
+            session,
+            round_number=round_number
+        )
     except api.CurrentCrunchNotFoundException:
         command.download_no_data_available()
 
@@ -181,6 +188,7 @@ def convert(
         python_file_path=python_file_path,
         override=override,
     )
+
 
 if __name__ == '__main__':
     cli()
