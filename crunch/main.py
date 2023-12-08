@@ -51,6 +51,8 @@ def setup(
     directory = directory\
         .replace("{competitionName}", competition_name)
 
+    directory = os.path.normpath(directory)
+
     command.setup(
         session,
         clone_token=clone_token,
@@ -73,7 +75,11 @@ def setup(
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
     print(f"Next recommended actions:")
-    print(f" - To get inside your workspace directory, run: cd {directory}")
+
+    if directory != '.':
+        print(
+            f" - To get inside your workspace directory, run: cd {directory}")
+
     print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
 
 
