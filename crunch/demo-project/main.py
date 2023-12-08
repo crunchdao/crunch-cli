@@ -4,17 +4,28 @@ The code will not have access to the internet (or any socket related operation).
 """
 
 # Imports
-import xgboost as xgb
-import pandas as pd
-import typing
+import os
+
+# dont forget to update the `requirements.txt`
 import joblib
-from pathlib import Path
+import pandas as pd
 
 
+# Uncomment what you need!
 def train(
     X_train: pd.DataFrame,
     y_train: pd.DataFrame,
-    model_directory_path: str = "resources"
+    # number_of_features: int,
+    model_directory_path: str,
+    # id_column_name: str,
+    # moon_column_name: str,
+    # target_column_name: str,
+    # prediction_column_name: str,
+    # moon: int,
+    # current_moon: int, # same as "moon"
+    # embargo: int,
+    # has_gpu: bool,
+    # has_trained: bool,
 ) -> None:
     """
     Do your model training here.
@@ -25,36 +36,44 @@ def train(
 
     Args:
         X_train, y_train: the data to train the model.
+        number_of_features: the number of features of the dataset
         model_directory_path: the path to save your updated model
+        id_column_name: the name of the id column
+        moon_column_name: the name of the moon column
+        target_column_name: the name of the target column
+        prediction_column_name: the name of the prediction column
+        moon, current_moon: the moon currently being processed
+        embargo: data embrago
+        has_gpu: if the runner has a gpu
+        has_trained: if the moon will train
 
     Returns:
         None
     """
+    
+    # TODO: EDIT ME
+    model = ...
 
-    # basic xgboost regressor
-    model = xgb.XGBRegressor(
-        objective='reg:squarederror',
-        max_depth=4,
-        learning_rate=0.1,
-        n_estimators=2,
-        n_jobs=-1,
-        colsample_bytree=0.05
+    joblib.dump(
+        model,
+        os.path.join(model_directory_path, "model.joblib")
     )
 
-    # training the model
-    print("training...")
-    model.fit(X_train.iloc[:, 2:], y_train.iloc[:, 2:])
 
-    # make sure that the train function correctly save the trained model
-    # in the model_directory_path
-    model_pathname = Path(model_directory_path) / "model.joblib"
-    print(f"Saving model in {model_pathname}")
-    joblib.dump(model, model_pathname)
-
-
+# Uncomment what you need!
 def infer(
     X_test: pd.DataFrame,
-    model_directory_path: str = "resources"
+    # number_of_features: int,
+    model_directory_path: str,
+    id_column_name: str,
+    moon_column_name: str,
+    # target_column_name: str,
+    prediction_column_name: str,
+    # moon: int,
+    # current_moon: int, # same as "moon"
+    # embargo: int,
+    # has_gpu: bool,
+    # has_trained: bool,
 ) -> pd.DataFrame:
     """
     Do your inference here.
@@ -64,18 +83,27 @@ def infer(
     can match it correctly.
 
     Args:
-        model_directory_path: the path to the directory to the directory in wich we will be saving your updated model.
         X_test: the independant  variables of the current date passed to your model.
+        number_of_features: the number of features of the dataset
+        model_directory_path: the path to the directory to the directory in wich we will be saving your updated model.
+        id_column_name: the name of the id column
+        moon_column_name: the name of the moon column
+        target_column_name: the name of the target column
+        prediction_column_name: the name of the prediction column
+        moon, current_moon: the moon currently being processed
+        embargo: data embrago
+        has_gpu: if the runner has a gpu
+        has_trained: if the moon will train
 
     Returns:
         A dataframe (date, id, value) with the inferences of your model for the current date.
     """
 
     # loading the model saved by the train function at previous iteration
-    model = joblib.load(Path(model_directory_path) / "model.joblib")
+    model = joblib.load(os.path.join(model_directory_path, "model.joblib"))
 
     # creating the predicted label dataframe with correct dates and ids
-    y_test_predicted = X_test[["date", "id"]].copy()
-    y_test_predicted["value"] = model.predict(X_test.iloc[:, 2:])
+    prediction = X_test[[moon_column_name, id_column_name]].copy()
+    prediction[prediction_column_name] = model.predict(X_test.iloc[:, 2:])
 
-    return y_test_predicted
+    return prediction
