@@ -22,20 +22,15 @@ def _delete_tree_if_exists(path: str):
 
 
 def _check_if_already_exists(directory: str, force: bool):
-    if directory == ".":
-        if force:
-            dot_crunchdao_path = _dot_crunchdao(directory)
-            _delete_tree_if_exists(dot_crunchdao_path)
-        elif len(os.listdir(directory)):
-            print(f"{directory}: directory not empty (use --force to override)")
-            raise click.Abort()
+    if not os.path.exists(directory):
+        return
 
-    elif os.path.exists(directory):
-        if force:
-            _delete_tree_if_exists(directory)
-        else:
-            print(f"{directory}: already exists (use --force to override)")
-            raise click.Abort()
+    if force:
+        dot_crunchdao_path = _dot_crunchdao(directory)
+        _delete_tree_if_exists(dot_crunchdao_path)
+    elif len(os.listdir(directory)):
+        print(f"{directory}: directory not empty (use --force to override)")
+        raise click.Abort()
 
 
 def _read_demo_file(file_name: str):
