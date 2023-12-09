@@ -67,7 +67,7 @@ def _call(function: callable, default_values: dict, specific_values: dict):
 
 def _monkey_patch_display():
     import builtins
-    
+
     name = "display"
     if not hasattr(builtins, name):
         setattr(builtins, name, print)
@@ -81,6 +81,8 @@ def run(
     train_frequency: int,
     round_number: str,
     has_gpu=False,
+    read_kwargs={},
+    write_kwargs={},
 ):
     install_logger()
     _monkey_patch_display()
@@ -124,17 +126,17 @@ def run(
     moons.sort()
 
     full_x = pandas.concat([
-        utils.read(x_train_path),
+        utils.read(x_train_path, kwargs=read_kwargs),
         x_test,
     ])
 
     if y_test_path:
         full_y = pandas.concat([
-            utils.read(y_train_path),
-            utils.read(y_test_path),
+            utils.read(y_train_path, kwargs=read_kwargs),
+            utils.read(y_test_path, kwargs=read_kwargs),
         ])
     else:
-        full_y = utils.read(y_train_path)
+        full_y = utils.read(y_train_path, kwargs=read_kwargs)
 
     for dataframe in [full_x, full_y]:
         dataframe.set_index(moon_column_name, drop=True, inplace=True)
@@ -207,7 +209,7 @@ def run(
         constants.DOT_DATA_DIRECTORY,
         "prediction.csv"
     )
-    utils.write(prediction, prediction_path)
+    utils.write(prediction, prediction_path, kwargs=write_kwargs)
 
     logging.warn('prediction_path=%s', prediction_path)
 

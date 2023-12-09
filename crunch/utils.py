@@ -109,7 +109,7 @@ def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
     old_path = os.path.join(dot_crunchdao_path, constants.OLD_PROJECT_FILE)
     if os.path.exists(old_path):
         os.remove(old_path)
-    
+
     path = os.path.join(dot_crunchdao_path, constants.PROJECT_FILE)
     with open(path, "w") as fd:
         json.dump({
@@ -125,7 +125,7 @@ def read_project_info() -> ProjectInfo:
             "adialab",
             root["userId"],
         )
-    
+
     content = _read_crunchdao_file(constants.PROJECT_FILE, True)
     root = json.loads(content)
 
@@ -139,7 +139,7 @@ def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
-def read(path: str, dataframe=True, **kwargs) -> typing.Union[pandas.DataFrame, typing.Any]:
+def read(path: str, dataframe=True, kwargs={}) -> typing.Union[pandas.DataFrame, typing.Any]:
     if dataframe:
         if path.endswith(".parquet"):
             return pandas.read_parquet(path, **kwargs)
@@ -148,7 +148,7 @@ def read(path: str, dataframe=True, **kwargs) -> typing.Union[pandas.DataFrame, 
     return joblib.load(path)
 
 
-def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str, **kwargs) -> None:
+def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str, kwargs={}) -> None:
     if isinstance(dataframe, pandas.DataFrame):
         if path.endswith(".parquet"):
             dataframe.to_parquet(path, **kwargs)

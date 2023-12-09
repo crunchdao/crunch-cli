@@ -41,9 +41,9 @@ class _Inline:
             command.download_no_data_available()
             raise click.Abort()
 
-        x_train = utils.read(x_train_path, **kwargs)
-        y_train = utils.read(y_train_path, **kwargs)
-        x_test = utils.read(x_test_path, **kwargs)
+        x_train = utils.read(x_train_path, kwargs=kwargs)
+        y_train = utils.read(y_train_path, kwargs=kwargs)
+        x_test = utils.read(x_test_path, kwargs=kwargs)
 
         return x_train, y_train, x_test
 
@@ -52,7 +52,9 @@ class _Inline:
         force_first_train=True,
         train_frequency=1,
         raise_abort=False,
-        round_number="@current"
+        round_number="@current",
+        read_kwargs={},
+        write_kwargs={},
     ):
         tester.install_logger()
 
@@ -71,7 +73,9 @@ class _Inline:
                 force_first_train,
                 train_frequency,
                 round_number,
-                self.has_gpu
+                self.has_gpu,
+                read_kwargs,
+                write_kwargs,
             )
         except click.Abort as abort:
             logging.error(f"Aborted!")
