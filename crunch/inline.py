@@ -41,9 +41,9 @@ class _Inline:
             command.download_no_data_available()
             raise click.Abort()
 
-        x_train = utils.read(x_train_path, **kwargs)
-        y_train = utils.read(y_train_path, **kwargs)
-        x_test = utils.read(x_test_path, **kwargs)
+        x_train = utils.read(x_train_path, kwargs)
+        y_train = utils.read(y_train_path, kwargs)
+        x_test = utils.read(x_test_path, kwargs)
 
         return x_train, y_train, x_test
 

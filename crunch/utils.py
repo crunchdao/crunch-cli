@@ -142,8 +142,8 @@ def read_token():
 def read(path: str, dataframe=True, **kwargs) -> typing.Union[pandas.DataFrame, typing.Any]:
     if dataframe:
         if path.endswith(".parquet"):
-            return pandas.read_parquet(path, **kwargs)
-        return pandas.read_csv(path, **kwargs)
+            return pandas.read_parquet(path, kwargs)
+        return pandas.read_csv(path, kwargs)
 
     return joblib.load(path)
 
