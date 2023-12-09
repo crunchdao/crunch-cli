@@ -148,12 +148,12 @@ def read(path: str, dataframe=True, **kwargs) -> typing.Union[pandas.DataFrame, 
     return joblib.load(path)
 
 
-def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str) -> None:
+def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str, **kwargs) -> None:
     if isinstance(dataframe, pandas.DataFrame):
         if path.endswith(".parquet"):
-            dataframe.to_parquet(path)
+            dataframe.to_parquet(path, **kwargs)
         else:
-            dataframe.to_csv(path)
+            dataframe.to_csv(path, **kwargs)
     else:
         joblib.dump(dataframe, path)
 
