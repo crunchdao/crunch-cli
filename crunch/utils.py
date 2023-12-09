@@ -139,11 +139,11 @@ def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
-def read(path: str, dataframe=True) -> typing.Union[pandas.DataFrame, typing.Any]:
+def read(path: str, dataframe=True, **kwargs) -> typing.Union[pandas.DataFrame, typing.Any]:
     if dataframe:
         if path.endswith(".parquet"):
-            return pandas.read_parquet(path)
-        return pandas.read_csv(path)
+            return pandas.read_parquet(path, **kwargs)
+        return pandas.read_csv(path, **kwargs)
 
     return joblib.load(path)
 
