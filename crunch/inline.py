@@ -24,7 +24,7 @@ class _Inline:
 
         print(f"loaded inline runner with module: {module}")
 
-    def load_data(self) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
+    def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
             (
                 _, # embargo
@@ -41,9 +41,9 @@ class _Inline:
             command.download_no_data_available()
             raise click.Abort()
 
-        x_train = utils.read(x_train_path)
-        y_train = utils.read(y_train_path)
-        x_test = utils.read(x_test_path)
+        x_train = utils.read(x_train_path, **kwargs)
+        y_train = utils.read(y_train_path, **kwargs)
+        x_test = utils.read(x_test_path, **kwargs)
 
         return x_train, y_train, x_test
 
