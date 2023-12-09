@@ -14,10 +14,18 @@ pip install crunch-cli --upgrade
 
 ```python
 import crunch
-crunch = crunch.load_notebook(__name__)
+crunch = crunch.load_notebook()
 
 # Getting the data
 X_train, y_train, X_test = crunch.load_data()
+```
+
+`crunch.load_data()` accept arguments for `read_parquet`.
+
+```python
+crunch.load_data(
+  engine="fastparquet"
+)
 ```
 
 ## Submit with Crunch CLI
