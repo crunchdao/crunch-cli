@@ -27,14 +27,14 @@ class _Inline:
     def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
             (
-                _, # embargo
-                _, # number of features
-                _, # column names
+                _,  # embargo
+                _,  # number of features
+                _,  # column names
                 (
                     x_train_path,
                     y_train_path,
                     x_test_path,
-                    _ # y_test_path
+                    _  # y_test_path
                 )
             ) = command.download(self.session)
         except api.CurrentCrunchNotFoundException:
@@ -86,7 +86,10 @@ class _Inline:
             return None
 
 
-def load(module_or_module_name: typing.Any, model_directory=constants.DEFAULT_MODEL_DIRECTORY):
+def load(
+    module_or_module_name: typing.Any = "__main__",
+    model_directory=constants.DEFAULT_MODEL_DIRECTORY
+):
     if isinstance(module_or_module_name, str):
         module = sys.modules[module_or_module_name]
     else:
