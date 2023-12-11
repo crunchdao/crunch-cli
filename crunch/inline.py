@@ -24,26 +24,26 @@ class _Inline:
 
         print(f"loaded inline runner with module: {module}")
 
-    def load_data(self) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
+    def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
             (
-                _, # embargo
-                _, # number of features
-                _, # column names
+                _,  # embargo
+                _,  # number of features
+                _,  # column names
                 (
                     x_train_path,
                     y_train_path,
                     x_test_path,
-                    _ # y_test_path
+                    _  # y_test_path
                 )
             ) = command.download(self.session)
         except api.CurrentCrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
 
-        x_train = utils.read(x_train_path)
-        y_train = utils.read(y_train_path)
-        x_test = utils.read(x_test_path)
+        x_train = utils.read(x_train_path, kwargs=kwargs)
+        y_train = utils.read(y_train_path, kwargs=kwargs)
+        x_test = utils.read(x_test_path, kwargs=kwargs)
 
         return x_train, y_train, x_test
 
@@ -52,7 +52,9 @@ class _Inline:
         force_first_train=True,
         train_frequency=1,
         raise_abort=False,
-        round_number="@current"
+        round_number="@current",
+        read_kwargs={},
+        write_kwargs={},
     ):
         tester.install_logger()
 
@@ -71,7 +73,9 @@ class _Inline:
                 force_first_train,
                 train_frequency,
                 round_number,
-                self.has_gpu
+                self.has_gpu,
+                read_kwargs,
+                write_kwargs,
             )
         except click.Abort as abort:
             logging.error(f"Aborted!")
@@ -82,7 +86,10 @@ class _Inline:
             return None
 
 
-def load(module_or_module_name: typing.Any, model_directory=constants.DEFAULT_MODEL_DIRECTORY):
+def load(
+    module_or_module_name: typing.Any = "__main__",
+    model_directory=constants.DEFAULT_MODEL_DIRECTORY
+):
     if isinstance(module_or_module_name, str):
         module = sys.modules[module_or_module_name]
     else:
