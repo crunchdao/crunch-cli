@@ -71,7 +71,6 @@ def run_via_api(
     prediction_column_name: str,
 ):
     project_info = utils.read_project_info()
-    project_info.competition_name = "datacrunch"
     checks = session.get(
         f"/v1/competitions/{project_info.competition_name}/checks"
     ).json()
