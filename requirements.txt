@@ -11,3 +11,4 @@ psutil
 requirements-parser
 setuptools
 packaging
+pytest

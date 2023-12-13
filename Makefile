@@ -10,8 +10,11 @@ install: init
 uninstall:
 	$(PIP) uninstall crunch
 
+test:
+	$(PYTHON) -m pytest -v
+
 build:
 	rm -rf build *.egg-info dist
 	python setup.py sdist bdist_wheel
 
-.PHONY: init install uninstall build
+.PHONY: init install uninstall test build
