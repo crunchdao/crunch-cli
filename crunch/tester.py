@@ -111,7 +111,8 @@ def run(
                 x_train_path,
                 y_train_path,
                 x_test_path,
-                y_test_path
+                y_test_path,
+                _  # example_prediction_path
             )
         ) = command.download(
             session,

@@ -34,7 +34,8 @@ class _Inline:
                     x_train_path,
                     y_train_path,
                     x_test_path,
-                    _  # y_test_path
+                    _,  # y_test_path
+                    _,  # example_prediction
                 )
             ) = command.download(self.session)
         except api.CurrentCrunchNotFoundException:
