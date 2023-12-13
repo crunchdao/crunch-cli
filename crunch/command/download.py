@@ -49,7 +49,7 @@ def _get_data_urls(
     data_directory: str,
     competition_name: str,
     push_token: str,
-) -> typing.Tuple[int, typing.Tuple[str, str, str], typing.Tuple[DataFile, DataFile, DataFile, DataFile]]:
+) -> typing.Tuple[int, int, typing.Tuple[str, str, str, str], typing.Tuple[DataFile, DataFile, DataFile, DataFile, DataFile]]:
     data_release = session.get(f"/v2/competitions/{competition_name}/rounds/{round_number}/phases/submission/data-release", params={
         "pushToken": push_token
     }).json()
