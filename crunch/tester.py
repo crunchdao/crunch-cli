@@ -2,20 +2,13 @@ import logging
 import os
 import time
 import typing
-import inspect
 
+import click
 import coloredlogs
 import pandas
-import psutil
 import requests
-import click
 
-from . import command, constants, ensure, utils, api
-
-
-class undefined:
-    pass
-
+from . import api, checker, command, constants, ensure, utils
 
 _logged_installed = False
 
@@ -34,37 +27,6 @@ def install_logger():
     _logged_installed = True
 
 
-def _call(function: callable, default_values: dict, specific_values: dict):
-    values = {
-        **default_values,
-        **specific_values
-    }
-
-    def log(message: str):
-        logging.debug(f"{function.__name__}: {message}")
-
-    arguments = {}
-    for name, parameter in inspect.signature(function).parameters.items():
-        name_str = str(parameter)
-        if name_str.startswith("*"):
-            log(f"unsupported parameter: {name_str}")
-            continue
-
-        if parameter.default != inspect.Parameter.empty:
-            log(f"skip param with default value: {name}={parameter.default}")
-            continue
-
-        value = values.get(name, undefined)
-        if value is undefined:
-            log(f"unknown parameter: {name}")
-            value = None
-
-        log(f"set {name}={value.__class__.__name__}")
-        arguments[name] = value
-
-    return function(**arguments)
-
-
 def _monkey_patch_display():
     import builtins
 
@@ -81,6 +43,7 @@ def run(
     train_frequency: int,
     round_number: str,
     has_gpu=False,
+    checks=True,
     read_kwargs={},
     write_kwargs={},
 ):
@@ -112,7 +75,7 @@ def run(
                 y_train_path,
                 x_test_path,
                 y_test_path,
-                _  # example_prediction_path
+                example_prediction_path
             )
         ) = command.download(
             session,
@@ -180,7 +143,7 @@ def run(
             x_train = full_x[full_x.index < moon - embargo].reset_index()
             y_train = full_y[full_y.index < moon - embargo].reset_index()
 
-            _call(train_function, default_values, {
+            utils.smart_call(train_function, default_values, {
                 "X_train": x_train,
                 "x_train": x_train,
                 "Y_train": y_train,
@@ -191,7 +154,7 @@ def run(
             logging.warn('call: infer')
             x_test = full_x[full_x.index == moon].reset_index()
 
-            prediction = _call(infer_function, default_values, {
+            prediction = utils.smart_call(infer_function, default_values, {
                 "X_test": x_test,
                 "x_test": x_test,
             })
@@ -210,9 +173,33 @@ def run(
         constants.DOT_DATA_DIRECTORY,
         "prediction.csv"
     )
+
+    logging.warn('save prediction - path=%s', prediction_path)
     utils.write(prediction, prediction_path, kwargs=write_kwargs)
 
-    logging.warn('prediction_path=%s', prediction_path)
+    if checks:
+        example_prediction = utils.read(example_prediction_path)
+
+        try:
+            checker.run_via_api(
+                session,
+                prediction,
+                example_prediction,
+                id_column_name,
+                moon_column_name,
+                prediction_column_name,
+            )
+
+            logging.warn(f"prediction is valid")
+        except checker.CheckError as error:
+            if error.__cause__:
+                logging.exception(
+                    "check failed - message=`%s`",
+                    error,
+                    exc_info=error.__cause__
+                )
+            else:
+                logging.error("check failed - message=`%s`", error)
 
     logging.warn(
         'duration: time=%s',
