@@ -14,6 +14,7 @@ def test(
     train_frequency: int,
     round_number: str,
     has_gpu: bool,
+    checks=True,
 ):
     spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
@@ -29,7 +30,13 @@ def test(
         train_frequency,
         round_number,
         has_gpu,
+        checks=checks,
     )
 
-    logging.warn('prediction=\n%s', prediction)
+    if prediction is not None:
+        logging.warn('prediction=\n%s', prediction)
+        logging.warn('')
+        logging.warn('local test succesfully run!')
+        logging.warn('')
+
     return prediction
