@@ -161,13 +161,6 @@ def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str, kwar
         joblib.dump(dataframe, path)
 
 
-def guess_extension(dataframe: typing.Union[pandas.DataFrame, typing.Any]):
-    if isinstance(dataframe, pandas.DataFrame):
-        return "parquet"
-
-    return "joblib"
-
-
 def strip_python_special_lines(lines: typing.List[str]):
     return "\n".join(
         line
