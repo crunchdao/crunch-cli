@@ -1,20 +1,22 @@
+import dataclasses
+import inspect
 import json
+import logging
 import os
+import re
 import traceback
 import typing
 import urllib
 import urllib.parse
-import re
-import dataclasses
 
 import click
 import joblib
-import pandas
-import requests
 import packaging.version
+import pandas
 import psutil
+import requests
 
-from . import constants, api
+from . import api, constants
 
 
 class CustomSession(requests.Session):
@@ -104,7 +106,8 @@ class ProjectInfo:
 
 
 def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
-    dot_crunchdao_path = os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+    dot_crunchdao_path = os.path.join(
+        directory, constants.DOT_CRUNCHDAO_DIRECTORY)
 
     old_path = os.path.join(dot_crunchdao_path, constants.OLD_PROJECT_FILE)
     if os.path.exists(old_path):
@@ -158,13 +161,6 @@ def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str, kwar
         joblib.dump(dataframe, path)
 
 
-def guess_extension(dataframe: typing.Union[pandas.DataFrame, typing.Any]):
-    if isinstance(dataframe, pandas.DataFrame):
-        return "parquet"
-
-    return "joblib"
-
-
 def strip_python_special_lines(lines: typing.List[str]):
     return "\n".join(
         line
@@ -202,3 +198,41 @@ def format_bytes(bytes: int):
         suffix_index += 1
 
     return f"{bytes:,.2f} {suffixes[suffix_index]}"
+
+
+class _undefined:
+    pass
+
+
+def smart_call(function: callable, default_values: dict, specific_values={}):
+    values = {
+        **default_values,
+        **specific_values
+    }
+
+    def warn(message: str):
+        logging.warn(f"{function.__name__}: {message}")
+
+    def debug(message: str):
+        logging.debug(f"{function.__name__}: {message}")
+
+    arguments = {}
+    for name, parameter in inspect.signature(function).parameters.items():
+        name_str = str(parameter)
+        if name_str.startswith("*"):
+            warn(f"unsupported parameter: {name_str}")
+            continue
+
+        if parameter.default != inspect.Parameter.empty:
+            warn(f"skip param with default value: {name}={parameter.default}")
+            continue
+
+        value = values.get(name, _undefined)
+        if value is _undefined:
+            warn(f"unknown parameter: {name}")
+            value = None
+
+        debug(f"set {name}={value.__class__.__name__}")
+        arguments[name] = value
+
+    return function(**arguments)

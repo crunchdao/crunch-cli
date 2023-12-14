@@ -49,7 +49,7 @@ def _get_data_urls(
     data_directory: str,
     competition_name: str,
     push_token: str,
-) -> typing.Tuple[int, typing.Tuple[str, str, str], typing.Tuple[DataFile, DataFile, DataFile, DataFile]]:
+) -> typing.Tuple[int, int, typing.Tuple[str, str, str, str], typing.Tuple[DataFile, DataFile, DataFile, DataFile, DataFile]]:
     data_release = session.get(f"/v2/competitions/{competition_name}/rounds/{round_number}/phases/submission/data-release", params={
         "pushToken": push_token
     }).json()
@@ -80,6 +80,7 @@ def _get_data_urls(
     y_train = get_file("yTrain", "y_train")
     x_test = get_file("xTest", "X_test")
     y_test = get_file("yTest", "y_test")
+    example_prediction = get_file("examplePrediction", "example_prediction")
 
     return (
         embargo,
@@ -94,7 +95,8 @@ def _get_data_urls(
             x_train,
             y_train,
             x_test,
-            y_test
+            y_test,
+            example_prediction
         )
     )
 
@@ -155,20 +157,22 @@ def download(
             x_train,
             y_train,
             x_test,
-            y_test
+            y_test,
+            example_prediction,
         )
     ) = _get_data_urls(
         session,
         round_number,
         constants.DOT_DATA_DIRECTORY,
         project_info.competition_name,
-        push_token
+        push_token,
     )
 
     _download(x_train, force)
     _download(y_train, force)
     _download(x_test, force)
     _download(y_test, force)
+    _download(example_prediction, force)
 
     return (
         embargo,
@@ -183,7 +187,8 @@ def download(
             x_train.path,
             y_train.path,
             x_test.path,
-            y_test.path if y_test.has_size else None
+            y_test.path if y_test.has_size else None,
+            example_prediction.path,
         )
     )
 
