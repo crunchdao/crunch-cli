@@ -3,13 +3,17 @@ import logging
 
 import click
 
-from . import command, constants, utils, api, library, tester
+from . import command, constants, utils, api, library, tester, __version__
 
 session = None
 debug = False
 
 
 @click.group()
+@click.version_option(
+    __version__.__version__,
+    package_name="__version__.__title__"
+)
 @click.option("--debug", "enable_debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
