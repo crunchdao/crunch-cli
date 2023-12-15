@@ -99,6 +99,17 @@ def _read_crunchdao_file(name: str, raise_if_missing=True):
         return fd.read()
 
 
+def write_token(plain_push_token: str, directory="."):
+    dot_crunchdao_path = os.path.join(
+        directory,
+        constants.DOT_CRUNCHDAO_DIRECTORY
+    )
+
+    token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
+    with open(token_file_path, "w") as fd:
+        fd.write(plain_push_token)
+
+
 @dataclasses.dataclass()
 class ProjectInfo:
     competition_name: str
@@ -107,7 +118,9 @@ class ProjectInfo:
 
 def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
     dot_crunchdao_path = os.path.join(
-        directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+        directory,
+        constants.DOT_CRUNCHDAO_DIRECTORY
+    )
 
     old_path = os.path.join(dot_crunchdao_path, constants.OLD_PROJECT_FILE)
     if os.path.exists(old_path):

@@ -99,21 +99,21 @@ def setup(
     dot_crunchdao_path = _dot_crunchdao(directory)
     os.makedirs(dot_crunchdao_path, exist_ok=True)
 
+    plain = push_token['plain']
+    user_id = push_token["project"]["userId"]
+
     project_info = utils.ProjectInfo(
         competition_name,
-        push_token["project"]["userId"]
+        user_id
     )
 
     utils.write_project_info(project_info, directory)
-
-    token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
-    with open(token_file_path, "w") as fd:
-        fd.write(push_token['plain'])
+    utils.write_token(plain, directory)
 
     try:
         code_tar = io.BytesIO(
             session.get(
-                f"/v2/competitions/{competition_name}/projects/{project_info.user_id}/clone",
+                f"/v2/competitions/{competition_name}/projects/{user_id}/clone",
                 params={
                     "pushToken": push_token['plain'],
                     "submissionNumber": submission_number,

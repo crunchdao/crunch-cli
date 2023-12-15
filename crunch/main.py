@@ -200,5 +200,18 @@ def convert(
     )
 
 
+@cli.command(help="Update a project token.")
+@click.argument("clone-token", required=True)
+def update_token(
+    clone_token: str,
+):
+    utils.change_root()
+
+    command.update_token(
+        session,
+        clone_token=clone_token
+    )
+
+
 if __name__ == '__main__':
     cli()
