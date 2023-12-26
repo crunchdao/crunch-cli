@@ -53,17 +53,13 @@ def _setup_demo(directory: str, filter: list = None):
             fd.write(content)
 
 
-def _setup_submission(directory: str, code_tar: io.BytesIO):
-    tar = tarfile.open(fileobj=code_tar)
-    for member in tar.getmembers():
-        path = os.path.join(directory, member.name)
-        print(f"extract {path}")
-
+def _setup_submission(directory: str, urls: dict):
+    for relative_path, url in urls.items():
+        path = os.path.join(directory, relative_path)
+        
         os.makedirs(os.path.dirname(path), exist_ok=True)
-
-        fileobj = tar.extractfile(member)
-        with open(path, "wb") as fd:
-            fd.write(fileobj.read())
+        
+        utils.download(url, path)
 
 
 def setup(
@@ -111,20 +107,18 @@ def setup(
     utils.write_token(plain, directory)
 
     try:
-        code_tar = io.BytesIO(
-            session.get(
-                f"/v2/competitions/{competition_name}/projects/{user_id}/clone",
-                params={
-                    "pushToken": push_token['plain'],
-                    "submissionNumber": submission_number,
-                    "includeModel": not no_model,
-                }
-            ).content
-        )
+        urls = session.get(
+            f"/v3/competitions/{competition_name}/projects/{user_id}/clone",
+            params={
+                "pushToken": push_token['plain'],
+                "submissionNumber": submission_number,
+                "includeModel": not no_model,
+            }
+        ).json()
     except api.NeverSubmittedException:
         _setup_demo(directory)
     else:
-        _setup_submission(directory, code_tar)
+        _setup_submission(directory, urls)
 
     path = os.path.join(directory, model_directory)
     os.makedirs(path, exist_ok=True)
