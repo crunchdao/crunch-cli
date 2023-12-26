@@ -17,8 +17,14 @@ class _Inline:
         self.has_gpu = has_gpu
 
         self.session = utils.CustomSession(
-            os.environ.get(constants.WEB_BASE_URL_ENV_VAR, constants.WEB_BASE_URL_DEFAULT),
-            os.environ.get(constants.API_BASE_URL_ENV_VAR, constants.API_BASE_URL_DEFAULT),
+            os.environ.get(
+                constants.WEB_BASE_URL_ENV_VAR,
+                constants.WEB_BASE_URL_DEFAULT
+            ),
+            os.environ.get(
+                constants.API_BASE_URL_ENV_VAR,
+                constants.API_BASE_URL_DEFAULT
+            ),
             bool(os.environ.get(constants.DEBUG_ENV_VAR, "False")),
         )
 
@@ -85,6 +91,11 @@ class _Inline:
                 raise abort
 
             return None
+
+    @property
+    def is_inside_runner(self):
+        from . import runner
+        return runner.is_inside
 
 
 def load(
