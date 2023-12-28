@@ -48,6 +48,22 @@ Options:
   --help                  Show this message and exit.
 ```
 
+## Detecting the environment
+
+Detecting whether you are running inside the runner or not, allows you to configure your program more precisely.
+
+```python
+import crunch
+
+if crunch.is_inside_runner:
+  print("running inside the runner")
+else:
+  print("running elsewhere")
+
+  model.enable_debug()
+  logger.set_level("TRACE")
+```
+
 ## Competition Links
 
 - [CrunchDAO Tournament](https://www.crunchdao.com)
