@@ -105,7 +105,10 @@ def _download(data_file: DataFile, force: bool):
     if data_file is None:
         return
 
-    print(f"download {data_file.path} from {cut_url(data_file.url)}")
+    file_length_str = f" ({data_file.size} bytes)" if data_file.has_size else ""
+    print(
+        f"download {data_file.path} from {cut_url(data_file.url)}" + file_length_str
+    )
 
     if not data_file.has_size:
         print(f"skip: not given by server")
@@ -122,21 +125,12 @@ def _download(data_file: DataFile, force: bool):
         print(f"signature missing: cannot download file without being authenticated")
         raise click.Abort()
 
-    with requests.get(data_file.url, stream=True) as response:
-        response.raise_for_status()
-
-        file_length = response.headers.get("Content-Length", None)
-        file_length = int(file_length) if not None else None
-
-        with open(data_file.path, 'wb') as fd, tqdm.tqdm(total=file_length, unit='iB', unit_scale=True, leave=False) as progress:
-            for chunk in response.iter_content(chunk_size=8192):
-                progress.update(len(chunk))
-                fd.write(chunk)
+    utils.download(data_file.url, data_file.path, log=False)
 
 
 def download(
     session: utils.CustomSession,
-    round_number = "@current",
+    round_number="@current",
     force=False,
 ):
     project_info = utils.read_project_info()
