@@ -15,6 +15,7 @@ import packaging.version
 import pandas
 import psutil
 import requests
+import tqdm
 
 from . import api, constants
 
@@ -99,6 +100,17 @@ def _read_crunchdao_file(name: str, raise_if_missing=True):
         return fd.read()
 
 
+def write_token(plain_push_token: str, directory="."):
+    dot_crunchdao_path = os.path.join(
+        directory,
+        constants.DOT_CRUNCHDAO_DIRECTORY
+    )
+
+    token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
+    with open(token_file_path, "w") as fd:
+        fd.write(plain_push_token)
+
+
 @dataclasses.dataclass()
 class ProjectInfo:
     competition_name: str
@@ -107,7 +119,9 @@ class ProjectInfo:
 
 def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
     dot_crunchdao_path = os.path.join(
-        directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+        directory,
+        constants.DOT_CRUNCHDAO_DIRECTORY
+    )
 
     old_path = os.path.join(dot_crunchdao_path, constants.OLD_PROJECT_FILE)
     if os.path.exists(old_path):
@@ -236,3 +250,42 @@ def smart_call(function: callable, default_values: dict, specific_values={}):
         arguments[name] = value
 
     return function(**arguments)
+
+
+def cut_url(url: str):
+    try:
+        return url[:url.index("?")]
+    except ValueError:
+        return url
+
+
+def download(url: str, path: str, log=True):
+    logged = False
+
+    try:
+        with requests.get(url, stream=True) as response:
+            response.raise_for_status()
+
+            file_length = response.headers.get("Content-Length", None)
+            file_length = int(file_length) if not None else None
+
+            if log:
+                if file_length is not None:
+                    file_length_str = f"{file_length} bytes"
+                else:
+                    file_length_str = "unknown length"
+
+                print(
+                    f"download {path} from {cut_url(url)} ({file_length_str})"
+                )
+                logged = True
+
+            with open(path, 'wb') as fd, tqdm.tqdm(total=file_length, unit='iB', unit_scale=True, leave=False) as progress:
+                for chunk in response.iter_content(chunk_size=8192):
+                    progress.update(len(chunk))
+                    fd.write(chunk)
+    except:
+        if log and not logged:
+            print(f"downloading {path} from {cut_url(url)}")
+
+        raise
