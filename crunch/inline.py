@@ -35,6 +35,7 @@ class _Inline:
             (
                 _,  # embargo
                 _,  # number of features
+                _,  # split keys
                 _,  # column names
                 (
                     x_train_path,
