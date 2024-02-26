@@ -2,11 +2,14 @@ import os
 import logging
 
 import click
+import dotenv
 
 from . import command, constants, utils, api, library, tester, __version__
 
 session = None
 debug = False
+
+dotenv.load_dotenv(".env", verbose=True)
 
 
 @click.group()
