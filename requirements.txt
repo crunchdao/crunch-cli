@@ -12,3 +12,4 @@ requirements-parser
 setuptools
 packaging
 pytest
+python-dotenv
