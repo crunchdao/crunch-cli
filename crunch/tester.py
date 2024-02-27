@@ -64,6 +64,7 @@ def run(
         (
             embargo,
             number_of_features,
+            split_keys,
             (
                 id_column_name,
                 moon_column_name,
@@ -86,13 +87,9 @@ def run(
         raise click.Abort()
 
     try:
-        x_test = utils.read(x_test_path)
-        moons = x_test[moon_column_name].unique()
-        moons.sort()
-
         full_x = pandas.concat([
             utils.read(x_train_path, kwargs=read_kwargs),
-            x_test,
+            utils.read(x_test_path),
         ])
 
         if y_test_path:
@@ -106,12 +103,11 @@ def run(
         for dataframe in [full_x, full_y]:
             dataframe.set_index(moon_column_name, drop=True, inplace=True)
 
-        del x_test
-
         os.makedirs(model_directory_path, exist_ok=True)
 
         predictions: typing.List[pandas.DataFrame] = []
 
+        moons = split_keys
         for index, moon in enumerate(moons):
             train = False
             if train_frequency != 0 and moon % train_frequency == 0:

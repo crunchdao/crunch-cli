@@ -61,6 +61,16 @@ def _get_data_urls(
     target_column_name = data_release["columnNames"]["target"]
     prediction_column_name = data_release["columnNames"]["prediction"]
     data_files = data_release["dataFiles"]
+    splits = data_release["splits"]
+
+    split_keys = {
+        split["key"]
+        for split in splits
+        if (
+            split["group"] == "TEST"
+            and split["reduced"] is not None
+        )
+    }
 
     def get_file(key: str, file_name: str) -> DataFile:
         data_file = data_files[key]
@@ -85,6 +95,7 @@ def _get_data_urls(
     return (
         embargo,
         number_of_features,
+        split_keys,
         (
             id_column_name,
             moon_column_name,
@@ -141,6 +152,7 @@ def download(
     (
         embargo,
         number_of_features,
+        split_keys,
         (
             id_column_name,
             moon_column_name,
@@ -171,6 +183,7 @@ def download(
     return (
         embargo,
         number_of_features,
+        split_keys,
         (
             id_column_name,
             moon_column_name,
