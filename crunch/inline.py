@@ -16,17 +16,7 @@ class _Inline:
         self.model_directory = model_directory
         self.has_gpu = has_gpu
 
-        self.session = utils.CustomSession(
-            os.environ.get(
-                constants.WEB_BASE_URL_ENV_VAR,
-                constants.WEB_BASE_URL_DEFAULT
-            ),
-            os.environ.get(
-                constants.API_BASE_URL_ENV_VAR,
-                constants.API_BASE_URL_DEFAULT
-            ),
-            bool(os.environ.get(constants.DEBUG_ENV_VAR, "False")),
-        )
+        self.session = utils.CustomSession.from_env()
 
         print(f"loaded inline runner with module: {module}")
 

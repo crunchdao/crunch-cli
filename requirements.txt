@@ -13,3 +13,4 @@ setuptools
 packaging
 pytest
 python-dotenv
+humanfriendly

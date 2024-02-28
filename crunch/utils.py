@@ -16,6 +16,7 @@ import pandas
 import psutil
 import requests
 import tqdm
+import humanfriendly
 
 from . import api, constants
 
@@ -30,6 +31,7 @@ class CustomSession(requests.Session):
         self.debug = debug
 
     def request(self, method, url, *args, **kwargs):
+        print(urllib.parse.urljoin(self.api_base_url, url))
         response = super().request(
             method,
             urllib.parse.urljoin(self.api_base_url, url),
@@ -68,6 +70,20 @@ class CustomSession(requests.Session):
         return urllib.parse.urljoin(
             self.web_base_url,
             path
+        )
+
+    @staticmethod
+    def from_env():
+        return CustomSession(
+            os.environ.get(
+                constants.WEB_BASE_URL_ENV_VAR,
+                constants.WEB_BASE_URL_DEFAULT
+            ),
+            os.environ.get(
+                constants.API_BASE_URL_ENV_VAR,
+                constants.API_BASE_URL_DEFAULT
+            ),
+            humanfriendly.coerce_boolean(os.environ.get(constants.DEBUG_ENV_VAR, "False"))
         )
 
 

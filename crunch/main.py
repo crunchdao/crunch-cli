@@ -2,14 +2,10 @@ import os
 import logging
 
 import click
-import dotenv
 
-from . import command, constants, utils, api, library, tester, __version__
+from . import command, constants, utils, api, library, tester, store, __version__
 
-session = None
-debug = False
-
-dotenv.load_dotenv(".env", verbose=True)
+store.load_from_env()
 
 
 @click.group()
@@ -17,19 +13,19 @@ dotenv.load_dotenv(".env", verbose=True)
     __version__.__version__,
     package_name="__version__.__title__"
 )
-@click.option("--debug", "enable_debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
+@click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
 def cli(
-    enable_debug: bool,
+    debug: bool,
     api_base_url: str,
     web_base_url: str,
 ):
-    global debug
-    debug = enable_debug
+    store.debug = debug
+    store.api_base_url = api_base_url
+    store.web_base_url = web_base_url
 
-    global session
-    session = utils.CustomSession(
+    store.session = utils.CustomSession(
         web_base_url,
         api_base_url,
         debug,
@@ -61,7 +57,7 @@ def setup(
     directory = os.path.normpath(directory)
 
     command.setup(
-        session,
+        store.session,
         clone_token=clone_token,
         submission_number=submission_number,
         competition_name=competition_name,
@@ -75,7 +71,7 @@ def setup(
         os.chdir(directory)
 
         try:
-            command.download(session, force=True)
+            command.download(store.session, force=True)
         except api.CurrentCrunchNotFoundException:
             command.download_no_data_available()
 
@@ -84,8 +80,7 @@ def setup(
     print(f"Next recommended actions:")
 
     if directory != '.':
-        print(
-            f" - To get inside your workspace directory, run: cd {directory}")
+        print(f" - To get inside your workspace directory, run: cd {directory}")
 
     print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
 
@@ -124,7 +119,7 @@ def push(
 
     try:
         command.push(
-            session,
+            store.session,
             message=message,
             main_file_path=main_file_path,
             model_directory_path=model_directory_path,
@@ -157,11 +152,11 @@ def test(
     tester.install_logger()
 
     if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
-        library.scan(session, requirements_file=constants.REQUIREMENTS_TXT)
+        library.scan(store.session, requirements_file=constants.REQUIREMENTS_TXT)
         logging.warn('')
 
     command.test(
-        session,
+        store.session,
         main_file_path=main_file_path,
         model_directory_path=model_directory_path,
         force_first_train=not no_force_first_train,
@@ -180,7 +175,7 @@ def download(
 
     try:
         command.download(
-            session,
+            store.session,
             round_number=round_number
         )
     except api.CurrentCrunchNotFoundException:
@@ -211,7 +206,7 @@ def update_token(
     utils.change_root()
 
     command.update_token(
-        session,
+        store.session,
         clone_token=clone_token
     )
 
