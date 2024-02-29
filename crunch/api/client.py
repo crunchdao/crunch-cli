@@ -5,7 +5,7 @@ import requests
 
 from .. import constants, store
 from .auth import ApiKeyAuth, Auth, NoneAuth
-from .errors import ApiException
+from .errors import ApiException, convert_error
 from .domain.check import CheckEndpointMixin
 from .domain.competition import (CompetitionCollection,
                                   CompetitionEndpointMixin)
@@ -66,13 +66,9 @@ class EndpointClient(
             response.raise_for_status()
         except requests.exceptions.HTTPError as error:
             content = error.response.json()
+            converted = convert_error(content)
 
-            code = content.pop("code", "")
-            message = content.pop("message", "")
-
-            raise ApiException(
-                f"{code}: {message}"
-            )
+            raise converted
 
     def _result(
         self,

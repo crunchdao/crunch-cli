@@ -82,7 +82,7 @@ def run(
             session,
             round_number=round_number
         )
-    except api.CurrentCrunchNotFoundException:
+    except api.CrunchNotFoundException:
         command.download_no_data_available()
         raise click.Abort()
 

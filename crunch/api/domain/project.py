@@ -1,7 +1,17 @@
+import enum
 import typing
 
-from .competition import Competition
 from ..resource import Collection, Model
+from .competition import Competition
+
+
+class ProjectTokenType(enum.Enum):
+
+    TEMPORARY = "TEMPORARY"
+    PERMANENT = "PERMANENT"
+
+    def __repr__(self):
+        return self.name
 
 
 class Project(Model):
@@ -69,6 +79,19 @@ class ProjectCollection(Collection):
         self
     ) -> Project:
         return self.get("@me")
+
+    # TODO Introduce an endpoint instead
+    def list(
+        self,
+    ) -> Project:
+        from ..errors import ProjectNotFoundException
+
+        try:
+            project = self.get_me()
+
+            return [project]
+        except ProjectNotFoundException:
+            return []
 
 
 class ProjectEndpointMixin:

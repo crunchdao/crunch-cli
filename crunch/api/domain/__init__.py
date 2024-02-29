@@ -11,8 +11,14 @@ from .data_release import (
     OriginalFiles,
     DataFile,
 )
-from .phase import Phase
+from .phase import (
+    Phase,
+    PhaseType,
+)
 from .prediction import Prediction
-from .project import Project
+from .project import (
+    Project,
+    ProjectTokenType,
+)
 from .round import Round
 from .score import Score

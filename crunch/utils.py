@@ -18,7 +18,7 @@ import requests
 import tqdm
 import humanfriendly
 
-from . import constants
+from . import constants, api
 
 
 class CustomSession(requests.Session):
@@ -46,18 +46,7 @@ class CustomSession(requests.Session):
             except:
                 print(response.text)
             else:
-                code = error.get("code", "")
-                message = error.get("message", "")
-
-                # if code == "INVALID_PROJECT_TOKEN":
-                #     raise api.InvalidProjectTokenException(message)
-                # elif code == "NEVER_SUBMITTED":
-                #     raise api.NeverSubmittedException(message)
-                # elif code == "CURRENT_CRUNCH_NOT_FOUND":
-                #     raise api.CurrentCrunchNotFoundException(message)
-                # else:
-                #     print(f"{method} {url}: {status_code}")
-                #     print(json.dumps(error, indent=4))
+                raise api.errors.convert_error(error)
 
             if self.debug:
                 traceback.print_stack()

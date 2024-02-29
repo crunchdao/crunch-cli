@@ -35,7 +35,7 @@ class _Inline:
                     _,  # example_prediction
                 )
             ) = command.download(self.session)
-        except api.CurrentCrunchNotFoundException:
+        except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
 

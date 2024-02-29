@@ -72,7 +72,7 @@ def setup(
 
         try:
             command.download(store.session, force=True)
-        except api.CurrentCrunchNotFoundException:
+        except api.CrunchNotFoundException:
             command.download_no_data_available()
 
     print("\n---")
@@ -178,7 +178,7 @@ def download(
             store.session,
             round_number=round_number
         )
-    except api.CurrentCrunchNotFoundException:
+    except api.CrunchNotFoundException:
         command.download_no_data_available()
 
 
