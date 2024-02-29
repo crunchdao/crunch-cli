@@ -1,7 +1,7 @@
 import typing
 
-from .resource import Collection, Model
 from ..identifiers import CompetitionIdentifierType
+from ..resource import Collection, Model
 
 
 class Competition(Model):
@@ -16,7 +16,7 @@ class Competition(Model):
 
     @property
     def checks(self):
-        from .checks import CheckCollection
+        from .check import CheckCollection
 
         return CheckCollection(
             competition=self,
@@ -25,7 +25,7 @@ class Competition(Model):
 
     @property
     def data_releases(self):
-        from .data_releases import DataReleaseCollection
+        from .data_release import DataReleaseCollection
 
         return DataReleaseCollection(
             competition=self,
@@ -34,7 +34,7 @@ class Competition(Model):
 
     @property
     def projects(self):
-        from .projects import ProjectCollection
+        from .project import ProjectCollection
 
         return ProjectCollection(
             competition=self,
@@ -43,7 +43,7 @@ class Competition(Model):
 
     @property
     def rounds(self):
-        from .rounds import RoundCollection
+        from .round import RoundCollection
 
         return RoundCollection(
             competition=self,
@@ -75,3 +75,27 @@ class CompetitionCollection(Collection):
             self.prepare_model(item)
             for item in response
         ]
+
+
+class CompetitionEndpointMixin:
+
+    def list_competitions(
+        self
+    ):
+        return self._result(
+            self.get(
+                "/v1/competitions"
+            ),
+            json=True
+        )
+
+    def get_competition(
+        self,
+        identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v1/competitions/{identifier}"
+            ),
+            json=True
+        )

@@ -4,8 +4,8 @@ import typing
 import dataclasses_json
 
 from ..identifiers import RoundIdentifierType
-from .competitions import Competition
-from .resource import Collection, Model
+from .competition import Competition
+from ..resource import Collection, Model
 
 
 class Round(Model):
@@ -33,7 +33,7 @@ class Round(Model):
 
     @property
     def phases(self):
-        from .phases import PhaseCollection
+        from .phase import PhaseCollection
 
         return PhaseCollection(
             round=self,
@@ -91,3 +91,29 @@ class RoundCollection(Collection):
             )
             for item in response
         ]
+
+
+class RoundEndpointMixin:
+
+    def list_rounds(
+        self,
+        competition_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v1/competitions/{competition_identifier}/rounds"
+            ),
+            json=True
+        )
+
+    def get_round(
+        self,
+        competition_identifier,
+        identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v1/competitions/{competition_identifier}/rounds/{identifier}"
+            ),
+            json=True
+        )

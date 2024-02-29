@@ -1,7 +1,7 @@
 import typing
 
-from .projects import Project
-from .resource import Collection, Model
+from .project import Project
+from ..resource import Collection, Model
 
 
 class Prediction(Model):
@@ -27,7 +27,7 @@ class Prediction(Model):
 
     @property
     def scores(self):
-        from .scores import ScoreCollection
+        from .score import ScoreCollection
 
         return ScoreCollection(
             prediction=self,
@@ -36,7 +36,7 @@ class Prediction(Model):
 
     @property
     def score_summary(self) -> "ScoreSummary":
-        from .scores import ScoreSummary
+        from .score import ScoreSummary
 
         response = self.client.api.get_score_summary(
             self._project.competition.id,
@@ -93,3 +93,31 @@ class PredictionCollection(Collection):
             )
             for item in response
         ]
+
+
+class PredictionEndpointMixin:
+
+    def list_predictions(
+        self,
+        competition_identifier,
+        user_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/predictions"
+            ),
+            json=True
+        )
+
+    def get_prediction(
+        self,
+        competition_identifier,
+        user_identifier,
+        prediction_id
+    ):
+        return self._result(
+            self.get(
+                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/predictions/{prediction_id}"
+            ),
+            json=True
+        )

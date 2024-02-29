@@ -1,7 +1,7 @@
 import typing
 
-from .competitions import Competition
-from .resource import Collection, Model
+from .competition import Competition
+from ..resource import Collection, Model
 
 
 class Project(Model):
@@ -27,7 +27,7 @@ class Project(Model):
 
     @property
     def predictions(self):
-        from .predictions import PredictionCollection
+        from .prediction import PredictionCollection
 
         return PredictionCollection(
             project=self,
@@ -69,3 +69,18 @@ class ProjectCollection(Collection):
         self
     ) -> Project:
         return self.get("@me")
+
+
+class ProjectEndpointMixin:
+
+    def get_project(
+        self,
+        competition_identifier,
+        user_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}"
+            ),
+            json=True
+        )

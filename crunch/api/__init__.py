@@ -1,2 +1,2 @@
-from .models import *
+from .domain import *
 from .client import Client

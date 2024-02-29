@@ -1,13 +1,12 @@
 import dataclasses
-import typing
 import enum
+import typing
 
 import dataclasses_json
 
 from ..identifiers import PhaseIdentifierType
-from .rounds import Round
-from .resource import Collection, Model
-
+from ..resource import Collection, Model
+from .round import Round
 
 
 class PhaseType(enum.Enum):
@@ -44,7 +43,7 @@ class Phase(Model):
 
     @property
     def crunches(self):
-        from .crunches import CrunchCollection
+        from .crunch import CrunchCollection
 
         return CrunchCollection(
             phase=self,
@@ -107,3 +106,31 @@ class PhaseCollection(Collection):
             )
             for item in response
         ]
+
+
+class PhaseEndpointMixin:
+
+    def list_phases(
+        self,
+        competition_identifier,
+        round_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases"
+            ),
+            json=True
+        )
+
+    def get_phase(
+        self,
+        competition_identifier,
+        round_identifier,
+        phase_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/{phase_identifier}"
+            ),
+            json=True
+        )

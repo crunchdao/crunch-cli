@@ -2,8 +2,8 @@ import enum
 import types
 import typing
 
-from .competitions import Competition
-from .resource import Collection, Model
+from .competition import Competition
+from ..resource import Collection, Model
 
 
 class CheckFunction(enum.Enum):
@@ -93,3 +93,17 @@ class CheckCollection(Collection):
             )
             for item in response
         ]
+
+
+class CheckEndpointMixin:
+
+    def list_checks(
+        self,
+        competition_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v1/competitions/{competition_identifier}/checks"
+            ),
+            json=True
+        )
