@@ -8,7 +8,7 @@ class Competition(Model):
 
     @property
     def name(self):
-        return self.attrs["name"]
+        return self._attrs["name"]
 
     @property
     def project(self):
@@ -20,7 +20,7 @@ class Competition(Model):
 
         return CheckCollection(
             competition=self,
-            client=self.client
+            client=self._client
         )
 
     @property
@@ -29,7 +29,7 @@ class Competition(Model):
 
         return DataReleaseCollection(
             competition=self,
-            client=self.client
+            client=self._client
         )
 
     @property
@@ -38,7 +38,7 @@ class Competition(Model):
 
         return ProjectCollection(
             competition=self,
-            client=self.client
+            client=self._client
         )
 
     @property
@@ -47,7 +47,7 @@ class Competition(Model):
 
         return RoundCollection(
             competition=self,
-            client=self.client
+            client=self._client
         )
 
 
@@ -62,14 +62,16 @@ class CompetitionCollection(Collection):
         self,
         id_or_name: CompetitionIdentifierType
     ) -> Competition:
-        return self.prepare_model(
-            self.client.api.get_competition(id_or_name)
+        response = self._client.api.get_competition(
+            id_or_name
         )
+
+        return self.prepare_model(response)
 
     def list(
         self
     ) -> typing.List[Competition]:
-        response = self.client.api.list_competitions()
+        response = self._client.api.list_competitions()
 
         return [
             self.prepare_model(item)

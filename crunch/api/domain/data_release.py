@@ -108,30 +108,30 @@ class DataRelease(Model):
 
     @property
     def name(self) -> typing.Optional[str]:
-        return self.attrs["name"]
+        return self._attrs["name"]
 
     @property
     def embargo(self) -> int:
-        return self.attrs["embargo"]
+        return self._attrs["embargo"]
 
     @property
     def number_of_features(self) -> int:
-        return self.attrs["numberOfFeatures"]
+        return self._attrs["numberOfFeatures"]
 
     @property
     def hash(self) -> typing.Optional[str]:
-        return self.attrs["hash"]
+        return self._attrs["hash"]
 
     @property
     def target_resolution(self):
-        return DataReleaseTargetResolution[self.attrs["target_resolution"]]
+        return DataReleaseTargetResolution[self._attrs["target_resolution"]]
 
     @property
     def data_files(self) -> typing.Union[DataFiles, OriginalFiles, typing.Dict[str, DataFile]]:
-        files = self.attrs.get("dataFiles")
+        files = self._attrs.get("dataFiles")
         if not files:
             self.reload()
-            files = self.attrs["dataFiles"]
+            files = self._attrs["dataFiles"]
 
         if "xTrain" in files:
             return DataFiles.from_dict(files)
@@ -146,10 +146,10 @@ class DataRelease(Model):
 
     @property
     def splits(self) -> typing.Tuple[DataReleaseSplit]:
-        splits = self.attrs.get("splits")
+        splits = self._attrs.get("splits")
         if not splits:
             self.reload(include_splits=True)
-            splits = self.attrs["splits"]
+            splits = self._attrs["splits"]
 
         return tuple(
             DataReleaseSplit.from_dict(split)
@@ -186,7 +186,7 @@ class DataReleaseCollection(Collection):
         number: typing.Union[int, str],
         include_splits: bool = False
     ) -> DataRelease:
-        response = self.client.api.get_data_release(
+        response = self._client.api.get_data_release(
             self.competition.id,
             number,
             include_splits=include_splits
@@ -200,7 +200,7 @@ class DataReleaseCollection(Collection):
     def list(
         self
     ) -> typing.List[Competition]:
-        response = self.client.api.list_data_releases(
+        response = self._client.api.list_data_releases(
             self.competition.id
         )
 

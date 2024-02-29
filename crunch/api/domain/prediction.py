@@ -23,7 +23,7 @@ class Prediction(Model):
 
     @property
     def name(self):
-        return self.attrs["name"]
+        return self._attrs["name"]
 
     @property
     def scores(self):
@@ -31,14 +31,14 @@ class Prediction(Model):
 
         return ScoreCollection(
             prediction=self,
-            client=self.client
+            client=self._client
         )
 
     @property
     def score_summary(self) -> "ScoreSummary":
         from .score import ScoreSummary
 
-        response = self.client.api.get_score_summary(
+        response = self._client.api.get_score_summary(
             self._project.competition.id,
             self._project.user_id,
             self.id
@@ -67,7 +67,7 @@ class PredictionCollection(Collection):
         self,
         id: int
     ) -> Prediction:
-        response = self.client.api.get_prediction(
+        response = self._client.api.get_prediction(
             self.project.competition.id,
             self.project.user_id,
             id
@@ -81,7 +81,7 @@ class PredictionCollection(Collection):
     def list(
         self
     ) -> typing.List[Prediction]:
-        response = self.client.api.list_predictions(
+        response = self._client.api.list_predictions(
             self.project.competition.id,
             self.project.user_id,
         )

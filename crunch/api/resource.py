@@ -16,9 +16,9 @@ class Model:
         client: "Client" = None,
         collection: "Collection" = None
     ):
-        self.client = client
-        self.collection = collection
-        self.attrs = attrs or {}
+        self._attrs = attrs or {}
+        self._client = client
+        self._collection = collection
 
     def __repr__(self):
         repr = f"{self.__class__.__name__}(id={self.id}"
@@ -36,11 +36,11 @@ class Model:
 
     @property
     def id(self):
-        return self.attrs.get(self.id_attribute)
+        return self._attrs.get(self.id_attribute)
 
     @property
     def resource_identifier(self):
-        return self.attrs.get(self.resource_identifier_attribute)
+        return self._attrs.get(self.resource_identifier_attribute)
 
     def reload(
         self,
@@ -48,7 +48,7 @@ class Model:
         **kwargs
     ):
         new_model = self.collection.get(self.resource_identifier, *args, **kwargs)
-        self.attrs = new_model.attrs
+        self._attrs = new_model.attrs
         return self
 
 
@@ -60,7 +60,7 @@ class Collection:
     model: typing.Type[T] = None
 
     def __init__(self, client=None):
-        self.client = client
+        self._client = client
 
     def __iter__(self) -> typing.Iterator[T]:
         return iter(self.list())
@@ -73,15 +73,15 @@ class Collection:
 
     def prepare_model(self, attrs, *args):
         if isinstance(attrs, self.model):
-            attrs.client = self.client
-            attrs.collection = self
+            attrs._client = self._client
+            attrs._collection = self
             return attrs
 
         if isinstance(attrs, dict):
             return self.model(
                 *args,
                 attrs=attrs,
-                client=self.client,
+                client=self._client,
                 collection=self
             )
 

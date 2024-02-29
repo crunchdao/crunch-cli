@@ -29,7 +29,7 @@ class Round(Model):
 
     @property
     def number(self) -> int:
-        return self.attrs["number"]
+        return self._attrs["number"]
 
     @property
     def phases(self):
@@ -37,7 +37,7 @@ class Round(Model):
 
         return PhaseCollection(
             round=self,
-            client=self.client
+            client=self._client
         )
 
 
@@ -61,7 +61,7 @@ class RoundCollection(Collection):
         self,
         identifier: RoundIdentifierType
     ) -> Round:
-        response = self.client.api.get_round(
+        response = self._client.api.get_round(
             self.competition.id,
             identifier
         )
@@ -80,7 +80,7 @@ class RoundCollection(Collection):
     def list(
         self
     ) -> typing.List[Round]:
-        response = self.client.api.list_rounds(
+        response = self._client.api.list_rounds(
             self.competition.id,
         )
 

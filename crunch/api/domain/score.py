@@ -55,7 +55,7 @@ class ScoreCollection(Collection):
     def list(
         self
     ) -> typing.List[Score]:
-        response = self.client.api.list_scores(
+        response = self._client.api.list_scores(
             self.prediction.project.competition.id,
             self.prediction.project.user_id,
             self.prediction.id

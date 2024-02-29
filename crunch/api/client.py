@@ -5,17 +5,17 @@ import requests
 
 from .. import constants, store
 from .auth import ApiKeyAuth, Auth, NoneAuth
-from .errors import ApiException, convert_error
 from .domain.check import CheckEndpointMixin
-from .domain.competition import (CompetitionCollection,
-                                  CompetitionEndpointMixin)
+from .domain.competition import CompetitionCollection, CompetitionEndpointMixin
 from .domain.crunch import CrunchEndpointMixin
 from .domain.data_release import DataReleaseEndpointMixin
 from .domain.phase import PhaseEndpointMixin
 from .domain.prediction import PredictionEndpointMixin
-from .domain.project import ProjectEndpointMixin
+from .domain.project import ProjectEndpointMixin, ProjectTokenCollection
 from .domain.round import RoundEndpointMixin
 from .domain.score import ScoreEndpointMixin
+from .domain.user import UserCollection, UserEndpointMixin
+from .errors import ApiException, convert_error
 
 
 class EndpointClient(
@@ -29,6 +29,7 @@ class EndpointClient(
     ProjectEndpointMixin,
     RoundEndpointMixin,
     ScoreEndpointMixin,
+    UserEndpointMixin,
 ):
 
     def __init__(
@@ -92,14 +93,33 @@ class Client:
 
     def __init__(
         self,
-        base_url: str,
+        api_base_url: str,
+        web_base_url: str,
         auth: Auth
     ):
-        self.api = EndpointClient(base_url, auth)
+        self.api = EndpointClient(api_base_url, auth)
+        self.web_base_url = web_base_url
 
     @property
     def competitions(self):
         return CompetitionCollection(client=self)
+
+    @property
+    def users(self):
+        return UserCollection(client=self)
+
+    @property
+    def project_tokens(self):
+        return ProjectTokenCollection(
+            competition=None,
+            client=self
+        )
+
+    def format_web_url(self, path: str):
+        return urllib.parse.urljoin(
+            self.web_base_url,
+            path
+        )
 
     def from_env():
         store.load_from_env()
@@ -110,4 +130,8 @@ class Client:
         else:
             auth = NoneAuth()
 
-        return Client(store.api_base_url, auth)
+        return Client(
+            store.api_base_url,
+            store.web_base_url,
+            auth
+        )

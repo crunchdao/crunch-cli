@@ -29,7 +29,7 @@ class Crunch(Model):
 
     @property
     def number(self) -> int:
-        return self.attrs["number"]
+        return self._attrs["number"]
 
 
 class CrunchCollection(Collection):
@@ -52,7 +52,7 @@ class CrunchCollection(Collection):
         self,
         identifier: CrunchIdentifierType
     ) -> Crunch:
-        response = self.client.api.get_crunch(
+        response = self._client.api.get_crunch(
             self.phase.round.competition.resource_identifier,
             self.phase.round.resource_identifier,
             self.phase.resource_identifier,
@@ -76,7 +76,7 @@ class CrunchCollection(Collection):
     def list(
         self
     ) -> typing.List[Crunch]:
-        response = self.client.api.list_crunches(
+        response = self._client.api.list_crunches(
             self.phase.round.competition.resource_identifier,
             self.phase.round.resource_identifier,
             self.phase.resource_identifier,

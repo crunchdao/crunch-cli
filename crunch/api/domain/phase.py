@@ -39,7 +39,7 @@ class Phase(Model):
 
     @property
     def type(self):
-        return PhaseType[self.attrs["type"]]
+        return PhaseType[self._attrs["type"]]
 
     @property
     def crunches(self):
@@ -47,7 +47,7 @@ class Phase(Model):
 
         return CrunchCollection(
             phase=self,
-            client=self.client
+            client=self._client
         )
 
 
@@ -71,7 +71,7 @@ class PhaseCollection(Collection):
         self,
         identifier: PhaseIdentifierType
     ) -> Phase:
-        response = self.client.api.get_phase(
+        response = self._client.api.get_phase(
             self.round.competition.resource_identifier,
             self.round.resource_identifier,
             identifier
@@ -94,7 +94,7 @@ class PhaseCollection(Collection):
     def list(
         self
     ) -> typing.List[Round]:
-        response = self.client.api.list_phases(
+        response = self._client.api.list_phases(
             self.round.competition.id,
             self.round.number
         )

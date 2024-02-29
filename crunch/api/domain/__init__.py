@@ -18,7 +18,9 @@ from .phase import (
 from .prediction import Prediction
 from .project import (
     Project,
+    ProjectToken,
     ProjectTokenType,
 )
 from .round import Round
 from .score import Score
+from .user import User

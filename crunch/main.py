@@ -7,6 +7,8 @@ from . import command, constants, utils, api, library, tester, store, __version_
 
 store.load_from_env()
 
+client: api.Client
+
 
 @click.group()
 @click.version_option(
@@ -29,6 +31,13 @@ def cli(
         web_base_url,
         api_base_url,
         debug,
+    )
+
+    global client
+    client = api.Client(
+        api_base_url,
+        web_base_url,
+        api.auth.NoneAuth()
     )
 
 
@@ -206,7 +215,7 @@ def update_token(
     utils.change_root()
 
     command.update_token(
-        store.session,
+        client,
         clone_token=clone_token
     )
 

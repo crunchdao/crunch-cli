@@ -48,19 +48,19 @@ class Check(Model):
 
     @property
     def function(self):
-        return CheckFunction[self.attrs["function"]]
+        return CheckFunction[self._attrs["function"]]
 
     @property
     def scope(self):
-        return CheckFunctionScope[self.attrs["scope"]]
+        return CheckFunctionScope[self._attrs["scope"]]
 
     @property
     def order(self):
-        return self.attrs["order"]
+        return self._attrs["order"]
 
     @property
     def parameters(self) -> dict:
-        return types.MappingProxyType(self.attrs["parameters"])
+        return types.MappingProxyType(self._attrs["parameters"])
 
 
 class CheckCollection(Collection):
@@ -82,7 +82,7 @@ class CheckCollection(Collection):
     def list(
         self
     ) -> Check:
-        response = self.client.api.list_checks(
+        response = self._client.api.list_checks(
             self.competition.id
         )
 
