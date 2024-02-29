@@ -3,8 +3,8 @@ import typing
 
 import dataclasses_json
 
-from .prediction import Prediction
 from ..resource import Collection, Model
+from .prediction import Prediction
 
 
 @dataclasses_json.dataclass_json(
@@ -55,19 +55,19 @@ class ScoreCollection(Collection):
     def list(
         self
     ) -> typing.List[Score]:
-        response = self._client.api.list_scores(
-            self.prediction.project.competition.id,
-            self.prediction.project.user_id,
-            self.prediction.id
+        return self.prepare_models(
+            self._client.api.list_scores(
+                self.prediction.project.competition.id,
+                self.prediction.project.user_id,
+                self.prediction.id
+            )
         )
 
-        return [
-            self.prepare_model(
-                item,
-                self.prediction
-            )
-            for item in response
-        ]
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.prediction
+        )
 
 
 class ScoreEndpointMixin:

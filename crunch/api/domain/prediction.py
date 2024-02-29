@@ -1,7 +1,7 @@
 import typing
 
-from .project import Project
 from ..resource import Collection, Model
+from .project import Project
 
 
 class Prediction(Model):
@@ -67,32 +67,29 @@ class PredictionCollection(Collection):
         self,
         id: int
     ) -> Prediction:
-        response = self._client.api.get_prediction(
-            self.project.competition.id,
-            self.project.user_id,
-            id
-        )
-
         return self.prepare_model(
-            response,
-            self.project
+            self._client.api.get_prediction(
+                self.project.competition.id,
+                self.project.user_id,
+                id
+            )
         )
 
     def list(
         self
     ) -> typing.List[Prediction]:
-        response = self._client.api.list_predictions(
-            self.project.competition.id,
-            self.project.user_id,
+        return self.prepare_models(
+            self._client.api.list_predictions(
+                self.project.competition.id,
+                self.project.user_id,
+            )
         )
 
-        return [
-            self.prepare_model(
-                item,
-                self.project
-            )
-            for item in response
-        ]
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.project
+        )
 
 
 class PredictionEndpointMixin:

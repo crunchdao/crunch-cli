@@ -1,11 +1,8 @@
-import dataclasses
 import typing
 
-import dataclasses_json
-
 from ..identifiers import RoundIdentifierType
-from .competition import Competition
 from ..resource import Collection, Model
+from .competition import Competition
 
 
 class Round(Model):
@@ -61,14 +58,11 @@ class RoundCollection(Collection):
         self,
         identifier: RoundIdentifierType
     ) -> Round:
-        response = self._client.api.get_round(
-            self.competition.id,
-            identifier
-        )
-
         return self.prepare_model(
-            response,
-            self.competition
+            self._client.api.get_round(
+                self.competition.id,
+                identifier
+            )
         )
 
     def get_current(self):
@@ -80,17 +74,17 @@ class RoundCollection(Collection):
     def list(
         self
     ) -> typing.List[Round]:
-        response = self._client.api.list_rounds(
-            self.competition.id,
+        return self.prepare_models(
+            self._client.api.list_rounds(
+                self.competition.id,
+            )
         )
 
-        return [
-            self.prepare_model(
-                item,
-                self.competition
-            )
-            for item in response
-        ]
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.competition
+        )
 
 
 class RoundEndpointMixin:

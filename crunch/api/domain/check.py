@@ -2,8 +2,8 @@ import enum
 import types
 import typing
 
-from .competition import Competition
 from ..resource import Collection, Model
+from .competition import Competition
 
 
 class CheckFunction(enum.Enum):
@@ -82,17 +82,17 @@ class CheckCollection(Collection):
     def list(
         self
     ) -> Check:
-        response = self._client.api.list_checks(
-            self.competition.id
+        return self.prepare_models(
+            self._client.api.list_checks(
+                self.competition.id
+            )
         )
 
-        return [
-            self.prepare_model(
-                item,
-                self.competition
-            )
-            for item in response
-        ]
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.competition
+        )
 
 
 class CheckEndpointMixin:

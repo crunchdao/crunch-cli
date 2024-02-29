@@ -47,8 +47,13 @@ class Model:
         *args,
         **kwargs
     ):
-        new_model = self.collection.get(self.resource_identifier, *args, **kwargs)
-        self._attrs = new_model.attrs
+        new_model = self._collection.get(
+            self.resource_identifier,
+            *args,
+            **kwargs
+        )
+
+        self._attrs = new_model._attrs
         return self
 
 
@@ -70,7 +75,7 @@ class Collection:
 
     def get(self, key):
         raise NotImplementedError
-    
+
     def prepare_model(self, attrs, *args):
         if isinstance(attrs, self.model):
             attrs._client = self._client

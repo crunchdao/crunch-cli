@@ -5,8 +5,8 @@ import typing
 
 import dataclasses_json
 
-from .competition import Competition
 from ..resource import Collection, Model
+from .competition import Competition
 
 
 class DataReleaseTargetResolution(enum.Enum):

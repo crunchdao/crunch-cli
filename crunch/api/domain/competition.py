@@ -62,21 +62,18 @@ class CompetitionCollection(Collection):
         self,
         id_or_name: CompetitionIdentifierType
     ) -> Competition:
-        response = self._client.api.get_competition(
-            id_or_name
+        return self.prepare_model(
+            self._client.api.get_competition(
+                id_or_name
+            )
         )
-
-        return self.prepare_model(response)
 
     def list(
         self
     ) -> typing.List[Competition]:
-        response = self._client.api.list_competitions()
-
-        return [
-            self.prepare_model(item)
-            for item in response
-        ]
+        return self.prepare_models(
+            self._client.api.list_competitions()
+        )
 
 
 class CompetitionEndpointMixin:

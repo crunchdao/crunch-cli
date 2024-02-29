@@ -1,11 +1,8 @@
-import dataclasses
 import typing
 
-import dataclasses_json
-
 from ..identifiers import CrunchIdentifierType
-from .phase import Phase
 from ..resource import Collection, Model
+from .phase import Phase
 
 
 class Crunch(Model):
@@ -52,16 +49,13 @@ class CrunchCollection(Collection):
         self,
         identifier: CrunchIdentifierType
     ) -> Crunch:
-        response = self._client.api.get_crunch(
-            self.phase.round.competition.resource_identifier,
-            self.phase.round.resource_identifier,
-            self.phase.resource_identifier,
-            identifier
-        )
-
         return self.prepare_model(
-            response,
-            self.phase
+            self._client.api.get_crunch(
+                self.phase.round.competition.resource_identifier,
+                self.phase.round.resource_identifier,
+                self.phase.resource_identifier,
+                identifier
+            )
         )
 
     def get_current(self):
@@ -76,19 +70,19 @@ class CrunchCollection(Collection):
     def list(
         self
     ) -> typing.List[Crunch]:
-        response = self._client.api.list_crunches(
-            self.phase.round.competition.resource_identifier,
-            self.phase.round.resource_identifier,
-            self.phase.resource_identifier,
+        return self.prepare_models(
+            self._client.api.list_crunches(
+                self.phase.round.competition.resource_identifier,
+                self.phase.round.resource_identifier,
+                self.phase.resource_identifier,
+            )
         )
 
-        return [
-            self.prepare_model(
-                item,
-                self.phase
-            )
-            for item in response
-        ]
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.phase
+        )
 
 
 class CrunchEndpointMixin:

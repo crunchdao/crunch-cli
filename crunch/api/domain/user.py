@@ -22,21 +22,18 @@ class UserCollection(Collection):
         self,
         id_or_login: CompetitionIdentifierType
     ) -> User:
-        response = self._client.api.get_user(
-            id_or_login
+        return self.prepare_model(
+            self._client.api.get_user(
+                id_or_login
+            )
         )
-
-        return self.prepare_model(response)
 
     def list(
         self
     ) -> typing.List[User]:
-        response = self._client.api.list_users()
-
-        return [
-            self.prepare_model(item)
-            for item in response
-        ]
+        return self.prepare_models(
+            self._client.api.list_users()
+        )
 
 
 class UserEndpointMixin:

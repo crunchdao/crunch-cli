@@ -85,15 +85,12 @@ class PhaseCollection(Collection):
         if isinstance(identifier, PhaseType):
             identifier = identifier.name
 
-        response = self._client.api.get_phase(
-            self.round.competition.resource_identifier,
-            self.round.resource_identifier,
-            identifier
-        )
-
         return self.prepare_model(
-            response,
-            self.round
+            self._client.api.get_phase(
+                self.round.competition.resource_identifier,
+                self.round.resource_identifier,
+                identifier
+            )
         )
 
     def get_current(self):
@@ -108,18 +105,18 @@ class PhaseCollection(Collection):
     def list(
         self
     ) -> typing.List[Round]:
-        response = self._client.api.list_phases(
-            self.round.competition.id,
-            self.round.number
+        return self.prepare_models(
+            self._client.api.list_phases(
+                self.round.competition.id,
+                self.round.number
+            )
         )
 
-        return [
-            self.prepare_model(
-                item,
-                self.round
-            )
-            for item in response
-        ]
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.round
+        )
 
 
 class PhaseEndpointMixin:

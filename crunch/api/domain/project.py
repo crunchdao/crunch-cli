@@ -25,10 +25,12 @@ class Project(Model):
         return self._competition
 
     @property
-    def user(self) -> User:
-        user_id = self._attrs["userId"]
+    def user_id(self) -> int:
+        return self._attrs["userId"]
 
-        return self._client.users.get(user_id)
+    @property
+    def user(self) -> User:
+        return self._client.users.get(self.user_id)
 
     @property
     def predictions(self):
@@ -60,14 +62,11 @@ class ProjectCollection(Collection):
         self,
         user_id_or_login: typing.Union[int, str]
     ) -> Project:
-        response = self._client.api.get_project(
-            self.competition.id,
-            user_id_or_login
-        )
-
         return self.prepare_model(
-            response,
-            self.competition
+            self._client.api.get_project(
+                self.competition.id,
+                user_id_or_login
+            )
         )
 
     def get_me(
@@ -87,6 +86,12 @@ class ProjectCollection(Collection):
             return [project]
         except ProjectNotFoundException:
             return []
+
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.competition
+        )
 
 
 class ProjectTokenType(enum.Enum):
