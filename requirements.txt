@@ -14,3 +14,4 @@ packaging
 pytest
 python-dotenv
 humanfriendly
+dataclasses_json
