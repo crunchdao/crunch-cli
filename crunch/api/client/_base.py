@@ -5,7 +5,7 @@ import urllib.parse
 import inflection
 
 from ... import store
-from .. import domain
+from .. import models
 
 
 @dataclasses.dataclass(frozen=True)
@@ -71,8 +71,8 @@ class Client:
             for suffix in ["Exception", "Error"]:
                 class_name = base_class_name + suffix
 
-                clazz = getattr(domain, class_name, None)
+                clazz = getattr(models, class_name, None)
                 if clazz is not None:
                     return clazz
 
-        return domain.ApiException
+        return models.ApiException
