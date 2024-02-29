@@ -3,6 +3,7 @@ from .competition import Competition
 from .crunch import Crunch
 from .data_release import (
     DataRelease,
+    DataReleaseColumnNames,
     DataReleaseTargetResolution,
     DataReleaseSplit,
     DataReleaseSplitGroup,

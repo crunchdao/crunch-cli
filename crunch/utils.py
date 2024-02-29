@@ -10,15 +10,15 @@ import urllib
 import urllib.parse
 
 import click
+import humanfriendly
 import joblib
 import packaging.version
 import pandas
 import psutil
 import requests
 import tqdm
-import humanfriendly
 
-from . import constants, api
+from . import api, constants
 
 
 class CustomSession(requests.Session):
@@ -262,6 +262,19 @@ def cut_url(url: str):
         return url[:url.index("?")]
     except ValueError:
         return url
+
+
+def get_extension(url: str):
+    url = cut_url(url)
+
+    if url.endswith(".parquet"):
+        return "parquet"
+
+    if url.endswith(".csv"):
+        return "csv"
+
+    print(f"unknown file extension: {url}")
+    raise click.Abort()
 
 
 def download(url: str, path: str, log=True):

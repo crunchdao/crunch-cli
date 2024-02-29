@@ -89,7 +89,7 @@ class DataReleaseSplit:
 
 class DataRelease(Model):
 
-    id_attribute = "number"
+    resource_identifier_attribute = "number"
 
     def __init__(
         self,
@@ -113,6 +113,10 @@ class DataRelease(Model):
     @property
     def embargo(self) -> int:
         return self._attrs["embargo"]
+
+    @property
+    def column_names(self) -> "DataReleaseColumnNames":
+        return DataReleaseColumnNames.from_dict(self._attrs["columnNames"])
 
     @property
     def number_of_features(self) -> int:
@@ -165,6 +169,19 @@ class DataRelease(Model):
         )
 
 
+@dataclasses_json.dataclass_json(
+    letter_case=dataclasses_json.LetterCase.CAMEL,
+    undefined=dataclasses_json.Undefined.EXCLUDE
+)
+@dataclasses.dataclass(frozen=True)
+class DataReleaseColumnNames:
+
+    id: str
+    moon: str
+    target: str
+    prediction: str
+
+
 class DataReleaseCollection(Collection):
 
     model = DataRelease
@@ -186,31 +203,28 @@ class DataReleaseCollection(Collection):
         number: typing.Union[int, str],
         include_splits: bool = False
     ) -> DataRelease:
-        response = self._client.api.get_data_release(
-            self.competition.id,
-            number,
-            include_splits=include_splits
-        )
-
         return self.prepare_model(
-            response,
-            self.competition
+            self._client.api.get_data_release(
+                self.competition.id,
+                number,
+                include_splits=include_splits
+            )
         )
 
     def list(
         self
     ) -> typing.List[Competition]:
-        response = self._client.api.list_data_releases(
-            self.competition.id
+        return self.prepare_models(
+            self._client.api.list_data_releases(
+                self.competition.id
+            )
         )
 
-        return [
-            self.prepare_model(
-                item,
-                self.competition
-            )
-            for item in response
-        ]
+    def prepare_model(self, attrs):
+        return super().prepare_model(
+            attrs,
+            self.competition
+        )
 
 
 class DataReleaseEndpointMixin:

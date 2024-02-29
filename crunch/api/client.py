@@ -3,8 +3,8 @@ import urllib.parse
 
 import requests
 
-from .. import constants, store
-from .auth import ApiKeyAuth, Auth, NoneAuth
+from .. import constants, store, utils
+from .auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
 from .domain.check import CheckEndpointMixin
 from .domain.competition import CompetitionCollection, CompetitionEndpointMixin
 from .domain.crunch import CrunchEndpointMixin
@@ -135,3 +135,17 @@ class Client:
             store.web_base_url,
             auth
         )
+
+    def from_project():
+        store.load_from_env()
+
+        project_info = utils.read_project_info()
+        push_token = utils.read_token()
+
+        client = Client(
+            store.api_base_url,
+            store.web_base_url,
+            PushTokenAuth(push_token)
+        )
+
+        return client, project_info

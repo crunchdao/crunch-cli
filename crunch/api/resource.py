@@ -70,7 +70,7 @@ class Collection:
 
     def get(self, key):
         raise NotImplementedError
-
+    
     def prepare_model(self, attrs, *args):
         if isinstance(attrs, self.model):
             attrs._client = self._client
@@ -86,3 +86,9 @@ class Collection:
             )
 
         raise Exception(f"can't create {self.model.__name__} from {attrs}")
+
+    def prepare_models(self, attrs_list):
+        return [
+            self.prepare_model(attrs)
+            for attrs in attrs_list
+        ]

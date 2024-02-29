@@ -184,7 +184,6 @@ def download(
 
     try:
         command.download(
-            store.session,
             round_number=round_number
         )
     except api.CrunchNotFoundException:

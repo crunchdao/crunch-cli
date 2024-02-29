@@ -1,8 +1,5 @@
-import dataclasses
 import enum
 import typing
-
-import dataclasses_json
 
 from ..identifiers import PhaseIdentifierType
 from ..resource import Collection, Model
@@ -50,6 +47,20 @@ class Phase(Model):
             client=self._client
         )
 
+    def get_data_release(self):
+        from .data_release import DataReleaseCollection
+
+        attrs = self._client.api.get_submission_phase_data_release(
+            self.round.competition.resource_identifier,
+            self.round.resource_identifier,
+        )
+
+        competition = self.round.competition
+        return DataReleaseCollection(
+            competition,
+            self._client
+        ).prepare_model(attrs)
+
 
 class PhaseCollection(Collection):
 
@@ -71,6 +82,9 @@ class PhaseCollection(Collection):
         self,
         identifier: PhaseIdentifierType
     ) -> Phase:
+        if isinstance(identifier, PhaseType):
+            identifier = identifier.name
+
         response = self._client.api.get_phase(
             self.round.competition.resource_identifier,
             self.round.resource_identifier,
@@ -131,6 +145,18 @@ class PhaseEndpointMixin:
         return self._result(
             self.get(
                 f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/{phase_identifier}"
+            ),
+            json=True
+        )
+
+    def get_submission_phase_data_release(
+        self,
+        competition_identifier,
+        round_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/submission/data-release"
             ),
             json=True
         )
