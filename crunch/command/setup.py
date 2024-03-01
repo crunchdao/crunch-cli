@@ -1,14 +1,11 @@
-import io
 import json
 import os
 import pkgutil
 import shutil
-import tarfile
 
 import click
-import requests
 
-from .. import api, constants, utils, api
+from .. import api, constants, utils
 
 
 def _dot_crunchdao(directory: str):
@@ -87,10 +84,12 @@ def setup(
     plain = project_token.plain
     user_id = project_token.project.user_id
 
-    utils.write_project_info(utils.ProjectInfo(
+    project_info = utils.ProjectInfo(
         competition_name,
         user_id
-    ), directory)
+    )
+
+    utils.write_project_info(project_info, directory)
     utils.write_token(plain, directory)
 
     os.chdir(directory)
