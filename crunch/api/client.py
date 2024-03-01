@@ -19,7 +19,7 @@ from .domain.round import RoundEndpointMixin
 from .domain.score import ScoreEndpointMixin
 from .domain.submission import SubmissionEndpointMixin
 from .domain.user import UserCollection, UserEndpointMixin
-from .errors import ApiException, convert_error
+from .errors import convert_error
 
 
 class EndpointClient(

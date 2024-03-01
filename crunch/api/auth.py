@@ -60,7 +60,7 @@ class PushTokenAuth(Auth):
         params: dict,
         data: typing.Optional[dict],
     ):
-        if data:
+        if data is not None:
             data["pushToken"] = self._token
         else:
             params["pushToken"] = self._token

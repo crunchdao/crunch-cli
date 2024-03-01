@@ -69,6 +69,12 @@ class Collection:
 
     def __iter__(self) -> typing.Iterator[T]:
         return iter(self.list())
+    
+    def __getitem__(self, key) -> T:
+        return self.list()[key]
+
+    def __getslice__(self, from_, to): 
+        return self.list()[from_, to]
 
     def list(self) -> typing.List[T]:
         raise NotImplementedError
