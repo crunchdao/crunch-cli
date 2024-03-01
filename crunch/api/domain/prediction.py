@@ -1,7 +1,18 @@
+import enum
 import typing
 
 from ..resource import Collection, Model
 from .project import Project
+
+
+class PredictionTag(enum.Enum):
+
+    USER_RUN_OUTPUT = "USER_RUN_OUTPUT"
+    MANAGED_RUN_OUTPUT = "MANAGED_RUN_OUTPUT"
+    USER_ORTHOGONALIZE = "USER_ORTHOGONALIZE"
+
+    def __repr__(self):
+        return self.name
 
 
 class Prediction(Model):
@@ -24,6 +35,10 @@ class Prediction(Model):
     @property
     def name(self):
         return self._attrs["name"]
+
+    @property
+    def tag(self):
+        return PredictionTag[self._attrs["tag"]]
 
     @property
     def scores(self):

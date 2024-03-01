@@ -25,7 +25,10 @@ from .phase import (
     Phase,
     PhaseType,
 )
-from .prediction import Prediction
+from .prediction import (
+    Prediction,
+    PredictionTag
+)
 from .project import (
     Project,
     ProjectToken,
