@@ -66,7 +66,6 @@ def setup(
     directory = os.path.normpath(directory)
 
     command.setup(
-        store.session,
         clone_token=clone_token,
         submission_number=submission_number,
         competition_name=competition_name,
@@ -77,10 +76,8 @@ def setup(
     )
 
     if not no_data:
-        os.chdir(directory)
-
         try:
-            command.download(store.session, force=True)
+            command.download(force=True)
         except api.CrunchNotFoundException:
             command.download_no_data_available()
 

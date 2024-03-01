@@ -76,6 +76,25 @@ class Collection:
     def get(self, key):
         raise NotImplementedError
 
+    def get_reference(
+        self,
+        id,
+        resource_identifier=None
+    ):
+        id_attribute = self.model.id_attribute
+        attrs = {
+            id_attribute: id
+        }
+
+        resource_identifier_attribute = self.model.resource_identifier_attribute
+        if (
+            resource_identifier_attribute != id_attribute
+            and resource_identifier is not None
+        ):
+            attrs[resource_identifier_attribute] = resource_identifier
+
+        return self.prepare_model(attrs)
+
     def prepare_model(self, attrs, *args):
         if isinstance(attrs, self.model):
             attrs._client = self._client

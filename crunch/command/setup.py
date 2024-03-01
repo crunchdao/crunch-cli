@@ -8,7 +8,7 @@ import tarfile
 import click
 import requests
 
-from .. import api, constants, utils
+from .. import api, constants, utils, api
 
 
 def _dot_crunchdao(directory: str):
@@ -38,7 +38,7 @@ def _read_demo_file(file_name: str):
     return pkgutil.get_data(__package__, resource)
 
 
-def _setup_demo(directory: str, filter: list = None):
+def _setup_demo(filter: list = None):
     files = json.loads(_read_demo_file("files.json").decode("utf-8"))
     for file in files:
         if filter and file not in filter:
@@ -47,23 +47,17 @@ def _setup_demo(directory: str, filter: list = None):
         print(f"use {file}")
 
         content = _read_demo_file(file)
-
-        path = os.path.join(directory, file)
-        with open(path, "wb") as fd:
+        with open(file, "wb") as fd:
             fd.write(content)
 
 
-def _setup_submission(directory: str, urls: dict):
-    for relative_path, url in urls.items():
-        path = os.path.join(directory, relative_path)
-        
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        
+def _setup_submission(urls: dict):
+    for path, url in urls.items():
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         utils.download(url, path)
 
 
 def setup(
-    session: requests.Session,
     clone_token: str,
     submission_number: str,
     competition_name: str,
@@ -74,20 +68,15 @@ def setup(
 ):
     _check_if_already_exists(directory, force)
 
+    client = api.Client.from_env()
+
     try:
-        push_token = session.post(
-            f"/v2/project-tokens/upgrade",
-            json={
-                "cloneToken": clone_token
-            }
-        ).json()
+        project_token = client.project_tokens.upgrade(clone_token)
     except api.InvalidProjectTokenException:
         print("your token seems to have expired or is invalid")
         print("---")
         print("please follow this link to copy and paste your new setup command:")
-        print(session.format_web_url(
-            f'/competitions/{competition_name}/submit'
-        ))
+        print(client.format_web_url(f'/competitions/{competition_name}/submit'))
         print("")
 
         raise click.Abort()
@@ -95,30 +84,29 @@ def setup(
     dot_crunchdao_path = _dot_crunchdao(directory)
     os.makedirs(dot_crunchdao_path, exist_ok=True)
 
-    plain = push_token['plain']
-    user_id = push_token["project"]["userId"]
+    plain = project_token.plain
+    user_id = project_token.project.user_id
 
-    project_info = utils.ProjectInfo(
+    utils.write_project_info(utils.ProjectInfo(
         competition_name,
         user_id
-    )
-
-    utils.write_project_info(project_info, directory)
+    ), directory)
     utils.write_token(plain, directory)
 
+    os.chdir(directory)
+    client, _ = api.Client.from_project()
+
     try:
-        urls = session.get(
-            f"/v3/competitions/{competition_name}/projects/{user_id}/clone",
-            params={
-                "pushToken": push_token['plain'],
-                "submissionNumber": submission_number,
-                "includeModel": not no_model,
-            }
-        ).json()
+        competition = client.competitions.get(competition_name)
+        project = competition.projects.get_reference(None, user_id)
+
+        urls = project.clone(
+            submission_number=submission_number,
+            include_model=not no_model,
+        )
     except api.NeverSubmittedException:
         _setup_demo(directory)
     else:
-        _setup_submission(directory, urls)
+        _setup_submission(urls)
 
-    path = os.path.join(directory, model_directory)
-    os.makedirs(path, exist_ok=True)
+    os.makedirs(model_directory, exist_ok=True)

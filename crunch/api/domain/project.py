@@ -9,6 +9,8 @@ from .user import User
 
 class Project(Model):
 
+    resource_identifier_attribute = "userId"
+
     def __init__(
         self,
         competition: Competition,
@@ -39,6 +41,18 @@ class Project(Model):
         return PredictionCollection(
             project=self,
             client=self._client
+        )
+
+    def clone(
+        self,
+        submission_number: typing.Optional[int],
+        include_model: typing.Optional[bool],
+    ) -> typing.Dict[str, str]:
+        return self._client.api.clone_project(
+            self.competition.id,
+            self.user_id,
+            submission_number,
+            include_model,
         )
 
 
@@ -117,15 +131,14 @@ class ProjectToken(Model):
         self._competition = competition
 
     @property
-    def project(self):
+    def project(self) -> Project:
         project_attrs = self._attrs["project"]
 
         competition_id = project_attrs["competitionId"]
         competition = self._client.competitions.get(competition_id)
 
         return competition.projects.prepare_model(
-            project_attrs,
-            competition
+            project_attrs
         )
 
     @property
@@ -196,6 +209,29 @@ class ProjectEndpointMixin:
                 json={
                     "cloneToken": clone_token
                 }
+            ),
+            json=True
+        )
+
+    def clone_project(
+        self,
+        competition_identifier,
+        user_identifier,
+        submission_number,
+        include_model,
+    ):
+        params = {}
+
+        if submission_number is not None:
+            params["submissionNumber"] = submission_number
+
+        if include_model is not None:
+            params["includeModel"] = include_model
+
+        return self._result(
+            self.get(
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/clone",
+                params=params
             ),
             json=True
         )
