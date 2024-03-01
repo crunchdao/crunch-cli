@@ -3,21 +3,9 @@ import os
 
 import click
 
-from . import (__version__, api, command, constants, library, store, tester,
-               utils)
+from . import __version__, api, command, constants, store, utils
 
 store.load_from_env()
-
-client: api.Client
-
-
-def _exit_via(
-    error: api.ApiException,
-    **kwargs
-):
-    print("\n---")
-    error.print_helper(**kwargs)
-    exit(1)
 
 
 @click.group()
@@ -36,19 +24,6 @@ def cli(
     store.debug = debug
     store.api_base_url = api_base_url
     store.web_base_url = web_base_url
-
-    store.session = utils.CustomSession(
-        web_base_url,
-        api_base_url,
-        debug,
-    )
-
-    global client
-    client = api.Client(
-        api_base_url,
-        web_base_url,
-        api.auth.NoneAuth()
-    )
 
 
 @cli.command(help="Setup a workspace directory with the latest submission of you code.")
@@ -86,7 +61,7 @@ def setup(
             no_model=no_model,
         )
     except api.ApiException as error:
-        _exit_via(
+        utils.exit_via(
             error,
             competition_name=competition_name
         )
@@ -148,7 +123,7 @@ def push(
             export_path,
         )
     except api.ApiException as error:
-        _exit_via(error)
+        utils.exit_via(error)
     finally:
         if converted:
             os.unlink(main_file_path)
@@ -173,6 +148,8 @@ def test(
     has_gpu: bool,
     no_checks: bool,
 ):
+    from . import library, tester
+
     utils.change_root()
     tester.install_logger()
 
@@ -191,7 +168,7 @@ def test(
             not no_checks,
         )
     except api.ApiException as error:
-        _exit_via(error)
+        utils.exit_via(error)
 
 
 @cli.command(help="Download the data locally.")
@@ -208,7 +185,7 @@ def download(
     except api.CrunchNotFoundException:
         command.download_no_data_available()
     except api.ApiException as error:
-        _exit_via(error)
+        utils.exit_via(error)
 
 
 @cli.command(help="Convert a notebook to a python script.")
@@ -227,7 +204,7 @@ def convert(
             override=override,
         )
     except api.ApiException as error:
-        _exit_via(error)
+        utils.exit_via(error)
 
 
 @cli.command(help="Update a project token.")
@@ -242,7 +219,7 @@ def update_token(
             clone_token=clone_token
         )
     except api.ApiException as error:
-        _exit_via(error)
+        utils.exit_via(error)
 
 
 if __name__ == '__main__':

@@ -16,8 +16,6 @@ class _Inline:
         self.model_directory = model_directory
         self.has_gpu = has_gpu
 
-        self.session = utils.CustomSession.from_env()
-
         print(f"loaded inline runner with module: {module}")
 
     def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:

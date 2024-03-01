@@ -4,13 +4,9 @@ import json
 import logging
 import os
 import re
-import traceback
 import typing
-import urllib
-import urllib.parse
 
 import click
-import humanfriendly
 import joblib
 import packaging.version
 import pandas
@@ -19,61 +15,6 @@ import requests
 import tqdm
 
 from . import api, constants
-
-
-class CustomSession(requests.Session):
-    # https://stackoverflow.com/a/51026159/7292958
-
-    def __init__(self, web_base_url=None, api_base_url=None, debug=False):
-        super().__init__()
-        self.web_base_url = web_base_url
-        self.api_base_url = api_base_url
-        self.debug = debug
-
-    def request(self, method, url, *args, **kwargs):
-        print(urllib.parse.urljoin(self.api_base_url, url))
-        response = super().request(
-            method,
-            urllib.parse.urljoin(self.api_base_url, url),
-            *args,
-            **kwargs
-        )
-
-        status_code = response.status_code
-        if status_code != 200:
-            try:
-                error = response.json()
-            except:
-                print(response.text)
-            else:
-                raise api.errors.convert_error(error)
-
-            if self.debug:
-                traceback.print_stack()
-
-            raise click.Abort()
-
-        return response
-
-    def format_web_url(self, path: str):
-        return urllib.parse.urljoin(
-            self.web_base_url,
-            path
-        )
-
-    @staticmethod
-    def from_env():
-        return CustomSession(
-            os.environ.get(
-                constants.WEB_BASE_URL_ENV_VAR,
-                constants.WEB_BASE_URL_DEFAULT
-            ),
-            os.environ.get(
-                constants.API_BASE_URL_ENV_VAR,
-                constants.API_BASE_URL_DEFAULT
-            ),
-            humanfriendly.coerce_boolean(os.environ.get(constants.DEBUG_ENV_VAR, "False"))
-        )
 
 
 def change_root():
@@ -307,3 +248,12 @@ def download(url: str, path: str, log=True):
             print(f"downloading {path} from {cut_url(url)}")
 
         raise
+
+
+def exit_via(
+    error: "api.ApiException",
+    **kwargs
+):
+    print("\n---")
+    error.print_helper(**kwargs)
+    exit(1)
