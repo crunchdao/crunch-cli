@@ -1,4 +1,5 @@
 from .check import Check
+from .common import GpuRequirement
 from .competition import Competition
 from .crunch import Crunch
 from .data_release import (
@@ -11,6 +12,10 @@ from .data_release import (
     DataFiles,
     OriginalFiles,
     DataFile,
+)
+from .library import (
+    Library,
+    LibraryListInclude,
 )
 from .phase import (
     Phase,

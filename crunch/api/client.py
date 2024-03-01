@@ -10,6 +10,7 @@ from .domain.check import CheckEndpointMixin
 from .domain.competition import CompetitionCollection, CompetitionEndpointMixin
 from .domain.crunch import CrunchEndpointMixin
 from .domain.data_release import DataReleaseEndpointMixin
+from .domain.library import LibraryCollection, LibraryEndpointMixin
 from .domain.phase import PhaseEndpointMixin
 from .domain.prediction import PredictionEndpointMixin
 from .domain.project import (Project, ProjectEndpointMixin,
@@ -27,6 +28,7 @@ class EndpointClient(
     CompetitionEndpointMixin,
     CrunchEndpointMixin,
     DataReleaseEndpointMixin,
+    LibraryEndpointMixin,
     PhaseEndpointMixin,
     PredictionEndpointMixin,
     ProjectEndpointMixin,
@@ -107,6 +109,10 @@ class Client:
     @property
     def competitions(self):
         return CompetitionCollection(client=self)
+
+    @property
+    def libraries(self):
+        return LibraryCollection(client=self)
 
     @property
     def users(self):
