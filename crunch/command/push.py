@@ -74,7 +74,7 @@ def push(
     installed_packages_version = {}
     if include_installed_packages_version:
         installed_packages_version = {
-            package.project_name: package.version + "qsd"
+            package.project_name: package.version
             for package in pkg_resources.working_set
             if utils.is_valid_version(package.version)
         }
