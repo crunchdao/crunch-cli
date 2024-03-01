@@ -16,3 +16,4 @@ python-dotenv
 humanfriendly
 dataclasses_json
 inflection
+scipy
