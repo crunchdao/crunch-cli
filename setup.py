@@ -37,7 +37,7 @@ setup(
     install_requires=requirements,
     zip_safe=False,
     entry_points={
-        'console_scripts': ['crunch=crunch.main:cli'],
+        'console_scripts': ['crunch=crunch.cli:cli'],
     },
     classifiers=[
         'Intended Audience :: Developers',
