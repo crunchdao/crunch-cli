@@ -56,6 +56,20 @@ class Model:
         self._attrs = new_model._attrs
         return self
 
+    @classmethod
+    def from_dict(
+        clazz,
+        input: typing.Union[dict, typing.List[dict]],
+        *args
+    ):
+        if isinstance(input, list):
+            return [
+                clazz.from_dict(x, *args)
+                for x in input
+            ]
+
+        return clazz(*args, attrs=input)
+
 
 T = typing.TypeVar('T')
 

@@ -1,14 +1,30 @@
 import typing
+import enum
 
 from ..identifiers import CompetitionIdentifierType
 from ..resource import Collection, Model
 
 
+class ReducerFunction(enum.Enum):
+
+    MEAN = "MEAN"
+    CUMPROD_PLUS_MINUS_1 = "CUMPROD_PLUS_MINUS_1"
+
+    def __repr__(self):
+        return self.name
+
+
 class Competition(Model):
+
+    resource_identifier_attribute = "name"
 
     @property
     def name(self):
         return self._attrs["name"]
+
+    @property
+    def scoring_reducer_function(self):
+        return ReducerFunction[self._attrs["scoringReducerFunction"]]
 
     @property
     def project(self):
@@ -28,6 +44,15 @@ class Competition(Model):
         from .data_release import DataReleaseCollection
 
         return DataReleaseCollection(
+            competition=self,
+            client=self._client
+        )
+
+    @property
+    def metrics(self):
+        from .metric import MetricCollection
+
+        return MetricCollection(
             competition=self,
             client=self._client
         )

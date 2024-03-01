@@ -6,6 +6,8 @@ from ..resource import Collection, Model
 
 class User(Model):
 
+    resource_identifier_attribute = "login"
+
     @property
     def login(self):
         return self._attrs["login"]

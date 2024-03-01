@@ -49,7 +49,9 @@ class InternalServerException(ApiException):
         print(f"\nPlease contact an administrator.")
 
 
+# microservice-related: failed to establish communication between services
 RetryableException = InternalServerException
+AnnotatedConnectException = InternalServerException
 
 
 class ValidationFailedException(ApiException):

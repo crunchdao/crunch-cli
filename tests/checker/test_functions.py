@@ -5,7 +5,7 @@ import numpy
 
 import crunch.checker
 
-FUNCTIONS = crunch.checker.functions
+functions = crunch.checker.functions
 CheckError = crunch.checker.CheckError
 
 
@@ -17,14 +17,14 @@ class FunctionsTest(unittest.TestCase):
         good = example.copy()
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.columns_name(bad, example)
+            functions.columns_name(bad, example)
 
         self.assertEquals(
             "Columns name are different from what is expected",
             str(context.exception)
         )
 
-        self.assertIsNone(FUNCTIONS.columns_name(good, example))
+        self.assertIsNone(functions.columns_name(good, example))
 
     def test_nans(self):
         nans = pandas.DataFrame([numpy.nan])
@@ -33,21 +33,21 @@ class FunctionsTest(unittest.TestCase):
         good = pandas.DataFrame([42])
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.nans(nans)
+            functions.nans(nans)
 
         self.assertEquals("NaNs detected", str(context.exception))
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.nans(infs)
+            functions.nans(infs)
 
         self.assertEquals("inf detected", str(context.exception))
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.nans(infs_negative)
+            functions.nans(infs_negative)
 
         self.assertEquals("inf detected", str(context.exception))
 
-        self.assertIsNone(FUNCTIONS.nans(good))
+        self.assertIsNone(functions.nans(good))
 
     def test_values_between(self):
         column_name = "a"
@@ -58,7 +58,7 @@ class FunctionsTest(unittest.TestCase):
         good = pandas.DataFrame([max / 2], columns=[column_name])
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.values_between(
+            functions.values_between(
                 bad_more,
                 column_name,
                 min, max
@@ -70,7 +70,7 @@ class FunctionsTest(unittest.TestCase):
         )
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.values_between(
+            functions.values_between(
                 bad_less,
                 column_name,
                 min, max
@@ -82,7 +82,7 @@ class FunctionsTest(unittest.TestCase):
         )
 
         self.assertIsNone(
-            FUNCTIONS.values_between(
+            functions.values_between(
                 good,
                 column_name,
                 min, max
@@ -96,7 +96,7 @@ class FunctionsTest(unittest.TestCase):
         good = pandas.DataFrame([values[0]], columns=[column_name])
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.values_allowed(
+            functions.values_allowed(
                 bad,
                 column_name,
                 values
@@ -108,7 +108,7 @@ class FunctionsTest(unittest.TestCase):
         )
 
         self.assertIsNone(
-            FUNCTIONS.values_allowed(
+            functions.values_allowed(
                 good,
                 column_name,
                 values
@@ -123,7 +123,7 @@ class FunctionsTest(unittest.TestCase):
         good = example.copy()
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.moons(
+            functions.moons(
                 bad,
                 example,
                 column_name
@@ -135,7 +135,7 @@ class FunctionsTest(unittest.TestCase):
         )
 
         self.assertIsNone(
-            FUNCTIONS.moons(
+            functions.moons(
                 example,
                 good,
                 column_name
@@ -153,7 +153,7 @@ class FunctionsTest(unittest.TestCase):
         good = example.copy()
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.ids_at_moon(
+            functions.ids_at_moon(
                 bad_duplicated,
                 example,
                 moon,
@@ -167,7 +167,7 @@ class FunctionsTest(unittest.TestCase):
         )
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.ids_at_moon(
+            functions.ids_at_moon(
                 bad_different,
                 example,
                 moon,
@@ -181,7 +181,7 @@ class FunctionsTest(unittest.TestCase):
         )
 
         self.assertIsNone(
-            FUNCTIONS.ids_at_moon(
+            functions.ids_at_moon(
                 good,
                 example,
                 moon,
@@ -199,7 +199,7 @@ class FunctionsTest(unittest.TestCase):
         good = pandas.DataFrame(ids, columns=[prediction_column_name])
 
         with self.assertRaises(CheckError) as context:
-            FUNCTIONS.constants_at_moon(
+            functions.constants_at_moon(
                 bad,
                 moon,
                 moon_column_name,
@@ -212,7 +212,7 @@ class FunctionsTest(unittest.TestCase):
         )
 
         self.assertIsNone(
-            FUNCTIONS.constants_at_moon(
+            functions.constants_at_moon(
                 good,
                 moon,
                 moon_column_name,

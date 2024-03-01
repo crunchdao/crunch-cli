@@ -11,6 +11,7 @@ from .domain.competition import CompetitionCollection, CompetitionEndpointMixin
 from .domain.crunch import CrunchEndpointMixin
 from .domain.data_release import DataReleaseEndpointMixin
 from .domain.library import LibraryCollection, LibraryEndpointMixin
+from .domain.metric import MetricEndpointMixin
 from .domain.phase import PhaseEndpointMixin
 from .domain.prediction import PredictionEndpointMixin
 from .domain.project import (Project, ProjectEndpointMixin,
@@ -29,6 +30,7 @@ class EndpointClient(
     CrunchEndpointMixin,
     DataReleaseEndpointMixin,
     LibraryEndpointMixin,
+    MetricEndpointMixin,
     PhaseEndpointMixin,
     PredictionEndpointMixin,
     ProjectEndpointMixin,
