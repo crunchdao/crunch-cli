@@ -70,17 +70,17 @@ class Collection:
     def __iter__(self) -> typing.Iterator[T]:
         return iter(self.list())
 
-    def list(self):
+    def list(self) -> typing.List[T]:
         raise NotImplementedError
 
-    def get(self, key):
+    def get(self, key) -> T:
         raise NotImplementedError
 
     def get_reference(
         self,
         id,
         resource_identifier=None
-    ):
+    ) -> T:
         id_attribute = self.model.id_attribute
         attrs = {
             id_attribute: id

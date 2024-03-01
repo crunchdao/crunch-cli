@@ -35,6 +35,15 @@ class Project(Model):
         return self._client.users.get(self.user_id)
 
     @property
+    def submissions(self):
+        from .submission import SubmissionCollection
+
+        return SubmissionCollection(
+            project=self,
+            client=self._client
+        )
+
+    @property
     def predictions(self):
         from .prediction import PredictionCollection
 

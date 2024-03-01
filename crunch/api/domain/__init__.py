@@ -24,4 +24,5 @@ from .project import (
 )
 from .round import Round
 from .score import Score
+from .submission import Submission
 from .user import User

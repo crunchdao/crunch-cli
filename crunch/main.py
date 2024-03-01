@@ -125,12 +125,11 @@ def push(
 
     try:
         command.push(
-            store.session,
-            message=message,
-            main_file_path=main_file_path,
-            model_directory_path=model_directory_path,
-            export_path=export_path,
-            include_installed_packages_version=not no_pip_freeze
+            message,
+            main_file_path,
+            model_directory_path,
+            not no_pip_freeze,
+            export_path,
         )
     finally:
         if converted:

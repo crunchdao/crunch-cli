@@ -117,9 +117,9 @@ def download(
     round_number="@current",
     force=False,
 ):
-    client, project_info = api.Client.from_project()
+    _, project = api.Client.from_project()
 
-    competition = client.competitions.get(project_info.competition_name)
+    competition = project.competition
     round = competition.rounds.get(round_number)
 
     os.makedirs(constants.DOT_DATA_DIRECTORY, exist_ok=True)

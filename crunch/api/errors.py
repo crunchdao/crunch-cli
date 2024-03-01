@@ -13,6 +13,31 @@ class ApiException(Exception):
         super().__init__(message)
 
 
+class InternalServerException(Exception):
+
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+RetryableException = InternalServerException
+
+
+class ValidationFailedException(Exception):
+
+    def __init__(
+        self,
+        message: str,
+        field_errors: list,
+    ):
+        super().__init__(message)
+
+        self.field_errors = field_errors
+
+
+##
+## domain
+##
+
 class CrunchNotFoundException(ApiException):
 
     def __init__(
@@ -32,6 +57,18 @@ class CrunchNotFoundException(ApiException):
         self.competition_name = competition_name
 
 
+class DailySubmissionLimitExceededException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        limit: int
+    ):
+        super().__init__(message)
+
+        self.limit = limit
+
+
 class InvalidProjectTokenException(ApiException):
 
     def __init__(
@@ -45,7 +82,9 @@ class InvalidProjectTokenException(ApiException):
 
 
 class NeverSubmittedException(ApiException):
-    pass
+
+    def __init__(self, message: str):
+        super().__init__(message)
 
 
 class ProjectNotFoundException(ApiException):
@@ -84,6 +123,7 @@ def convert_error(
     response: dict
 ):
     code = response.pop("code", "")
+    message = response.pop("message", "")
 
     props = {
         inflection.underscore(key): value
@@ -91,7 +131,12 @@ def convert_error(
     }
 
     error_class = find_error_class(code)
-    return utils.smart_call(error_class, props)
+    if error_class == ApiException:
+        message = f"{code}: {message}"
+
+    return utils.smart_call(error_class, props, {
+        "message": message
+    })
 
 
 def find_error_class(

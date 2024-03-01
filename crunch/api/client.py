@@ -12,9 +12,11 @@ from .domain.crunch import CrunchEndpointMixin
 from .domain.data_release import DataReleaseEndpointMixin
 from .domain.phase import PhaseEndpointMixin
 from .domain.prediction import PredictionEndpointMixin
-from .domain.project import ProjectEndpointMixin, ProjectTokenCollection
+from .domain.project import (Project, ProjectEndpointMixin,
+                             ProjectTokenCollection)
 from .domain.round import RoundEndpointMixin
 from .domain.score import ScoreEndpointMixin
+from .domain.submission import SubmissionEndpointMixin
 from .domain.user import UserCollection, UserEndpointMixin
 from .errors import ApiException, convert_error
 
@@ -30,6 +32,7 @@ class EndpointClient(
     ProjectEndpointMixin,
     RoundEndpointMixin,
     ScoreEndpointMixin,
+    SubmissionEndpointMixin,
     UserEndpointMixin,
 ):
 
@@ -122,6 +125,7 @@ class Client:
             path
         )
 
+    @staticmethod
     def from_env():
         store.load_from_env()
 
@@ -137,7 +141,8 @@ class Client:
             auth
         )
 
-    def from_project():
+    @staticmethod
+    def from_project() -> typing.Tuple["Client", Project]:
         store.load_from_env()
 
         project_info = utils.read_project_info()
@@ -149,4 +154,7 @@ class Client:
             PushTokenAuth(push_token)
         )
 
-        return client, project_info
+        competition = client.competitions.get(project_info.competition_name)
+        project = competition.projects.get_reference(None, project_info.user_id)
+
+        return client, project
