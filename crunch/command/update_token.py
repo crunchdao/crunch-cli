@@ -11,7 +11,7 @@ def update_token(
     project_token = client.project_tokens.upgrade(clone_token)
 
     plain = project_token.plain
-    user_id = project_token.project.id
+    user_id = project_token.project.user_id
 
     project_info.user_id = user_id
     utils.write_project_info(project_info)
