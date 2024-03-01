@@ -69,6 +69,18 @@ class DailySubmissionLimitExceededException(ApiException):
         self.limit = limit
 
 
+class ForbiddenLibraryException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        packages: typing.List[str]
+    ):
+        super().__init__(message)
+
+        self.packages = packages
+
+
 class InvalidProjectTokenException(ApiException):
 
     def __init__(

@@ -58,7 +58,6 @@ class _Inline:
 
         try:
             library.scan(
-                self.session,
                 module=self.module
             )
 

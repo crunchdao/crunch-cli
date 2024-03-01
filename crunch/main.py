@@ -157,7 +157,7 @@ def test(
     tester.install_logger()
 
     if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
-        library.scan(store.session, requirements_file=constants.REQUIREMENTS_TXT)
+        library.scan(requirements_file=constants.REQUIREMENTS_TXT)
         logging.warn('')
 
     command.test(

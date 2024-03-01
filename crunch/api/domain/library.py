@@ -31,7 +31,7 @@ class Library(Model):
 
     @property
     def aliases(self) -> typing.Tuple[str]:
-        return tuple(self._attrs["aliases"])
+        return tuple(self._attrs.get("aliases") or [])
 
 
 class LibraryCollection(Collection):
