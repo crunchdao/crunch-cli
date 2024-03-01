@@ -1,3 +1,4 @@
+import json
 import sys
 import typing
 
@@ -22,6 +23,7 @@ def _print_contact(
 class ApiException(Exception):
 
     def __init__(self, message: str):
+        self.message = message  # because python does not keep a reference himself...
         super().__init__(message)
 
     def print_helper(
@@ -30,10 +32,10 @@ class ApiException(Exception):
     ):
         print(f"A problem occured: {self.message}")
 
-        self._print_contact()
+        _print_contact()
 
 
-class InternalServerException(Exception):
+class InternalServerException(ApiException):
 
     def __init__(self, message: str):
         super().__init__(message)
@@ -50,7 +52,7 @@ class InternalServerException(Exception):
 RetryableException = InternalServerException
 
 
-class ValidationFailedException(Exception):
+class ValidationFailedException(ApiException):
 
     def __init__(
         self,
@@ -60,6 +62,16 @@ class ValidationFailedException(Exception):
         super().__init__(message)
 
         self.field_errors = field_errors
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print(f"A validation error occured: {self.message}")
+
+        print(json.dumps(self.field_errors, indent=4))
+
+        _print_contact()
 
 
 ##
