@@ -7,14 +7,13 @@ from .. import tester, utils
 
 
 def test(
-    session: utils.CustomSession,
     main_file_path: str,
     model_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
     round_number: str,
     has_gpu: bool,
-    checks=True,
+    checks: bool,
 ):
     spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
@@ -24,13 +23,12 @@ def test(
 
     prediction = tester.run(
         module,
-        session,
         model_directory_path,
         force_first_train,
         train_frequency,
         round_number,
         has_gpu,
-        checks=checks,
+        checks,
     )
 
     if prediction is not None:

@@ -1,26 +1,27 @@
 import logging
+import typing
 
 import pandas
 
-from .. import utils
+from .. import utils, api
 from . import functions
 
 CheckError = functions.CheckError
 
 _FUNCTIONS = {
-    "COLUMNS_NAME": functions.columns_name,
-    "NANS": functions.nans,
-    "VALUES_BETWEEN": functions.values_between,
-    "VALUES_ALLOWED": functions.values_allowed,
-    "MOONS": functions.moons,
-    "IDS": functions.ids_at_moon,
-    "CONSTANTS": functions.constants_at_moon,
+    api.CheckFunction.COLUMNS_NAME: functions.columns_name,
+    api.CheckFunction.NANS: functions.nans,
+    api.CheckFunction.VALUES_BETWEEN: functions.values_between,
+    api.CheckFunction.VALUES_ALLOWED: functions.values_allowed,
+    api.CheckFunction.MOONS: functions.moons,
+    api.CheckFunction.IDS: functions.ids_at_moon,
+    api.CheckFunction.CONSTANTS: functions.constants_at_moon,
 }
 
 
 def _run_checks(
-    checks: list,
-    scope: str,
+    checks: typing.List[api.Check],
+    scope: api.CheckFunctionScope,
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     id_column_name: str,
@@ -28,21 +29,20 @@ def _run_checks(
     prediction_column_name: str,
     moon: int,
 ):
-    checks.sort(key=lambda x: x['order'])
+    checks.sort(key=lambda x: x.order)
     
     for check in checks:
-        if check['scope'] != scope:
+        if check.scope != scope:
             continue
 
-        function_name = check["function"]
+        function_name = check.function
         function = _FUNCTIONS.get(function_name)
         if function is None:
-            logging.error(f"missing function - name={function_name}")
+            logging.error(f"missing function - name={function_name.name}")
             continue
 
-        parameters = check.get("parameters", {})
-        logging.warn(
-            f"check prediction - call={function.__name__}({parameters}) moon={moon}")
+        parameters = check.parameters
+        logging.warn(f"check prediction - call={function.__name__}({parameters}) moon={moon}")
 
         try:
             utils.smart_call(function, {
@@ -63,17 +63,15 @@ def _run_checks(
 
 
 def run_via_api(
-    session: utils.CustomSession,
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     id_column_name: str,
     moon_column_name: str,
     prediction_column_name: str,
 ):
-    project_info = utils.read_project_info()
-    checks = session.get(
-        f"/v1/competitions/{project_info.competition_name}/checks"
-    ).json()
+    _, project = api.Client.from_project()
+    competition = project.competition
+    checks = competition.checks.list()
 
     return run(
         checks,
@@ -86,7 +84,7 @@ def run_via_api(
 
 
 def run(
-    checks: list,
+    checks: typing.List[api.Check],
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     id_column_name: str,
@@ -94,7 +92,8 @@ def run(
     prediction_column_name: str,
 ):
     _run_checks(
-        checks, "ROOT",
+        checks,
+        api.CheckFunctionScope.ROOT,
         prediction,
         example_prediction,
         id_column_name,
@@ -108,7 +107,8 @@ def run(
         example_prediction_at_moon = example_prediction[example_prediction[moon_column_name] == moon]
 
         _run_checks(
-            checks, "MOON",
+            checks,
+            api.CheckFunctionScope.MOON,
             prediction_at_moon,
             example_prediction_at_moon,
             id_column_name,

@@ -60,7 +60,7 @@ class Check(Model):
 
     @property
     def parameters(self) -> dict:
-        return types.MappingProxyType(self._attrs["parameters"])
+        return types.MappingProxyType(self._attrs.get("parameters") or {})
 
 
 class CheckCollection(Collection):

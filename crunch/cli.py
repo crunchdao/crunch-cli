@@ -162,6 +162,7 @@ def push(
 @click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
 @click.option("--round-number", default="@current", help="Change round number to get the data from.")
 @click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
+@click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
 def test(
     main_file_path: str,
     model_directory_path: str,
@@ -169,7 +170,8 @@ def test(
     train_frequency: int,
     skip_library_check: bool,
     round_number: str,
-    has_gpu: str,
+    has_gpu: bool,
+    no_checks: bool,
 ):
     utils.change_root()
     tester.install_logger()
@@ -180,13 +182,13 @@ def test(
 
     try:
         command.test(
-            store.session,
-            main_file_path=main_file_path,
-            model_directory_path=model_directory_path,
-            force_first_train=not no_force_first_train,
-            train_frequency=train_frequency,
-            round_number=round_number,
-            has_gpu=has_gpu,
+            main_file_path,
+            model_directory_path,
+            not no_force_first_train,
+            train_frequency,
+            round_number,
+            has_gpu,
+            not no_checks,
         )
     except api.ApiException as error:
         _exit_via(error)

@@ -1,4 +1,8 @@
-from .check import Check
+from .check import (
+    Check,
+    CheckFunction,
+    CheckFunctionScope
+)
 from .common import GpuRequirement
 from .competition import Competition
 from .crunch import Crunch

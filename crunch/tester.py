@@ -37,7 +37,6 @@ def _monkey_patch_display():
 
 def run(
     module: typing.Any,
-    session: requests.Session,
     model_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
@@ -173,7 +172,6 @@ def run(
 
             try:
                 checker.run_via_api(
-                    session,
                     prediction,
                     example_prediction,
                     column_names.id,
