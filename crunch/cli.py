@@ -1,13 +1,23 @@
-import os
 import logging
+import os
 
 import click
 
-from . import command, constants, utils, api, library, tester, store, __version__
+from . import (__version__, api, command, constants, library, store, tester,
+               utils)
 
 store.load_from_env()
 
 client: api.Client
+
+
+def _exit_via(
+    error: api.ApiException,
+    **kwargs
+):
+    print("\n---")
+    error.print_helper(**kwargs)
+    exit(1)
 
 
 @click.group()
@@ -65,15 +75,21 @@ def setup(
 
     directory = os.path.normpath(directory)
 
-    command.setup(
-        clone_token=clone_token,
-        submission_number=submission_number,
-        competition_name=competition_name,
-        directory=directory,
-        model_directory=model_directory_path,
-        force=force,
-        no_model=no_model,
-    )
+    try:
+        command.setup(
+            clone_token=clone_token,
+            submission_number=submission_number,
+            competition_name=competition_name,
+            directory=directory,
+            model_directory=model_directory_path,
+            force=force,
+            no_model=no_model,
+        )
+    except api.ApiException as error:
+        _exit_via(
+            error,
+            competition_name=competition_name
+        )
 
     if not no_data:
         try:
@@ -131,6 +147,8 @@ def push(
             not no_pip_freeze,
             export_path,
         )
+    except api.ApiException as error:
+        _exit_via(error)
     finally:
         if converted:
             os.unlink(main_file_path)
@@ -160,15 +178,18 @@ def test(
         library.scan(requirements_file=constants.REQUIREMENTS_TXT)
         logging.warn('')
 
-    command.test(
-        store.session,
-        main_file_path=main_file_path,
-        model_directory_path=model_directory_path,
-        force_first_train=not no_force_first_train,
-        train_frequency=train_frequency,
-        round_number=round_number,
-        has_gpu=has_gpu,
-    )
+    try:
+        command.test(
+            store.session,
+            main_file_path=main_file_path,
+            model_directory_path=model_directory_path,
+            force_first_train=not no_force_first_train,
+            train_frequency=train_frequency,
+            round_number=round_number,
+            has_gpu=has_gpu,
+        )
+    except api.ApiException as error:
+        _exit_via(error)
 
 
 @cli.command(help="Download the data locally.")
@@ -184,6 +205,8 @@ def download(
         )
     except api.CrunchNotFoundException:
         command.download_no_data_available()
+    except api.ApiException as error:
+        _exit_via(error)
 
 
 @cli.command(help="Convert a notebook to a python script.")
@@ -195,11 +218,14 @@ def convert(
     notebook_file_path: str,
     python_file_path: str,
 ):
-    command.convert(
-        notebook_file_path=notebook_file_path,
-        python_file_path=python_file_path,
-        override=override,
-    )
+    try:
+        command.convert(
+            notebook_file_path=notebook_file_path,
+            python_file_path=python_file_path,
+            override=override,
+        )
+    except api.ApiException as error:
+        _exit_via(error)
 
 
 @cli.command(help="Update a project token.")
@@ -209,10 +235,12 @@ def update_token(
 ):
     utils.change_root()
 
-    command.update_token(
-        client,
-        clone_token=clone_token
-    )
+    try:
+        command.update_token(
+            clone_token=clone_token
+        )
+    except api.ApiException as error:
+        _exit_via(error)
 
 
 if __name__ == '__main__':

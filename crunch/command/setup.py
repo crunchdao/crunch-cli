@@ -67,16 +67,7 @@ def setup(
 
     client = api.Client.from_env()
 
-    try:
-        project_token = client.project_tokens.upgrade(clone_token)
-    except api.InvalidProjectTokenException:
-        print("your token seems to have expired or is invalid")
-        print("---")
-        print("please follow this link to copy and paste your new setup command:")
-        print(client.format_web_url(f'/competitions/{competition_name}/submit'))
-        print("")
-
-        raise click.Abort()
+    project_token = client.project_tokens.upgrade(clone_token)
 
     dot_crunchdao_path = _dot_crunchdao(directory)
     os.makedirs(dot_crunchdao_path, exist_ok=True)

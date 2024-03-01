@@ -7,16 +7,44 @@ from .. import utils
 from .domain import *
 
 
+def _print_contact(
+    and_: typing.Optional[str] = None
+):
+    message = "If you think that is an error"
+    if and_:
+        message + " and " + and_
+    message += ", please contact an administrator."
+
+    print("")
+    print(message)
+
+
 class ApiException(Exception):
 
     def __init__(self, message: str):
         super().__init__(message)
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print(f"A problem occured: {self.message}")
+
+        self._print_contact()
 
 
 class InternalServerException(Exception):
 
     def __init__(self, message: str):
         super().__init__(message)
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print(f"An internal error occured: {self.message}")
+
+        print(f"\nPlease contact an administrator.")
 
 
 RetryableException = InternalServerException
@@ -35,7 +63,7 @@ class ValidationFailedException(Exception):
 
 
 ##
-## domain
+# domain
 ##
 
 class CrunchNotFoundException(ApiException):
@@ -56,6 +84,16 @@ class CrunchNotFoundException(ApiException):
         self.round_number = round_number
         self.competition_name = competition_name
 
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print("Crunch not found.")
+        print("")
+        print("The competition may be over or the server is not correctly configured.")
+
+        _print_contact()
+
 
 class DailySubmissionLimitExceededException(ApiException):
 
@@ -67,6 +105,16 @@ class DailySubmissionLimitExceededException(ApiException):
         super().__init__(message)
 
         self.limit = limit
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print("Daily submission limit exceeded.")
+
+        print(f"\nCurrent limit: {self.limit}")
+
+        _print_contact("you should get more")
 
 
 class ForbiddenLibraryException(ApiException):
@@ -80,6 +128,18 @@ class ForbiddenLibraryException(ApiException):
 
         self.packages = packages
 
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print("Forbidden packages has been found and the server is unable to accept your work.")
+
+        print("\nProblematic packages:")
+        for package in self.packages:
+            print(f"- {package}")
+
+        _print_contact("the package should be allowed")
+
 
 class InvalidProjectTokenException(ApiException):
 
@@ -92,11 +152,32 @@ class InvalidProjectTokenException(ApiException):
 
         self.token_type = token_type
 
+    def print_helper(
+        self,
+        competition_name: str,
+        **kwargs,
+    ):
+        from .client import Client
+
+        print("Your token seems to have expired or is invalid.")
+
+        client = Client.from_env()
+        print("\nPlease follow this link to copy and paste your new setup command:")
+        print(client.format_web_url(f'/competitions/{competition_name}/submit'))
+
+        _print_contact()
+
 
 class NeverSubmittedException(ApiException):
 
     def __init__(self, message: str):
         super().__init__(message)
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        raise NotImplementedError()
 
 
 class ProjectNotFoundException(ApiException):
@@ -112,6 +193,20 @@ class ProjectNotFoundException(ApiException):
         self.competition_id = competition_id
         self.user_id = user_id
 
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        from .client import Client
+
+        print("Project not found.")
+
+        client, project = Client.from_project()
+        print("\nPlease follow this link to copy and paste your new setup command:")
+        print(client.format_web_url(f'/competitions/{project.competition.name}/submit'))
+
+        _print_contact()
+
 
 class RoundNotFoundException(ApiException):
 
@@ -123,6 +218,16 @@ class RoundNotFoundException(ApiException):
         super().__init__(message)
 
         self.round_id = round_id
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print("Round not found.")
+        print("")
+        print("The competition may be over or the server is not correctly configured.")
+
+        _print_contact()
 
 
 # TODO Only use one class like crunch
