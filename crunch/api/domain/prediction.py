@@ -5,16 +5,6 @@ from ..resource import Collection, Model
 from .project import Project
 
 
-class PredictionTag(enum.Enum):
-
-    USER_RUN_OUTPUT = "USER_RUN_OUTPUT"
-    MANAGED_RUN_OUTPUT = "MANAGED_RUN_OUTPUT"
-    USER_ORTHOGONALIZE = "USER_ORTHOGONALIZE"
-
-    def __repr__(self):
-        return self.name
-
-
 class Prediction(Model):
 
     def __init__(
@@ -37,8 +27,8 @@ class Prediction(Model):
         return self._attrs["name"]
 
     @property
-    def tag(self):
-        return PredictionTag[self._attrs["tag"]]
+    def managed(self) -> bool:
+        return self._attrs["managed"]
 
     @property
     def scores(self):

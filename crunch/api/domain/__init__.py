@@ -32,10 +32,7 @@ from .phase import (
     Phase,
     PhaseType,
 )
-from .prediction import (
-    Prediction,
-    PredictionTag
-)
+from .prediction import Prediction
 from .project import (
     Project,
     ProjectToken,
