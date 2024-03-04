@@ -85,6 +85,15 @@ class DataReleaseSplit:
     key: typing.Union[str, int]
     group: DataReleaseSplitGroup
     reduced: typing.Optional[DataReleaseSplitReduced] = None
+    
+    @staticmethod
+    def from_dict_array(
+        input: typing.List[dict]
+    ):
+        return [
+            DataReleaseSplit.from_dict(x)
+            for x in input
+        ]
 
 
 class DataRelease(Model):
@@ -155,10 +164,7 @@ class DataRelease(Model):
             self.reload(include_splits=True)
             splits = self._attrs["splits"]
 
-        return tuple(
-            DataReleaseSplit.from_dict(split)
-            for split in splits
-        )
+        return tuple(DataReleaseSplit.from_dict_array(splits))
 
     def reload(
         self,

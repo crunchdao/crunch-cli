@@ -58,20 +58,25 @@ class Model:
 
     @classmethod
     def from_dict(
-        clazz,
-        input: typing.Union[dict, typing.List[dict]],
+        cls,
+        input: dict,
         *args
     ):
-        if isinstance(input, list):
-            return [
-                clazz.from_dict(x, *args)
-                for x in input
-            ]
+        return cls(*args, attrs=input)
 
-        return clazz(*args, attrs=input)
+    @classmethod
+    def from_dict_array(
+        cls,
+        input: typing.List[dict],
+        *args
+    ):
+        return [
+            cls.from_dict(x, *args)
+            for x in input
+        ]
 
 
-T = typing.TypeVar('T')
+T = typing.TypeVar('T', Model, Model)
 
 
 class Collection:
@@ -115,7 +120,7 @@ class Collection:
 
         return self.prepare_model(attrs)
 
-    def prepare_model(self, attrs, *args):
+    def prepare_model(self, attrs, *args) -> T:
         if isinstance(attrs, self.model):
             attrs._client = self._client
             attrs._collection = self
@@ -131,7 +136,7 @@ class Collection:
 
         raise Exception(f"can't create {self.model.__name__} from {attrs}")
 
-    def prepare_models(self, attrs_list):
+    def prepare_models(self, attrs_list) -> typing.List[T]:
         return [
             self.prepare_model(attrs)
             for attrs in attrs_list
