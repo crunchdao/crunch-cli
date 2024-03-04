@@ -27,7 +27,7 @@ def _get_data_urls(
     int,
     int,
     typing.List[int],
-    api.DataReleaseColumnNames,
+    api.ColumnNames,
     typing.Tuple[DataFile, DataFile, DataFile, DataFile, DataFile]
 ]:
     data_release = round.phases.get_submission().get_data_release()
