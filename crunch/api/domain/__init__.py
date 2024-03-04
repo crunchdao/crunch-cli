@@ -11,7 +11,7 @@ from .competition import (
 from .crunch import Crunch
 from .data_release import (
     DataRelease,
-    DataReleaseColumnNames,
+    ColumnNames,
     DataReleaseTargetResolution,
     DataReleaseSplit,
     DataReleaseSplitGroup,

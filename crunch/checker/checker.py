@@ -3,7 +3,7 @@ import typing
 
 import pandas
 
-from .. import utils, api
+from .. import api, utils
 from . import functions
 
 CheckError = functions.CheckError
@@ -14,13 +14,11 @@ def _run_checks(
     scope: api.CheckFunctionScope,
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
-    id_column_name: str,
-    moon_column_name: str,
-    prediction_column_name: str,
+    column_names: api.ColumnNames,
     moon: int,
 ):
     checks.sort(key=lambda x: x.order)
-    
+
     for check in checks:
         if check.scope != scope:
             continue
@@ -38,9 +36,10 @@ def _run_checks(
             utils.smart_call(function, {
                 "prediction": prediction,
                 "example_prediction": example_prediction,
-                "id_column_name": id_column_name,
-                "moon_column_name": moon_column_name,
-                "prediction_column_name": prediction_column_name,
+                "id_column_name": column_names.id,
+                "moon_column_name": column_names.moon,
+                "prediction_column_name": column_names.prediction,
+                "column_names": column_names,
                 "moon": moon,
                 **parameters,
             })
@@ -55,9 +54,7 @@ def _run_checks(
 def run_via_api(
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
-    id_column_name: str,
-    moon_column_name: str,
-    prediction_column_name: str,
+    column_names: api.ColumnNames,
 ):
     _, project = api.Client.from_project()
     competition = project.competition
@@ -67,9 +64,7 @@ def run_via_api(
         checks,
         prediction,
         example_prediction,
-        id_column_name,
-        moon_column_name,
-        prediction_column_name,
+        column_names,
     )
 
 
@@ -77,32 +72,27 @@ def run(
     checks: typing.List[api.Check],
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
-    id_column_name: str,
-    moon_column_name: str,
-    prediction_column_name: str,
+    column_names: api.ColumnNames,
 ):
     _run_checks(
         checks,
         api.CheckFunctionScope.ROOT,
         prediction,
         example_prediction,
-        id_column_name,
-        moon_column_name,
-        prediction_column_name,
-        None
+        column_names,
+        None,
     )
 
-    for moon in example_prediction[moon_column_name].unique():
-        prediction_at_moon = prediction[prediction[moon_column_name] == moon]
-        example_prediction_at_moon = example_prediction[example_prediction[moon_column_name] == moon]
+    moons = example_prediction[column_names.moon].unique()
+    for moon in moons:
+        prediction_at_moon = prediction[prediction[column_names.moon] == moon]
+        example_prediction_at_moon = example_prediction[example_prediction[column_names.moon] == moon]
 
         _run_checks(
             checks,
             api.CheckFunctionScope.MOON,
             prediction_at_moon,
             example_prediction_at_moon,
-            id_column_name,
-            moon_column_name,
-            prediction_column_name,
+            column_names,
             moon,
         )

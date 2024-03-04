@@ -115,8 +115,8 @@ class DataRelease(Model):
         return self._attrs["embargo"]
 
     @property
-    def column_names(self) -> "DataReleaseColumnNames":
-        return DataReleaseColumnNames.from_dict(self._attrs["columnNames"])
+    def column_names(self) -> "ColumnNames":
+        return ColumnNames.from_dict(self._attrs["columnNames"])
 
     @property
     def number_of_features(self) -> int:
@@ -174,7 +174,7 @@ class DataRelease(Model):
     undefined=dataclasses_json.Undefined.EXCLUDE
 )
 @dataclasses.dataclass(frozen=True)
-class DataReleaseColumnNames:
+class ColumnNames:
 
     id: str
     moon: str

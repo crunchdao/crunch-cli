@@ -4,27 +4,29 @@ import numpy
 import pandas
 import scipy.stats
 
+from .. import api
+
 
 def orthogonalize(
     prediction: pandas.DataFrame,
     orthogonalization_data: typing.Any,
-    id_column_name: str,
-    moon_column_name: str,
-    prediction_column_name: str,
+    column_names: api.ColumnNames,
     **kwargs
 ):
+    prediction_column_name = column_names.prediction
+
     def process(group: pandas.DataFrame):
         date = group.name
 
         group[prediction_column_name] = _gaussianizer(group[prediction_column_name])
-        group[prediction_column_name] = _orthogonalizer(group, orthogonalization_data[date], id_column_name, prediction_column_name)
+        group[prediction_column_name] = _orthogonalizer(group, orthogonalization_data[date], column_names.id, prediction_column_name)
         group[prediction_column_name] = _mean_zeroed(group[prediction_column_name])
         group[prediction_column_name] = _linealg_norm(group[prediction_column_name])
 
         return group
 
     return prediction\
-        .groupby(moon_column_name, group_keys=False)\
+        .groupby(column_names.moon, group_keys=False)\
         .apply(process)
 
 

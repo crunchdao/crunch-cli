@@ -1,9 +1,8 @@
 import collections
 import dataclasses
-import typing
 import logging
+import typing
 
-import flask
 import pandas
 
 from .. import api
@@ -20,24 +19,24 @@ def _call_scorer(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     y_test: pandas.DataFrame,
     prediction: pandas.DataFrame,
-    id_column_name: str,
-    moon_column_name: str,
-    target_column_name: str,
-    prediction_column_name: str,
+    column_names: api.ColumnNames,
 ) -> typing.OrderedDict[int, float]:
-    moon_and_id = [moon_column_name, id_column_name]
+    moon_and_id = [column_names.moon, column_names.id]
 
     prediction = prediction.sort_values(by=moon_and_id)
     y_test = y_test.sort_values(by=moon_and_id)
 
     merged_df = pandas.merge(y_test, prediction, on=moon_and_id)
 
+    target_column_name = column_names.target
+    prediction_column_name = column_names.prediction
+
     if target_column_name == prediction_column_name:
         target_column_name += "_x"
         prediction_column_name += "_y"
 
     correlation = merged_df\
-        .groupby(moon_column_name, group_keys=False)\
+        .groupby(column_names.moon, group_keys=False)\
         .apply(lambda group: scorer(
             group,
             target_column_name,
@@ -51,35 +50,21 @@ def score(
     logger: logging.Logger,
     y_test: pandas.DataFrame,
     prediction: pandas.DataFrame,
-    id_column_name: str,
-    moon_column_name: str,
-    target_column_name: str,
-    prediction_column_name: str,
+    column_names: api.ColumnNames,
     reducer_function: api.ReducerFunction,
     metrics: typing.List[api.Metric],
-    splits: typing.List[api.DataReleaseSplit],
-    orthogonalization: bool,
+    y_test_keys: typing.Collection[typing.Union[int, str]],
 ) -> typing.Dict[str, ScoredMetric]:
-    y_test_keys = {
-        split.key
-        for split in splits
-        if (
-            split.group == api.DataReleaseSplitGroup.TEST
-            # spaghetti: if orthogonalization, reduced must not be none
-            and (split.reduced is None) != orthogonalization
-        )
-    }
-
     prediction = prediction[[
-        moon_column_name,
-        id_column_name,
-        prediction_column_name
+        column_names.moon,
+        column_names.id,
+        column_names.prediction
     ]]
 
     y_test = y_test[[
-        moon_column_name,
-        id_column_name,
-        target_column_name
+        column_names.moon,
+        column_names.id,
+        column_names.target
     ]]
 
     scores = {}
@@ -94,10 +79,7 @@ def score(
             scorer,
             y_test,
             prediction,
-            id_column_name,
-            moon_column_name,
-            target_column_name,
-            prediction_column_name,
+            column_names,
         )
 
         details = {}

@@ -121,6 +121,7 @@ def run(
                 "moon_column_name": column_names.moon,
                 "target_column_name": column_names.target,
                 "prediction_column_name": column_names.prediction,
+                "column_names": column_names,
                 "moon": moon,
                 "current_moon": moon,
                 "embargo": embargo,
