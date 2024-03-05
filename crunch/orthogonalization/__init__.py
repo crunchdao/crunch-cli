@@ -3,10 +3,11 @@ This package is not correctly named, but due to system's naming, it will stay th
 - @Caceresenzo
 """
 
-import typing
 import collections
+import typing
 
 import pandas
+import typing_extensions
 
 from .. import api, runner
 from .orthogonalize import process, run_from_runner, run_via_api
@@ -22,7 +23,7 @@ __all__ = [
 @typing.overload
 def run(
     prediction: pandas.DataFrame,
-    as_dataframe: typing.Literal[False]
+    as_dataframe: typing_extensions.Literal[False]
 ) -> typing.List[api.Score]:
     ...
 
@@ -30,7 +31,7 @@ def run(
 @typing.overload
 def run(
     prediction: pandas.DataFrame,
-    as_dataframe: typing.Literal[True]
+    as_dataframe: typing_extensions.Literal[True]
 ) -> typing.Optional[pandas.DataFrame]:
     ...
 
@@ -48,7 +49,7 @@ def run(
 
     if not as_dataframe:
         return scores
-    
+
     if not len(scores):
         return None
 

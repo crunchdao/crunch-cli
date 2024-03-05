@@ -1,5 +1,7 @@
 import typing
 
+import typing_extensions
+
 CompetitionIdentifierType = typing.Union[
     int,
     str
@@ -7,7 +9,7 @@ CompetitionIdentifierType = typing.Union[
 
 RoundIdentifierType = typing.Union[
     int,
-    typing.Literal[
+    typing_extensions.Literal[
         "@current",
         "@last",
     ]
@@ -15,18 +17,18 @@ RoundIdentifierType = typing.Union[
 
 PhaseIdentifierType = typing.Union[
     str,
-    typing.Literal[
+    typing_extensions.Literal[
         "submission",
         "out-of-sample",
     ],
-    typing.Literal[
+    typing_extensions.Literal[
         "@current",
     ]
 ]
 
 CrunchIdentifierType = typing.Union[
     int,
-    typing.Literal[
+    typing_extensions.Literal[
         "@current",
         "@next",
         "@published",
