@@ -2,17 +2,32 @@ import typing
 
 import pandas
 
-from .. import vendor
+from .. import __version__, api, vendor
 
 
-def orthogonalize(
+def run_via_api(
+    dataframe: pandas.DataFrame,
+):
+    _, project = api.Client.from_project()
+
+    competition = project.competition
+    round = competition.rounds.current
+
+    return round.orthogonalize(dataframe)
+
+
+def run_from_runner(
+    dataframe: pandas.DataFrame,
+):
+    from ._runner import delegate
+    return delegate(dataframe)
+
+
+def process(
     competition_name: str,
     prediction: pandas.DataFrame,
     orthogonalization_data: typing.Any,
-    id_column_name: str,
-    moon_column_name: str,
-    target_column_name: str,
-    prediction_column_name: str,
+    column_names: api.ColumnNames,
 ):
     module = vendor.get(competition_name)
 
@@ -24,10 +39,7 @@ def orthogonalize(
         competition_name=competition_name,
         prediction=prediction,
         orthogonalization_data=orthogonalization_data,
-        id_column_name=id_column_name,
-        moon_column_name=moon_column_name,
-        target_column_name=target_column_name,
-        prediction_column_name=prediction_column_name,
+        column_names=column_names
     )
 
     if not isinstance(dataframe, pandas.DataFrame):
