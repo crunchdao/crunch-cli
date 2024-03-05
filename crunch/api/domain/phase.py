@@ -48,7 +48,7 @@ class Phase(Model):
         )
 
     def get_data_release(self):
-        from .data_release import DataReleaseCollection
+        from .data_release import DataReleaseCollection, DataRelease
 
         attrs = self._client.api.get_submission_phase_data_release(
             self.round.competition.resource_identifier,
@@ -56,10 +56,12 @@ class Phase(Model):
         )
 
         competition = self.round.competition
-        return DataReleaseCollection(
+        data_release = DataReleaseCollection(
             competition,
             self._client
         ).prepare_model(attrs)
+
+        return typing.cast(DataRelease, data_release)
 
 
 class PhaseCollection(Collection):
