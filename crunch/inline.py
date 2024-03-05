@@ -32,7 +32,7 @@ class _Inline:
                     _,  # y_test_path
                     _,  # example_prediction
                 )
-            ) = command.download(self.session)
+            ) = command.download()
         except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
@@ -63,7 +63,6 @@ class _Inline:
 
             return tester.run(
                 self.module,
-                self.session,
                 self.model_directory,
                 force_first_train,
                 train_frequency,
