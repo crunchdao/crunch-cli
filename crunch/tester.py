@@ -175,9 +175,7 @@ def run(
                 checker.run_via_api(
                     prediction,
                     example_prediction,
-                    column_names.id,
-                    column_names.moon,
-                    column_names.prediction,
+                    column_names,
                 )
 
                 logging.warn(f"prediction is valid")
