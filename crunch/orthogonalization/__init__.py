@@ -1,4 +1,10 @@
+"""
+This package is not correctly named, but due to system's naming, it will stay that way :)
+- @Caceresenzo
+"""
+
 import typing
+import collections
 
 import pandas
 
@@ -15,39 +21,43 @@ __all__ = [
 
 @typing.overload
 def run(
-    dataframe: pandas.DataFrame,
-    raw: typing.Literal[True]
+    prediction: pandas.DataFrame,
+    as_dataframe: typing.Literal[False]
 ) -> typing.List[api.Score]:
     ...
 
 
 @typing.overload
 def run(
-    dataframe: pandas.DataFrame,
-    raw: typing.Literal[False]
-) -> pandas.DataFrame:
+    prediction: pandas.DataFrame,
+    as_dataframe: typing.Literal[True]
+) -> typing.Optional[pandas.DataFrame]:
     ...
 
 
 def run(
-    dataframe: pandas.DataFrame,
-    raw=False
+    prediction: pandas.DataFrame,
+    as_dataframe=True
 ):
     if runner.is_inside:
         f = run_from_runner
     else:
         f = run_via_api
 
-    scores = f(dataframe)
+    scores = f(prediction)
 
-    if raw:
+    if not as_dataframe:
         return scores
+    
+    if not len(scores):
+        return None
 
-    result = pandas.json_normalize([
-        score._attrs
-        for score in scores
-    ])
+    rows = collections.defaultdict(lambda: collections.defaultdict(dict))
+    for score in scores:
+        for moon, value in score.details.items():
+            rows[score.metric.name][moon] = value
 
-    del result["id"]
+    result = pandas.DataFrame(rows)
+    result.index.name = "moon"
 
     return result

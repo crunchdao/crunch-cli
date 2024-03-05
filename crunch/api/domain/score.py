@@ -35,6 +35,20 @@ class Score(Model):
     def prediction(self):
         return self._prediction
 
+    @property
+    def metric(self):
+        from .metric import Metric
+
+        metric_attrs = self._attrs.get("metric")
+        if metric_attrs is not None:
+            return Metric(None, metric_attrs)
+    
+        return None
+
+    @property
+    def details(self) -> typing.Dict[str, str]:
+        return self._attrs.get("details") or {}
+
 
 class ScoreCollection(Collection):
 

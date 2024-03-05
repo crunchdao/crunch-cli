@@ -7,7 +7,7 @@ from .. import __version__, api, vendor
 
 def run_via_api(
     dataframe: pandas.DataFrame,
-):
+) -> typing.List[api.Score]:
     _, project = api.Client.from_project()
 
     competition = project.competition
@@ -18,7 +18,7 @@ def run_via_api(
 
 def run_from_runner(
     dataframe: pandas.DataFrame,
-):
+) -> typing.List[api.Score]:
     from ._runner import delegate
     return delegate(dataframe)
 
