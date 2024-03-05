@@ -38,14 +38,14 @@ def _get_data_urls(
     data_files: api.DataFiles = data_release.data_files
     splits = data_release.splits
 
-    split_keys = {
+    split_keys = [
         split.key
         for split in splits
         if (
             split.group == api.DataReleaseSplitGroup.TEST
             and split.reduced is not None
         )
-    }
+    ]
 
     def get_file(file_name: str) -> DataFile:
         key = file_name.lower()
