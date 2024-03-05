@@ -53,6 +53,9 @@ class InternalServerException(ApiException):
 RetryableException = InternalServerException
 AnnotatedConnectException = InternalServerException
 
+# java related
+NullPointerException = InternalServerException
+
 
 class ValidationFailedException(ApiException):
 
@@ -79,6 +82,18 @@ class ValidationFailedException(ApiException):
 ##
 # domain
 ##
+
+class CheckException(ApiException):
+
+    def __init__(self, message: str):
+        super().__init__(message)
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print(f"Checks failed with error: {self.message}")
+
 
 class CrunchNotFoundException(ApiException):
 
