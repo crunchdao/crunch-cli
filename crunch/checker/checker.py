@@ -74,6 +74,9 @@ def run(
     example_prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
 ):
+    if not len(checks):
+        return
+
     _run_checks(
         checks,
         api.CheckFunctionScope.ROOT,
