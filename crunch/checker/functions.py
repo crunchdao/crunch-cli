@@ -1,6 +1,8 @@
 import numpy
 import pandas
 
+from .. import api
+
 
 class CheckError(ValueError):
     pass
@@ -99,3 +101,14 @@ def constants_at_moon(
 
     if n == 1:
         raise CheckError(f"Constant values on {moon_column_name}={moon}")
+
+
+REGISTRY = {
+    api.CheckFunction.COLUMNS_NAME: columns_name,
+    api.CheckFunction.NANS: nans,
+    api.CheckFunction.VALUES_BETWEEN: values_between,
+    api.CheckFunction.VALUES_ALLOWED: values_allowed,
+    api.CheckFunction.MOONS: moons,
+    api.CheckFunction.IDS: ids_at_moon,
+    api.CheckFunction.CONSTANTS: constants_at_moon,
+}

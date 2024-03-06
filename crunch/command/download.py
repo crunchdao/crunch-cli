@@ -1,33 +1,10 @@
 import os
 import typing
-import datetime
 import dataclasses
 
 import click
-import requests
-import tqdm
 
-from .. import constants, utils
-
-
-def cut_url(url: str):
-    try:
-        return url[:url.index("?")]
-    except ValueError:
-        return url
-
-
-def get_extension(url: str):
-    url = cut_url(url)
-
-    if url.endswith(".parquet"):
-        return "parquet"
-
-    if url.endswith(".csv"):
-        return "csv"
-
-    print(f"unknown file extension: {url}")
-    raise click.Abort()
+from .. import constants, utils, api
 
 
 @dataclasses.dataclass
@@ -44,64 +21,60 @@ class DataFile:
 
 
 def _get_data_urls(
-    session: utils.CustomSession,
-    round_number: str,
+    round: api.Round,
     data_directory: str,
-    competition_name: str,
-    push_token: str,
-) -> typing.Tuple[int, int, typing.Tuple[str, str, str, str], typing.Tuple[DataFile, DataFile, DataFile, DataFile, DataFile]]:
-    data_release = session.get(f"/v2/competitions/{competition_name}/rounds/{round_number}/phases/submission/data-release", params={
-        "pushToken": push_token
-    }).json()
+) -> typing.Tuple[
+    int,
+    int,
+    typing.List[int],
+    api.ColumnNames,
+    typing.Tuple[DataFile, DataFile, DataFile, DataFile, DataFile]
+]:
+    data_release = round.phases.get_submission().get_data_release()
 
-    embargo = data_release["embargo"]
-    number_of_features = data_release["numberOfFeatures"]
-    id_column_name = data_release["columnNames"]["id"]
-    moon_column_name = data_release["columnNames"]["moon"]
-    target_column_name = data_release["columnNames"]["target"]
-    prediction_column_name = data_release["columnNames"]["prediction"]
-    data_files = data_release["dataFiles"]
-    splits = data_release["splits"]
+    embargo = data_release.embargo
+    number_of_features = data_release.number_of_features
+    column_names = data_release.column_names
+    data_files: api.DataFiles = data_release.data_files
+    splits = data_release.splits
 
-    split_keys = {
-        split["key"]
+    split_keys = [
+        split.key
         for split in splits
         if (
-            split["group"] == "TEST"
-            and split["reduced"] is not None
+            split.group == api.DataReleaseSplitGroup.TEST
+            and split.reduced is not None
         )
-    }
+    ]
 
-    def get_file(key: str, file_name: str) -> DataFile:
-        data_file = data_files[key]
+    def get_file(file_name: str) -> DataFile:
+        key = file_name.lower()
+        data_file: api.DataFile = getattr(data_files, key)
 
-        url = data_file["url"]
+        url = data_file.url
         path = os.path.join(
             data_directory,
-            f"{file_name}.{get_extension(url)}"
+            f"{file_name}.{utils.get_extension(url)}"
         )
 
-        size = data_file["size"]
-        signed = data_file["signed"]
+        return DataFile(
+            url,
+            path,
+            data_file.size,
+            data_file.signed
+        )
 
-        return DataFile(url, path, size, signed)
-
-    x_train = get_file("xTrain", "X_train")
-    y_train = get_file("yTrain", "y_train")
-    x_test = get_file("xTest", "X_test")
-    y_test = get_file("yTest", "y_test")
-    example_prediction = get_file("examplePrediction", "example_prediction")
+    x_train = get_file("X_train")
+    y_train = get_file("y_train")
+    x_test = get_file("X_test")
+    y_test = get_file("y_test")
+    example_prediction = get_file("example_prediction")
 
     return (
         embargo,
         number_of_features,
         split_keys,
-        (
-            id_column_name,
-            moon_column_name,
-            target_column_name,
-            prediction_column_name,
-        ),
+        column_names,
         (
             x_train,
             y_train,
@@ -112,14 +85,15 @@ def _get_data_urls(
     )
 
 
-def _download(data_file: DataFile, force: bool):
+def _download(
+    data_file: DataFile,
+    force: bool
+):
     if data_file is None:
         return
 
     file_length_str = f" ({data_file.size} bytes)" if data_file.has_size else ""
-    print(
-        f"download {data_file.path} from {cut_url(data_file.url)}" + file_length_str
-    )
+    print(f"download {data_file.path} from {utils.cut_url(data_file.url)}" + file_length_str)
 
     if not data_file.has_size:
         print(f"skip: not given by server")
@@ -140,12 +114,13 @@ def _download(data_file: DataFile, force: bool):
 
 
 def download(
-    session: utils.CustomSession,
     round_number="@current",
     force=False,
 ):
-    project_info = utils.read_project_info()
-    push_token = utils.read_token()
+    _, project = api.Client.from_project()
+
+    competition = project.competition
+    round = competition.rounds.get(round_number)
 
     os.makedirs(constants.DOT_DATA_DIRECTORY, exist_ok=True)
 
@@ -153,12 +128,7 @@ def download(
         embargo,
         number_of_features,
         split_keys,
-        (
-            id_column_name,
-            moon_column_name,
-            target_column_name,
-            prediction_column_name,
-        ),
+        column_names,
         (
             x_train,
             y_train,
@@ -167,11 +137,8 @@ def download(
             example_prediction,
         )
     ) = _get_data_urls(
-        session,
-        round_number,
+        round,
         constants.DOT_DATA_DIRECTORY,
-        project_info.competition_name,
-        push_token,
     )
 
     _download(x_train, force)
@@ -184,12 +151,7 @@ def download(
         embargo,
         number_of_features,
         split_keys,
-        (
-            id_column_name,
-            moon_column_name,
-            target_column_name,
-            prediction_column_name,
-        ),
+        column_names,
         (
             x_train.path,
             y_train.path,
@@ -201,12 +163,5 @@ def download(
 
 
 def download_no_data_available():
-    today = datetime.date.today()
-
     print("\n---")
-
-    # competition lunch
-    if today <= datetime.date(2023, 5, 16):
-        print("The data will be released on May 16th, 2023, 05.00 PM CET")
-    else:
-        print("No data is available yet")
+    print("No data is available yet")

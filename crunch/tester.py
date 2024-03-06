@@ -37,7 +37,6 @@ def _monkey_patch_display():
 
 def run(
     module: typing.Any,
-    session: requests.Session,
     model_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
@@ -65,12 +64,7 @@ def run(
             embargo,
             number_of_features,
             split_keys,
-            (
-                id_column_name,
-                moon_column_name,
-                target_column_name,
-                prediction_column_name,
-            ),
+            column_names,
             (
                 x_train_path,
                 y_train_path,
@@ -79,10 +73,9 @@ def run(
                 example_prediction_path
             )
         ) = command.download(
-            session,
             round_number=round_number
         )
-    except api.CurrentCrunchNotFoundException:
+    except api.CrunchNotFoundException:
         command.download_no_data_available()
         raise click.Abort()
 
@@ -101,7 +94,7 @@ def run(
             full_y = utils.read(y_train_path, kwargs=read_kwargs)
 
         for dataframe in [full_x, full_y]:
-            dataframe.set_index(moon_column_name, drop=True, inplace=True)
+            dataframe.set_index(column_names.moon, drop=True, inplace=True)
 
         os.makedirs(model_directory_path, exist_ok=True)
 
@@ -124,10 +117,11 @@ def run(
             default_values = {
                 "number_of_features": number_of_features,
                 "model_directory_path": model_directory_path,
-                "id_column_name": id_column_name,
-                "moon_column_name": moon_column_name,
-                "target_column_name": target_column_name,
-                "prediction_column_name": prediction_column_name,
+                "id_column_name": column_names.id,
+                "moon_column_name": column_names.moon,
+                "target_column_name": column_names.target,
+                "prediction_column_name": column_names.prediction,
+                "column_names": column_names,
                 "moon": moon,
                 "current_moon": moon,
                 "embargo": embargo,
@@ -158,9 +152,9 @@ def run(
 
                 ensure.return_infer(
                     prediction,
-                    id_column_name,
-                    moon_column_name,
-                    prediction_column_name,
+                    column_names.id,
+                    column_names.moon,
+                    column_names.prediction,
                 )
 
             predictions.append(prediction)
@@ -179,12 +173,9 @@ def run(
 
             try:
                 checker.run_via_api(
-                    session,
                     prediction,
                     example_prediction,
-                    id_column_name,
-                    moon_column_name,
-                    prediction_column_name,
+                    column_names,
                 )
 
                 logging.warn(f"prediction is valid")

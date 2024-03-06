@@ -13,3 +13,8 @@ setuptools
 packaging
 pytest
 python-dotenv
+humanfriendly
+dataclasses_json
+inflection
+scipy
+scikit-learn

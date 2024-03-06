@@ -6,7 +6,7 @@ import pkg_resources
 
 import gitignorefile
 
-from .. import constants, utils
+from .. import constants, utils, api
 from .setup import _setup_demo
 
 
@@ -62,16 +62,15 @@ def _list_model_files(
 
 
 def push(
-    session: utils.CustomSession,
     message: str,
     main_file_path: str,
     model_directory_path: str,
     include_installed_packages_version: bool,
     export_path: str = None,
 ):
-    project_info = utils.read_project_info()
-    push_token = utils.read_token()
-    
+    client, project = api.Client.from_project()
+    competition = project.competition
+
     installed_packages_version = {}
     if include_installed_packages_version:
         installed_packages_version = {
@@ -112,34 +111,32 @@ def push(
 
                     files.append(("modelFiles", (name, fd)))
 
-                print(f"export {project_info.competition_name}:project/{project_info.user_id}")
-                submission = session.post(
-                    f"/v2/competitions/{project_info.competition_name}/projects/{project_info.user_id}/submissions",
-                    data={
-                        "message": message,
-                        "mainFilePath": main_file_path,
-                        "modelDirectoryPath": model_directory_path,
-                        "pushToken": push_token,
-                        "notebook": False,
-                        **{
-                            f"preferredPackagesVersion[{key}]": value
-                            for key, value in installed_packages_version.items()
-                        }
-                    },
-                    files=tuple(files)
-                ).json()
+                print(f"export {competition.name}:project/{project.user_id}")
+                submission = project.submissions.create(
+                    message=message,
+                    main_file_path=main_file_path,
+                    model_directory_path=model_directory_path,
+                    notebook=False,
+                    preferred_packages_version=installed_packages_version,
+                    files=files,
+                )
 
-                _print_success(session, project_info, submission)
-
+                _print_success(client, submission)
                 return submission
     finally:
         for fd in fds:
             fd.close()
 
 
-def _print_success(session: utils.CustomSession, project_info: utils.ProjectInfo, submission: dict):
+def _print_success(
+    client: api.Client,
+    submission: api.Submission
+):
     print("\n---")
-    print(f"submission #{submission['number']} succesfully uploaded!")
+    print(f"submission #{submission.number} succesfully uploaded!")
 
-    url = session.format_web_url(f"/competitions/{project_info.competition_name}/projects/{project_info.user_id}/submissions/{submission['number']}")
+    project = submission.project
+    competition = project.competition
+
+    url = client.format_web_url(f"/competitions/{competition.name}/projects/{project.user_id}/submissions/{submission.number}")
     print(f"Find it on your dashboard: {url}")

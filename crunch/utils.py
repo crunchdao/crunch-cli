@@ -4,10 +4,7 @@ import json
 import logging
 import os
 import re
-import traceback
 import typing
-import urllib
-import urllib.parse
 
 import click
 import joblib
@@ -18,57 +15,6 @@ import requests
 import tqdm
 
 from . import api, constants
-
-
-class CustomSession(requests.Session):
-    # https://stackoverflow.com/a/51026159/7292958
-
-    def __init__(self, web_base_url=None, api_base_url=None, debug=False):
-        super().__init__()
-        self.web_base_url = web_base_url
-        self.api_base_url = api_base_url
-        self.debug = debug
-
-    def request(self, method, url, *args, **kwargs):
-        response = super().request(
-            method,
-            urllib.parse.urljoin(self.api_base_url, url),
-            *args,
-            **kwargs
-        )
-
-        status_code = response.status_code
-        if status_code != 200:
-            try:
-                error = response.json()
-            except:
-                print(response.text)
-            else:
-                code = error.get("code", "")
-                message = error.get("message", "")
-
-                if code == "INVALID_PROJECT_TOKEN":
-                    raise api.InvalidProjectTokenException(message)
-                elif code == "NEVER_SUBMITTED":
-                    raise api.NeverSubmittedException(message)
-                elif code == "CURRENT_CRUNCH_NOT_FOUND":
-                    raise api.CurrentCrunchNotFoundException(message)
-                else:
-                    print(f"{method} {url}: {status_code}")
-                    print(json.dumps(error, indent=4))
-
-            if self.debug:
-                traceback.print_stack()
-
-            raise click.Abort()
-
-        return response
-
-    def format_web_url(self, path: str):
-        return urllib.parse.urljoin(
-            self.web_base_url,
-            path
-        )
 
 
 def change_root():
@@ -259,6 +205,19 @@ def cut_url(url: str):
         return url
 
 
+def get_extension(url: str):
+    url = cut_url(url)
+
+    if url.endswith(".parquet"):
+        return "parquet"
+
+    if url.endswith(".csv"):
+        return "csv"
+
+    print(f"unknown file extension: {url}")
+    raise click.Abort()
+
+
 def download(url: str, path: str, log=True):
     logged = False
 
@@ -289,3 +248,12 @@ def download(url: str, path: str, log=True):
             print(f"downloading {path} from {cut_url(url)}")
 
         raise
+
+
+def exit_via(
+    error: "api.ApiException",
+    **kwargs
+):
+    print("\n---")
+    error.print_helper(**kwargs)
+    exit(1)

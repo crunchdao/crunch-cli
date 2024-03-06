@@ -1,12 +1,11 @@
 import logging
-import os
 import sys
 import typing
 
 import click
 import pandas
 
-from . import command, constants, tester, utils, api, library
+from . import api, command, constants, library, tester, utils
 
 
 class _Inline:
@@ -16,19 +15,10 @@ class _Inline:
         self.model_directory = model_directory
         self.has_gpu = has_gpu
 
-        self.session = utils.CustomSession(
-            os.environ.get(
-                constants.WEB_BASE_URL_ENV_VAR,
-                constants.WEB_BASE_URL_DEFAULT
-            ),
-            os.environ.get(
-                constants.API_BASE_URL_ENV_VAR,
-                constants.API_BASE_URL_DEFAULT
-            ),
-            bool(os.environ.get(constants.DEBUG_ENV_VAR, "False")),
-        )
-
         print(f"loaded inline runner with module: {module}")
+
+    def load_notebook(self, *args, **kwargs):
+        return load(*args, **kwargs)
 
     def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
@@ -44,8 +34,8 @@ class _Inline:
                     _,  # y_test_path
                     _,  # example_prediction
                 )
-            ) = command.download(self.session)
-        except api.CurrentCrunchNotFoundException:
+            ) = command.download()
+        except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
 
@@ -67,16 +57,12 @@ class _Inline:
         tester.install_logger()
 
         try:
-            library.scan(
-                self.session,
-                module=self.module
-            )
+            library.scan(module=self.module)
 
             logging.warn('')
 
             return tester.run(
                 self.module,
-                self.session,
                 self.model_directory,
                 force_first_train,
                 train_frequency,
@@ -92,6 +78,13 @@ class _Inline:
                 raise abort
 
             return None
+
+    def alpha_score(
+        self,
+        prediction: pandas.DataFrame
+    ):
+        from . import orthogonalization
+        return orthogonalization.run(prediction)
 
     @property
     def is_inside_runner(self):

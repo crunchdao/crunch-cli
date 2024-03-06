@@ -1,16 +1,17 @@
-import typing
-import requirements
 import ast
 import logging
-import requests
+import typing
 
-from . import utils
+import requirements
 
+from . import api, utils
 
 DOT = "."
 
 
-def strip_packages(name: str):
+def strip_packages(
+    name: str
+):
     if name.startswith(DOT):
         return None  # just in case, but should not happen
 
@@ -21,7 +22,9 @@ def strip_packages(name: str):
     return name[:index]
 
 
-def _convert_import(node: ast.AST):
+def _convert_import(
+    node: ast.AST
+):
     packages = set()
 
     if isinstance(node, ast.Import):
@@ -37,7 +40,9 @@ def _convert_import(node: ast.AST):
     return packages
 
 
-def extract_from_requirements(file_path: str):
+def extract_from_requirements(
+    file_path: str
+):
     with open(file_path, 'r') as fd:
         return {
             requirement.name
@@ -45,7 +50,9 @@ def extract_from_requirements(file_path: str):
         }
 
 
-def extract_from_code_cells(cells: typing.List[typing.List[str]]):
+def extract_from_code_cells(
+    cells: typing.List[typing.List[str]]
+):
     packages = set()
 
     for index, lines in enumerate(cells):
@@ -62,7 +69,9 @@ def extract_from_code_cells(cells: typing.List[typing.List[str]]):
     return packages
 
 
-def extract_from_notebook_modules(module: typing.Any):
+def extract_from_notebook_modules(
+    module: typing.Any
+):
     cells = getattr(module, "In", [])
     cells_and_lines = [
         cell if isinstance(cell, list) else cell.split("\n")
@@ -72,29 +81,36 @@ def extract_from_notebook_modules(module: typing.Any):
     return extract_from_code_cells(cells_and_lines)
 
 
-def find_forbidden(packages: typing.Set[str], session: requests.Session, allow_standard: bool):
-    libraries = session.get("/v1/libraries", params={
-        "include": "ALL" if allow_standard else "THIRD_PARTY"
-    }).json()
+def find_forbidden(
+    packages: typing.Set[str],
+    allow_standard: bool
+):
+    client = api.Client.from_env()
+
+    libraries = client.libraries.list(
+        include=api.LibraryListInclude.ALL if allow_standard else api.LibraryListInclude.THIRD_PARTY
+    )
 
     whitelist = set()
     for library in libraries:
-        whitelist.add(library["name"])
-        whitelist.update(library.get("aliases", []))
+        whitelist.add(library.name)
+        whitelist.update(library.aliases)
 
     return packages - whitelist
 
 
-def scan(session: requests.Session, module: typing.Any = None, requirements_file: str = None):
+def scan(
+    module: typing.Any = None,
+    requirements_file: str = None
+):
     forbidden = set()
 
     if module:
         packages = extract_from_notebook_modules(module)
-        forbidden = find_forbidden(packages, session, True)
+        forbidden = find_forbidden(packages, True)
     elif requirements_file:
         packages = extract_from_requirements(requirements_file)
-        forbidden = find_forbidden(packages, session, False)
-    
+        forbidden = find_forbidden(packages, False)
 
     for package in forbidden:
         logging.error('forbidden library: %s', package)

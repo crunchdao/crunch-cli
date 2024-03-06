@@ -1,15 +1,11 @@
-import os
 import logging
+import os
 
 import click
-import dotenv
 
-from . import command, constants, utils, api, library, tester, __version__
+from . import __version__, api, command, constants, store, utils
 
-session = None
-debug = False
-
-dotenv.load_dotenv(".env", verbose=True)
+store.load_from_env()
 
 
 @click.group()
@@ -17,23 +13,17 @@ dotenv.load_dotenv(".env", verbose=True)
     __version__.__version__,
     package_name="__version__.__title__"
 )
-@click.option("--debug", "enable_debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
+@click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
 def cli(
-    enable_debug: bool,
+    debug: bool,
     api_base_url: str,
     web_base_url: str,
 ):
-    global debug
-    debug = enable_debug
-
-    global session
-    session = utils.CustomSession(
-        web_base_url,
-        api_base_url,
-        debug,
-    )
+    store.debug = debug
+    store.api_base_url = api_base_url
+    store.web_base_url = web_base_url
 
 
 @cli.command(help="Setup a workspace directory with the latest submission of you code.")
@@ -60,23 +50,26 @@ def setup(
 
     directory = os.path.normpath(directory)
 
-    command.setup(
-        session,
-        clone_token=clone_token,
-        submission_number=submission_number,
-        competition_name=competition_name,
-        directory=directory,
-        model_directory=model_directory_path,
-        force=force,
-        no_model=no_model,
-    )
+    try:
+        command.setup(
+            clone_token=clone_token,
+            submission_number=submission_number,
+            competition_name=competition_name,
+            directory=directory,
+            model_directory=model_directory_path,
+            force=force,
+            no_model=no_model,
+        )
+    except api.ApiException as error:
+        utils.exit_via(
+            error,
+            competition_name=competition_name
+        )
 
     if not no_data:
-        os.chdir(directory)
-
         try:
-            command.download(session, force=True)
-        except api.CurrentCrunchNotFoundException:
+            command.download(force=True)
+        except api.CrunchNotFoundException:
             command.download_no_data_available()
 
     print("\n---")
@@ -84,8 +77,7 @@ def setup(
     print(f"Next recommended actions:")
 
     if directory != '.':
-        print(
-            f" - To get inside your workspace directory, run: cd {directory}")
+        print(f" - To get inside your workspace directory, run: cd {directory}")
 
     print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
 
@@ -124,13 +116,14 @@ def push(
 
     try:
         command.push(
-            session,
-            message=message,
-            main_file_path=main_file_path,
-            model_directory_path=model_directory_path,
-            export_path=export_path,
-            include_installed_packages_version=not no_pip_freeze
+            message,
+            main_file_path,
+            model_directory_path,
+            not no_pip_freeze,
+            export_path,
         )
+    except api.ApiException as error:
+        utils.exit_via(error)
     finally:
         if converted:
             os.unlink(main_file_path)
@@ -144,6 +137,7 @@ def push(
 @click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
 @click.option("--round-number", default="@current", help="Change round number to get the data from.")
 @click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
+@click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
 def test(
     main_file_path: str,
     model_directory_path: str,
@@ -151,24 +145,30 @@ def test(
     train_frequency: int,
     skip_library_check: bool,
     round_number: str,
-    has_gpu: str,
+    has_gpu: bool,
+    no_checks: bool,
 ):
+    from . import library, tester
+
     utils.change_root()
     tester.install_logger()
 
     if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
-        library.scan(session, requirements_file=constants.REQUIREMENTS_TXT)
+        library.scan(requirements_file=constants.REQUIREMENTS_TXT)
         logging.warn('')
 
-    command.test(
-        session,
-        main_file_path=main_file_path,
-        model_directory_path=model_directory_path,
-        force_first_train=not no_force_first_train,
-        train_frequency=train_frequency,
-        round_number=round_number,
-        has_gpu=has_gpu,
-    )
+    try:
+        command.test(
+            main_file_path,
+            model_directory_path,
+            not no_force_first_train,
+            train_frequency,
+            round_number,
+            has_gpu,
+            not no_checks,
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
 
 
 @cli.command(help="Download the data locally.")
@@ -180,11 +180,12 @@ def download(
 
     try:
         command.download(
-            session,
             round_number=round_number
         )
-    except api.CurrentCrunchNotFoundException:
+    except api.CrunchNotFoundException:
         command.download_no_data_available()
+    except api.ApiException as error:
+        utils.exit_via(error)
 
 
 @cli.command(help="Convert a notebook to a python script.")
@@ -196,11 +197,14 @@ def convert(
     notebook_file_path: str,
     python_file_path: str,
 ):
-    command.convert(
-        notebook_file_path=notebook_file_path,
-        python_file_path=python_file_path,
-        override=override,
-    )
+    try:
+        command.convert(
+            notebook_file_path=notebook_file_path,
+            python_file_path=python_file_path,
+            override=override,
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
 
 
 @cli.command(help="Update a project token.")
@@ -210,10 +214,12 @@ def update_token(
 ):
     utils.change_root()
 
-    command.update_token(
-        session,
-        clone_token=clone_token
-    )
+    try:
+        command.update_token(
+            clone_token=clone_token
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
 
 
 if __name__ == '__main__':
