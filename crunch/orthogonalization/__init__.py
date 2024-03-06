@@ -1,8 +1,3 @@
-"""
-This package is not correctly named, but due to system's naming, it will stay that way :)
-- @Caceresenzo
-"""
-
 import collections
 import typing
 
