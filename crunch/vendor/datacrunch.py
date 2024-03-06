@@ -43,29 +43,29 @@ def _gaussianizer(
 
 def _orthogonalizer(
     prediction: pandas.DataFrame,
-    betas: pandas.DataFrame,
+    P_matrix: pandas.DataFrame,
     id_column_name: str,
     prediction_column_name: str,
 ) -> pandas.Series:
     projector_columns = [
         column
-        for column in betas.columns
+        for column in P_matrix.columns
         if 'Projector' in column
     ]
 
     merged = pandas.merge(
         prediction,
-        betas,
+        P_matrix,
         on=id_column_name,
         how='right' # necessary to preserve the order of the rows of the projection matrix.
     )
 
-    dot = numpy.dot(
+    prediction_parallel = numpy.dot(
         merged[projector_columns],
         merged[prediction_column_name]
     )
 
-    return merged[prediction_column_name] - dot
+    return merged[prediction_column_name] - prediction_parallel
 
 
 def _mean_zeroed(
