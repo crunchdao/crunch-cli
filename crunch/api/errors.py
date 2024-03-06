@@ -13,7 +13,7 @@ def _print_contact(
 ):
     message = "If you think that is an error"
     if and_:
-        message + " and " + and_
+        message += " and " + and_
     message += ", please contact an administrator."
 
     print("")
