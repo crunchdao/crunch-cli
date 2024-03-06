@@ -85,9 +85,9 @@ def dot_product(
 
 
 REGISTRY = {
-    api.MetricFunction.SPEARMAN: spearman,
-    api.MetricFunction.F1: fbeta_factory(beta=1),
-    api.MetricFunction.RECALL: recall,
-    api.MetricFunction.PRECISION: precision,
-    api.MetricFunction.DOT_PRODUCT: dot_product,
+    api.ScorerFunction.SPEARMAN: spearman,
+    api.ScorerFunction.F1: fbeta_factory(beta=1),
+    api.ScorerFunction.RECALL: recall,
+    api.ScorerFunction.PRECISION: precision,
+    api.ScorerFunction.DOT_PRODUCT: dot_product,
 }

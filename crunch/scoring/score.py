@@ -51,7 +51,6 @@ def score(
     y_test: pandas.DataFrame,
     prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
-    reducer_function: api.ReducerFunction,
     metrics: typing.List[api.Metric],
     y_test_keys: typing.Collection[typing.Union[int, str]],
 ) -> typing.Dict[str, ScoredMetric]:
@@ -70,9 +69,9 @@ def score(
     scores = {}
 
     for metric in metrics:
-        scorer = scorers.REGISTRY.get(metric.function)
+        scorer = scorers.REGISTRY.get(metric.scorer_function)
         if scorer is None:
-            logger.warn(f"unknown metric - name={metric.name} function={metric.function.name}")
+            logger.warn(f"unknown metric - name={metric.name} function={metric.scorer_function.name}")
             continue
 
         all_details = _call_scorer(
@@ -90,23 +89,23 @@ def score(
                 details[moon] = value
                 popped = False
 
-            logger.info(f"score - metric={metric.name} function={metric.function.name} moon={moon} value={value} popped={popped}")
+            logger.info(f"score - metric={metric.name} function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
 
         values = list(details.values())
         values_count = len(values)
 
         if values_count == 0:
-            method = "none"
+            reducer_method = "none"
             value = None
         elif values_count == 1:
-            method = "first"
+            reducer_method = "first"
             value = values[0]
         else:
-            method = reducer_function.name
-            reducer = reducers.REGISTRY[reducer_function]
+            reducer_method = metric.reducer_function.name
+            reducer = reducers.REGISTRY[metric.reducer_function]
             value = reducer(values)
 
-        logger.info(f"score - metric={metric.name} function={metric.function.name} method={method} value={value}")
+        logger.info(f"score - metric={metric.name} scorer={metric.scorer_function.name} reducer={reducer_method} value={value}")
 
         scores[metric.name] = ScoredMetric(
             value=value,

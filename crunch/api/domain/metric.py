@@ -1,18 +1,26 @@
 import enum
-import types
 import typing
 
 from ..resource import Collection, Model
 from .competition import Competition
 
 
-class MetricFunction(enum.Enum):
+class ScorerFunction(enum.Enum):
 
     SPEARMAN = "SPEARMAN"
     F1 = "F1"
     RECALL = "RECALL"
     PRECISION = "PRECISION"
     DOT_PRODUCT = "DOT_PRODUCT"
+
+    def __repr__(self):
+        return self.name
+
+
+class ReducerFunction(enum.Enum):
+
+    MEAN = "MEAN"
+    CUMPROD_PLUS_MINUS_1 = "CUMPROD_PLUS_MINUS_1"
 
     def __repr__(self):
         return self.name
@@ -58,8 +66,12 @@ class Metric(Model):
         return self._attrs["multiplier"]
 
     @property
-    def function(self):
-        return MetricFunction[self._attrs["function"]]
+    def scorer_function(self):
+        return ScorerFunction[self._attrs["scorerFunction"]]
+
+    @property
+    def reducer_function(self):
+        return ReducerFunction[self._attrs["reducerFunction"]]
 
 
 class MetricCollection(Collection):

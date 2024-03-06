@@ -4,10 +4,7 @@ from .check import (
     CheckFunctionScope
 )
 from .common import GpuRequirement
-from .competition import (
-    Competition,
-    ReducerFunction
-)
+from .competition import Competition
 from .crunch import Crunch
 from .data_release import (
     DataRelease,
@@ -26,7 +23,8 @@ from .library import (
 )
 from .metric import (
     Metric,
-    MetricFunction,
+    ScorerFunction,
+    ReducerFunction,
 )
 from .phase import (
     Phase,
