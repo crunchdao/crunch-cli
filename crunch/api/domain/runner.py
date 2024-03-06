@@ -119,8 +119,7 @@ class RunnerRunEndpointMixin:
                     "work": work,
                     "moon": moon,
                 }
-            ),
-            json=True
+            )
         )
 
     def report_runner_run_trace(
@@ -136,8 +135,7 @@ class RunnerRunEndpointMixin:
                     "content": content,
                     "moon": moon,
                 }
-            ),
-            json=True
+            )
         )
 
     def submit_runner_run_result(
@@ -153,6 +151,5 @@ class RunnerRunEndpointMixin:
                     "useInitialModel": use_initial_model
                 },
                 files=tuple(files)
-            ),
-            json=True
+            )
         )
