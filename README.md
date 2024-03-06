@@ -2,7 +2,7 @@
 
 [![PyTest](https://github.com/crunchdao/crunch-cli/actions/workflows/pytest.yml/badge.svg)](https://github.com/crunchdao/crunch-cli/actions/workflows/pytest.yml)
 
-CrunchDAO CLI is a Python library designed for the ADIA Lab Market Prediction Competition, offering convenient access to competition's data and enabling effortless submission. When utilized in the command-line interface (CLI), its goal is to deliver a user experience akin to GitHub, enabling you to seamlessly push the code from your local environment.
+This Python library is designed for the CrunchDAO Platform, offering convenient access to competition's data and enabling effortless submission. When utilized in the command-line interface (CLI), its goal is to deliver a user experience akin to GitHub, enabling you to seamlessly push the code from your local environment.
 
 ## Installation
 
@@ -66,8 +66,9 @@ else:
 
 ## Competition Links
 
-- [CrunchDAO Tournament](https://www.crunchdao.com)
+- [Competition Platform](https://www.crunchdao.com)
 - [ADIA Lab Market Prediction Competition](https://www.crunchdao.com/live/adialab)
+- [see more](https://hub.crunchdao.com/)
 
 ## Contributing
 
