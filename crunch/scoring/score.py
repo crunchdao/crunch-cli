@@ -23,9 +23,7 @@ def _call_scorer(
 ) -> typing.OrderedDict[int, float]:
     moon_and_id = [column_names.moon, column_names.id]
 
-    prediction = prediction.sort_values(by=moon_and_id)
     y_test = y_test.sort_values(by=moon_and_id)
-
     merged_df = pandas.merge(y_test, prediction, on=moon_and_id)
 
     target_column_name = column_names.target
