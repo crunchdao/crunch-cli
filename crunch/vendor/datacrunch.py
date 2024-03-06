@@ -80,7 +80,7 @@ def _orthogonalizer(
         merged[prediction_column_name]
     )
 
-    return prediction[prediction_column_name] - dot
+    return merged[prediction_column_name] - dot
 
 
 def _mean_zeroed(
