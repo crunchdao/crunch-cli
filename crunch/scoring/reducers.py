@@ -10,9 +10,7 @@ def cumprod_plus_minus_1(
     values: typing.List[float]
 ) -> float:
     array = numpy.array(values)
-    cumprod = numpy.cumprod(array + 1) - 1
-
-    return cumprod[-1]
+    return numpy.prod(array + 1) - 1
 
 
 REGISTRY = {
