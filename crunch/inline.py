@@ -1,12 +1,11 @@
 import logging
-import os
 import sys
 import typing
 
 import click
 import pandas
 
-from . import command, constants, tester, utils, api, library
+from . import api, command, constants, library, tester, utils
 
 
 class _Inline:
@@ -55,9 +54,7 @@ class _Inline:
         tester.install_logger()
 
         try:
-            library.scan(
-                module=self.module
-            )
+            library.scan(module=self.module)
 
             logging.warn('')
 
@@ -78,6 +75,13 @@ class _Inline:
                 raise abort
 
             return None
+
+    def alpha_score(
+        self,
+        prediction: pandas.DataFrame
+    ):
+        from . import orthogonalization
+        return orthogonalization.run(prediction)
 
     @property
     def is_inside_runner(self):
