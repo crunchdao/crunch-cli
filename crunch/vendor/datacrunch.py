@@ -32,29 +32,14 @@ def orthogonalize(
 
 def _gaussianizer(
     series: pandas.Series,
-    range=3.,
 ) -> pandas.Series:
-    """
-    :param range: (float) The range for generating alpha scores.
-    """
-    series_length = len(series)
-
-    x = numpy.linspace(-range, range, series_length)
-    cdf_vector = scipy.stats.norm.cdf(x)
-
-    xx = numpy.linspace(cdf_vector[0], cdf_vector[-1], series_length)
-    gaussian = scipy.stats.norm.ppf(xx)
-
-    gaussian -= numpy.mean(gaussian)
-    gaussian /= numpy.std(gaussian)
-
-    indices = series.rank(method="first").astype(int)
+    normalized_rank = series.rank(method="average").values / (len(series) + 1)
+    gaussianized_values = scipy.stats.norm.ppf(normalized_rank)
 
     return pandas.Series(
-        data=gaussian[indices - 1],
+        gaussianized_values, 
         index=series.index
     )
-
 
 def _orthogonalizer(
     prediction: pandas.DataFrame,
