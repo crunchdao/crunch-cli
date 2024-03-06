@@ -44,6 +44,15 @@ class Project(Model):
         )
 
     @property
+    def runs(self):
+        from .run import RunCollection
+
+        return RunCollection(
+            project=self,
+            client=self._client
+        )
+
+    @property
     def predictions(self):
         from .prediction import PredictionCollection
 
@@ -96,6 +105,10 @@ class ProjectCollection(Collection):
         self
     ) -> Project:
         return self.get("@me")
+
+    @property
+    def me(self) -> Project:
+        return self.get_me()
 
     # TODO Introduce an endpoint instead
     def list(

@@ -17,6 +17,8 @@ from .domain.prediction import PredictionEndpointMixin
 from .domain.project import (Project, ProjectEndpointMixin,
                              ProjectTokenCollection)
 from .domain.round import RoundEndpointMixin
+from .domain.run import RunEndpointMixin
+from .domain.runner import RunnerRun, RunnerRunEndpointMixin
 from .domain.score import ScoreEndpointMixin
 from .domain.submission import SubmissionEndpointMixin
 from .domain.user import UserCollection, UserEndpointMixin
@@ -35,6 +37,8 @@ class EndpointClient(
     PredictionEndpointMixin,
     ProjectEndpointMixin,
     RoundEndpointMixin,
+    RunEndpointMixin,
+    RunnerRunEndpointMixin,
     ScoreEndpointMixin,
     SubmissionEndpointMixin,
     UserEndpointMixin,
@@ -124,6 +128,12 @@ class Client:
     def project_tokens(self):
         return ProjectTokenCollection(
             competition=None,
+            client=self
+        )
+
+    def get_runner_run(self, run_id: int):
+        return RunnerRun(
+            run_id,
             client=self
         )
 

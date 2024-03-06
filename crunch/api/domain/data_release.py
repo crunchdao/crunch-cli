@@ -55,6 +55,7 @@ class OriginalFiles:
     x: DataFile
     y: DataFile
     example_prediction: DataFile
+    orthogonalization_data: typing.Optional[DataFile]
 
 
 class DataReleaseSplitGroup(enum.Enum):

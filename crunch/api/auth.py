@@ -64,3 +64,22 @@ class PushTokenAuth(Auth):
             data["pushToken"] = self._token
         else:
             params["pushToken"] = self._token
+
+
+class RunTokenAuth(Auth):
+
+    def __init__(
+        self,
+        token: str
+    ):
+        super().__init__()
+
+        self._token = token
+
+    def apply(
+        self,
+        headers: dict,
+        params: dict,
+        data: typing.Optional[dict],
+    ):
+        headers["X-Run-Token"] = self._token

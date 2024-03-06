@@ -39,6 +39,8 @@ from .project import (
     ProjectTokenType,
 )
 from .round import Round
+from .run import Run
+from .runner import RunnerRun
 from .score import Score
 from .submission import Submission
 from .user import User
