@@ -17,6 +17,9 @@ class _Inline:
 
         print(f"loaded inline runner with module: {module}")
 
+    def load_notebook(self, *args, **kwargs):
+        return load(*args, **kwargs)
+
     def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
             (
