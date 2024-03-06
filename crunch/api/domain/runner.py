@@ -146,10 +146,10 @@ class RunnerRunEndpointMixin:
     ):
         return self._result(
             self.post(
-                f"/v1/runner/runs/{run_id}/trace",
+                f"/v1/runner/runs/{run_id}/result",
+                files=tuple(files),
                 data={
                     "useInitialModel": use_initial_model
                 },
-                files=tuple(files)
             )
         )
