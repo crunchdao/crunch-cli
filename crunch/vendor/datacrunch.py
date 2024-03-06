@@ -71,7 +71,8 @@ def _orthogonalizer(
     merged = pandas.merge(
         prediction,
         betas,
-        on=id_column_name
+        on=id_column_name,
+        how='right' # necessary to preserve the order of the rows of the projection matrix.
     )
 
     dot = numpy.dot(
