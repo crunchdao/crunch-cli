@@ -242,11 +242,11 @@ class RoundNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        round_id: typing.Optional[int],
+        round_number: typing.Optional[int],
     ):
         super().__init__(message)
 
-        self.round_id = round_id
+        self.round_number = round_number
 
     def print_helper(
         self,
@@ -280,9 +280,14 @@ def convert_error(
     if error_class == ApiException:
         message = f"{code}: {message}"
 
-    return utils.smart_call(error_class, props, {
-        "message": message
-    })
+    return utils.smart_call(
+        error_class,
+        props,
+        {
+            "message": message
+        },
+        log=False
+    )
 
 
 def find_error_class(

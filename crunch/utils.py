@@ -164,17 +164,24 @@ class _undefined:
     pass
 
 
-def smart_call(function: callable, default_values: dict, specific_values={}):
+def smart_call(
+    function: callable,
+    default_values: dict,
+    specific_values={},
+    log=True
+):
     values = {
         **default_values,
         **specific_values
     }
 
     def warn(message: str):
-        logging.warn(f"{function.__name__}: {message}")
+        if log:
+            logging.warn(f"{function.__name__}: {message}")
 
     def debug(message: str):
-        logging.debug(f"{function.__name__}: {message}")
+        if log:
+            logging.debug(f"{function.__name__}: {message}")
 
     arguments = {}
     for name, parameter in inspect.signature(function).parameters.items():
