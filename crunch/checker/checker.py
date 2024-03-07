@@ -8,10 +8,19 @@ from . import functions
 
 CheckError = functions.CheckError
 
+def _filter_checks(
+    checks: typing.List[api.Check],
+    scope: api.CheckFunctionScope
+):
+    return [
+        check
+        for check in checks
+        if check.scope == scope
+    ]
+
 
 def _run_checks(
     checks: typing.List[api.Check],
-    scope: api.CheckFunctionScope,
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
@@ -20,9 +29,6 @@ def _run_checks(
     checks.sort(key=lambda x: x.order)
 
     for check in checks:
-        if check.scope != scope:
-            continue
-
         function_name = check.function
         function = functions.REGISTRY.get(function_name)
         if function is None:
@@ -78,22 +84,24 @@ def run(
         return
 
     _run_checks(
-        checks,
-        api.CheckFunctionScope.ROOT,
+        _filter_checks(checks, api.CheckFunctionScope.ROOT),
         prediction,
         example_prediction,
         column_names,
         None,
     )
 
-    moons = example_prediction[column_names.moon].unique()
+    moon_checks = _filter_checks(checks, api.CheckFunctionScope.MOON)
+    if not len(moon_checks):
+        return
+
+    moons = prediction[column_names.moon].unique()
     for moon in moons:
         prediction_at_moon = prediction[prediction[column_names.moon] == moon]
         example_prediction_at_moon = example_prediction[example_prediction[column_names.moon] == moon]
 
         _run_checks(
-            checks,
-            api.CheckFunctionScope.MOON,
+            moon_checks,
             prediction_at_moon,
             example_prediction_at_moon,
             column_names,
