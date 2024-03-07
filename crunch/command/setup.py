@@ -20,11 +20,10 @@ def _delete_tree_if_exists(path: str):
 
 def _check_if_already_exists(directory: str, force: bool):
     if not os.path.exists(directory):
-        return
+        return False
 
     if force:
-        dot_crunchdao_path = _dot_crunchdao(directory)
-        _delete_tree_if_exists(dot_crunchdao_path)
+        return True
     elif len(os.listdir(directory)):
         print(f"{directory}: directory not empty (use --force to override)")
         raise click.Abort()
@@ -63,13 +62,16 @@ def setup(
     force: bool,
     no_model: bool,
 ):
-    _check_if_already_exists(directory, force)
+    should_delete = _check_if_already_exists(directory, force)
 
     client = api.Client.from_env()
 
     project_token = client.project_tokens.upgrade(clone_token)
 
     dot_crunchdao_path = _dot_crunchdao(directory)
+    if should_delete:
+        _delete_tree_if_exists(dot_crunchdao_path)
+
     os.makedirs(dot_crunchdao_path, exist_ok=True)
 
     plain = project_token.plain
