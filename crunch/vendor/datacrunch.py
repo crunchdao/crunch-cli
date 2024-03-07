@@ -66,7 +66,7 @@ def _orthogonalizer(
         merged[prediction_column_name]
     )
 
-    return merged[prediction_column_name] - prediction_parallel
+    return merged[prediction_column_name].to_numpy() - prediction_parallel
 
 
 def _mean_zeroed(
