@@ -20,7 +20,7 @@ class ScorerFunction(enum.Enum):
 class ReducerFunction(enum.Enum):
 
     MEAN = "MEAN"
-    CUMPROD_PLUS_MINUS_1 = "CUMPROD_PLUS_MINUS_1"
+    PRODUCT_PLUS_MINUS_1 = "PRODUCT_PLUS_MINUS_1"
 
     def __repr__(self):
         return self.name

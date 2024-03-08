@@ -6,7 +6,7 @@ import numpy
 from .. import api
 
 
-def cumprod_plus_minus_1(
+def product_plus_minus_1(
     values: typing.List[float]
 ) -> float:
     array = numpy.array(values)
@@ -15,5 +15,5 @@ def cumprod_plus_minus_1(
 
 REGISTRY = {
     api.ReducerFunction.MEAN: statistics.mean,
-    api.ReducerFunction.CUMPROD_PLUS_MINUS_1: cumprod_plus_minus_1,
+    api.ReducerFunction.PRODUCT_PLUS_MINUS_1: product_plus_minus_1,
 }
