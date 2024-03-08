@@ -176,6 +176,7 @@ def run(
                     prediction,
                     example_prediction,
                     column_names,
+                    logging,
                 )
 
                 logging.warn(f"prediction is valid")

@@ -25,6 +25,7 @@ def _run_checks(
     example_prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
     moon: int,
+    logger: logging.Logger,
 ):
     checks.sort(key=lambda x: x.order)
 
@@ -32,11 +33,11 @@ def _run_checks(
         function_name = check.function
         function = functions.REGISTRY.get(function_name)
         if function is None:
-            logging.error(f"missing function - name={function_name.name}")
+            logger.error(f"missing function - name={function_name.name}")
             continue
 
         parameters = check.parameters
-        logging.warn(f"check prediction - call={function.__name__}({parameters}) moon={moon}")
+        logger.info(f"check prediction - call={function.__name__}({parameters}) moon={moon}")
 
         try:
             utils.smart_call(function, {
@@ -61,6 +62,7 @@ def run_via_api(
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
+    logger: logging.Logger,
 ):
     _, project = api.Client.from_project()
     competition = project.competition
@@ -71,6 +73,7 @@ def run_via_api(
         prediction,
         example_prediction,
         column_names,
+        logger,
     )
 
 
@@ -79,6 +82,7 @@ def run(
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
+    logger: logging.Logger,
 ):
     if not len(checks):
         return
@@ -89,6 +93,7 @@ def run(
         example_prediction,
         column_names,
         None,
+        logger,
     )
 
     moon_checks = _filter_checks(checks, api.CheckFunctionScope.MOON)
@@ -106,4 +111,5 @@ def run(
             example_prediction_at_moon,
             column_names,
             moon,
+            logger,
         )
