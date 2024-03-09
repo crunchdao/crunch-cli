@@ -65,6 +65,7 @@ def push(
     main_file_path: str,
     model_directory_path: str,
     include_installed_packages_version: bool,
+    dry: bool,
     export_path: str = None,
 ):
     client, project = api.Client.from_project()
@@ -108,17 +109,23 @@ def push(
                     files.append(("modelFiles", (name, fd)))
 
                 print(f"export {competition.name}:project/{project.user_id}")
-                submission = project.submissions.create(
-                    message=message,
-                    main_file_path=main_file_path,
-                    model_directory_path=model_directory_path,
-                    notebook=False,
-                    preferred_packages_version=installed_packages_version,
-                    files=files,
-                )
+                if dry:
+                    print("create dry")
+                else:
+                    print("create")
 
-                _print_success(client, submission)
-                return submission
+                    submission = project.submissions.create(
+                        message=message,
+                        main_file_path=main_file_path,
+                        model_directory_path=model_directory_path,
+                        notebook=False,
+                        preferred_packages_version=installed_packages_version,
+                        files=files,
+                    )
+
+                    _print_success(client, submission)
+
+                    return submission
     finally:
         for fd in fds:
             fd.close()

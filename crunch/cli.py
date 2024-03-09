@@ -93,12 +93,14 @@ def setup(
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 @click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
+@click.option("--dry", is_flag=True, help="Prepare file but do not really create the submission.")
 def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
     export_path: str,
     no_pip_freeze: bool,
+    dry: bool,
 ):
     utils.change_root()
 
@@ -125,6 +127,7 @@ def push(
             main_file_path,
             model_directory_path,
             not no_pip_freeze,
+            dry,
             export_path,
         )
     except api.ApiException as error:
