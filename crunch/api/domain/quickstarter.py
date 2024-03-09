@@ -5,6 +5,7 @@ import dataclasses_json
 
 from ..resource import Collection, Model
 from .competition import Competition
+from .enum_ import Language
 
 
 @dataclasses_json.dataclass_json(
@@ -73,8 +74,24 @@ class Quickstarter(Model):
         return self.competition is None
 
     @property
+    def name(self) -> bool:
+        return self._attrs["name"]
+
+    @property
+    def title(self) -> bool:
+        return self._attrs["title"]
+
+    @property
     def authors(self) -> typing.List[QuickstarterAuthor]:
         return QuickstarterAuthor.from_dict_array(self._attrs["authors"])
+
+    @property
+    def language(self) -> Language:
+        return Language[self._attrs["language"]]
+
+    @property
+    def notebook(self) -> bool:
+        return self._attrs["notebook"]
 
     @property
     def files(self) -> typing.List[QuickstarterFile]:
