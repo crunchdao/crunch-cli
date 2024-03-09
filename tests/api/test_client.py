@@ -19,17 +19,18 @@ class ClientTest(unittest.TestCase):
         for library in self.client.libraries[:2]:
             print(library)
 
-    def test_quickstarters(self):
-        for quickstarter in self.client.quickstarters[:2]:
-            print(quickstarter.reload())
-            print(quickstarter.authors)
-            print(quickstarter.files[0])
+    # TODO Enable after production has quickstarter feature deployed
+    # def test_quickstarters(self):
+    #     for quickstarter in self.client.quickstarters[:2]:
+    #         print(quickstarter.reload())
+    #         print(quickstarter.authors)
+    #         print(quickstarter.files[0])
 
-        adialab = self.client.competitions.get("adialab")
-        for quickstarter in adialab.quickstarters[:2]:
-            print(quickstarter.reload())
-            print(quickstarter.authors)
-            print(quickstarter.files[0])
+    #     adialab = self.client.competitions.get("adialab")
+    #     for quickstarter in adialab.quickstarters[:2]:
+    #         print(quickstarter.reload())
+    #         print(quickstarter.authors)
+    #         print(quickstarter.files[0])
 
     def test_users(self):
         for user in self.client.users[:2]:
