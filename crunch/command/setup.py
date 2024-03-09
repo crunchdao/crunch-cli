@@ -1,9 +1,9 @@
-import json
 import os
-import pkgutil
 import shutil
+import typing
 
 import click
+import inquirer
 
 from .. import api, constants, utils
 
@@ -29,27 +29,81 @@ def _check_if_already_exists(directory: str, force: bool):
         raise click.Abort()
 
 
-def _read_demo_file(file_name: str):
-    resource = "/".join(["..", "demo-project", file_name])
-    return pkgutil.get_data(__package__, resource)
+def _select_quickstarter(
+    client: api.Client,
+    competition_name: str,
+    quickstarter_name: typing.Optional[str],
+    show_notebook_quickstarters: bool,
+) -> typing.Optional[api.Quickstarter]:
+    quickstarters = [
+        *client.quickstarters.list(),
+        *client.competitions.get(competition_name).quickstarters.list()
+    ]
+
+    if quickstarter_name is not None:
+        for quickstarter in quickstarters:
+            if quickstarter_name in (quickstarter.name, quickstarter.title):
+                return quickstarter
+
+            print(f"{competition_name}: no quickstarter named `{quickstarter_name}`")
+            raise click.Abort()
+
+    if not show_notebook_quickstarters:
+        quickstarters = list(filter(lambda x: not x.notebook, quickstarters))
+
+    quickstarters_length = len(quickstarters)
+    if quickstarters_length == 0:
+        return None
+    elif quickstarters_length == 1:
+        return quickstarters[0]
+
+    mapping = {}
+    for quickstarter in quickstarters:
+        key = f"{quickstarter.title} ({quickstarter.id})"
+
+        if show_notebook_quickstarters:
+            type = "Notebook" if quickstarter.notebook else "Code"
+            key = f"[{type}] {key}"
+
+        mapping[key] = quickstarter
+
+    questions = [
+        inquirer.List(
+            'quickstarter',
+            message="What quickstarter to use?",
+            choices=mapping.keys(),
+        ),
+    ]
+
+    answers = inquirer.prompt(questions, raise_keyboard_interrupt=True)
+    return mapping[answers["quickstarter"]]
 
 
-def _setup_demo(filter: list = None):
-    files = json.loads(_read_demo_file("files.json").decode("utf-8"))
-    for file in files:
-        if filter and file not in filter:
-            continue
+def _setup_quickstarter(
+    directory: str,
+    client: api.Client,
+    competition_name: str,
+    quickstarter_name: typing.Optional[str],
+    show_notebook_quickstarters: bool,
+):
+    quickstarter = _select_quickstarter(
+        client,
+        competition_name,
+        quickstarter_name,
+        show_notebook_quickstarters
+    )
 
-        print(f"use {file}")
+    if quickstarter is None:
+        print("No quickstarter available, leaving directory empty.")
+        return
 
-        content = _read_demo_file(file)
-        with open(file, "wb") as fd:
-            fd.write(content)
+    for file in quickstarter.files:
+        path = os.path.join(directory, file.name)
+        utils.download(file.url, path)
 
 
 def _setup_submission(urls: dict):
     for path, url in urls.items():
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         utils.download(url, path)
 
 
@@ -61,6 +115,8 @@ def setup(
     model_directory: str,
     force: bool,
     no_model: bool,
+    quickstarter_name: typing.Optional[str],
+    show_notebook_quickstarters: bool,
 ):
     should_delete = _check_if_already_exists(directory, force)
 
@@ -86,15 +142,22 @@ def setup(
     utils.write_token(plain, directory)
 
     os.chdir(directory)
-    _, project = api.Client.from_project()
+    client, project = api.Client.from_project()
 
     try:
+        raise api.NeverSubmittedException("x")
         urls = project.clone(
             submission_number=submission_number,
             include_model=not no_model,
         )
     except api.NeverSubmittedException:
-        _setup_demo(directory)
+        _setup_quickstarter(
+            ".",  # already os.chdir
+            client,
+            competition_name,
+            quickstarter_name,
+            show_notebook_quickstarters
+        )
     else:
         _setup_submission(urls)
 

@@ -33,6 +33,8 @@ def cli(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--quickstarter-name", type=str, help="Pre-select a quickstarter.")
+@click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
 @click.argument("competition-name", required=True)
 @click.argument("directory", default="{competitionName}")
 def setup(
@@ -44,6 +46,8 @@ def setup(
     competition_name: str,
     directory: str,
     model_directory_path: str,
+    quickstarter_name: str,
+    show_notebook_quickstarters: bool,
 ):
     directory = directory\
         .replace("{competitionName}", competition_name)
@@ -59,18 +63,19 @@ def setup(
             model_directory=model_directory_path,
             force=force,
             no_model=no_model,
+            quickstarter_name=quickstarter_name,
+            show_notebook_quickstarters=show_notebook_quickstarters,
         )
+
+        if not no_data:
+            command.download(force=True)
+    except api.CrunchNotFoundException:
+        command.download_no_data_available()
     except api.ApiException as error:
         utils.exit_via(
             error,
             competition_name=competition_name
         )
-
-    if not no_data:
-        try:
-            command.download(force=True)
-        except api.CrunchNotFoundException:
-            command.download_no_data_available()
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
