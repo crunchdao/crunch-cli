@@ -136,8 +136,8 @@ class Collection:
 
         raise Exception(f"can't create {self.model.__name__} from {attrs}")
 
-    def prepare_models(self, attrs_list) -> typing.List[T]:
+    def prepare_models(self, attrs_list, *args) -> typing.List[T]:
         return [
-            self.prepare_model(attrs)
+            self.prepare_model(attrs, *args)
             for attrs in attrs_list
         ]

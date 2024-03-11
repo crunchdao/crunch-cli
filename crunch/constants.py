@@ -13,6 +13,7 @@ IGNORED_FILES = [
     f"{DOT_CRUNCHDAO_DIRECTORY}/",
     f"{DOT_DATA_DIRECTORY}/",
     f"__pycache__/",
+    f".env",
 ]
 
 DEBUG_ENV_VAR = "CRUNCH_DEBUG"

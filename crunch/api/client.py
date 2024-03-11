@@ -16,6 +16,7 @@ from .domain.phase import PhaseEndpointMixin
 from .domain.prediction import PredictionEndpointMixin
 from .domain.project import (Project, ProjectEndpointMixin,
                              ProjectTokenCollection)
+from .domain.quickstarter import QuickstarterEndpointMixin, QuickstarterCollection
 from .domain.round import RoundEndpointMixin
 from .domain.run import RunEndpointMixin
 from .domain.runner import RunnerRun, RunnerRunEndpointMixin
@@ -36,6 +37,7 @@ class EndpointClient(
     PhaseEndpointMixin,
     PredictionEndpointMixin,
     ProjectEndpointMixin,
+    QuickstarterEndpointMixin,
     RoundEndpointMixin,
     RunEndpointMixin,
     RunnerRunEndpointMixin,
@@ -127,6 +129,13 @@ class Client:
     @property
     def project_tokens(self):
         return ProjectTokenCollection(
+            competition=None,
+            client=self
+        )
+
+    @property
+    def quickstarters(self):
+        return QuickstarterCollection(
             competition=None,
             client=self
         )

@@ -33,6 +33,8 @@ def cli(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--quickstarter-name", type=str, help="Pre-select a quickstarter.")
+@click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
 @click.argument("competition-name", required=True)
 @click.argument("directory", default="{competitionName}")
 def setup(
@@ -44,6 +46,8 @@ def setup(
     competition_name: str,
     directory: str,
     model_directory_path: str,
+    quickstarter_name: str,
+    show_notebook_quickstarters: bool,
 ):
     directory = directory\
         .replace("{competitionName}", competition_name)
@@ -59,18 +63,19 @@ def setup(
             model_directory=model_directory_path,
             force=force,
             no_model=no_model,
+            quickstarter_name=quickstarter_name,
+            show_notebook_quickstarters=show_notebook_quickstarters,
         )
+
+        if not no_data:
+            command.download(force=True)
+    except api.CrunchNotFoundException:
+        command.download_no_data_available()
     except api.ApiException as error:
         utils.exit_via(
             error,
             competition_name=competition_name
         )
-
-    if not no_data:
-        try:
-            command.download(force=True)
-        except api.CrunchNotFoundException:
-            command.download_no_data_available()
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -82,18 +87,43 @@ def setup(
     print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
 
 
+@cli.command(help="Setup a workspace directory with the latest submission of you code.")
+@click.option("--name", type=str, help="Pre-select a quickstarter.")
+@click.option("--show-notebook", is_flag=True, help="Show quickstarters notebook in selection.")
+@click.option("--overwrite", is_flag=True, help="Overwrite any files that are conflicting.")
+def quickstarter(
+    name: str,
+    show_notebook: bool,
+    overwrite: bool,
+):
+    utils.change_root()
+
+    try:
+        command.quickstarter(
+            name=name,
+            show_notebook=show_notebook,
+            overwrite=overwrite,
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
+
+    print(f"quickstarter deployed")
+
+
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 @click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
+@click.option("--dry", is_flag=True, help="Prepare file but do not really create the submission.")
 def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
     export_path: str,
     no_pip_freeze: bool,
+    dry: bool,
 ):
     utils.change_root()
 
@@ -120,6 +150,7 @@ def push(
             main_file_path,
             model_directory_path,
             not no_pip_freeze,
+            dry,
             export_path,
         )
     except api.ApiException as error:

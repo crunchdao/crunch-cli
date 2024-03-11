@@ -26,12 +26,6 @@ setup(
     author_email=about['__author_email__'],
     url=about['__url__'],
     packages=find_packages(),
-    package_data={
-        package: [
-            "demo-project/*",
-            "demo-project/.*",
-        ]
-    },
     include_package_data=True,
     python_requires=">=3",
     install_requires=requirements,

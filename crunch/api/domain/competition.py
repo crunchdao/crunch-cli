@@ -54,6 +54,15 @@ class Competition(Model):
         )
 
     @property
+    def quickstarters(self):
+        from .quickstarter import QuickstarterCollection
+
+        return QuickstarterCollection(
+            competition=self,
+            client=self._client
+        )
+
+    @property
     def rounds(self):
         from .round import RoundCollection
 

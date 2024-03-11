@@ -226,6 +226,8 @@ def get_extension(url: str):
 
 
 def download(url: str, path: str, log=True):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    
     logged = False
 
     try:
