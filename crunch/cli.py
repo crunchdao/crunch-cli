@@ -87,6 +87,29 @@ def setup(
     print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
 
 
+@cli.command(help="Setup a workspace directory with the latest submission of you code.")
+@click.option("--name", type=str, help="Pre-select a quickstarter.")
+@click.option("--show-notebook", is_flag=True, help="Show quickstarters notebook in selection.")
+@click.option("--overwrite", is_flag=True, help="Overwrite any files that are conflicting.")
+def quickstarter(
+    name: str,
+    show_notebook: bool,
+    overwrite: bool,
+):
+    utils.change_root()
+
+    try:
+        command.quickstarter(
+            name=name,
+            show_notebook=show_notebook,
+            overwrite=overwrite,
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
+
+    print(f"quickstarter deployed")
+
+
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
