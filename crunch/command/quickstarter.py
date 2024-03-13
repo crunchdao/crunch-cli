@@ -13,9 +13,11 @@ def _select(
     quickstarter_name: typing.Optional[str],
     show_notebook_quickstarters: bool,
 ) -> typing.Optional[api.Quickstarter]:
+    competition = client.competitions.get(competition_name)
+
     quickstarters = [
-        *client.quickstarters.list(),
-        *client.competitions.get(competition_name).quickstarters.list()
+        *client.quickstarters(competition.format).list(),
+        *competition.quickstarters.list()
     ]
 
     if quickstarter_name is not None:

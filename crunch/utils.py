@@ -221,6 +221,9 @@ def get_extension(url: str):
     if url.endswith(".csv"):
         return "csv"
 
+    if url.endswith(".pickle"):
+        return "pickle"
+
     print(f"unknown file extension: {url}")
     raise click.Abort()
 

@@ -7,7 +7,8 @@ import requests
 from .. import constants, store, utils
 from .auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
 from .domain.check import CheckEndpointMixin
-from .domain.competition import CompetitionCollection, CompetitionEndpointMixin
+from .domain.competition import (CompetitionCollection,
+                                 CompetitionEndpointMixin, CompetitionFormat)
 from .domain.crunch import CrunchEndpointMixin
 from .domain.data_release import DataReleaseEndpointMixin
 from .domain.library import LibraryCollection, LibraryEndpointMixin
@@ -16,7 +17,8 @@ from .domain.phase import PhaseEndpointMixin
 from .domain.prediction import PredictionEndpointMixin
 from .domain.project import (Project, ProjectEndpointMixin,
                              ProjectTokenCollection)
-from .domain.quickstarter import QuickstarterEndpointMixin, QuickstarterCollection
+from .domain.quickstarter import (QuickstarterCollection,
+                                  QuickstarterEndpointMixin)
 from .domain.round import RoundEndpointMixin
 from .domain.run import RunEndpointMixin
 from .domain.runner import RunnerRun, RunnerRunEndpointMixin
@@ -133,10 +135,10 @@ class Client:
             client=self
         )
 
-    @property
-    def quickstarters(self):
+    def quickstarters(self, competition_format: CompetitionFormat):
         return QuickstarterCollection(
             competition=None,
+            competition_format=competition_format,
             client=self
         )
 

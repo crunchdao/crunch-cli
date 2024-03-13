@@ -4,7 +4,10 @@ from .check import (
     CheckFunctionScope
 )
 from .common import GpuRequirement
-from .competition import Competition
+from .competition import (
+    Competition,
+    CompetitionFormat,
+)
 from .crunch import Crunch
 from .data_release import (
     DataRelease,
