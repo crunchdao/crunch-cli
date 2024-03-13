@@ -20,7 +20,7 @@ class ClientTest(unittest.TestCase):
             print(library)
 
     def test_quickstarters(self):
-        for quickstarter in self.client.quickstarters[:2]:
+        for quickstarter in self.client.quickstarters(api.CompetitionFormat.TIMESERIES)[:2]:
             print(quickstarter.reload())
             print(quickstarter.authors)
             print(quickstarter.files[0])
