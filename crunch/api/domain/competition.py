@@ -1,8 +1,17 @@
-import typing
 import enum
+import typing
 
 from ..identifiers import CompetitionIdentifierType
 from ..resource import Collection, Model
+
+
+class CompetitionFormat(enum.Enum):
+
+    TIMESERIES = "TIMESERIES"
+    DAG = "DAG"
+
+    def __repr__(self):
+        return self.name
 
 
 class Competition(Model):
@@ -10,8 +19,12 @@ class Competition(Model):
     resource_identifier_attribute = "name"
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._attrs["name"]
+
+    @property
+    def format(self):
+        return CompetitionFormat[self._attrs["format"]]
 
     @property
     def project(self):
