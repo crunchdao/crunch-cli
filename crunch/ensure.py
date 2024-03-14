@@ -29,9 +29,11 @@ def return_infer(
 
     expected = {
         id_column_name,
-        moon_column_name,
         prediction_column_name
     }
+
+    if moon_column_name is not None:
+        expected.add(moon_column_name)
     
     got: typing.Set[str] = set(result.columns)
 
