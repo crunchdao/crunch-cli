@@ -7,7 +7,7 @@ import crunch.checker
 
 functions = crunch.checker.functions
 CheckError = crunch.checker.CheckError
-
+TIMESERIES = crunch.api.CompetitionFormat.TIMESERIES
 
 class FunctionsTest(unittest.TestCase):
 
@@ -142,10 +142,8 @@ class FunctionsTest(unittest.TestCase):
             )
         )
 
-    def test_ids_at_moon(self):
-        moon = 42
+    def test_ids(self):
         id_column_name = "a"
-        moon_column_name = "b"
         ids = [24, 42]
         example = pandas.DataFrame(ids, columns=[id_column_name])
         bad_duplicated = pandas.DataFrame(ids * 2, columns=[id_column_name])
@@ -153,69 +151,60 @@ class FunctionsTest(unittest.TestCase):
         good = example.copy()
 
         with self.assertRaises(CheckError) as context:
-            functions.ids_at_moon(
+            functions.ids(
                 bad_duplicated,
                 example,
-                moon,
                 id_column_name,
-                moon_column_name,
+                TIMESERIES,
             )
 
         self.assertEquals(
-            f"Duplicate ID(s) on {moon_column_name}={moon}",
+            f"Duplicate ID(s)",
             str(context.exception)
         )
 
         with self.assertRaises(CheckError) as context:
-            functions.ids_at_moon(
+            functions.ids(
                 bad_different,
                 example,
-                moon,
                 id_column_name,
-                moon_column_name,
+                TIMESERIES,
             )
 
         self.assertEquals(
-            f"Different ID(s) on {moon_column_name}={moon}",
+            f"Different ID(s)",
             str(context.exception)
         )
 
         self.assertIsNone(
-            functions.ids_at_moon(
+            functions.ids(
                 good,
                 example,
-                moon,
                 id_column_name,
-                moon_column_name,
+                TIMESERIES,
             )
         )
 
-    def test_constants_at_moon(self):
-        moon = 42
+    def test_constants(self):
         prediction_column_name = "a"
-        moon_column_name = "b"
         ids = [24, 42]
         bad = pandas.DataFrame([ids[0]] * 2, columns=[prediction_column_name])
         good = pandas.DataFrame(ids, columns=[prediction_column_name])
 
         with self.assertRaises(CheckError) as context:
-            functions.constants_at_moon(
+            functions.constants(
                 bad,
-                moon,
-                moon_column_name,
                 prediction_column_name,
             )
 
         self.assertEquals(
-            f"Constant values on {moon_column_name}={moon}",
+            f"Constant values",
             str(context.exception)
         )
 
         self.assertIsNone(
-            functions.constants_at_moon(
+            functions.constants(
                 good,
-                moon,
-                moon_column_name,
                 prediction_column_name,
             )
         )
