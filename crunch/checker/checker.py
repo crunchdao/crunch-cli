@@ -24,6 +24,7 @@ def _run_checks(
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
+    competition_format: api.CompetitionFormat,
     moon: int,
     logger: logging.Logger,
 ):
@@ -47,11 +48,14 @@ def _run_checks(
                 "moon_column_name": column_names.moon,
                 "prediction_column_name": column_names.prediction,
                 "column_names": column_names,
-                "moon": moon,
+                "competition_format": competition_format,
                 **parameters,
             })
-        except CheckError:
-            raise
+        except CheckError as error:
+            if moon is None:
+                raise
+
+            raise CheckError(f"{error} on {column_names.moon}={moon}") from error
         except Exception as exception:
             raise CheckError(
                 "failed to check"
@@ -65,7 +69,7 @@ def run_via_api(
     logger: logging.Logger,
 ):
     _, project = api.Client.from_project()
-    competition = project.competition
+    competition = project.competition.reload()
     checks = competition.checks.list()
 
     return run(
@@ -73,6 +77,7 @@ def run_via_api(
         prediction,
         example_prediction,
         column_names,
+        competition.format,
         logger,
     )
 
@@ -82,6 +87,7 @@ def run(
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
+    competition_format: api.CompetitionFormat,
     logger: logging.Logger,
 ):
     if not len(checks):
@@ -92,6 +98,7 @@ def run(
         prediction,
         example_prediction,
         column_names,
+        competition_format,
         None,
         logger,
     )

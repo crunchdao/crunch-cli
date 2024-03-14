@@ -106,7 +106,11 @@ def read(path: str, dataframe=True, kwargs={}) -> typing.Union[pandas.DataFrame,
     if dataframe:
         if path.endswith(".parquet"):
             return pandas.read_parquet(path, **kwargs)
+
         return pandas.read_csv(path, **kwargs)
+
+    if path.endswith(".pickle"):
+        return pandas.read_pickle(path, **kwargs)
 
     return joblib.load(path)
 

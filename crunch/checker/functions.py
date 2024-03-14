@@ -66,31 +66,44 @@ def moons(
         )
 
 
-def ids_at_moon(
+# TODO Maybe it would be better to extract ids first, and then do those checks?
+def ids(
     prediction: pandas.DataFrame,
     example_prediction: pandas.DataFrame,
-    moon: int,
     id_column_name: str,
-    moon_column_name: str,
+    competition_format: api.CompetitionFormat,
 ):
     """
     DataFrame must already be filtered.
     """
 
-    left = prediction[id_column_name]
-    if left.duplicated().sum() > 0:
-        raise CheckError(f"Duplicate ID(s) on {moon_column_name}={moon}")
+    def extract_ids(dataframe: pandas.DataFrame):
+        column = dataframe[id_column_name]
 
-    right = example_prediction[id_column_name]
+        if competition_format == api.CompetitionFormat.TIMESERIES:
+            return column
 
+        # TODO Too much specific
+        if competition_format == api.CompetitionFormat.DAG:
+            id_format = f"^(\\d+)_.*?$"
+            id_infos = example_prediction[id_column_name].str.extract(id_format)
+
+            return id_infos[0]
+
+        raise ValueError(f"unsupported competition format: {competition_format}")
+
+    left = extract_ids(prediction)
+    if competition_format != api.CompetitionFormat.DAG:
+        if left.duplicated().sum() > 0:
+            raise CheckError(f"Duplicate ID(s)")
+
+    right = extract_ids(example_prediction)
     if set(left) != set(right):
-        raise CheckError(f"Different ID(s) on {moon_column_name}={moon}")
+        raise CheckError(f"Different ID(s)")
 
 
-def constants_at_moon(
+def constants(
     prediction: pandas.DataFrame,
-    moon: int,
-    moon_column_name: str,
     prediction_column_name: str,
 ):
     """
@@ -100,7 +113,7 @@ def constants_at_moon(
     n = prediction[prediction_column_name].nunique()
 
     if n == 1:
-        raise CheckError(f"Constant values on {moon_column_name}={moon}")
+        raise CheckError(f"Constant values")
 
 
 REGISTRY = {
@@ -109,6 +122,6 @@ REGISTRY = {
     api.CheckFunction.VALUES_BETWEEN: values_between,
     api.CheckFunction.VALUES_ALLOWED: values_allowed,
     api.CheckFunction.MOONS: moons,
-    api.CheckFunction.IDS: ids_at_moon,
-    api.CheckFunction.CONSTANTS: constants_at_moon,
+    api.CheckFunction.IDS: ids,
+    api.CheckFunction.CONSTANTS: constants,
 }

@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from .. import tester, utils
+from .. import tester, utils, api
 
 
 def test(
@@ -15,6 +15,9 @@ def test(
     has_gpu: bool,
     checks: bool,
 ):
+    _, project = api.Client.from_project()
+    competition = project.competition.reload()
+
     spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
 
@@ -27,6 +30,7 @@ def test(
         force_first_train,
         train_frequency,
         round_number,
+        competition.format,
         has_gpu,
         checks,
     )

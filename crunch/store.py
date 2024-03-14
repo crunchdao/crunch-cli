@@ -13,7 +13,7 @@ api_base_url: str = None
 def load_from_env():
     global debug, web_base_url, api_base_url
 
-    dotenv.load_dotenv(".env", verbose=True)
+    dotenv.load_dotenv(".env", verbose=False)
 
     debug = humanfriendly.coerce_boolean(os.getenv(constants.DEBUG_ENV_VAR))
     web_base_url = os.getenv(constants.WEB_BASE_URL_ENV_VAR, constants.WEB_BASE_URL_DEFAULT)
