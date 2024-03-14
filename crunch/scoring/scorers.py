@@ -1,6 +1,5 @@
 import numpy
 import pandas
-import sklearn.metrics
 
 from .. import api
 
@@ -24,6 +23,8 @@ def fbeta_factory(beta: int):
         target_column_name: str,
         prediction_column_name: str,
     ) -> float:
+        import sklearn.metrics
+
         prediction = group[prediction_column_name]
 
         threshold = prediction.median()
@@ -43,6 +44,8 @@ def recall(
     target_column_name: str,
     prediction_column_name: str,
 ) -> float:
+    import sklearn.metrics
+
     prediction = group[prediction_column_name]
 
     threshold = prediction.median()
@@ -59,6 +62,8 @@ def precision(
     target_column_name: str,
     prediction_column_name: str,
 ) -> float:
+    import sklearn.metrics
+
     prediction = group[prediction_column_name]
 
     threshold = prediction.median()

@@ -2,7 +2,6 @@ import os
 import typing
 
 import click
-import inquirer
 
 from .. import api, utils
 
@@ -13,6 +12,8 @@ def _select(
     quickstarter_name: typing.Optional[str],
     show_notebook_quickstarters: bool,
 ) -> typing.Optional[api.Quickstarter]:
+    import inquirer
+
     competition = client.competitions.get(competition_name)
 
     quickstarters = [

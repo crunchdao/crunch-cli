@@ -4,9 +4,7 @@ import time
 import typing
 
 import click
-import coloredlogs
 import pandas
-import requests
 
 from . import api, checker, command, constants, ensure, utils
 
@@ -18,6 +16,7 @@ def install_logger():
     if _logged_installed:
         return
 
+    import coloredlogs
     coloredlogs.install(
         level=logging.INFO,
         fmt='%(asctime)s %(message)s',

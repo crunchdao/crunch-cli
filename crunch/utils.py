@@ -8,9 +8,7 @@ import typing
 
 import click
 import joblib
-import packaging.version
 import pandas
-import psutil
 import requests
 import tqdm
 
@@ -140,6 +138,8 @@ def to_unix_path(input: str):
 
 
 def is_valid_version(input: str):
+    import packaging.version
+
     try:
         packaging.version.Version(input)
         return True
@@ -148,6 +148,7 @@ def is_valid_version(input: str):
 
 
 def get_process_memory() -> int:
+    import psutil
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     return mem_info.rss

@@ -1,12 +1,9 @@
 import os
+import shutil
 import tarfile
 import tempfile
-import shutil
-import pkg_resources
 
-import gitignorefile
-
-from .. import constants, utils, api
+from .. import api, constants, utils
 
 
 def _list_files(
@@ -30,6 +27,8 @@ def _list_files(
 def _list_code_files(
     model_directory_path: str
 ):
+    import gitignorefile
+
     ignore_files = [
         *constants.IGNORED_FILES,
         utils.to_unix_path(f"{model_directory_path}/")
@@ -68,6 +67,8 @@ def push(
     dry: bool,
     export_path: str = None,
 ):
+    import pkg_resources
+
     client, project = api.Client.from_project()
     competition = project.competition
 

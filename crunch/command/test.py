@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from .. import tester, utils, api
+from .. import tester, api
 
 
 def test(

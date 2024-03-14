@@ -1,11 +1,12 @@
 PYTHON=python
 PIP=$(PYTHON) -m pip
 
-init:
-	$(PIP) install -r requirements.txt
-
-install: init
+install:
 	$(PIP) install -e .
+
+install-runner:
+	$(PIP) install -r requirements/runner.txt
+	$(PIP) install --no-dependencies -e .
 
 uninstall:
 	$(PIP) uninstall crunch
@@ -17,4 +18,4 @@ build:
 	rm -rf build *.egg-info dist
 	python setup.py sdist bdist_wheel
 
-.PHONY: init install uninstall test build
+.PHONY: install uninstall test build

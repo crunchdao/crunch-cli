@@ -10,7 +10,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, package, '__version__.py')) as f:
     exec(f.read(), about)
 
-with open('requirements.txt') as fd:
+with open('requirements/default.txt') as fd:
     requirements = fd.read().splitlines()
 
 with open('README.md') as fd:
