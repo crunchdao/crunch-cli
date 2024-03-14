@@ -7,6 +7,7 @@ from .errors import (
     InternalServerException,
     ValidationFailedException,
     CheckException,
+    CompetitionNameNotFoundException,
     CrunchNotFoundException,
     DailySubmissionLimitExceededException,
     ForbiddenLibraryException,

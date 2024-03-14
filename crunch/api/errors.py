@@ -95,6 +95,25 @@ class CheckException(ApiException):
         print(f"Checks failed with error: {self.message}")
 
 
+class CompetitionNameNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        competition_name: str
+    ):
+        super().__init__(message)
+
+        self.competition_name = competition_name
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print(f"Competition `{self.competition_name}` not found.")
+        _print_contact()
+
+
 class CrunchNotFoundException(ApiException):
 
     def __init__(
