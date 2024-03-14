@@ -54,6 +54,9 @@ class _Inline:
         read_kwargs={},
         write_kwargs={},
     ):
+        _, project = api.Client.from_project()
+        competition = project.competition.reload()
+
         tester.install_logger()
 
         try:
@@ -67,6 +70,7 @@ class _Inline:
                 force_first_train,
                 train_frequency,
                 round_number,
+                competition.format,
                 self.has_gpu,
                 read_kwargs,
                 write_kwargs,
