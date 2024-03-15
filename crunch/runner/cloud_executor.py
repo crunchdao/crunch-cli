@@ -216,16 +216,6 @@ class SandboxExecutor:
 
     def start(self):
         ping(self.ping_urls)
-
-        spec = importlib.util.spec_from_file_location(
-            "user_code",
-            os.path.join(self.code_directory, self.main_file)
-        )
-
-        module = importlib.util.module_from_spec(spec)
-
-        sys.path.insert(0, self.code_directory)
-        spec.loader.exec_module(module)
         
         self.state = read(self.state_file, False)
         self.splits = api.DataReleaseSplit.from_dict_array(self.state["splits"])
@@ -256,10 +246,20 @@ class SandboxExecutor:
 
         gc.collect()
 
-        train_function = ensure_function(module, "train")
-        infer_function = ensure_function(module, "infer")
-
         try:
+            spec = importlib.util.spec_from_file_location(
+                "user_code",
+                os.path.join(self.code_directory, self.main_file)
+            )
+
+            module = importlib.util.module_from_spec(spec)
+
+            sys.path.insert(0, self.code_directory)
+            spec.loader.exec_module(module)
+
+            train_function = ensure_function(module, "train")
+            infer_function = ensure_function(module, "infer")
+
             default_values = {
                 "number_of_features": self.number_of_features,
                 "model_directory_path": self.model_directory_path,
