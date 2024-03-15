@@ -8,9 +8,7 @@ import typing
 
 import click
 import joblib
-import packaging.version
 import pandas
-import psutil
 import requests
 import tqdm
 
@@ -140,6 +138,8 @@ def to_unix_path(input: str):
 
 
 def is_valid_version(input: str):
+    import packaging.version
+
     try:
         packaging.version.Version(input)
         return True
@@ -148,6 +148,7 @@ def is_valid_version(input: str):
 
 
 def get_process_memory() -> int:
+    import psutil
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     return mem_info.rss
@@ -232,9 +233,16 @@ def get_extension(url: str):
     raise click.Abort()
 
 
-def download(url: str, path: str, log=True):
+def download(
+    url: str,
+    path: str,
+    log=True,
+    print=print,
+    progress_bar=True,
+):
+    url_cut = cut_url(url)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    
+
     logged = False
 
     try:
@@ -250,18 +258,24 @@ def download(url: str, path: str, log=True):
                 else:
                     file_length_str = "unknown length"
 
-                print(
-                    f"download {path} from {cut_url(url)} ({file_length_str})"
-                )
+                print(f"download {path} from {url_cut} ({file_length_str})")
                 logged = True
 
-            with open(path, 'wb') as fd, tqdm.tqdm(total=file_length, unit='iB', unit_scale=True, leave=False) as progress:
+            progress = tqdm.tqdm(
+                total=file_length,
+                unit='iB',
+                unit_scale=True,
+                leave=False,
+                disable=not progress_bar
+            )
+
+            with open(path, 'wb') as fd, progress:
                 for chunk in response.iter_content(chunk_size=8192):
                     progress.update(len(chunk))
                     fd.write(chunk)
     except:
         if log and not logged:
-            print(f"downloading {path} from {cut_url(url)}")
+            print(f"downloading {path} from {url_cut}")
 
         raise
 

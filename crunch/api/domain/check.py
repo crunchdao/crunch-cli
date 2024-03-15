@@ -23,7 +23,7 @@ class CheckFunction(enum.Enum):
 class CheckFunctionScope(enum.Enum):
 
     ROOT = "ROOT"
-    MOON = "MOON"
+    KEY = "KEY"
 
     def __repr__(self):
         return self.name

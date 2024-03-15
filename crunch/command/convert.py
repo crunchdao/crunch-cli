@@ -1,16 +1,16 @@
 import ast
 import json
 import os
-import re
 import typing
 
-import astor
 import click
 
 from .. import constants, utils
 
 
 def convert_cells(cells: typing.List[typing.Any]):
+    import astor
+
     module = ast.Module()
     module.body = []
 

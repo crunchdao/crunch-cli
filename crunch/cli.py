@@ -1,5 +1,6 @@
 import logging
 import os
+import functools
 
 import click
 
@@ -160,46 +161,29 @@ def push(
             os.unlink(main_file_path)
 
 
+def local_options(f):
+    options = [
+        click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code."),
+        click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored."),
+        click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop."),
+        click.option("--train-frequency", default=1, show_default=True, help="Train interval."),
+        click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check."),
+        click.option("--round-number", default="@current", help="Change round number to get the data from."),
+        click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`."),
+        click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
+    ]
+
+    return functools.reduce(lambda f, option: option(f), options, f)
+
+
 @cli.command(help="Test your code locally.")
-@click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
-@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
-@click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
-@click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
-@click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
-@click.option("--round-number", default="@current", help="Change round number to get the data from.")
-@click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
-@click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
+@local_options
+@click.pass_context
 def test(
-    main_file_path: str,
-    model_directory_path: str,
-    no_force_first_train: bool,
-    train_frequency: int,
-    skip_library_check: bool,
-    round_number: str,
-    has_gpu: bool,
-    no_checks: bool,
+    context: click.Context,
+    **kwargs
 ):
-    from . import library, tester
-
-    utils.change_root()
-    tester.install_logger()
-
-    if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
-        library.scan(requirements_file=constants.REQUIREMENTS_TXT)
-        logging.warn('')
-
-    try:
-        command.test(
-            main_file_path,
-            model_directory_path,
-            not no_force_first_train,
-            train_frequency,
-            round_number,
-            has_gpu,
-            not no_checks,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    context.forward(local, **kwargs)
 
 
 @cli.command(help="Download the data locally.")
@@ -251,6 +235,250 @@ def update_token(
         )
     except api.ApiException as error:
         utils.exit_via(error)
+
+
+@cli.group(name="runner")
+def runner_group():
+    pass
+
+
+@runner_group.command(help="Run your code locally.")
+@click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
+@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
+@click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
+@click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
+@click.option("--round-number", default="@current", help="Change round number to get the data from.")
+@click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
+@click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
+def local(
+    main_file_path: str,
+    model_directory_path: str,
+    no_force_first_train: bool,
+    train_frequency: int,
+    skip_library_check: bool,
+    round_number: str,
+    has_gpu: bool,
+    no_checks: bool,
+):
+    from . import library, tester
+
+    utils.change_root()
+    tester.install_logger()
+
+    if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
+        library.scan(requirements_file=constants.REQUIREMENTS_TXT)
+        logging.warn('')
+
+    try:
+        command.test(
+            main_file_path,
+            model_directory_path,
+            not no_force_first_train,
+            train_frequency,
+            round_number,
+            has_gpu,
+            not no_checks,
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
+
+
+@runner_group.command(help="Cloud runner, do not directly run!")
+@click.option("--competition-name", envvar="COMPETITION_NAME", required=True)
+# ---
+@click.option("--context-directory", envvar="CONTEXT_DIRECTORY", default="/context")
+@click.option("--state-file", envvar="STATE_FILE", default="{context}/state.json")
+@click.option("--venv-directory", envvar="VENV_DIRECTORY", default="{context}/venv")
+@click.option("--data-directory", envvar="DATA_DIRECTORY", default="{context}/data")
+@click.option("--code-directory", envvar="CODE_DIRECTORY", default="{context}/code")
+@click.option("--model-directory", envvar="MODEL_DIRECTORY", default="model")
+@click.option("--main-file", envvar="MAIN_FILE", default="main.py")
+# ---
+@click.option("--run-id", envvar="RUN_ID", required=True)
+@click.option("--run-token", envvar="RUN_TOKEN", required=True)
+@click.option("--log-secret", envvar="LOG_SECRET", default=None, type=str)
+@click.option("--train-frequency", envvar="TRAIN_FREQUENCY", type=int, default=0)
+@click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", is_flag=True)
+@click.option("--gpu", envvar="GPU", is_flag=True)
+@click.option("--crunch-cli-commit-hash", default="main", envvar="CRUNCH_CLI_COMMIT_HASH")
+# ---
+@click.option("--max-retry", envvar="MAX_RETRY", default=3, type=int)
+@click.option("--retry-seconds", envvar="RETRY_WAIT", default=60, type=int)
+def cloud(
+    competition_name: str,
+    # ---
+    context_directory: str,
+    state_file: str,
+    venv_directory: str,
+    data_directory: str,
+    code_directory: str,
+    model_directory: str,
+    main_file: str,
+    # ---
+    run_id: str,
+    run_token: str,
+    log_secret: str,
+    train_frequency: int,
+    force_first_train: bool,
+    gpu: bool,
+    crunch_cli_commit_hash: str,
+    # ---
+    max_retry: int,
+    retry_seconds: int
+):
+    from .runner import is_inside
+    if not is_inside:
+        print("not in a runner")
+        raise click.Abort()
+
+    os.unsetenv("RUN_ID")
+    os.unsetenv("RUN_TOKEN")
+    os.unsetenv("LOG_SECRET")
+
+    code_directory = code_directory.replace("{context}", context_directory)
+    data_directory = data_directory.replace("{context}", context_directory)
+    venv_directory = venv_directory.replace("{context}", context_directory)
+    state_file = state_file.replace("{context}", context_directory)
+
+    requirements_txt_path = os.path.join(code_directory, "requirements.txt")
+    model_directory_path = os.path.join(code_directory, model_directory)
+
+    prediction_file_name = "prediction.csv"
+    prediction_path = os.path.join(context_directory, prediction_file_name)
+
+    trace_file_name = "trace.txt"
+    trace_path = os.path.join(context_directory, trace_file_name)
+
+    auth = api.auth.RunTokenAuth(run_token)
+    client = api.Client.from_env(auth)
+
+    competition = client.competitions.get(competition_name)
+    run = client.get_runner_run(run_id)
+
+    from .runner.cloud import CloudRunner
+    runner = CloudRunner(
+        competition,
+        run,
+        # ---
+        context_directory,
+        state_file,
+        venv_directory,
+        data_directory,
+        code_directory,
+        main_file,
+        # ---
+        requirements_txt_path,
+        model_directory_path,
+        prediction_path,
+        trace_path,
+        # ---
+        log_secret,
+        train_frequency,
+        force_first_train,
+        gpu,
+        crunch_cli_commit_hash,
+        # ---
+        max_retry,
+        retry_seconds
+    )
+
+    runner.start()
+
+
+@runner_group.command(help="Cloud executor, do not directly run!")
+@click.option("--competition-name", required=True)
+@click.option("--competition-format", required=True)
+# ---
+@click.option("--x", "x_path", required=True)
+@click.option("--y", "y_path", required=True)
+@click.option("--orthogonalization-data", "orthogonalization_data_path", default=None)
+# ---
+@click.option("--main-file", required=True)
+@click.option("--code-directory", required=True)
+@click.option("--model-directory", "model_directory_path", required=True)
+@click.option("--prediction", "prediction_path", required=True)
+@click.option("--trace", "trace_path", required=True)
+@click.option("--state-file", "state_file", required=True)
+@click.option("--ping-url", "ping_urls", multiple=True)
+# ---
+@click.option("--train", required=True, type=bool)
+@click.option("--moon", required=True, type=int)
+@click.option("--embargo", required=True, type=int)
+@click.option("--number-of-features", required=True, type=int)
+@click.option("--gpu", required=True, type=bool)
+# ---
+@click.option("--id-column-name", required=True)
+@click.option("--moon-column-name", required=True)
+@click.option("--target-column-name", required=True)
+@click.option("--prediction-column-name", required=True)
+def cloud_executor(
+    competition_name: str,
+    competition_format: str,
+    # ---
+    x_path: str,
+    y_path: str,
+    orthogonalization_data_path: str,
+    # ---
+    main_file: str,
+    code_directory: str,
+    model_directory_path: str,
+    prediction_path: str,
+    trace_path: str,
+    state_file: list,
+    ping_urls: list,
+    # ---
+    train: bool,
+    moon: int,
+    embargo: int,
+    number_of_features: int,
+    gpu: bool,
+    # ---
+    id_column_name: str,
+    moon_column_name: str,
+    target_column_name: str,
+    prediction_column_name: str,
+):
+    from .runner import is_inside
+    if not is_inside:
+        print("not in a runner")
+        raise click.Abort()
+
+    from . import monkey_patches
+    monkey_patches.apply_all()
+
+    from .runner.cloud_executor import SandboxExecutor
+    executor = SandboxExecutor(
+        competition_name,
+        api.CompetitionFormat[competition_format],
+        # ---
+        x_path,
+        y_path,
+        orthogonalization_data_path,
+        # ---
+        main_file,
+        code_directory,
+        model_directory_path,
+        prediction_path,
+        trace_path,
+        state_file,
+        ping_urls,
+        # ---
+        train,
+        moon,
+        embargo,
+        number_of_features,
+        gpu,
+        # ---
+        api.ColumnNames(
+            id_column_name,
+            moon_column_name,
+            target_column_name,
+            prediction_column_name
+        )
+    )
+
+    executor.start()
 
 
 if __name__ == '__main__':

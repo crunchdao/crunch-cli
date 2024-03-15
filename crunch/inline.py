@@ -5,7 +5,7 @@ import typing
 import click
 import pandas
 
-from . import api, command, constants, library, tester, utils
+from . import api, command, constants, utils
 
 
 class _Inline:
@@ -54,6 +54,8 @@ class _Inline:
         read_kwargs={},
         write_kwargs={},
     ):
+        from . import library, tester
+
         _, project = api.Client.from_project()
         competition = project.competition.reload()
 

@@ -103,7 +103,7 @@ def run(
         logger,
     )
 
-    moon_checks = _filter_checks(checks, api.CheckFunctionScope.MOON)
+    moon_checks = _filter_checks(checks, api.CheckFunctionScope.KEY)
     if not len(moon_checks):
         return
 
@@ -117,6 +117,7 @@ def run(
             prediction_at_moon,
             example_prediction_at_moon,
             column_names,
+            competition_format,
             moon,
             logger,
         )
