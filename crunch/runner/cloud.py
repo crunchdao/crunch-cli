@@ -239,6 +239,7 @@ class CloudRunner(Runner):
         self.report_current("upload result")
 
         utils.write(prediction, self.prediction_path)
+        print(prediction)
 
         fds = []
         try:

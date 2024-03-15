@@ -149,9 +149,7 @@ def call(function: callable, default_values: dict, specific_values: dict):
             continue
 
         if parameter.default != inspect.Parameter.empty:
-            error(
-                f"skip parameter with default value: {name}={parameter.default}"
-            )
+            error(f"skip parameter with default value: {name}={parameter.default}")
             continue
 
         value = values.get(name, undefined)
@@ -159,10 +157,7 @@ def call(function: callable, default_values: dict, specific_values: dict):
             error(f"unknown parameter: {name}")
             value = None
 
-        error(
-            f"{function.__name__}: set {name}={value.__class__.__name__}",
-            level="trace"
-        )
+        error(f"set {name}={value.__class__.__name__}", level="trace")
         arguments[name] = value
 
     handler = timeit_noarg(function)
