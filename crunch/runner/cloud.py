@@ -496,6 +496,7 @@ class CloudRunner(Runner):
             url,
             path,
             print=self.log,
+            progress_bar=False,
         )
 
     def download_files(

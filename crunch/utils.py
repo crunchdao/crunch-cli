@@ -237,7 +237,8 @@ def download(
     url: str,
     path: str,
     log=True,
-    print=print
+    print=print,
+    progress_bar=True,
 ):
     url_cut = cut_url(url)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -260,7 +261,15 @@ def download(
                 print(f"download {path} from {url_cut} ({file_length_str})")
                 logged = True
 
-            with open(path, 'wb') as fd, tqdm.tqdm(total=file_length, unit='iB', unit_scale=True, leave=False) as progress:
+            progress = tqdm.tqdm(
+                total=file_length,
+                unit='iB',
+                unit_scale=True,
+                leave=False,
+                disable=not progress_bar
+            )
+
+            with open(path, 'wb') as fd, progress:
                 for chunk in response.iter_content(chunk_size=8192):
                     progress.update(len(chunk))
                     fd.write(chunk)
