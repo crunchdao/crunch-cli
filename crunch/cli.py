@@ -301,6 +301,7 @@ def local(
 @click.option("--train-frequency", envvar="TRAIN_FREQUENCY", type=int, default=0)
 @click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", is_flag=True)
 @click.option("--gpu", envvar="GPU", is_flag=True)
+@click.option("--crunch-cli-commit-hash", default="master", envvar="CRUNCH_CLI_COMMIT_HASH")
 # ---
 @click.option("--max-retry", envvar="MAX_RETRY", default=3, type=int)
 @click.option("--retry-seconds", envvar="RETRY_WAIT", default=60, type=int)
@@ -321,6 +322,7 @@ def cloud(
     train_frequency: int,
     force_first_train: bool,
     gpu: bool,
+    crunch_cli_commit_hash: str,
     # ---
     max_retry: int,
     retry_seconds: int

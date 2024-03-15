@@ -56,6 +56,7 @@ class CloudRunner(Runner):
         train_frequency: str,
         force_first_train: bool,
         gpu: bool,
+        crunch_cli_commit_hash: str,
         # ---
         max_retry: int,
         retry_seconds: int
@@ -81,6 +82,7 @@ class CloudRunner(Runner):
         self.train_frequency = train_frequency
         self.force_first_train = force_first_train
         self.gpu = gpu
+        self.crunch_cli_commit_hash = crunch_cli_commit_hash
 
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
@@ -122,7 +124,7 @@ class CloudRunner(Runner):
 
             self.pip([
                 "--upgrade",
-                "git+https://github.com/crunchdao/crunch-cli@beta-9"
+                f"git+https://github.com/crunchdao/crunch-cli@{self.crunch_cli_commit_hash}"
             ])
 
         if self.gpu and self.log("fixing gpu requirements..."):
