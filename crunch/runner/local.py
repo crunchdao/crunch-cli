@@ -121,6 +121,46 @@ class LocalRunner(Runner):
                 utils.format_bytes(memory_after - memory_before)
             )
 
+    def start_dag(self):
+        x_train = utils.read(self.x_train_path, dataframe=False, kwargs=self.read_kwargs)
+        x_test = utils.read(self.x_test_path, dataframe=False, kwargs=self.read_kwargs)
+        y_train = utils.read(self.y_train_path, dataframe=False, kwargs=self.read_kwargs)
+
+        default_values = {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "id_column_name": self.column_names.id,
+            "prediction_column_name": self.column_names.prediction,
+            "column_names": self.column_names,
+            "has_gpu": self.has_gpu,
+            "has_trained": True,
+        }
+
+        if True:
+            logging.warn('call: train')
+            utils.smart_call(self.train_function, default_values, {
+                "X_train": x_train,
+                "x_train": x_train,
+                "Y_train": y_train,
+                "y_train": y_train,
+            })
+
+        if True:
+            logging.warn('call: infer')
+            prediction = utils.smart_call(self.infer_function, default_values, {
+                "X_test": x_test,
+                "x_test": x_test,
+            })
+
+            ensure.return_infer(
+                prediction,
+                self.column_names.id,
+                None,
+                self.column_names.prediction,
+            )
+
+        return prediction
+
     def timeseries_loop(
         self,
         moon: int,
@@ -178,7 +218,10 @@ class LocalRunner(Runner):
         )
 
         logging.warn('save prediction - path=%s', prediction_path)
-        utils.write(prediction, prediction_path, kwargs=self.write_kwargs)
+        utils.write(prediction, prediction_path, kwargs={
+            "index": False,
+            **self.write_kwargs
+        })
 
         if self.checks:
             example_prediction = utils.read(self.example_prediction_path)

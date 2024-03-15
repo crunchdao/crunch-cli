@@ -64,6 +64,10 @@ class Runner(abc.ABC):
         return pandas.concat(predictions)
 
     @abc.abstractmethod
+    def start_dag(self):
+        ...
+
+    @abc.abstractmethod
     def timeseries_loop(
         self,
         moon: int,

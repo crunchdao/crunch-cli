@@ -101,12 +101,6 @@ class CloudRunner(Runner):
         return super().start_timeseries()
 
     def initialize(self):
-        if self.log("initializing state..."):
-            self.report_current("initialize state")
-
-            self.initialize_state()
-            self.bash2(["chmod", "a+r", self.state_file])
-
         if self.log("downloading code..."):
             self.report_current("download code")
 
@@ -153,6 +147,9 @@ class CloudRunner(Runner):
             for path, url in data_urls.items():
                 self.download(url, path)
 
+            self.initialize_state()
+            self.bash2(["chmod", "a+r", self.state_file])
+
         if self.log("downloading model..."):
             self.report_current("download model")
 
@@ -173,64 +170,21 @@ class CloudRunner(Runner):
             self.have_model
         )
 
+    def start_dag(self):
+        return self.sandbox(
+            True,
+            -1,
+        )
+
     def timeseries_loop(
         self,
         moon: int,
         train: bool
     ) -> pandas.DataFrame:
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            self.bash2(["chmod", "a+rxw", tmpdirname])
-
-            y_tmp_path = link(tmpdirname, self.y_path, fake=not train)
-            x_tmp_path = link(tmpdirname, self.x_path)
-            orthogonalization_data_tmp_path = link(tmpdirname, self.orthogonalization_data_path)
-
-            tmp_paths = filter(bool, [
-                y_tmp_path,
-                x_tmp_path,
-                orthogonalization_data_tmp_path,
-            ])
-
-            self.bash2(["chmod", "a+r", *tmp_paths])
-
-            try:
-                self.sandbox({
-                    "competition-name": self.competition.name,
-                    # ---
-                    "x": x_tmp_path,
-                    "y": y_tmp_path,
-                    "orthogonalization-data": orthogonalization_data_tmp_path,
-                    # ---
-                    "main-file": self.main_file,
-                    "code-directory": self.code_directory,
-                    "model-directory": self.model_directory_path,
-                    "prediction": self.prediction_path,
-                    "trace": self.trace_path,
-                    "state-file": self.state_file,
-                    "ping-url": [
-                        urllib.parse.urljoin(
-                            store.api_base_url,
-                            "/v1/runner/ping"
-                        ),
-                        "https://1.1.1.1",  # CloudFlare
-                    ],
-                    # ---
-                    "train": train,
-                    "moon": moon,
-                    "embargo": self.embargo,
-                    "number-of-features": self.number_of_features,
-                    "gpu": self.gpu,
-                    # ---
-                    "id-column-name": self.column_names.id,
-                    "moon-column-name": self.column_names.moon,
-                    "target-column-name": self.column_names.target,
-                    "prediction-column-name": self.column_names.prediction,
-                })
-            except SystemExit:
-                self.report_trace(moon)
-                raise
-
-        return utils.read(self.prediction_path)
+        return self.sandbox(
+            train,
+            moon,
+        )
 
     def finalize(self, prediction: pandas.DataFrame):
         prediction_file_name = os.path.basename(self.prediction_path)
@@ -330,6 +284,13 @@ class CloudRunner(Runner):
 
     def initialize_state(self):
         state = {
+            "splits": [
+                {
+                    "key": split.key,
+                    "group": split.group.name,
+                }
+                for split in self.splits
+            ],
             "metrics": [
                 metric._attrs
                 for metric in self.competition.metrics
@@ -406,36 +367,92 @@ class CloudRunner(Runner):
 
     def sandbox(
         self,
-        options: dict
+        train: bool,
+        moon: int
     ):
-        args = []
-        for key, value in options.items():
-            if value is None:
-                continue
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            self.bash2(["chmod", "a+rxw", tmpdirname])
 
-            if isinstance(value, bool):
-                value = str(value).lower()
+            y_tmp_path = link(tmpdirname, self.y_path, fake=not train)
+            x_tmp_path = link(tmpdirname, self.x_path)
+            orthogonalization_data_tmp_path = link(tmpdirname, self.orthogonalization_data_path)
 
-            if isinstance(value, list):
-                for item in value:
+            tmp_paths = filter(bool, [
+                y_tmp_path,
+                x_tmp_path,
+                orthogonalization_data_tmp_path,
+            ])
+
+            self.bash2(["chmod", "a+r", *tmp_paths])
+
+            options = {
+                "competition-name": self.competition.name,
+                "competition-format": self.competition.format.name,
+                # ---
+                "x": x_tmp_path,
+                "y": y_tmp_path,
+                "orthogonalization-data": orthogonalization_data_tmp_path,
+                # ---
+                "main-file": self.main_file,
+                "code-directory": self.code_directory,
+                "model-directory": self.model_directory_path,
+                "prediction": self.prediction_path,
+                "trace": self.trace_path,
+                "state-file": self.state_file,
+                "ping-url": [
+                    urllib.parse.urljoin(
+                        store.api_base_url,
+                        "/v1/runner/ping"
+                    ),
+                    "https://1.1.1.1",  # CloudFlare
+                ],
+                # ---
+                "train": train,
+                "moon": moon,
+                "embargo": self.embargo,
+                "number-of-features": self.number_of_features,
+                "gpu": self.gpu,
+                # ---
+                "id-column-name": self.column_names.id,
+                "moon-column-name": self.column_names.moon or "",
+                "target-column-name": self.column_names.target or "",
+                "prediction-column-name": self.column_names.prediction,
+            }
+
+            args = []
+            for key, value in options.items():
+                if value is None:
+                    continue
+
+                if isinstance(value, bool):
+                    value = str(value).lower()
+
+                if isinstance(value, list):
+                    for item in value:
+                        args.append(f"--{key}")
+                        args.append(str(item))
+                else:
                     args.append(f"--{key}")
-                    args.append(str(item))
-            else:
-                args.append(f"--{key}")
-                args.append(str(value))
+                    args.append(str(value))
 
-        self.do_bash(
-            [
-                "sandbox", "-v", self.sandbox_restriction_flag,
-                "--",
-                "prefix", "user-code",
-                "--",
-                "python3", "-u",
-                "-m", "crunch", "runner", "cloud-executor",
-                *args
-            ],
-            self.venv_env
-        )
+            try:
+                self.do_bash(
+                    [
+                        "sandbox", "-v", self.sandbox_restriction_flag,
+                        "--",
+                        "prefix", "user-code",
+                        "--",
+                        "python3", "-u",
+                        "-m", "crunch", "runner", "cloud-executor",
+                        *args
+                    ],
+                    self.venv_env
+                )
+            except SystemExit:
+                self.report_trace(moon)
+                raise
+
+        return utils.read(self.prediction_path)
 
     @property
     def venv_env(self):

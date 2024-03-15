@@ -169,6 +169,7 @@ class SandboxExecutor:
     def __init__(
         self,
         competition_name: str,
+        competition_format: api.CompetitionFormat,
         # ---
         x_path: str,
         y_path: str,
@@ -191,6 +192,7 @@ class SandboxExecutor:
         column_names: api.ColumnNames
     ):
         self.competition_name = competition_name
+        self.competition_format = competition_format
 
         self.x_path = x_path
         self.y_path = y_path
@@ -224,6 +226,11 @@ class SandboxExecutor:
 
         sys.path.insert(0, self.code_directory)
         spec.loader.exec_module(module)
+        
+        self.state = read(self.state_file, False)
+        self.splits = api.DataReleaseSplit.from_dict_array(self.state["splits"])
+        self.metrics = api.Metric.from_dict_array(self.state["metrics"], None)
+        self.checks = api.Check.from_dict_array(self.state["checks"], None)
 
         full_x = read(self.x_path, True)
 
@@ -233,8 +240,8 @@ class SandboxExecutor:
         if self.train:
             full_y = read(self.y_path, True)
 
-            x_train = self.filter_embargo(full_x)
-            y_train = self.filter_embargo(full_y)
+            x_train = self.filter_train(full_x)
+            y_train = self.filter_train(full_y)
 
             del full_y
 
@@ -244,7 +251,7 @@ class SandboxExecutor:
             delete(self.y_path)
             delete(self.orthogonalization_data_path)
 
-        x_test = self.filter_at(full_x)
+        x_test = self.filter_test(full_x)
         del full_x
 
         gc.collect()
@@ -294,12 +301,48 @@ class SandboxExecutor:
 
         write(prediction, self.prediction_path)
 
-    def filter_embargo(self, dataframe: pandas.DataFrame):
-        # TODO Use split's key with (index(moon) - embargo)
-        return dataframe[dataframe[self.column_names.moon] < self.moon - self.embargo].copy()
+    def filter_train(self, dataframe: pandas.DataFrame):
+        if self.competition_format == api.CompetitionFormat.TIMESERIES:
+            # TODO Use split's key with (index(moon) - embargo)
+            return dataframe[dataframe[self.column_names.moon] < self.moon - self.embargo].copy()
+        
+        if self.competition_format == api.CompetitionFormat.DAG:
+            dataframe: dict
 
-    def filter_at(self, dataframe: pandas.DataFrame):
-        return dataframe[dataframe[self.column_names.moon] == self.moon].copy()
+            keys = [
+                split.key
+                for split in self.splits
+                if split.group == api.DataReleaseSplitGroup.TRAIN
+            ]
+
+            return {
+                key: value
+                for key, value in dataframe.items()
+                if key in keys
+            }
+
+        raise ValueError(f"unsupported: {self.competition_format}")
+
+    def filter_test(self, dataframe: pandas.DataFrame):
+        if self.competition_format == api.CompetitionFormat.TIMESERIES:
+            return dataframe[dataframe[self.column_names.moon] == self.moon].copy()
+        
+        if self.competition_format == api.CompetitionFormat.DAG:
+            dataframe: dict
+
+            keys = [
+                split.key
+                for split in self.splits
+                if split.group == api.DataReleaseSplitGroup.TEST
+            ]
+
+            return {
+                key: value
+                for key, value in dataframe.items()
+                if key in keys
+            }
+
+        raise ValueError(f"unsupported: {self.competition_format}")
 
     def setup_orthogonalization(
         self,
@@ -312,7 +355,6 @@ class SandboxExecutor:
         ]
 
         full_orthogonalization_data = read(self.orthogonalization_data_path, True) if self.train else delete(self.orthogonalization_data_path)
-        state = read(self.state_file, False)
 
         split_keys = y_train[self.column_names.moon].unique()
         orthogonalization_data = {
@@ -322,15 +364,12 @@ class SandboxExecutor:
         }
         del full_orthogonalization_data
 
-        metrics = api.Metric.from_dict_array(state["metrics"], None)
-        checks = api.Check.from_dict_array(state["checks"], None)
-
         logger = logging.getLogger("orthogonalization")
         logger.setLevel(logging.WARNING)
 
         metric_by_name = {
             metric.name: metric
-            for metric in metrics
+            for metric in self.metrics
         }
 
         def orthogonalize(prediction: pandas.DataFrame):
@@ -343,7 +382,7 @@ class SandboxExecutor:
             self.crunch.checker.run(
                 [
                     check
-                    for check in checks
+                    for check in self.checks
                     if check.function not in REMOVED_CHECKS
                 ],
                 prediction,
@@ -378,7 +417,7 @@ class SandboxExecutor:
                 y,
                 orthogonalized,
                 self.column_names,
-                metrics,
+                self.metrics,
                 y_keys,
             )
 

@@ -383,8 +383,9 @@ def cloud(
     runner.start()
 
 
-@runner_group.command(help="Cloud runner, do not directly run!")
+@runner_group.command(help="Cloud executor, do not directly run!")
 @click.option("--competition-name", required=True)
+@click.option("--competition-format", required=True)
 # ---
 @click.option("--x", "x_path", required=True)
 @click.option("--y", "y_path", required=True)
@@ -410,6 +411,7 @@ def cloud(
 @click.option("--prediction-column-name", required=True)
 def cloud_executor(
     competition_name: str,
+    competition_format: str,
     # ---
     x_path: str,
     y_path: str,
@@ -445,6 +447,7 @@ def cloud_executor(
     from .runner.cloud_executor import SandboxExecutor
     executor = SandboxExecutor(
         competition_name,
+        api.CompetitionFormat[competition_format],
         # ---
         x_path,
         y_path,
