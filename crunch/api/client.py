@@ -155,14 +155,17 @@ class Client:
         )
 
     @staticmethod
-    def from_env():
+    def from_env(
+        auth: typing.Optional[Auth] = None
+    ):
         store.load_from_env()
 
-        api_key = os.getenv(constants.API_KEY_ENV_VAR)
-        if api_key:
-            auth = ApiKeyAuth(api_key)
-        else:
-            auth = NoneAuth()
+        if auth is None:
+            api_key = os.getenv(constants.API_KEY_ENV_VAR)
+            if api_key:
+                auth = ApiKeyAuth(api_key)
+            else:
+                auth = NoneAuth()
 
         return Client(
             store.api_base_url,

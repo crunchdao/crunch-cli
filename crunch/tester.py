@@ -6,7 +6,7 @@ import typing
 import click
 import pandas
 
-from . import api, checker, command, constants, ensure, utils
+from . import api, checker, command, constants, ensure, utils, monkey_patches
 
 _logged_installed = False
 
@@ -199,117 +199,30 @@ def run(
     read_kwargs={},
     write_kwargs={},
 ):
-    install_logger()
-    _monkey_patch_display()
+    from .runner.local import LocalRunner
+    runner = LocalRunner(
+        module,
+        model_directory_path,
+        force_first_train,
+        train_frequency,
+        round_number,
+        competition_format,
+        has_gpu,
+        checks,
+        read_kwargs,
+        write_kwargs,
+    )
 
-    logging.info('running local test')
-    logging.warn("internet access isn't restricted, no check will be done")
-    logging.info("")
-
-    memory_before = utils.get_process_memory()
-    start = time.time()
-
-    train_function = ensure.is_function(module, "train")
-    infer_function = ensure.is_function(module, "infer")
-
-    try:
-        (
-            embargo,
-            number_of_features,
-            split_keys,
-            column_names,
-            (
-                x_train_path,
-                y_train_path,
-                x_test_path,
-                y_test_path,
-                example_prediction_path
-            )
-        ) = command.download(
-            round_number=round_number
-        )
-    except api.CrunchNotFoundException:
-        command.download_no_data_available()
-        raise click.Abort()
-
-    try:
-        if competition_format == api.CompetitionFormat.TIMESERIES:
-            prediction = _run_timeseries(
-                model_directory_path,
-                force_first_train,
-                train_frequency,
-                has_gpu,
-                read_kwargs,
-                train_function,
-                infer_function,
-                embargo,
-                number_of_features,
-                split_keys,
-                column_names,
-                x_train_path,
-                y_train_path,
-                x_test_path,
-                y_test_path,
-            )
-        elif competition_format == api.CompetitionFormat.DAG:
-            prediction = _run_dag(
-                model_directory_path,
-                has_gpu,
-                read_kwargs,
-                train_function,
-                infer_function,
-                number_of_features,
-                column_names,
-                x_train_path,
-                y_train_path,
-                x_test_path,
-            )
-        else:
-            raise ValueError(f"unsupported competition format: {competition_format}")
-
-        prediction_path = os.path.join(
-            constants.DOT_DATA_DIRECTORY,
-            "prediction.csv"
-        )
-
-        logging.warn('save prediction - path=%s', prediction_path)
-        utils.write(prediction, prediction_path, kwargs=write_kwargs)
-
-        if checks:
-            example_prediction = utils.read(example_prediction_path)
-
-            try:
-                checker.run_via_api(
-                    prediction,
-                    example_prediction,
-                    column_names,
-                    logging,
-                )
-
-                logging.warn(f"prediction is valid")
-            except checker.CheckError as error:
-                if error.__cause__:
-                    logging.exception(
-                        "check failed - message=`%s`",
-                        error,
-                        exc_info=error.__cause__
-                    )
-                else:
-                    logging.error("check failed - message=`%s`", error)
-
-                return None
-
-        return prediction
-    finally:
-        logging.warn(
-            'duration - time=%s',
-            time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
-        )
-
-        memory_after = utils.get_process_memory()
-        logging.warn(
-            'memory - before="%s" after="%s" consumed="%s"',
-            utils.format_bytes(memory_before),
-            utils.format_bytes(memory_after),
-            utils.format_bytes(memory_after - memory_before)
-        )
+    runner.start()
+    # prediction = _run_dag(
+    #     model_directory_path,
+    #     has_gpu,
+    #     read_kwargs,
+    #     train_function,
+    #     infer_function,
+    #     number_of_features,
+    #     column_names,
+    #     x_train_path,
+    #     y_train_path,
+    #     x_test_path,
+    # )

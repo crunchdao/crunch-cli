@@ -14,5 +14,6 @@ from .errors import (
     InvalidProjectTokenException,
     NeverSubmittedException,
     ProjectNotFoundException,
+    RunNotFoundException,
     RoundNotFoundException,
 )

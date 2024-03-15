@@ -256,6 +256,27 @@ class ProjectNotFoundException(ApiException):
         _print_contact()
 
 
+class RunNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        run_id: typing.Optional[int],
+    ):
+        super().__init__(message)
+
+        self.run_id = run_id
+
+    def print_helper(
+        self,
+        **kwargs,
+    ):
+        print("Run not found.")
+        print("")
+        print("The run may have been removed or the project is not the owner.")
+
+        _print_contact()
+
 class RoundNotFoundException(ApiException):
 
     def __init__(

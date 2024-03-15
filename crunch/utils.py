@@ -233,9 +233,15 @@ def get_extension(url: str):
     raise click.Abort()
 
 
-def download(url: str, path: str, log=True):
+def download(
+    url: str,
+    path: str,
+    log=True,
+    print=print
+):
+    url_cut = cut_url(url)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    
+
     logged = False
 
     try:
@@ -251,9 +257,7 @@ def download(url: str, path: str, log=True):
                 else:
                     file_length_str = "unknown length"
 
-                print(
-                    f"download {path} from {cut_url(url)} ({file_length_str})"
-                )
+                print(f"download {path} from {url_cut} ({file_length_str})")
                 logged = True
 
             with open(path, 'wb') as fd, tqdm.tqdm(total=file_length, unit='iB', unit_scale=True, leave=False) as progress:
@@ -262,7 +266,7 @@ def download(url: str, path: str, log=True):
                     fd.write(chunk)
     except:
         if log and not logged:
-            print(f"downloading {path} from {cut_url(url)}")
+            print(f"downloading {path} from {url_cut}")
 
         raise
 
