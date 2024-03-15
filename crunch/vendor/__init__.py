@@ -7,7 +7,7 @@ class NoVendorModuleException(Exception):
 
 
 def find(competition_name: str):
-    if competition_name == "datacrunch":
+    if competition_name in ["datacrunch", "datacrunch-rally"]:
         from . import datacrunch
 
         return datacrunch
