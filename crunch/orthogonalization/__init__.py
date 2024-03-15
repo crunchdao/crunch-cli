@@ -50,8 +50,8 @@ def run(
 
     rows = collections.defaultdict(lambda: collections.defaultdict(dict))
     for score in scores:
-        for moon, value in score.details.items():
-            rows[score.metric.name][moon] = value
+        for detail in score.details:
+            rows[score.metric.name][detail.key] = detail.value
 
     result = pandas.DataFrame(rows)
     result.index.name = "moon"
