@@ -97,8 +97,7 @@ class CloudRunner(Runner):
         self.report_current("ending")
 
     def start_timeseries(self):
-        self.bash2(["touch", self.prediction_path, self.trace_path])
-        self.bash2(["chmod", "o+w", self.prediction_path, self.trace_path])
+        self.create_trace_file()
 
         return super().start_timeseries()
 
@@ -173,6 +172,8 @@ class CloudRunner(Runner):
         )
 
     def start_dag(self):
+        self.create_trace_file()
+
         return self.sandbox(
             True,
             -1,
@@ -283,6 +284,10 @@ class CloudRunner(Runner):
             print(f"{prefix} {message}", file=file)
 
         return True
+
+    def create_trace_file(self):
+        self.bash2(["touch", self.prediction_path, self.trace_path])
+        self.bash2(["chmod", "o+w", self.prediction_path, self.trace_path])
 
     def initialize_state(self):
         state = {
