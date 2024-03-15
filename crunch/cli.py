@@ -392,6 +392,7 @@ def cloud(
 # ---
 @click.option("--x", "x_path", required=True)
 @click.option("--y", "y_path", required=True)
+@click.option("--y-raw", "y_raw_path", default=None)
 @click.option("--orthogonalization-data", "orthogonalization_data_path", default=None)
 # ---
 @click.option("--main-file", required=True)
@@ -418,6 +419,7 @@ def cloud_executor(
     # ---
     x_path: str,
     y_path: str,
+    y_raw_path: str,
     orthogonalization_data_path: str,
     # ---
     main_file: str,
@@ -454,6 +456,7 @@ def cloud_executor(
         # ---
         x_path,
         y_path,
+        y_raw_path,
         orthogonalization_data_path,
         # ---
         main_file,

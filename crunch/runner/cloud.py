@@ -382,11 +382,13 @@ class CloudRunner(Runner):
 
             y_tmp_path = link(tmpdirname, self.y_path, fake=not train)
             x_tmp_path = link(tmpdirname, self.x_path)
+            y_raw_tmp_path = link(tmpdirname, self.y_raw_path)
             orthogonalization_data_tmp_path = link(tmpdirname, self.orthogonalization_data_path)
 
             tmp_paths = filter(bool, [
                 y_tmp_path,
                 x_tmp_path,
+                y_raw_tmp_path,
                 orthogonalization_data_tmp_path,
             ])
 
@@ -398,6 +400,7 @@ class CloudRunner(Runner):
                 # ---
                 "x": x_tmp_path,
                 "y": y_tmp_path,
+                "y-raw": y_raw_tmp_path,
                 "orthogonalization-data": orthogonalization_data_tmp_path,
                 # ---
                 "main-file": self.main_file,
@@ -497,6 +500,16 @@ class CloudRunner(Runner):
             self.x_path: x_url,
             self.y_path: y_url,
         }
+
+        self.y_raw_path = None
+        if data_files.y_raw:
+            y_raw_url = data_files.y_raw.url
+            self.y_raw_path = os.path.join(
+                self.data_directory,
+                f"y_raw.{utils.get_extension(y_raw_url)}"
+            )
+
+            data_urls[self.y_raw_path] = y_raw_url
 
         self.orthogonalization_data_path = None
         if data_files.orthogonalization_data:

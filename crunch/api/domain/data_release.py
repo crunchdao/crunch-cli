@@ -54,6 +54,7 @@ class OriginalFiles:
 
     x: DataFile
     y: DataFile
+    y_raw: typing.Optional[DataFile]
     example_prediction: DataFile
     orthogonalization_data: typing.Optional[DataFile]
 

@@ -12,14 +12,20 @@ from . import reducers, scorers
 @dataclasses.dataclass
 class ScoredMetric:
     value: typing.Optional[float]
-    details: typing.Dict[int, float]
+    details: typing.List["ScoredMetricDetail"]
+
+
+@dataclasses.dataclass
+class ScoredMetricDetail:
+    key: typing.Union[str, int]
+    value: float
 
 
 def _call_scorer(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     y_test: pandas.DataFrame,
     prediction: pandas.DataFrame,
-    column_names: api.ColumnNames,
+    column_names: api.ColumnNames
 ) -> typing.OrderedDict[int, float]:
     moon_and_id = [column_names.moon, column_names.id]
 
@@ -50,7 +56,7 @@ def score(
     prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
     metrics: typing.List[api.Metric],
-    y_test_keys: typing.Collection[typing.Union[int, str]],
+    y_test_keys: typing.Collection[typing.Union[int, str]]
 ) -> typing.Dict[str, ScoredMetric]:
     prediction = prediction[[
         column_names.moon,
@@ -85,6 +91,7 @@ def score(
 
             if moon in y_test_keys:
                 details[moon] = value
+
                 popped = False
 
             logger.info(f"score - metric={metric.name} function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
@@ -107,7 +114,10 @@ def score(
 
         scores[metric.name] = ScoredMetric(
             value=value,
-            details=all_details,
+            details=[
+                ScoredMetricDetail(key, value)
+                for key, value in all_details.items()
+            ],
         )
 
     return scores

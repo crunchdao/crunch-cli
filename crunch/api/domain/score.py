@@ -18,6 +18,26 @@ class ScoreSummary:
     metrics: typing.Dict[str, typing.Optional[float]]
 
 
+@dataclasses_json.dataclass_json(
+    letter_case=dataclasses_json.LetterCase.CAMEL,
+    undefined=dataclasses_json.Undefined.EXCLUDE
+)
+@dataclasses.dataclass(frozen=True)
+class ScoreDetail:
+
+    key: typing.Union[str, int]
+    value: typing.Optional[float]
+    
+    @staticmethod
+    def from_dict_array(
+        input: typing.List[dict]
+    ):
+        return [
+            ScoreDetail.from_dict(x)
+            for x in input
+        ]
+
+
 class Score(Model):
 
     def __init__(
@@ -42,12 +62,12 @@ class Score(Model):
         metric_attrs = self._attrs.get("metric")
         if metric_attrs is not None:
             return Metric(None, metric_attrs)
-    
+
         return None
 
     @property
-    def details(self) -> typing.Dict[str, str]:
-        return self._attrs.get("details") or {}
+    def details(self) -> typing.List[ScoreDetail]:
+        return ScoreDetail.from_dict_array(self._attrs.get("details") or [])
 
 
 class ScoreCollection(Collection):
