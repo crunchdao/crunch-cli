@@ -14,7 +14,7 @@ import typing
 import pandas
 import requests
 
-from .. import api, orthogonalization, scoring
+from .. import api, orthogonalization, scoring, checker
 from ..orthogonalization import _runner as orthogonalization_runner
 
 
@@ -173,6 +173,7 @@ class SandboxExecutor:
         # ---
         x_path: str,
         y_path: str,
+        y_raw_path: str,
         orthogonalization_data_path: str,
         # ---
         main_file: str,
@@ -196,6 +197,7 @@ class SandboxExecutor:
 
         self.x_path = x_path
         self.y_path = y_path
+        self.y_raw_path = y_raw_path
         self.orthogonalization_data_path = orthogonalization_data_path
 
         self.main_file = main_file
@@ -216,7 +218,7 @@ class SandboxExecutor:
 
     def start(self):
         ping(self.ping_urls)
-        
+
         self.state = read(self.state_file, False)
         self.splits = api.DataReleaseSplit.from_dict_array(self.state["splits"])
         self.metrics = api.Metric.from_dict_array(self.state["metrics"], None)
@@ -236,10 +238,17 @@ class SandboxExecutor:
             del full_y
 
             if self.orthogonalization_data_path:
-                self.setup_orthogonalization(y_train, trained)
-        else:
-            delete(self.y_path)
-            delete(self.orthogonalization_data_path)
+                full_y_raw = None
+                if self.y_raw_path:
+                    full_y_raw = read(self.y_raw_path, True)
+                    y_raw = self.filter_train(full_y_raw)
+
+                self.setup_orthogonalization(y_train, y_raw, trained)
+
+        delete(self.y_path)
+        delete(self.y_raw_path)
+        delete(self.y_raw_path)
+        delete(self.orthogonalization_data_path)
 
         x_test = self.filter_test(full_x)
         del full_x
@@ -305,7 +314,7 @@ class SandboxExecutor:
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
             # TODO Use split's key with (index(moon) - embargo)
             return dataframe[dataframe[self.column_names.moon] < self.moon - self.embargo].copy()
-        
+
         if self.competition_format == api.CompetitionFormat.DAG:
             dataframe: dict
 
@@ -326,7 +335,7 @@ class SandboxExecutor:
     def filter_test(self, dataframe: pandas.DataFrame):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
             return dataframe[dataframe[self.column_names.moon] == self.moon].copy()
-        
+
         if self.competition_format == api.CompetitionFormat.DAG:
             dataframe: dict
 
@@ -347,6 +356,7 @@ class SandboxExecutor:
     def setup_orthogonalization(
         self,
         y_train: pandas.DataFrame,
+        y_raw: typing.Optional[pandas.DataFrame],
         trained: Reference
     ):
         REMOVED_CHECKS = [
@@ -354,7 +364,7 @@ class SandboxExecutor:
             api.CheckFunction.MOONS,
         ]
 
-        full_orthogonalization_data = read(self.orthogonalization_data_path, True) if self.train else delete(self.orthogonalization_data_path)
+        full_orthogonalization_data = read(self.orthogonalization_data_path, True) if self.train else None
 
         split_keys = y_train[self.column_names.moon].unique()
         orthogonalization_data = {
@@ -379,7 +389,7 @@ class SandboxExecutor:
             example_prediction = y_train[[self.column_names.moon, self.column_names.id]].copy()
             example_prediction[self.column_names.prediction] = 0
 
-            self.crunch.checker.run(
+            checker.run(
                 [
                     check
                     for check in self.checks
@@ -388,6 +398,7 @@ class SandboxExecutor:
                 prediction,
                 example_prediction,
                 self.column_names,
+                self.competition_format,
                 logger
             )
 
@@ -414,7 +425,7 @@ class SandboxExecutor:
 
             result = scoring.score(
                 logger,
-                y,
+                y if y_raw is None else y_raw,
                 orthogonalized,
                 self.column_names,
                 self.metrics,
@@ -432,7 +443,13 @@ class SandboxExecutor:
                         "success": True,
                         "metric": metric._attrs,
                         "value": scored.value,
-                        "details": scored.details,
+                        "details": [
+                            {
+                                "key": detail.key,
+                                "value": detail.value,
+                            }
+                            for detail in scored.details
+                        ],
                         "createdAt": datetime.datetime.now().isoformat(),
                     }
                 )
