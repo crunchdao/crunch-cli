@@ -85,7 +85,7 @@ class CloudRunner(Runner):
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
 
-        self.sandbox_restriction_flag = "-v"  # "--change-network-namespace" if gpu else "--filter-socket-syscalls"
+        self.sandbox_restriction_flag = "--change-network-namespace" if gpu else "--filter-socket-syscalls"
 
     def start(self):
         self.report_current("starting")
@@ -123,13 +123,13 @@ class CloudRunner(Runner):
             else:
                 self.log("no requirements.txt found")
 
-        # if self.log("installing crunch-cli..."):
-        #     self.report_current("install crunch-cli")
+        if self.log("installing crunch-cli..."):
+            self.report_current("install crunch-cli")
 
-        #     self.pip([
-        #         "--upgrade",
-        #         "git+https://github.com/crunchdao/crunch-cli"
-        #     ])
+            self.pip([
+                "--upgrade",
+                "git+https://github.com/crunchdao/crunch-cli@beta-9"
+            ])
 
         if self.gpu and self.log("fixing gpu requirements..."):
             self.report_current("fix gpu requirements")
