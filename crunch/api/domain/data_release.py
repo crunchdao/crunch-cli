@@ -54,6 +54,7 @@ class OriginalFiles:
 
     x: DataFile
     y: DataFile
+    y_raw: typing.Optional[DataFile]
     example_prediction: DataFile
     orthogonalization_data: typing.Optional[DataFile]
 
@@ -186,6 +187,7 @@ class ColumnNames:
     id: str
     moon: typing.Optional[str]
     target: typing.Optional[str]
+    raw_target: typing.Optional[str]
     prediction: str
 
 
