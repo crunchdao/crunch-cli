@@ -377,6 +377,7 @@ def cloud(
         train_frequency,
         force_first_train,
         gpu,
+        crunch_cli_commit_hash,
         # ---
         max_retry,
         retry_seconds
