@@ -98,7 +98,7 @@ class CloudRunner(Runner):
         self.bash2(["touch", self.prediction_path, self.trace_path])
         self.bash2(["chmod", "o+w", self.prediction_path, self.trace_path])
 
-        super().start_timeseries()
+        return super().start_timeseries()
 
     def initialize(self):
         if self.log("initializing state..."):
@@ -238,8 +238,13 @@ class CloudRunner(Runner):
         self.log("uploading result...")
         self.report_current("upload result")
 
-        utils.write(prediction, self.prediction_path)
-        print(prediction)
+        utils.write(
+            prediction,
+            self.prediction_path,
+            kwargs=dict(
+                index=False
+            )
+        )
 
         fds = []
         try:

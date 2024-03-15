@@ -61,9 +61,7 @@ def moons(
     right = example_prediction[moon_column_name].unique()
 
     if set(left) != set(right):
-        raise CheckError(
-            f"{moon_column_name} are different from what is expected"
-        )
+        raise CheckError(f"{moon_column_name} are different from what is expected")
 
 
 # TODO Maybe it would be better to extract ids first, and then do those checks?
