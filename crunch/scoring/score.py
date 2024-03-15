@@ -12,7 +12,13 @@ from . import reducers, scorers
 @dataclasses.dataclass
 class ScoredMetric:
     value: typing.Optional[float]
-    details: typing.Dict[int, float]
+    details: typing.List["ScoredMetricDetail"]
+
+
+@dataclasses.dataclass
+class ScoredMetricDetail:
+    key: typing.Union[str, int]
+    value: float
 
 
 def _call_scorer(
@@ -20,13 +26,13 @@ def _call_scorer(
     y_test: pandas.DataFrame,
     prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
+    target_column_name: str,
 ) -> typing.OrderedDict[int, float]:
     moon_and_id = [column_names.moon, column_names.id]
 
     y_test = y_test.sort_values(by=moon_and_id)
     merged_df = pandas.merge(y_test, prediction, on=moon_and_id)
 
-    target_column_name = column_names.target
     prediction_column_name = column_names.prediction
 
     if target_column_name == prediction_column_name:
@@ -51,6 +57,7 @@ def score(
     column_names: api.ColumnNames,
     metrics: typing.List[api.Metric],
     y_test_keys: typing.Collection[typing.Union[int, str]],
+    target_column_name: str,
 ) -> typing.Dict[str, ScoredMetric]:
     prediction = prediction[[
         column_names.moon,
@@ -61,7 +68,7 @@ def score(
     y_test = y_test[[
         column_names.moon,
         column_names.id,
-        column_names.target
+        target_column_name
     ]]
 
     scores = {}
@@ -77,6 +84,7 @@ def score(
             y_test,
             prediction,
             column_names,
+            target_column_name,
         )
 
         details = {}
@@ -85,6 +93,7 @@ def score(
 
             if moon in y_test_keys:
                 details[moon] = value
+
                 popped = False
 
             logger.info(f"score - metric={metric.name} function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
@@ -107,7 +116,10 @@ def score(
 
         scores[metric.name] = ScoredMetric(
             value=value,
-            details=all_details,
+            details=[
+                ScoredMetricDetail(key, value)
+                for key, value in all_details.items()
+            ],
         )
 
     return scores
