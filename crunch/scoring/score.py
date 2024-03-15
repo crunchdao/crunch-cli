@@ -25,14 +25,14 @@ def _call_scorer(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     y_test: pandas.DataFrame,
     prediction: pandas.DataFrame,
-    column_names: api.ColumnNames,
-    target_column_name: str,
+    column_names: api.ColumnNames
 ) -> typing.OrderedDict[int, float]:
     moon_and_id = [column_names.moon, column_names.id]
 
     y_test = y_test.sort_values(by=moon_and_id)
     merged_df = pandas.merge(y_test, prediction, on=moon_and_id)
 
+    target_column_name = column_names.target
     prediction_column_name = column_names.prediction
 
     if target_column_name == prediction_column_name:
@@ -56,8 +56,7 @@ def score(
     prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
     metrics: typing.List[api.Metric],
-    y_test_keys: typing.Collection[typing.Union[int, str]],
-    target_column_name: str,
+    y_test_keys: typing.Collection[typing.Union[int, str]]
 ) -> typing.Dict[str, ScoredMetric]:
     prediction = prediction[[
         column_names.moon,
@@ -68,7 +67,7 @@ def score(
     y_test = y_test[[
         column_names.moon,
         column_names.id,
-        target_column_name
+        column_names.target
     ]]
 
     scores = {}
@@ -84,7 +83,6 @@ def score(
             y_test,
             prediction,
             column_names,
-            target_column_name,
         )
 
         details = {}

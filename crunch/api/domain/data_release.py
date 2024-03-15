@@ -187,7 +187,6 @@ class ColumnNames:
     id: str
     moon: typing.Optional[str]
     target: typing.Optional[str]
-    raw_target: typing.Optional[str]
     prediction: str
 
 
