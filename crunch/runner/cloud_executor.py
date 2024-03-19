@@ -424,6 +424,7 @@ class SandboxExecutor:
             )
 
             result = scoring.score(
+                self.competition_format,
                 logger,
                 y if y_raw is None else y_raw,
                 orthogonalized,
