@@ -56,7 +56,7 @@ def score(
 
     if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
-        
+
         merged = merge(
             y_test,
             prediction,
@@ -65,7 +65,7 @@ def score(
 
     elif competition_format == api.CompetitionFormat.DAG:
         from ._format.dag import merge
-        
+
         merged = merge(
             y_test,
             prediction,
@@ -74,7 +74,7 @@ def score(
 
     else:
         raise ValueError(f"unsupported competition format: {competition_format}")
-    
+
     # print(merged)
 
     scores = {}
