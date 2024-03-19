@@ -4,17 +4,34 @@ import pandas
 from .. import api
 
 
-def spearman(
+def balanced_accuracy_score(
     group: pandas.DataFrame,
     target_column_name: str,
     prediction_column_name: str,
 ) -> float:
-    score = group[prediction_column_name].corr(
-        group[target_column_name],
-        method="spearman"
+    import sklearn.metrics
+    
+    target = group[target_column_name]
+    prediction = group[prediction_column_name]
+
+    return sklearn.metrics.balanced_accuracy_score(
+        target,
+        prediction
     )
 
-    return score
+
+def dot_product(
+    group: pandas.DataFrame,
+    target_column_name: str,
+    prediction_column_name: str,
+) -> float:
+    prediction = group[prediction_column_name]
+    target = group[target_column_name]
+
+    return numpy.dot(
+        prediction,
+        target,
+    )
 
 
 def fbeta_factory(beta: int):
@@ -39,24 +56,6 @@ def fbeta_factory(beta: int):
     return _score
 
 
-def recall(
-    group: pandas.DataFrame,
-    target_column_name: str,
-    prediction_column_name: str,
-) -> float:
-    import sklearn.metrics
-
-    prediction = group[prediction_column_name]
-
-    threshold = prediction.median()
-    prediction = (prediction > threshold).astype(int)
-
-    return sklearn.metrics.recall_score(
-        group[target_column_name],
-        prediction
-    )
-
-
 def precision(
     group: pandas.DataFrame,
     target_column_name: str,
@@ -75,24 +74,42 @@ def precision(
     )
 
 
-def dot_product(
+def recall(
     group: pandas.DataFrame,
     target_column_name: str,
     prediction_column_name: str,
 ) -> float:
-    prediction = group[prediction_column_name]
-    target = group[target_column_name]
+    import sklearn.metrics
 
-    return numpy.dot(
-        prediction,
-        target,
+    prediction = group[prediction_column_name]
+
+    threshold = prediction.median()
+    prediction = (prediction > threshold).astype(int)
+
+    return sklearn.metrics.recall_score(
+        group[target_column_name],
+        prediction
     )
 
 
+def spearman(
+    group: pandas.DataFrame,
+    target_column_name: str,
+    prediction_column_name: str,
+) -> float:
+    score = group[prediction_column_name].corr(
+        group[target_column_name],
+        method="spearman"
+    )
+
+    return score
+
+
 REGISTRY = {
-    api.ScorerFunction.SPEARMAN: spearman,
-    api.ScorerFunction.F1: fbeta_factory(beta=1),
-    api.ScorerFunction.RECALL: recall,
-    api.ScorerFunction.PRECISION: precision,
+    api.ScorerFunction.BALANCED_ACCURACY_SCORE: balanced_accuracy_score,
     api.ScorerFunction.DOT_PRODUCT: dot_product,
+    api.ScorerFunction.F1: fbeta_factory(beta=1),
+    api.ScorerFunction.PRECISION: precision,
+    api.ScorerFunction.RECALL: recall,
+    api.ScorerFunction.SPEARMAN: spearman,
 }

@@ -7,11 +7,12 @@ from .competition import Competition
 
 class ScorerFunction(enum.Enum):
 
-    SPEARMAN = "SPEARMAN"
-    F1 = "F1"
-    RECALL = "RECALL"
-    PRECISION = "PRECISION"
+    BALANCED_ACCURACY_SCORE = "BALANCED_ACCURACY_SCORE"
     DOT_PRODUCT = "DOT_PRODUCT"
+    F1 = "F1"
+    PRECISION = "PRECISION"
+    RECALL = "RECALL"
+    SPEARMAN = "SPEARMAN"
 
     def __repr__(self):
         return self.name
