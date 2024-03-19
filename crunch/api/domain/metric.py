@@ -7,7 +7,7 @@ from .competition import Competition
 
 class ScorerFunction(enum.Enum):
 
-    BALANCED_ACCURACY_SCORE = "BALANCED_ACCURACY_SCORE"
+    BALANCED_ACCURACY = "BALANCED_ACCURACY"
     DOT_PRODUCT = "DOT_PRODUCT"
     F1 = "F1"
     PRECISION = "PRECISION"

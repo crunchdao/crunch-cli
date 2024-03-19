@@ -4,7 +4,7 @@ import pandas
 from .. import api
 
 
-def balanced_accuracy_score(
+def balanced_accuracy(
     group: pandas.DataFrame,
     target_column_name: str,
     prediction_column_name: str,
@@ -106,7 +106,7 @@ def spearman(
 
 
 REGISTRY = {
-    api.ScorerFunction.BALANCED_ACCURACY_SCORE: balanced_accuracy_score,
+    api.ScorerFunction.BALANCED_ACCURACY: balanced_accuracy,
     api.ScorerFunction.DOT_PRODUCT: dot_product,
     api.ScorerFunction.F1: fbeta_factory(beta=1),
     api.ScorerFunction.PRECISION: precision,
