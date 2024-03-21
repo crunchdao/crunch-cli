@@ -23,15 +23,9 @@ class ScoredMetricDetail:
 
 def _call_scorer(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
-    y_test: pandas.DataFrame,
-    prediction: pandas.DataFrame,
-    column_names: api.ColumnNames
+    merged: pandas.DataFrame,
+    column_names: api.ColumnNames,
 ) -> typing.OrderedDict[int, float]:
-    moon_and_id = [column_names.moon, column_names.id]
-
-    y_test = y_test.sort_values(by=moon_and_id)
-    merged_df = pandas.merge(y_test, prediction, on=moon_and_id)
-
     target_column_name = column_names.target
     prediction_column_name = column_names.prediction
 
@@ -39,7 +33,7 @@ def _call_scorer(
         target_column_name += "_x"
         prediction_column_name += "_y"
 
-    correlation = merged_df\
+    correlation = merged\
         .groupby(column_names.moon, group_keys=False)\
         .apply(lambda group: scorer(
             group,
@@ -51,6 +45,7 @@ def _call_scorer(
 
 
 def score(
+    competition_format: api.CompetitionFormat,
     logger: logging.Logger,
     y_test: pandas.DataFrame,
     prediction: pandas.DataFrame,
@@ -58,17 +53,29 @@ def score(
     metrics: typing.List[api.Metric],
     y_test_keys: typing.Collection[typing.Union[int, str]]
 ) -> typing.Dict[str, ScoredMetric]:
-    prediction = prediction[[
-        column_names.moon,
-        column_names.id,
-        column_names.prediction
-    ]]
 
-    y_test = y_test[[
-        column_names.moon,
-        column_names.id,
-        column_names.target
-    ]]
+    if competition_format == api.CompetitionFormat.TIMESERIES:
+        from ._format.timeseries import merge
+
+        merged = merge(
+            y_test,
+            prediction,
+            column_names
+        )
+
+    elif competition_format == api.CompetitionFormat.DAG:
+        from ._format.dag import merge
+
+        merged = merge(
+            y_test,
+            prediction,
+            column_names,
+        )
+
+    else:
+        raise ValueError(f"unsupported competition format: {competition_format}")
+
+    # print(merged)
 
     scores = {}
 
@@ -80,9 +87,8 @@ def score(
 
         all_details = _call_scorer(
             scorer,
-            y_test,
-            prediction,
-            column_names,
+            merged,
+            column_names
         )
 
         details = {}

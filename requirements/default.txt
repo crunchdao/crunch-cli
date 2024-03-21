@@ -6,6 +6,7 @@ humanfriendly
 inflection
 inquirer
 joblib
+networkx
 packaging
 pandas
 psutil

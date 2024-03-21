@@ -185,8 +185,8 @@ class DataRelease(Model):
 class ColumnNames:
 
     id: str
-    moon: typing.Optional[str]
-    target: typing.Optional[str]
+    moon: str
+    target: str
     prediction: str
 
 
