@@ -17,8 +17,11 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Install dependencies
-        run: make install
+      - name: Build
+        run: make build
+
+      - name: Install wheel
+        run: pip install dist/*.whl
 
       - name: Run tests
         run: make test
