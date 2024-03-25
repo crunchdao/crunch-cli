@@ -2,6 +2,7 @@ import collections
 import typing
 
 import pandas
+import requests
 import typing_extensions
 
 from .. import api, runner
@@ -33,14 +34,20 @@ def run(
 
 def run(
     prediction: pandas.DataFrame,
-    as_dataframe=True
+    as_dataframe=True,
+    max_retry=3
 ):
     if runner.is_inside:
-        f = run_from_runner
+        scores = run_from_runner(prediction)
     else:
-        f = run_via_api
-
-    scores = f(prediction)
+        max_retry = max(1, max_retry)
+        for retry in range(1, max_retry + 1):
+            try:
+                scores = run_via_api(prediction)
+                break
+            except requests.ConnectionError:
+                if retry == max_retry:
+                    raise
 
     if not as_dataframe:
         return scores
