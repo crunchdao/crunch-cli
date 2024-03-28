@@ -60,7 +60,6 @@ def setup(
     _, project = api.Client.from_project()
 
     try:
-        raise api.NeverSubmittedException("qsd")
         urls = project.clone(
             submission_number=submission_number,
             include_model=not no_model,
