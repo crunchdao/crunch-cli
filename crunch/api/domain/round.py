@@ -41,7 +41,8 @@ class Round(Model):
 
     def orthogonalize(
         self,
-        dataframe: pandas.DataFrame
+        dataframe: pandas.DataFrame,
+        timeout=60
     ):
         from .score import Score
 
@@ -54,7 +55,8 @@ class Round(Model):
                 self.resource_identifier,
                 [
                     ("predictionFile", ('prediction.parquet', tmp, "application/x-tar"))
-                ]
+                ],
+                timeout=timeout
             )
 
         return Score.from_dict_array(result, None)
@@ -146,13 +148,15 @@ class RoundEndpointMixin:
         self,
         competition_identifier,
         round_identifier,
-        files
+        files,
+        timeout=60
     ):
         return self._result(
             self.post(
                 f"/v1/competitions/{competition_identifier}/rounds/{round_identifier}/orthogonalize",
                 data={},  # push token will be added
-                files=tuple(files)
+                files=tuple(files),
+                timeout=timeout
             ),
             json=True
         )

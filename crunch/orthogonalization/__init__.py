@@ -35,7 +35,8 @@ def run(
 def run(
     prediction: pandas.DataFrame,
     as_dataframe=True,
-    max_retry=3
+    max_retry=3,
+    timeout=60,
 ):
     if runner.is_inside:
         scores = run_from_runner(prediction)
@@ -43,9 +44,9 @@ def run(
         max_retry = max(1, max_retry)
         for retry in range(1, max_retry + 1):
             try:
-                scores = run_via_api(prediction)
+                scores = run_via_api(prediction, timeout)
                 break
-            except requests.ConnectionError:
+            except (requests.ConnectionError, requests.Timeout):
                 if retry == max_retry:
                     raise
 

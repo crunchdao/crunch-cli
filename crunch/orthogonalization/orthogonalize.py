@@ -7,13 +7,17 @@ from .. import __version__, api, vendor
 
 def run_via_api(
     dataframe: pandas.DataFrame,
+    timeout: int,
 ) -> typing.List[api.Score]:
     _, project = api.Client.from_project()
 
     competition = project.competition
     round = competition.rounds.current
 
-    return round.orthogonalize(dataframe)
+    return round.orthogonalize(
+        dataframe,
+        timeout=timeout
+    )
 
 
 def run_from_runner(
