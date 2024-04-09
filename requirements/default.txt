@@ -1,3 +1,4 @@
+astor
 click
 coloredlogs
 dataclasses_json
