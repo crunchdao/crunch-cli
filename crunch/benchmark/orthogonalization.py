@@ -9,7 +9,6 @@ from .. import orthogonalization, store
 def benchmark(
     prediction: pandas.DataFrame,
 ):
-
     success, failure = 0, 0
 
     def print_status(print=print):
