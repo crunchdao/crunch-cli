@@ -5,7 +5,7 @@ import typing
 import click
 import pandas
 
-from . import api, command, constants, utils
+from . import api, command, constants, utils, orthogonalization, runner
 
 
 class _Inline:
@@ -87,14 +87,20 @@ class _Inline:
 
     def alpha_score(
         self,
-        prediction: pandas.DataFrame
+        prediction: pandas.DataFrame,
+        as_dataframe=True,
+        max_retry=orthogonalization.DEFAULT_MAX_RETRY,
+        timeout=orthogonalization.DEFAULT_TIMEOUT,
     ):
-        from . import orthogonalization
-        return orthogonalization.run(prediction)
+        return orthogonalization.run(
+            prediction,
+            as_dataframe,
+            max_retry,
+            timeout,
+        )
 
     @property
     def is_inside_runner(self):
-        from . import runner
         return runner.is_inside
 
 
