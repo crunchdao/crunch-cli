@@ -1,0 +1,1 @@
+import os, sys; exec('try: import crunch.monkey_patches; crunch.monkey_patches.apply_all()\nexcept ImportError as error: print("crunch: could not auto monkey patch:", error, file=sys.stderr)') if os.environ.get("CRUNCH_AUTO_MONKEY_PATCH", "false").lower() == "true" else None
