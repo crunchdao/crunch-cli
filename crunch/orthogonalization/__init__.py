@@ -15,6 +15,9 @@ __all__ = [
     "process",
 ]
 
+DEFAULT_MAX_RETRY = 3
+DEFAULT_TIMEOUT = 60
+
 
 @typing.overload
 def run(
@@ -35,8 +38,8 @@ def run(
 def run(
     prediction: pandas.DataFrame,
     as_dataframe=True,
-    max_retry=3,
-    timeout=60,
+    max_retry=DEFAULT_MAX_RETRY,
+    timeout=DEFAULT_TIMEOUT,
 ):
     if runner.is_inside:
         scores = run_from_runner(prediction)
