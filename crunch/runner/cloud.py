@@ -456,7 +456,10 @@ class CloudRunner(Runner):
                         "-m", "crunch", "runner", "cloud-executor",
                         *args
                     ],
-                    self.venv_env
+                    {
+                        **self.venv_env,
+                        "CRUNCH_AUTO_MONKEY_PATCH": "true",
+                    }
                 )
             except SystemExit:
                 self.report_trace(moon)
