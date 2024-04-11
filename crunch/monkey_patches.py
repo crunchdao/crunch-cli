@@ -5,7 +5,15 @@ import logging
 import sys
 
 
+_APPLIED = False
+
+
 def apply_all():
+    global _APPLIED
+
+    if _APPLIED:
+        return
+
     io_no_tty()
     tqdm_display()
     pathlib_str_functions()
@@ -13,6 +21,8 @@ def apply_all():
     display_add()
     catboost_info_directory()
     logging_file_handler()
+
+    _APPLIED = True
 
 
 def io_no_tty():
