@@ -27,7 +27,6 @@ with open(os.path.join(here, package, '__version__.py')) as f:
 
 with open('requirements/default.txt') as fd:
     requirements = fd.read().splitlines()
-requirements = []
 
 with open('README.md') as fd:
     readme = fd.read()
