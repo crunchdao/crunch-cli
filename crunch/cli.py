@@ -1,10 +1,10 @@
+import functools
 import logging
 import os
-import functools
 
 import click
 
-from . import __version__, api, command, constants, store, utils
+from . import __version__, api, benchmark, command, constants, store, utils
 
 store.load_from_env()
 
@@ -232,6 +232,28 @@ def update_token(
     try:
         command.update_token(
             clone_token=clone_token
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
+
+
+@cli.group(name="benchmark")
+def benchmark_group():
+    pass
+
+
+@benchmark_group.command(help="Benchmark the orthogonalization feature.")
+@click.argument("prediction-path", type=click.Path(exists=True, dir_okay=False), required=True)
+def orthogonalization(
+    prediction_path: str,
+):
+    utils.change_root()
+
+    try:
+        prediction = utils.read(prediction_path, dataframe=True)
+
+        benchmark.orthogonalization(
+            prediction=prediction
         )
     except api.ApiException as error:
         utils.exit_via(error)

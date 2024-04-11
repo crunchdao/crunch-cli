@@ -15,6 +15,8 @@ def load_from_env():
 
     dotenv.load_dotenv(".env", verbose=False)
 
-    debug = humanfriendly.coerce_boolean(os.getenv(constants.DEBUG_ENV_VAR))
+    if not debug:
+        debug = humanfriendly.coerce_boolean(os.getenv(constants.DEBUG_ENV_VAR))
+
     web_base_url = os.getenv(constants.WEB_BASE_URL_ENV_VAR, constants.WEB_BASE_URL_DEFAULT)
     api_base_url = os.getenv(constants.API_BASE_URL_ENV_VAR, constants.API_BASE_URL_DEFAULT)
