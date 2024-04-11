@@ -29,7 +29,8 @@ def io_no_tty():
     import sys
 
     for io in [sys.stdin, sys.stdout, sys.stderr]:
-        io.isatty = lambda: False
+        if io:
+            io.isatty = lambda: False
 
 
 def tqdm_display():
