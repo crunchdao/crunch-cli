@@ -1,9 +1,24 @@
 #!/usr/bin/env python3
 
+import distutils.sysconfig
 import os
-from setuptools import setup, find_packages
+import sys
+
+from setuptools import find_packages, setup
 
 package = "crunch"
+
+
+def find_pth_directory():
+    """
+    see https://github.com/xolox/python-coloredlogs/blob/65bdfe976ac0bf81e8c0bd9a98242b9d666b2859/setup.py#L64-L84
+    """
+
+    if 'bdist_wheel' in sys.argv:
+        return "/"
+
+    return os.path.relpath(distutils.sysconfig.get_python_lib(), sys.prefix)
+
 
 about = {}
 here = os.path.abspath(os.path.dirname(__file__))
@@ -26,7 +41,9 @@ setup(
     author_email=about['__author_email__'],
     url=about['__url__'],
     packages=find_packages(),
-    include_package_data=True,
+    data_files=[
+        (find_pth_directory(), ['crunch-monkeypatch.pth']),
+    ],
     python_requires=">=3",
     install_requires=requirements,
     zip_safe=False,

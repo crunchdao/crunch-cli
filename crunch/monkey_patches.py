@@ -5,7 +5,15 @@ import logging
 import sys
 
 
+_APPLIED = False
+
+
 def apply_all():
+    global _APPLIED
+
+    if _APPLIED:
+        return
+
     io_no_tty()
     tqdm_display()
     pathlib_str_functions()
@@ -13,13 +21,17 @@ def apply_all():
     display_add()
     catboost_info_directory()
     logging_file_handler()
+    pycaret_internal_logging()
+
+    _APPLIED = True
 
 
 def io_no_tty():
     import sys
 
     for io in [sys.stdin, sys.stdout, sys.stderr]:
-        io.isatty = lambda: False
+        if io:
+            io.isatty = lambda: False
 
 
 def tqdm_display():
@@ -119,3 +131,12 @@ def logging_file_handler():
         original(self, filename, *args, **kwargs)
 
     logging.FileHandler.__init__ = patched
+
+
+def pycaret_internal_logging():
+    try:
+        import pycaret.internal.logging
+    except ModuleNotFoundError:
+        return
+    
+    pycaret.internal.logging.LOGGER = pycaret.internal.logging.create_logger("/dev/stdout")
