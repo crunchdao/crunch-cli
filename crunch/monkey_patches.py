@@ -21,6 +21,7 @@ def apply_all():
     display_add()
     catboost_info_directory()
     logging_file_handler()
+    pycaret_internal_logging()
 
     _APPLIED = True
 
@@ -130,3 +131,12 @@ def logging_file_handler():
         original(self, filename, *args, **kwargs)
 
     logging.FileHandler.__init__ = patched
+
+
+def pycaret_internal_logging():
+    try:
+        import pycaret.internal.logging
+    except ModuleNotFoundError:
+        return
+    
+    pycaret.internal.logging.LOGGER = pycaret.internal.logging.create_logger("/dev/stdout")
