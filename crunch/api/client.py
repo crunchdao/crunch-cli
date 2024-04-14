@@ -3,6 +3,7 @@ import typing
 import urllib.parse
 
 import requests
+import tqdm
 
 from .. import constants, store, utils
 from .auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
@@ -61,19 +62,54 @@ class EndpointClient(
     def request(self, method, url, *args, **kwargs):
         headers = kwargs.pop("headers", {})
         params = kwargs.pop("params", {})
-        data = kwargs.pop("data", None)
+        data: dict = kwargs.pop("data", None)
+        files: tuple = kwargs.pop("files", None)
 
         self.auth_.apply(headers, params, data)
 
-        return super().request(
-            method,
-            urllib.parse.urljoin(self.base_url, url),
-            *args,
-            headers=headers,
-            params=params,
-            data=data,
-            **kwargs,
-        )
+        progress: tqdm.tqdm = None
+
+        if files is not None and store.debug:
+            import requests_toolbelt
+
+            fields = [
+                *((
+                    (key, str(value))
+                    for key, value in data.items()
+                ) if data is not None else []),
+                *files,
+            ]
+
+            progress = tqdm.tqdm(
+                desc="upload",
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024
+            )
+
+            def callback(monitor: requests_toolbelt.MultipartEncoderMonitor):
+                progress.update(monitor.bytes_read - progress.n)
+
+            encoder = requests_toolbelt.MultipartEncoder(fields)
+
+            headers["Content-Type"] = encoder.content_type
+            data = requests_toolbelt.MultipartEncoderMonitor(encoder, callback)
+            files = None
+
+        try:
+            return super().request(
+                method,
+                urllib.parse.urljoin(self.base_url, url),
+                *args,
+                headers=headers,
+                params=params,
+                data=data,
+                files=files,
+                **kwargs,
+            )
+        finally:
+            if progress is not None:
+                progress.close()
 
     def _raise_for_status(
         self,

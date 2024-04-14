@@ -15,6 +15,7 @@ pyarrow
 pytest
 python-dotenv
 requests
+requests-toolbelt
 requirements-parser
 scikit-learn
 scipy
