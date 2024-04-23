@@ -1,8 +1,10 @@
+import json
 import os
 import typing
 import urllib.parse
 
 import requests
+import sseclient
 import tqdm
 
 from .. import constants, store, utils
@@ -127,10 +129,14 @@ class EndpointClient(
         self,
         response: requests.Response,
         json=False,
-        binary=False
+        binary=False,
+        sse_handler=None,
     ):
         assert not (json and binary)
         self._raise_for_status(response)
+
+        if sse_handler and response.headers.get("content-type") == "text/event-stream":
+            return self._result_sse(response, sse_handler, json)
 
         if json:
             return response.json()
@@ -139,6 +145,32 @@ class EndpointClient(
             return response.content
 
         return response.text
+
+    def _result_sse(
+        self,
+        response: requests.Response,
+        sse_handler: typing.Callable[[sseclient.Event], None],
+        as_json=False,
+    ):
+        client = sseclient.SSEClient(response)
+        for event in client.events():
+            is_error = event.event.startswith("error:")
+            is_result = event.event == "result"
+
+            if as_json or is_error:
+                try:
+                    event.data = json.loads(event.data)
+                except json.decoder.JSONDecodeError:
+                    pass
+
+            if is_error:
+                converted = convert_error(event.data)
+                raise converted
+
+            if is_result:
+                return event.data
+
+            sse_handler(event)
 
 
 class Client:

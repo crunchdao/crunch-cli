@@ -69,7 +69,7 @@ class SubmissionCollection(Collection):
                 self.project.user_id,
             )
         )
-    
+
     def create(
         self,
         message: str,
@@ -78,6 +78,7 @@ class SubmissionCollection(Collection):
         notebook: bool,
         preferred_packages_version: typing.Dict[str, str],
         files: typing.List[typing.Tuple],
+        sse_handler: typing.Callable[["sseclient.Event"], None]
     ):
         return self.prepare_model(
             self._client.api.create_submission(
@@ -89,6 +90,7 @@ class SubmissionCollection(Collection):
                 notebook,
                 preferred_packages_version,
                 files,
+                sse_handler,
             )
         )
 
@@ -136,10 +138,16 @@ class SubmissionEndpointMixin:
         notebook,
         preferred_packages_version,
         files,
+        sse_handler=None,
     ):
+        sse = sse_handler is not None
+
         return self._result(
             self.post(
                 f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/submissions",
+                params={
+                    "sse": sse,
+                },
                 data={
                     "message": message,
                     "mainFilePath": main_file_path,
@@ -150,7 +158,9 @@ class SubmissionEndpointMixin:
                         for key, value in preferred_packages_version.items()
                     }
                 },
-                files=tuple(files)
+                files=tuple(files),
+                stream=sse
             ),
-            json=True
+            json=True,
+            sse_handler=sse_handler,
         )

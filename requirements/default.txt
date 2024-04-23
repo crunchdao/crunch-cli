@@ -19,4 +19,5 @@ requests-toolbelt
 requirements-parser
 scikit-learn
 scipy
+sseclient-py
 tqdm
