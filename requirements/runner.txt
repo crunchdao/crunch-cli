@@ -19,4 +19,5 @@ requests-toolbelt
 
 
 
+sseclient-py
 tqdm

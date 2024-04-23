@@ -3,7 +3,7 @@ import shutil
 import tarfile
 import tempfile
 
-from .. import api, constants, utils
+from .. import api, constants, store, utils
 
 
 def _list_files(
@@ -111,9 +111,22 @@ def push(
 
                 print(f"export {competition.name}:project/{project.user_id}")
                 if dry:
-                    print("create dry")
+                    print("create dry (no upload)")
                 else:
-                    print("create")
+                    print("create on server")
+
+                    if store.debug:
+                        def sse_handler(event):
+                            data = event.data
+                            if isinstance(data, dict):
+                                data = " ".join(
+                                    f"{key}={value}"
+                                    for key, value in data.items()
+                                )
+
+                            print(f"server: {event.event}: {data}")
+                    else:
+                        sse_handler = None
 
                     submission = project.submissions.create(
                         message=message,
@@ -122,6 +135,7 @@ def push(
                         notebook=False,
                         preferred_packages_version=installed_packages_version,
                         files=files,
+                        sse_handler=sse_handler
                     )
 
                     _print_success(client, submission)
