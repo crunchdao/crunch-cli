@@ -39,11 +39,24 @@ class LocalRunner(Runner):
         self.write_kwargs = write_kwargs
 
     def start(self):
-        self.report_current("starting")
+        memory_before = utils.get_process_memory()
+        start = time.time()
 
-        super().start()
+        try:
+            super().start()
+        finally:
+            logging.warn(
+                'duration - time=%s',
+                time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
+            )
 
-        self.report_current("ending")
+            memory_after = utils.get_process_memory()
+            logging.warn(
+                'memory - before="%s" after="%s" consumed="%s"',
+                utils.format_bytes(memory_before),
+                utils.format_bytes(memory_after),
+                utils.format_bytes(memory_after - memory_before)
+            )
 
     def setup(self):
         tester.install_logger()
@@ -100,26 +113,6 @@ class LocalRunner(Runner):
             self.keys,
             False,
         )
-
-    def start(self):
-        memory_before = utils.get_process_memory()
-        start = time.time()
-
-        try:
-            super().start()
-        finally:
-            logging.warn(
-                'duration - time=%s',
-                time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
-            )
-
-            memory_after = utils.get_process_memory()
-            logging.warn(
-                'memory - before="%s" after="%s" consumed="%s"',
-                utils.format_bytes(memory_before),
-                utils.format_bytes(memory_after),
-                utils.format_bytes(memory_after - memory_before)
-            )
 
     def start_dag(self):
         x_train = utils.read(self.x_train_path, dataframe=False, kwargs=self.read_kwargs)

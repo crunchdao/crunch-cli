@@ -172,6 +172,7 @@ class CloudRunner(Runner):
         )
 
     def start_dag(self):
+        self.report_current("process dag")
         self.create_trace_file()
 
         return self.sandbox(
@@ -184,16 +185,18 @@ class CloudRunner(Runner):
         moon: int,
         train: bool
     ) -> pandas.DataFrame:
+        self.report_current("process loop", moon)
+
         return self.sandbox(
             train,
             moon,
         )
 
     def finalize(self, prediction: pandas.DataFrame):
-        prediction_file_name = os.path.basename(self.prediction_path)
-
-        self.log("uploading result...")
         self.report_current("upload result")
+        self.log("uploading result...")
+
+        prediction_file_name = os.path.basename(self.prediction_path)
 
         utils.write(
             prediction,
