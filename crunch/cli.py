@@ -250,7 +250,7 @@ def orthogonalization(
     utils.change_root()
 
     try:
-        prediction = utils.read(prediction_path, dataframe=True)
+        prediction = utils.read(prediction_path)
 
         benchmark.orthogonalization(
             prediction=prediction

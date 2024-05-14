@@ -100,11 +100,11 @@ def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
-def read(path: str, dataframe=True, kwargs={}) -> typing.Union[pandas.DataFrame, typing.Any]:
-    if dataframe:
-        if path.endswith(".parquet"):
-            return pandas.read_parquet(path, **kwargs)
+def read(path: str, kwargs={}) -> typing.Any:
+    if path.endswith(".parquet"):
+        return pandas.read_parquet(path, **kwargs)
 
+    if path.endswith(".csv"):
         return pandas.read_csv(path, **kwargs)
 
     if path.endswith(".pickle"):
@@ -113,14 +113,17 @@ def read(path: str, dataframe=True, kwargs={}) -> typing.Union[pandas.DataFrame,
     return joblib.load(path)
 
 
-def write(dataframe: typing.Union[pandas.DataFrame, typing.Any], path: str, kwargs={}) -> None:
-    if isinstance(dataframe, pandas.DataFrame):
-        if path.endswith(".parquet"):
-            dataframe.to_parquet(path, **kwargs)
-        else:
-            dataframe.to_csv(path, **kwargs)
-    else:
-        joblib.dump(dataframe, path)
+def write(dataframe: typing.Any, path: str, kwargs={}) -> None:
+    if path.endswith(".parquet"):
+        return dataframe.to_parquet(path, **kwargs)
+
+    if path.endswith(".csv"):
+        return dataframe.to_csv(path, **kwargs)
+
+    if path.endswith(".pickle"):
+        return pandas.to_pickle(dataframe, path, **kwargs)
+
+    return joblib.dump(dataframe, path)
 
 
 def strip_python_special_lines(lines: typing.List[str]):
