@@ -182,12 +182,36 @@ class DataRelease(Model):
     undefined=dataclasses_json.Undefined.EXCLUDE
 )
 @dataclasses.dataclass(frozen=True)
+class TargetColumnNames:
+
+    input: str
+    output: str
+
+
+@dataclasses_json.dataclass_json(
+    letter_case=dataclasses_json.LetterCase.CAMEL,
+    undefined=dataclasses_json.Undefined.EXCLUDE
+)
+@dataclasses.dataclass(frozen=True)
 class ColumnNames:
 
     id: str
     moon: str
-    target: str
-    prediction: str
+    targets: typing.Dict[str, TargetColumnNames]
+
+    @property
+    def inputs(self):
+        return [
+            target_column_names.input
+            for target_column_names in self.targets.values()
+        ]
+
+    @property
+    def outputs(self):
+        return [
+            target_column_names.output
+            for target_column_names in self.targets.values()
+        ]
 
 
 class DataReleaseCollection(Collection):

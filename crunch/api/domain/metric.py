@@ -3,6 +3,7 @@ import typing
 
 from ..resource import Collection, Model
 from .competition import Competition
+from .target import Target
 
 
 class ScorerFunction(enum.Enum):
@@ -11,6 +12,7 @@ class ScorerFunction(enum.Enum):
     DOT_PRODUCT = "DOT_PRODUCT"
     F1 = "F1"
     PRECISION = "PRECISION"
+    RANDOM = "RANDOM"
     RECALL = "RECALL"
     SPEARMAN = "SPEARMAN"
 
@@ -34,6 +36,7 @@ class Metric(Model):
     def __init__(
         self,
         competition: Competition,
+        target: Target = None,
         attrs=None,
         client=None,
         collection=None
@@ -41,10 +44,15 @@ class Metric(Model):
         super().__init__(attrs, client, collection)
 
         self._competition = competition
+        self._target = target or Target(competition, attrs["target"], client)
 
     @property
     def competition(self):
         return self._competition
+
+    @property
+    def target(self):
+        return self._target
 
     @property
     def name(self) -> str:
@@ -82,11 +90,13 @@ class MetricCollection(Collection):
     def __init__(
         self,
         competition: Competition,
+        target: Target,
         client=None
     ):
         super().__init__(client)
 
         self.competition = competition
+        self.target = target
 
     def __iter__(self) -> typing.Iterator[Metric]:
         return super().__iter__()
@@ -98,6 +108,7 @@ class MetricCollection(Collection):
         return self.prepare_model(
             self._client.api.get_metric(
                 self.competition.id,
+                self.target.name,
                 name
             )
         )
@@ -107,14 +118,16 @@ class MetricCollection(Collection):
     ) -> Metric:
         return self.prepare_models(
             self._client.api.list_metrics(
-                self.competition.id
+                self.competition.id,
+                self.target.name,
             )
         )
 
     def prepare_model(self, attrs):
         return super().prepare_model(
             attrs,
-            self.competition
+            self.competition,
+            self.target
         )
 
 
@@ -123,22 +136,24 @@ class MetricEndpointMixin:
     def get_metric(
         self,
         competition_identifier,
-        name
+        target_name,
+        metric_name
     ):
         return self._result(
             self.get(
-                f"/v1/competitions/{competition_identifier}/metrics/{name}"
+                f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics/{metric_name}"
             ),
             json=True
         )
 
     def list_metrics(
         self,
-        competition_identifier
+        competition_identifier,
+        target_name,
     ):
         return self._result(
             self.get(
-                f"/v1/competitions/{competition_identifier}/metrics"
+                f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics"
             ),
             json=True
         )
