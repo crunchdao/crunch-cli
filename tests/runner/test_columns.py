@@ -2,7 +2,7 @@ import collections
 import unittest
 
 from crunch.api import ColumnNames, TargetColumnNames
-from crunch.runner.runner import Columns
+from crunch.runner import Columns
 
 
 class ColumnsTest(unittest.TestCase):
