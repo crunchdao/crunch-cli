@@ -119,7 +119,7 @@ class MetricCollection(Collection):
         return self.prepare_models(
             self._client.api.list_metrics(
                 self.competition.id,
-                self.target.name,
+                self.target.name if self.target else None,
             )
         )
 
@@ -151,9 +151,13 @@ class MetricEndpointMixin:
         competition_identifier,
         target_name,
     ):
+        url = (
+            f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics"
+            if target_name is not None else
+            f"/v1/competitions/{competition_identifier}/metrics"
+        )
+
         return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics"
-            ),
+            self.get(url),
             json=True
         )
