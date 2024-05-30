@@ -14,8 +14,9 @@ import typing
 import pandas
 import requests
 
-from .. import api, orthogonalization, scoring, checker
+from .. import api, checker, orthogonalization, scoring
 from ..orthogonalization import _runner as orthogonalization_runner
+from .columns import Columns
 
 
 class Reference:
@@ -268,14 +269,18 @@ class SandboxExecutor:
 
             train_function = ensure_function(module, "train")
             infer_function = ensure_function(module, "infer")
+            
+            target_column_names, prediction_column_names = Columns.from_model(self.column_names)
 
             default_values = {
                 "number_of_features": self.number_of_features,
                 "model_directory_path": self.model_directory_path,
                 "id_column_name": self.column_names.id,
                 "moon_column_name": self.column_names.moon,
-                "target_column_name": self.column_names.target,
-                "prediction_column_name": self.column_names.prediction,
+                "target_column_name": self.column_names.first_target.input,
+                "target_column_names": target_column_names,
+                "prediction_column_name": self.column_names.first_target.output,
+                "prediction_column_names": prediction_column_names,
                 "column_names": self.column_names,
                 "moon": self.moon,
                 "current_moon": self.moon,
@@ -387,7 +392,8 @@ class SandboxExecutor:
                 raise ValueError("orthogonalize not available anymore")
 
             example_prediction = y_train[[self.column_names.moon, self.column_names.id]].copy()
-            example_prediction[self.column_names.prediction] = 0
+            for prediction_column_name in self.column_names.outputs:
+                example_prediction[prediction_column_name] = 0
 
             checker.run(
                 [

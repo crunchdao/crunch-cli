@@ -1,6 +1,7 @@
 import functools
 import logging
 import os
+import typing
 
 import click
 
@@ -477,8 +478,7 @@ def cloud(
 # ---
 @click.option("--id-column-name", required=True)
 @click.option("--moon-column-name", required=True)
-@click.option("--target-column-name", required=True)
-@click.option("--prediction-column-name", required=True)
+@click.option("--target", "targets", required=True, multiple=True, nargs=3)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
@@ -493,8 +493,8 @@ def cloud_executor(
     model_directory_path: str,
     prediction_path: str,
     trace_path: str,
-    state_file: list,
-    ping_urls: list,
+    state_file: str,
+    ping_urls: typing.List[str],
     # ---
     train: bool,
     moon: int,
@@ -504,8 +504,7 @@ def cloud_executor(
     # ---
     id_column_name: str,
     moon_column_name: str,
-    target_column_name: str,
-    prediction_column_name: str,
+    targets: typing.List[typing.Tuple[str, str, str]],
 ):
     from .runner import is_inside
     if not is_inside:
@@ -542,8 +541,10 @@ def cloud_executor(
         api.ColumnNames(
             id_column_name,
             moon_column_name,
-            target_column_name,
-            prediction_column_name
+            {
+                target_name: api.TargetColumnNames(input, output)
+                for target_name, input, output in targets
+            }
         )
     )
 

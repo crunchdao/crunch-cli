@@ -427,12 +427,22 @@ class CloudRunner(Runner):
                 "gpu": self.gpu,
                 # ---
                 "id-column-name": self.column_names.id,
-                "moon-column-name": self.column_names.moon or "",
-                "target-column-name": self.column_names.target or "",
-                "prediction-column-name": self.column_names.prediction,
+                "moon-column-name": self.column_names.moon,
+                "target": [
+                    (target_name, target_column_names.input, target_column_names.output)
+                    for target_name, target_column_names in self.column_names.targets.items()
+                ],
             }
 
+            # TODO move to a dedicated function
             args = []
+            def append_value(value: typing.Any):
+                if isinstance(value, tuple):
+                    for x in value:
+                        args.append(str(x))
+                else:
+                    args.append(str(value))
+
             for key, value in options.items():
                 if value is None:
                     continue
@@ -443,10 +453,10 @@ class CloudRunner(Runner):
                 if isinstance(value, list):
                     for item in value:
                         args.append(f"--{key}")
-                        args.append(str(item))
+                        append_value(item)
                 else:
                     args.append(f"--{key}")
-                    args.append(str(value))
+                    append_value(value)
 
             try:
                 self.do_bash(
