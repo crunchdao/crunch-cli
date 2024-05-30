@@ -27,6 +27,50 @@ def cli(
     store.web_base_url = web_base_url
 
 
+
+@cli.command(help="Initialize an empty workspace directory.")
+@click.option("--token", "clone_token", required=True, help="Clone token to use.")
+@click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
+@click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
+@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.argument("competition-name", required=True)
+@click.argument("directory", default="{competitionName}")
+def init(
+    clone_token: str,
+    no_data: bool,
+    force: bool,
+    competition_name: str,
+    directory: str,
+    model_directory_path: str,
+):
+    directory = directory\
+        .replace("{competitionName}", competition_name)
+
+    directory = os.path.normpath(directory)
+
+    try:
+        command.init(
+            clone_token=clone_token,
+            competition_name=competition_name,
+            directory=directory,
+            model_directory=model_directory_path,
+            force=force,
+        )
+
+        if not no_data:
+            command.download(force=True)
+    except api.CrunchNotFoundException:
+        command.download_no_data_available()
+    except api.ApiException as error:
+        utils.exit_via(
+            error,
+            competition_name=competition_name
+        )
+
+    print("\n---")
+    print(f"Success! Your environment has been correctly initialized.")
+
+
 @cli.command(help="Setup a workspace directory with the latest submission of you code.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
 @click.option("--submission", "submission_number", required=False, type=int, help="Submission number to clone. (latest if not specified)")
