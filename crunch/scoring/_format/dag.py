@@ -142,6 +142,8 @@ def merge(
     prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
 ):
+    raise NotImplementedError()
+
     prediction = process_prediction(
         prediction,
         column_names,
