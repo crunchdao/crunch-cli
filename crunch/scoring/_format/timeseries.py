@@ -11,13 +11,13 @@ def merge(
     prediction = prediction[[
         column_names.moon,
         column_names.id,
-        column_names.prediction
+        *column_names.outputs
     ]]
 
     y_test = y_test[[
         column_names.moon,
         column_names.id,
-        column_names.target
+        *column_names.inputs
     ]]
 
     return pandas.merge(
