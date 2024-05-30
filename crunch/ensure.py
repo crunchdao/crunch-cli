@@ -23,13 +23,14 @@ def return_infer(
     result,
     id_column_name: str,
     moon_column_name: str,
-    prediction_column_name: str
+    prediction_column_names: list
 ) -> pandas.DataFrame:
     is_dataframe(result, "prediction")
 
+    # TODO should not happen, but should we still use a set here?
     expected = {
         id_column_name,
-        prediction_column_name
+        *prediction_column_names
     }
 
     if moon_column_name is not None:

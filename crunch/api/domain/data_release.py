@@ -87,7 +87,7 @@ class DataReleaseSplit:
     key: typing.Union[str, int]
     group: DataReleaseSplitGroup
     reduced: typing.Optional[DataReleaseSplitReduced] = None
-    
+
     @staticmethod
     def from_dict_array(
         input: typing.List[dict]
@@ -197,7 +197,19 @@ class ColumnNames:
 
     id: str
     moon: str
-    targets: typing.Dict[str, TargetColumnNames]
+    targets: typing.OrderedDict[str, TargetColumnNames]
+
+    @property
+    def first_target_name(self):
+        return next(iter(self.targets.keys()), None)
+
+    @property
+    def first_target(self):
+        key = self.first_target_name
+        if key is None:
+            return None
+
+        return self.targets[key]
 
     @property
     def inputs(self):
