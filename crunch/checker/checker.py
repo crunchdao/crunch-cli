@@ -37,29 +37,32 @@ def _run_checks(
             logger.error(f"missing function - name={function_name.name}")
             continue
 
-        parameters = check.parameters
-        logger.info(f"check prediction - call={function.__name__}({parameters}) moon={moon}")
+        for _, target_column_names in column_names.targets.items():
+            parameters = check.parameters
+            prediction_column_name = target_column_names.output
 
-        try:
-            utils.smart_call(function, {
-                "prediction": prediction,
-                "example_prediction": example_prediction,
-                "id_column_name": column_names.id,
-                "moon_column_name": column_names.moon,
-                "prediction_column_name": column_names.prediction,
-                "column_names": column_names,
-                "competition_format": competition_format,
-                **parameters,
-            })
-        except CheckError as error:
-            if moon is None:
-                raise
+            logger.info(f"check prediction - call={function.__name__}({parameters}) moon={moon} prediction_column_name=`{prediction_column_name}`")
 
-            raise CheckError(f"{error} on {column_names.moon}={moon}") from error
-        except Exception as exception:
-            raise CheckError(
-                "failed to check"
-            ) from exception
+            try:
+                utils.smart_call(function, {
+                    "prediction": prediction,
+                    "example_prediction": example_prediction,
+                    "id_column_name": column_names.id,
+                    "moon_column_name": column_names.moon,
+                    "prediction_column_name": prediction_column_name,
+                    "column_names": column_names,
+                    "competition_format": competition_format,
+                    **parameters,
+                })
+            except CheckError as error:
+                if moon is None:
+                    raise
+
+                raise CheckError(f"{error} on {column_names.moon}={moon} column={prediction_column_name}") from error
+            except Exception as exception:
+                raise CheckError(
+                    "failed to check"
+                ) from exception
 
 
 def run_via_api(
