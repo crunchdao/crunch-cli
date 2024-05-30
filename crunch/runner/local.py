@@ -115,9 +115,9 @@ class LocalRunner(Runner):
         )
 
     def start_dag(self):
-        x_train = utils.read(self.x_train_path, dataframe=False, kwargs=self.read_kwargs)
-        x_test = utils.read(self.x_test_path, dataframe=False, kwargs=self.read_kwargs)
-        y_train = utils.read(self.y_train_path, dataframe=False, kwargs=self.read_kwargs)
+        x_train = utils.read(self.x_train_path, kwargs=self.read_kwargs)
+        x_test = utils.read(self.x_test_path, kwargs=self.read_kwargs)
+        y_train = utils.read(self.y_train_path, kwargs=self.read_kwargs)
 
         default_values = {
             "number_of_features": self.number_of_features,
