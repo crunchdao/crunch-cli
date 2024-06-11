@@ -134,9 +134,9 @@ REGISTRY = {
     api.CheckFunction.COLUMNS_NAME: CheckFunctionDescriptor(columns_name, False),
     api.CheckFunction.NANS: CheckFunctionDescriptor(nans, False),
     api.CheckFunction.IDS: CheckFunctionDescriptor(ids, False),
+    api.CheckFunction.MOONS: CheckFunctionDescriptor(moons, False),
 
     api.CheckFunction.VALUES_BETWEEN: CheckFunctionDescriptor(values_between, True),
     api.CheckFunction.VALUES_ALLOWED: CheckFunctionDescriptor(values_allowed, True),
-    api.CheckFunction.MOONS: CheckFunctionDescriptor(moons, True),
     api.CheckFunction.CONSTANTS: CheckFunctionDescriptor(constants, True),
 }
