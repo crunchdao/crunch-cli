@@ -236,7 +236,7 @@ class LocalRunner(Runner):
 
                 logging.warn(f"prediction is valid")
             except checker.CheckError as error:
-                if error.__cause__:
+                if not isinstance(error.__cause__, checker.CheckError):
                     logging.exception(
                         "check failed - message=`%s`",
                         error,
