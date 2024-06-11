@@ -18,15 +18,23 @@ store.load_from_env()
 @click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
+@click.option("--staging", is_flag=True, help="Connect to the staging environment.")
 def cli(
     debug: bool,
     api_base_url: str,
     web_base_url: str,
+    staging: bool,
 ):
     store.debug = debug
     store.api_base_url = api_base_url
     store.web_base_url = web_base_url
 
+    if staging:
+        print("environment: forcing staging urls")
+        print(f"environment: ignoring ${constants.API_BASE_URL_ENV_VAR} and ${constants.WEB_BASE_URL_ENV_VAR}")
+
+        store.api_base_url = constants.API_BASE_URL_STAGING
+        store.web_base_url = constants.WEB_BASE_URL_STAGING
 
 
 @cli.command(help="Initialize an empty workspace directory.")
