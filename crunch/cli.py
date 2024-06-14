@@ -1,6 +1,7 @@
 import functools
 import logging
 import os
+import typing
 
 import click
 
@@ -17,14 +18,66 @@ store.load_from_env()
 @click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
+@click.option("--staging", is_flag=True, help="Connect to the staging environment.")
 def cli(
     debug: bool,
     api_base_url: str,
     web_base_url: str,
+    staging: bool,
 ):
     store.debug = debug
     store.api_base_url = api_base_url
     store.web_base_url = web_base_url
+
+    if staging:
+        print("environment: forcing staging urls")
+        print(f"environment: ignoring ${constants.API_BASE_URL_ENV_VAR} and ${constants.WEB_BASE_URL_ENV_VAR}")
+
+        store.api_base_url = constants.API_BASE_URL_STAGING
+        store.web_base_url = constants.WEB_BASE_URL_STAGING
+
+
+@cli.command(help="Initialize an empty workspace directory.")
+@click.option("--token", "clone_token", required=True, help="Clone token to use.")
+@click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
+@click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
+@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.argument("competition-name", required=True)
+@click.argument("directory", default="{competitionName}")
+def init(
+    clone_token: str,
+    no_data: bool,
+    force: bool,
+    competition_name: str,
+    directory: str,
+    model_directory_path: str,
+):
+    directory = directory\
+        .replace("{competitionName}", competition_name)
+
+    directory = os.path.normpath(directory)
+
+    try:
+        command.init(
+            clone_token=clone_token,
+            competition_name=competition_name,
+            directory=directory,
+            model_directory=model_directory_path,
+            force=force,
+        )
+
+        if not no_data:
+            command.download(force=True)
+    except api.CrunchNotFoundException:
+        command.download_no_data_available()
+    except api.ApiException as error:
+        utils.exit_via(
+            error,
+            competition_name=competition_name
+        )
+
+    print("\n---")
+    print(f"Success! Your environment has been correctly initialized.")
 
 
 @cli.command(help="Setup a workspace directory with the latest submission of you code.")
@@ -433,8 +486,7 @@ def cloud(
 # ---
 @click.option("--id-column-name", required=True)
 @click.option("--moon-column-name", required=True)
-@click.option("--target-column-name", required=True)
-@click.option("--prediction-column-name", required=True)
+@click.option("--target", "targets", required=True, multiple=True, nargs=3)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
@@ -449,8 +501,8 @@ def cloud_executor(
     model_directory_path: str,
     prediction_path: str,
     trace_path: str,
-    state_file: list,
-    ping_urls: list,
+    state_file: str,
+    ping_urls: typing.List[str],
     # ---
     train: bool,
     moon: int,
@@ -460,8 +512,7 @@ def cloud_executor(
     # ---
     id_column_name: str,
     moon_column_name: str,
-    target_column_name: str,
-    prediction_column_name: str,
+    targets: typing.List[typing.Tuple[str, str, str]],
 ):
     from .runner import is_inside
     if not is_inside:
@@ -498,8 +549,10 @@ def cloud_executor(
         api.ColumnNames(
             id_column_name,
             moon_column_name,
-            target_column_name,
-            prediction_column_name
+            {
+                target_name: api.TargetColumnNames(input, output)
+                for target_name, input, output in targets
+            }
         )
     )
 

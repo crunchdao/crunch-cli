@@ -54,6 +54,16 @@ class Competition(Model):
 
         return MetricCollection(
             competition=self,
+            target=None,
+            client=self._client
+        )
+
+    @property
+    def targets(self):
+        from .target import TargetCollection
+
+        return TargetCollection(
+            competition=self,
             client=self._client
         )
 

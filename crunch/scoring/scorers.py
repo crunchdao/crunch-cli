@@ -74,6 +74,14 @@ def precision(
     )
 
 
+def random(
+    group: pandas.DataFrame,
+    target_column_name: str,
+    prediction_column_name: str,
+) -> float:
+    return numpy.random.random_sample()
+
+
 def recall(
     group: pandas.DataFrame,
     target_column_name: str,
@@ -110,6 +118,7 @@ REGISTRY = {
     api.ScorerFunction.DOT_PRODUCT: dot_product,
     api.ScorerFunction.F1: fbeta_factory(beta=1),
     api.ScorerFunction.PRECISION: precision,
+    api.ScorerFunction.RANDOM: random,
     api.ScorerFunction.RECALL: recall,
     api.ScorerFunction.SPEARMAN: spearman,
 }

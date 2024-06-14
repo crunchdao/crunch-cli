@@ -25,9 +25,10 @@ def _call_scorer(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
     column_names: api.ColumnNames,
+    target_column_names: api.TargetColumnNames,
 ) -> typing.OrderedDict[int, float]:
-    target_column_name = column_names.target
-    prediction_column_name = column_names.prediction
+    target_column_name = target_column_names.input
+    prediction_column_name = target_column_names.output
 
     if target_column_name == prediction_column_name:
         target_column_name += "_x"
@@ -52,7 +53,7 @@ def score(
     column_names: api.ColumnNames,
     metrics: typing.List[api.Metric],
     y_test_keys: typing.Collection[typing.Union[int, str]]
-) -> typing.Dict[str, ScoredMetric]:
+) -> typing.Dict[int, ScoredMetric]:
 
     if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
@@ -80,15 +81,23 @@ def score(
     scores = {}
 
     for metric in metrics:
+        target_name = metric.target.name
+
+        target_column_names = column_names.targets.get(target_name)
+        if target_column_names is None:
+            logger.warn(f"unknown target column names - target_name={target_name} known_target_names={list(column_names.targets.keys())}")
+            continue
+
         scorer = scorers.REGISTRY.get(metric.scorer_function)
         if scorer is None:
-            logger.warn(f"unknown metric - name={metric.name} function={metric.scorer_function.name}")
+            logger.warn(f"unknown metric - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name}")
             continue
 
         all_details = _call_scorer(
             scorer,
             merged,
-            column_names
+            column_names,
+            target_column_names
         )
 
         details = {}
@@ -100,7 +109,7 @@ def score(
 
                 popped = False
 
-            logger.info(f"score - metric={metric.name} function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
+            logger.info(f"score - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
 
         values = list(details.values())
         values_count = len(values)
@@ -118,7 +127,7 @@ def score(
 
         logger.info(f"score - metric={metric.name} scorer={metric.scorer_function.name} reducer={reducer_method} value={value}")
 
-        scores[metric.name] = ScoredMetric(
+        scores[metric.id] = ScoredMetric(
             value=value,
             details=[
                 ScoredMetricDetail(key, value)

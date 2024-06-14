@@ -1,5 +1,7 @@
 import numpy
 import pandas
+import dataclasses
+import typing
 
 from .. import api
 
@@ -114,12 +116,27 @@ def constants(
         raise CheckError(f"Constant values")
 
 
+@dataclasses.dataclass()
+class CheckFunctionDescriptor:
+    """
+    column_based: Refer to the multiple target system where it is better to check on individual columns to help the user understand where the issue is.
+    """
+
+    callable: typing.Callable
+    column_based: bool = True
+
+    @property
+    def name(self):
+        return self.callable.__name__
+
+
 REGISTRY = {
-    api.CheckFunction.COLUMNS_NAME: columns_name,
-    api.CheckFunction.NANS: nans,
-    api.CheckFunction.VALUES_BETWEEN: values_between,
-    api.CheckFunction.VALUES_ALLOWED: values_allowed,
-    api.CheckFunction.MOONS: moons,
-    api.CheckFunction.IDS: ids,
-    api.CheckFunction.CONSTANTS: constants,
+    api.CheckFunction.COLUMNS_NAME: CheckFunctionDescriptor(columns_name, False),
+    api.CheckFunction.NANS: CheckFunctionDescriptor(nans, False),
+    api.CheckFunction.IDS: CheckFunctionDescriptor(ids, False),
+    api.CheckFunction.MOONS: CheckFunctionDescriptor(moons, False),
+
+    api.CheckFunction.VALUES_BETWEEN: CheckFunctionDescriptor(values_between, True),
+    api.CheckFunction.VALUES_ALLOWED: CheckFunctionDescriptor(values_allowed, True),
+    api.CheckFunction.CONSTANTS: CheckFunctionDescriptor(constants, True),
 }

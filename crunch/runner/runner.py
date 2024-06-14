@@ -4,6 +4,7 @@ import typing
 import pandas
 
 from .. import api
+from .columns import Columns
 
 
 class Runner(abc.ABC):
@@ -58,7 +59,7 @@ class Runner(abc.ABC):
                 moon,
                 train,
             )
-            
+
             predictions.append(prediction)
 
         return pandas.concat(predictions)
@@ -74,7 +75,7 @@ class Runner(abc.ABC):
         train: bool
     ) -> pandas.DataFrame:
         ...
-    
+
     def setup(self):
         ...
 

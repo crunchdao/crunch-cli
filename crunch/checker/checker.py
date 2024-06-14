@@ -32,34 +32,55 @@ def _run_checks(
 
     for check in checks:
         function_name = check.function
-        function = functions.REGISTRY.get(function_name)
-        if function is None:
+        function_descriptor = functions.REGISTRY.get(function_name)
+        if function_descriptor is None:
             logger.error(f"missing function - name={function_name.name}")
             continue
 
-        parameters = check.parameters
-        logger.info(f"check prediction - call={function.__name__}({parameters}) moon={moon}")
+        def do_call(prediction_column_name: str):
+            parameters = check.parameters
 
-        try:
-            utils.smart_call(function, {
-                "prediction": prediction,
-                "example_prediction": example_prediction,
-                "id_column_name": column_names.id,
-                "moon_column_name": column_names.moon,
-                "prediction_column_name": column_names.prediction,
-                "column_names": column_names,
-                "competition_format": competition_format,
-                **parameters,
-            })
-        except CheckError as error:
-            if moon is None:
-                raise
+            if True:
+                suffix = ""
 
-            raise CheckError(f"{error} on {column_names.moon}={moon}") from error
-        except Exception as exception:
-            raise CheckError(
-                "failed to check"
-            ) from exception
+                if moon is not None:
+                    suffix = f" moon={moon}"
+                    
+                if prediction_column_name is not None:
+                    suffix = f" column=`{prediction_column_name}`"
+
+                logger.info(f"check prediction - call={function_descriptor.name}({parameters}){suffix}")
+
+            try:
+                utils.smart_call(
+                    function_descriptor.callable,
+                    {
+                        "prediction": prediction,
+                        "example_prediction": example_prediction,
+                        "id_column_name": column_names.id,
+                        "moon_column_name": column_names.moon,
+                        "prediction_column_name": prediction_column_name,
+                        "column_names": column_names,
+                        "competition_format": competition_format,
+                    },
+                    parameters
+                )
+            except CheckError as error:
+                if moon is None:
+                    raise
+
+                raise CheckError(f"{error} on {column_names.moon}={moon} column={prediction_column_name}") from error
+            except Exception as exception:
+                raise CheckError(
+                    "failed to check"
+                ) from exception
+
+        if function_descriptor.column_based:
+            for prediction_column_name in column_names.outputs:
+                
+                do_call(prediction_column_name)
+        else:
+            do_call(None)
 
 
 def run_via_api(

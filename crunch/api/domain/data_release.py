@@ -87,7 +87,7 @@ class DataReleaseSplit:
     key: typing.Union[str, int]
     group: DataReleaseSplitGroup
     reduced: typing.Optional[DataReleaseSplitReduced] = None
-    
+
     @staticmethod
     def from_dict_array(
         input: typing.List[dict]
@@ -182,12 +182,48 @@ class DataRelease(Model):
     undefined=dataclasses_json.Undefined.EXCLUDE
 )
 @dataclasses.dataclass(frozen=True)
+class TargetColumnNames:
+
+    input: str
+    output: str
+
+
+@dataclasses_json.dataclass_json(
+    letter_case=dataclasses_json.LetterCase.CAMEL,
+    undefined=dataclasses_json.Undefined.EXCLUDE
+)
+@dataclasses.dataclass(frozen=True)
 class ColumnNames:
 
     id: str
     moon: str
-    target: str
-    prediction: str
+    targets: typing.OrderedDict[str, TargetColumnNames]
+
+    @property
+    def first_target_name(self):
+        return next(iter(self.targets.keys()), None)
+
+    @property
+    def first_target(self):
+        key = self.first_target_name
+        if key is None:
+            return None
+
+        return self.targets[key]
+
+    @property
+    def inputs(self):
+        return [
+            target_column_names.input
+            for target_column_names in self.targets.values()
+        ]
+
+    @property
+    def outputs(self):
+        return [
+            target_column_names.output
+            for target_column_names in self.targets.values()
+        ]
 
 
 class DataReleaseCollection(Collection):

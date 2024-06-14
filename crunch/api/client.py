@@ -27,6 +27,7 @@ from .domain.run import RunEndpointMixin
 from .domain.runner import RunnerRun, RunnerRunEndpointMixin
 from .domain.score import ScoreEndpointMixin
 from .domain.submission import SubmissionEndpointMixin
+from .domain.target import TargetEndpointMixin
 from .domain.user import UserCollection, UserEndpointMixin
 from .errors import convert_error
 
@@ -48,6 +49,7 @@ class EndpointClient(
     RunnerRunEndpointMixin,
     ScoreEndpointMixin,
     SubmissionEndpointMixin,
+    TargetEndpointMixin,
     UserEndpointMixin,
 ):
 

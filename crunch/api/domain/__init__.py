@@ -12,6 +12,7 @@ from .crunch import Crunch
 from .data_release import (
     DataRelease,
     ColumnNames,
+    TargetColumnNames,
     DataReleaseTargetResolution,
     DataReleaseSplit,
     DataReleaseSplitGroup,
@@ -49,4 +50,5 @@ from .run import Run
 from .runner import RunnerRun
 from .score import Score
 from .submission import Submission
+from .target import Target
 from .user import User

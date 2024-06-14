@@ -8,7 +8,7 @@ import pandas
 
 from .. import (api, checker, command, constants, ensure, monkey_patches,
                 tester, utils)
-from .runner import Runner
+from .runner import Runner, Columns
 
 
 class LocalRunner(Runner):
@@ -119,11 +119,14 @@ class LocalRunner(Runner):
         x_test = utils.read(self.x_test_path, kwargs=self.read_kwargs)
         y_train = utils.read(self.y_train_path, kwargs=self.read_kwargs)
 
+        _, prediction_column_names = Columns.from_model(self.column_names)
+
         default_values = {
             "number_of_features": self.number_of_features,
             "model_directory_path": self.model_directory_path,
             "id_column_name": self.column_names.id,
-            "prediction_column_name": self.column_names.prediction,
+            "prediction_column_name": self.column_names.first_target.output,
+            "prediction_column_names": prediction_column_names,
             "column_names": self.column_names,
             "has_gpu": self.has_gpu,
             "has_trained": True,
@@ -159,13 +162,17 @@ class LocalRunner(Runner):
         moon: int,
         train: bool
     ) -> pandas.DataFrame:
+        target_column_names, prediction_column_names = Columns.from_model(self.column_names)
+
         default_values = {
             "number_of_features": self.number_of_features,
             "model_directory_path": self.model_directory_path,
             "id_column_name": self.column_names.id,
             "moon_column_name": self.column_names.moon,
-            "target_column_name": self.column_names.target,
-            "prediction_column_name": self.column_names.prediction,
+            "target_column_name": self.column_names.first_target.input,
+            "target_column_names": target_column_names,
+            "prediction_column_name": self.column_names.first_target.output,
+            "prediction_column_names": prediction_column_names,
             "column_names": self.column_names,
             "moon": moon,
             "current_moon": moon,
@@ -199,7 +206,7 @@ class LocalRunner(Runner):
                 prediction,
                 self.column_names.id,
                 self.column_names.moon,
-                self.column_names.prediction,
+                self.column_names.outputs,
             )
 
         return prediction
@@ -229,7 +236,7 @@ class LocalRunner(Runner):
 
                 logging.warn(f"prediction is valid")
             except checker.CheckError as error:
-                if error.__cause__:
+                if not isinstance(error.__cause__, checker.CheckError):
                     logging.exception(
                         "check failed - message=`%s`",
                         error,

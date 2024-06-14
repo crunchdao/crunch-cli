@@ -13,16 +13,15 @@ def orthogonalize(
     column_names: api.ColumnNames,
     **kwargs
 ):
-    prediction_column_name = column_names.prediction
-
     def process(group: pandas.DataFrame):
         date = group.name
 
-        group[prediction_column_name] = _gaussianizer(group[prediction_column_name])
-        group[prediction_column_name] = _orthogonalizer(group, orthogonalization_data[date], column_names.id, prediction_column_name)
-        # Based on orthogonalization_data, necessary to bring back to mean zero before L1-normalizing.
-        group[prediction_column_name] = _mean_zeroed(group[prediction_column_name])
-        group[prediction_column_name] = _l1_normalize(group[prediction_column_name])
+        for prediction_column_name in column_names.outputs:
+            group[prediction_column_name] = _gaussianizer(group[prediction_column_name])
+            group[prediction_column_name] = _orthogonalizer(group, orthogonalization_data[date], column_names.id, prediction_column_name)
+            # Based on orthogonalization_data, necessary to bring back to mean zero before L1-normalizing.
+            group[prediction_column_name] = _mean_zeroed(group[prediction_column_name])
+            group[prediction_column_name] = _l1_normalize(group[prediction_column_name])
 
         return group
 
