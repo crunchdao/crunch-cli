@@ -5,6 +5,7 @@ Heavily inspired (copied) from https://github.com/docker/docker-py/blob/main/doc
 import typing
 
 
+# TODO: add better support for composite key resources
 class Model:
 
     id_attribute = 'id'
@@ -24,7 +25,13 @@ class Model:
         repr = f"{self.__class__.__name__}(id={self.id}"
 
         if self.id_attribute != self.resource_identifier_attribute:
-            repr += f", {self.resource_identifier_attribute}={self.resource_identifier}"
+            if isinstance(self.resource_identifier_attribute, (list, tuple)):
+                repr += f", " + ", ".join([
+                    f"{key}={value}"
+                    for key, value in zip(self.resource_identifier_attribute, self.resource_identifier)
+                ])
+            else:
+                repr += f", {self.resource_identifier_attribute}={self.resource_identifier}"
 
         return f"{repr})"
 
@@ -40,6 +47,12 @@ class Model:
 
     @property
     def resource_identifier(self):
+        if isinstance(self.resource_identifier_attribute, (list, tuple)):
+            return [
+                getattr(self, key, None) or self._attrs.get(key)
+                for key in self.resource_identifier_attribute
+            ]
+
         return self._attrs.get(self.resource_identifier_attribute)
 
     def reload(
@@ -47,8 +60,12 @@ class Model:
         *args,
         **kwargs
     ):
+        resource_identifier = self.resource_identifier
+        if not isinstance(resource_identifier, (list, tuple)):
+            resource_identifier = [resource_identifier]
+
         new_model = self._collection.get(
-            self.resource_identifier,
+            *resource_identifier,
             *args,
             **kwargs
         )
@@ -88,11 +105,11 @@ class Collection:
 
     def __iter__(self) -> typing.Iterator[T]:
         return iter(self.list())
-    
+
     def __getitem__(self, key) -> T:
         return self.list()[key]
 
-    def __getslice__(self, from_, to): 
+    def __getslice__(self, from_, to):
         return self.list()[from_, to]
 
     def list(self) -> typing.List[T]:
