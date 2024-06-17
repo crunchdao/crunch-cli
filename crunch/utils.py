@@ -58,6 +58,7 @@ def write_token(plain_push_token: str, directory="."):
 @dataclasses.dataclass()
 class ProjectInfo:
     competition_name: str
+    project_name: str
     user_id: str
 
 
@@ -75,6 +76,7 @@ def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
     with open(path, "w") as fd:
         json.dump({
             "competitionName": info.competition_name,
+            "projectName": info.project_name,
             "userId": info.user_id,
         }, fd)
 
@@ -84,14 +86,17 @@ def read_project_info() -> ProjectInfo:
     if old_content is not None:
         return ProjectInfo(
             "adialab",
+            "default",
             root["userId"],
         )
 
     content = _read_crunchdao_file(constants.PROJECT_FILE, True)
     root = json.loads(content)
 
+    # TODO: need of a better system for handling file versions
     return ProjectInfo(
         root["competitionName"],
+        root.get("projectName") or "default", #  backward compatibility
         root["userId"],
     )
 

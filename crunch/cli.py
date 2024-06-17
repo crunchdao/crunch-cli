@@ -10,6 +10,15 @@ from . import __version__, api, benchmark, command, constants, store, utils
 store.load_from_env()
 
 
+DIRECTORY_DEFAULT_FORMAT = "{competitionName}-{projectName}"
+def _format_directory(directory: str, competition_name: str, project_name: str):
+    directory = directory \
+        .replace("{competitionName}", competition_name) \
+        .replace("{projectName}", project_name)
+
+    return os.path.normpath(directory)
+
+
 @click.group()
 @click.version_option(
     __version__.__version__,
@@ -43,24 +52,24 @@ def cli(
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
 @click.argument("competition-name", required=True)
-@click.argument("directory", default="{competitionName}")
+@click.argument("project-name", required=True)
+@click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
 def init(
     clone_token: str,
     no_data: bool,
     force: bool,
     competition_name: str,
+    project_name: str,
     directory: str,
     model_directory_path: str,
 ):
-    directory = directory\
-        .replace("{competitionName}", competition_name)
-
-    directory = os.path.normpath(directory)
+    directory = _format_directory(directory, competition_name, project_name)
 
     try:
         command.init(
             clone_token=clone_token,
             competition_name=competition_name,
+            project_name=project_name,
             directory=directory,
             model_directory=model_directory_path,
             force=force,
@@ -90,7 +99,8 @@ def init(
 @click.option("--quickstarter-name", type=str, help="Pre-select a quickstarter.")
 @click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
 @click.argument("competition-name", required=True)
-@click.argument("directory", default="{competitionName}")
+@click.argument("project-name", required=True)
+@click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
 def setup(
     clone_token: str,
     submission_number: str,
@@ -98,27 +108,26 @@ def setup(
     no_model: bool,
     force: bool,
     competition_name: str,
+    project_name: str,
     directory: str,
     model_directory_path: str,
     quickstarter_name: str,
     show_notebook_quickstarters: bool,
 ):
-    directory = directory\
-        .replace("{competitionName}", competition_name)
-
-    directory = os.path.normpath(directory)
+    directory = _format_directory(directory, competition_name, project_name)
 
     try:
         command.setup(
-            clone_token=clone_token,
-            submission_number=submission_number,
-            competition_name=competition_name,
-            directory=directory,
-            model_directory=model_directory_path,
-            force=force,
-            no_model=no_model,
-            quickstarter_name=quickstarter_name,
-            show_notebook_quickstarters=show_notebook_quickstarters,
+            clone_token,
+            submission_number,
+            competition_name,
+            project_name,
+            directory,
+            model_directory_path,
+            force,
+            no_model,
+            quickstarter_name,
+            show_notebook_quickstarters,
         )
 
         if not no_data:
