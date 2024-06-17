@@ -1,4 +1,3 @@
-import enum
 import typing
 
 from ..resource import Collection, Model
@@ -39,18 +38,6 @@ class Prediction(Model):
             client=self._client
         )
 
-    @property
-    def score_summary(self) -> "ScoreSummary":
-        from .score import ScoreSummary
-
-        response = self._client.api.get_score_summary(
-            self._project.competition.id,
-            self._project.user_id,
-            self.id
-        )
-
-        return ScoreSummary.from_dict(response)
-
 
 class PredictionCollection(Collection):
 
@@ -76,6 +63,7 @@ class PredictionCollection(Collection):
             self._client.api.get_prediction(
                 self.project.competition.id,
                 self.project.user_id,
+                self.project.name,
                 id
             )
         )
@@ -87,6 +75,7 @@ class PredictionCollection(Collection):
             self._client.api.list_predictions(
                 self.project.competition.id,
                 self.project.user_id,
+                self.project.name,
             )
         )
 
@@ -102,11 +91,12 @@ class PredictionEndpointMixin:
     def list_predictions(
         self,
         competition_identifier,
-        user_identifier
+        user_identifier,
+        project_identifier
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/predictions"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/predictions"
             ),
             json=True
         )
@@ -115,11 +105,12 @@ class PredictionEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         prediction_id
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/predictions/{prediction_id}"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/predictions/{prediction_id}"
             ),
             json=True
         )

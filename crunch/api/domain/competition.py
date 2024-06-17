@@ -27,10 +27,6 @@ class Competition(Model):
         return CompetitionFormat[self._attrs["format"]]
 
     @property
-    def project(self):
-        return self.projects.get_me()
-
-    @property
     def checks(self):
         from .check import CheckCollection
 

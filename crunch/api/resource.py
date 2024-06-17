@@ -133,7 +133,10 @@ class Collection:
             resource_identifier_attribute != id_attribute
             and resource_identifier is not None
         ):
-            attrs[resource_identifier_attribute] = resource_identifier
+            if isinstance(resource_identifier_attribute, (list, tuple)):
+                attrs.update(dict(zip(resource_identifier_attribute, resource_identifier)))
+            else:
+                attrs[resource_identifier_attribute] = resource_identifier
 
         return self.prepare_model(attrs)
 

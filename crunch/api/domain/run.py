@@ -54,6 +54,7 @@ class RunCollection(Collection):
             self._client.api.get_run(
                 self.project.competition.id,
                 self.project.user_id,
+                self.project.name,
                 id
             )
         )
@@ -70,6 +71,7 @@ class RunCollection(Collection):
             self._client.api.list_runs(
                 self.project.competition.id,
                 self.project.user_id,
+                self.project.name,
                 managed,
                 submission.number if submission is not None else submission_number,
             )
@@ -88,6 +90,7 @@ class RunEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         managed,
         submission_number
     ):
@@ -101,7 +104,7 @@ class RunEndpointMixin:
 
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/runs",
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs",
                 params=params
             ),
             json=True
@@ -111,11 +114,12 @@ class RunEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         run_id
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/runs/{run_id}"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs/{run_id}"
             ),
             json=True
         )

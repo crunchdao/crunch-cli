@@ -9,7 +9,7 @@ from .user import User
 
 class Project(Model):
 
-    resource_identifier_attribute = "userId"
+    resource_identifier_attribute = ("userId", "name")
 
     def __init__(
         self,
@@ -29,6 +29,10 @@ class Project(Model):
     @property
     def user_id(self) -> int:
         return self._attrs["userId"]
+
+    @property
+    def name(self) -> str:
+        return self._attrs["name"]
 
     @property
     def user(self) -> User:
@@ -69,6 +73,7 @@ class Project(Model):
         return self._client.api.clone_project(
             self.competition.id,
             self.user_id,
+            self.name,
             submission_number,
             include_model,
         )
@@ -92,36 +97,28 @@ class ProjectCollection(Collection):
 
     def get(
         self,
-        user_id_or_login: typing.Union[int, str]
+        user_identifier: typing.Union[int, str] = "@me",
+        project_identifier: typing.Union[int, str, typing.Literal["@first"]] = "@first"
     ) -> Project:
         return self.prepare_model(
             self._client.api.get_project(
                 self.competition.id,
-                user_id_or_login
+                user_identifier,
+                project_identifier
             )
         )
-
-    def get_me(
-        self
-    ) -> Project:
-        return self.get("@me")
-
-    @property
-    def me(self) -> Project:
-        return self.get_me()
 
     # TODO Introduce an endpoint instead
     def list(
         self,
-    ) -> Project:
-        from ..errors import ProjectNotFoundException
-
-        try:
-            project = self.get_me()
-
-            return [project]
-        except ProjectNotFoundException:
-            return []
+        user_identifier: typing.Union[int, str] = "@me",
+    ) -> typing.List[Project]:
+        return self.prepare_models(
+            self._client.api.list_projects(
+                self.competition.id,
+                user_identifier
+            )
+        )
 
     def prepare_model(self, attrs):
         return super().prepare_model(
@@ -212,11 +209,24 @@ class ProjectEndpointMixin:
     def get_project(
         self,
         competition_identifier,
+        user_identifier,
+        project_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}"
+            ),
+            json=True
+        )
+
+    def list_projects(
+        self,
+        competition_identifier,
         user_identifier
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}"
             ),
             json=True
         )
@@ -239,6 +249,7 @@ class ProjectEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         submission_number,
         include_model,
     ):
@@ -252,7 +263,7 @@ class ProjectEndpointMixin:
 
         return self._result(
             self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/clone",
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/clone",
                 params=params
             ),
             json=True
