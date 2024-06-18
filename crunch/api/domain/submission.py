@@ -128,7 +128,7 @@ class SubmissionEndpointMixin:
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions/{submission_number}"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions/{submission_number}"
             ),
             json=True
         )
@@ -150,7 +150,7 @@ class SubmissionEndpointMixin:
 
         return self._result(
             self.post(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
                 params={
                     "sse": sse,
                 },
