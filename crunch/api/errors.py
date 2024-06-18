@@ -165,6 +165,26 @@ class ForbiddenLibraryException(ApiException):
         _print_contact("the package should be allowed")
 
 
+class HardcodedStringFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        file_name: str,
+        string: str,
+    ):
+        super().__init__(message)
+
+        self.file_name = file_name
+        self.string = string
+
+    def print_helper(self):
+        print("A hardcoded string value has been found, and your submission cannot be accepted.")
+
+        print(f"\nFile Name: {self.file_name}")
+        print(f"String: \"{self.string}\"")
+
+
 class InvalidProjectTokenException(ApiException):
 
     def __init__(
