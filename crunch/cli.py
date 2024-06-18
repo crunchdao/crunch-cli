@@ -71,10 +71,7 @@ def init(
     except api.CrunchNotFoundException:
         command.download_no_data_available()
     except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
+        utils.exit_via(error)
 
     print("\n---")
     print(f"Success! Your environment has been correctly initialized.")
@@ -126,10 +123,7 @@ def setup(
     except api.CrunchNotFoundException:
         command.download_no_data_available()
     except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
+        utils.exit_via(error)
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
