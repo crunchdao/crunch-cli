@@ -172,17 +172,19 @@ class HardcodedStringFoundException(ApiException):
         message: str,
         file_name: str,
         string: str,
+        quote: str,
     ):
         super().__init__(message)
 
         self.file_name = file_name
         self.string = string
+        self.quote = quote
 
     def print_helper(self):
         print("A hardcoded string value has been found, and your submission cannot be accepted.")
 
         print(f"\nFile Name: {self.file_name}")
-        print(f"String: \"{self.string}\"")
+        print(f"String: {self.quote}{self.string}{self.quote}")
 
 
 class InvalidProjectTokenException(ApiException):
