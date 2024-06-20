@@ -63,6 +63,10 @@ class SubmissionFileCollection(Collection):
     def list(
         self
     ) -> typing.List[SubmissionFile]:
+        from_attrs = self.submission._attrs.get("files")
+        if from_attrs:
+            return self.prepare_models(from_attrs)
+
         return self.prepare_models(
             self._client.api.list_submission_files(
                 self.submission.project.competition.id,
