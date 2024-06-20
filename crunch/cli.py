@@ -270,10 +270,13 @@ def convert(
 
 
 @cli.command(help="Update a project token.")
-@click.argument("clone-token", required=True)
+@click.argument("clone-token", required=False)
 def update_token(
     clone_token: str,
 ):
+    if not clone_token:
+        clone_token = click.prompt("Clone Token", hide_input=True)
+
     utils.change_root()
 
     try:
