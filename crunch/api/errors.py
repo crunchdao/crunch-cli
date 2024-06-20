@@ -202,7 +202,7 @@ class InvalidProjectTokenException(ApiException):
         from .client import Client
 
         print("Your token seems to have expired or is invalid.")
-        
+
         client = Client.from_env()
         project_info = utils.read_project_info()
 
@@ -263,6 +263,24 @@ class RunNotFoundException(ApiException):
         print("The run may have been removed or the project is not the owner.")
 
         _print_contact()
+
+
+class RestrictedPhaseActionException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        phase_type: str,
+    ):
+        super().__init__(message)
+
+        self.phase_type = PhaseType[phase_type]
+
+    def print_helper(self):
+        print(f"This action cannot be done during the {self.phase_type.pretty()} phase.")
+
+        _print_contact()
+
 
 class RoundNotFoundException(ApiException):
 
