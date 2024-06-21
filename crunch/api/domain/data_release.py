@@ -184,6 +184,8 @@ class DataRelease(Model):
 @dataclasses.dataclass(frozen=True)
 class TargetColumnNames:
 
+    id: int
+    name: str
     input: str
     output: str
 
@@ -197,33 +199,39 @@ class ColumnNames:
 
     id: str
     moon: str
-    targets: typing.OrderedDict[str, TargetColumnNames]
-
-    @property
-    def first_target_name(self):
-        return next(iter(self.targets.keys()), None)
+    targets: typing.List[TargetColumnNames]
 
     @property
     def first_target(self):
-        key = self.first_target_name
-        if key is None:
-            return None
-
-        return self.targets[key]
+        return next(iter(self.targets), None)
 
     @property
     def inputs(self):
         return [
             target_column_names.input
-            for target_column_names in self.targets.values()
+            for target_column_names in self.targets
         ]
 
     @property
     def outputs(self):
         return [
             target_column_names.output
-            for target_column_names in self.targets.values()
+            for target_column_names in self.targets
         ]
+
+    @property
+    def target_names(self):
+        return [
+            target_column_names.name
+            for target_column_names in self.targets
+        ]
+
+    def get_target_by_name(self, name: str):
+        for target in self.targets:
+            if target.name == name:
+                return target
+
+        return None
 
 
 class DataReleaseCollection(Collection):

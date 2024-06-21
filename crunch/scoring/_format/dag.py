@@ -76,7 +76,7 @@ def process_prediction(
     column_names: api.ColumnNames,
 ):
     # TODO support multiple target
-    for targe_column_names in column_names.targets.values():
+    for targe_column_names in column_names.targets:
         prediction_column_name = targe_column_names.output
         
         prediction = prediction[[
@@ -117,7 +117,7 @@ def process_y(
     column_names: api.ColumnNames,
 ):
     # TODO support multiple target
-    for targe_column_names in column_names.targets.values():
+    for targe_column_names in column_names.targets:
         target_column_name = targe_column_names.input
 
         dataframes: typing.List[pandas.DataFrame] = []

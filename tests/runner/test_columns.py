@@ -57,10 +57,10 @@ class ColumnsTest(unittest.TestCase):
         column_names = ColumnNames(
             id=None,
             moon=None,
-            targets=collections.OrderedDict(
-                a=TargetColumnNames("b", "c"),
-                d=TargetColumnNames("e", "f")
-            )
+            targets=[
+                TargetColumnNames(None, "a", "b", "c"),
+                TargetColumnNames(None, "d", "e", "f")
+            ]
         )
 
         inputs, outputs = Columns.from_model(column_names)
