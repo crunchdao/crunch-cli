@@ -51,6 +51,7 @@ class _Inline:
         train_frequency=1,
         raise_abort=False,
         round_number="@current",
+        no_determinism_check=False,
         read_kwargs={},
         write_kwargs={},
     ):
@@ -74,6 +75,7 @@ class _Inline:
                 round_number,
                 competition.format,
                 self.has_gpu,
+                not no_determinism_check,
                 read_kwargs,
                 write_kwargs,
             )

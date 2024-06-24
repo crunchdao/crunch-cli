@@ -62,11 +62,13 @@ class RunnerRun(Model):
     def submit_result(
         self,
         use_initial_model: bool,
+        deterministic: typing.Optional[bool],
         files: typing.List[typing.Tuple]
     ):
         self._client.api.submit_runner_run_result(
             self._run_id,
             use_initial_model,
+            deterministic,
             files
         )
 
@@ -142,6 +144,7 @@ class RunnerRunEndpointMixin:
         self,
         run_id,
         use_initial_model,
+        deterministic,
         files
     ):
         return self._result(
@@ -149,7 +152,8 @@ class RunnerRunEndpointMixin:
                 f"/v1/runner/runs/{run_id}/result",
                 files=tuple(files),
                 data={
-                    "useInitialModel": use_initial_model
+                    "useInitialModel": use_initial_model,
+                    "deterministic": deterministic,
                 },
             )
         )

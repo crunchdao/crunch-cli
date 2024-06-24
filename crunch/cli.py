@@ -323,6 +323,7 @@ def runner_group():
 @click.option("--round-number", default="@current", help="Change round number to get the data from.")
 @click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
 @click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
+@click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check.")
 def local(
     main_file_path: str,
     model_directory_path: str,
@@ -332,6 +333,7 @@ def local(
     round_number: str,
     has_gpu: bool,
     no_checks: bool,
+    no_determinism_check: bool,
 ):
     from . import library, tester
 
@@ -351,6 +353,7 @@ def local(
             round_number,
             has_gpu,
             not no_checks,
+            not no_determinism_check,
         )
     except api.ApiException as error:
         utils.exit_via(error)
@@ -372,6 +375,7 @@ def local(
 @click.option("--log-secret", envvar="LOG_SECRET", default=None, type=str)
 @click.option("--train-frequency", envvar="TRAIN_FREQUENCY", type=int, default=0)
 @click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", is_flag=True)
+@click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", is_flag=True)
 @click.option("--gpu", envvar="GPU", is_flag=True)
 @click.option("--crunch-cli-commit-hash", default="main", envvar="CRUNCH_CLI_COMMIT_HASH")
 # ---
@@ -393,6 +397,7 @@ def cloud(
     log_secret: str,
     train_frequency: int,
     force_first_train: bool,
+    determinism_check_enabled: bool,
     gpu: bool,
     crunch_cli_commit_hash: str,
     # ---
@@ -448,6 +453,7 @@ def cloud(
         log_secret,
         train_frequency,
         force_first_train,
+        determinism_check_enabled,
         gpu,
         crunch_cli_commit_hash,
         # ---
