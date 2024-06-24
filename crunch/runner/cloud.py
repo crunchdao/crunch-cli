@@ -55,13 +55,14 @@ class CloudRunner(Runner):
         log_secret: str,
         train_frequency: str,
         force_first_train: bool,
+        determinism_check_enabled: bool,
         gpu: bool,
         crunch_cli_commit_hash: str,
         # ---
         max_retry: int,
         retry_seconds: int
     ):
-        super().__init__(competition.format)
+        super().__init__(competition.format, determinism_check_enabled)
 
         self.competition = competition
         self.run = run
@@ -95,11 +96,6 @@ class CloudRunner(Runner):
         super().start()
 
         self.report_current("ending")
-
-    def start_timeseries(self):
-        self.create_trace_file()
-
-        return super().start_timeseries()
 
     def initialize(self):
         if self.log("downloading code..."):
@@ -171,14 +167,10 @@ class CloudRunner(Runner):
             self.have_model
         )
 
-    def start_dag(self):
-        self.report_current("process dag")
+    def start_timeseries(self):
         self.create_trace_file()
 
-        return self.sandbox(
-            True,
-            -1,
-        )
+        return super().start_timeseries()
 
     def timeseries_loop(
         self,
@@ -191,6 +183,18 @@ class CloudRunner(Runner):
             train,
             moon,
         )
+
+    def start_dag(self):
+        self.report_current("process dag")
+        self.create_trace_file()
+
+        return super().start_dag()
+
+    def dag_loop(
+        self,
+        train: bool
+    ):
+        return self.sandbox(train, -1)
 
     def finalize(self, prediction: pandas.DataFrame):
         self.report_current("upload result")
@@ -252,6 +256,7 @@ class CloudRunner(Runner):
                 try:
                     self.run.submit_result(
                         use_initial_model=not has_model_changed,
+                        deterministic=self.deterministic,
                         files=files
                     )
 

@@ -30,6 +30,7 @@ def run(
     competition_format: api.CompetitionFormat,
     has_gpu=False,
     checks=True,
+    determinism_check_enabled=True,
     read_kwargs={},
     write_kwargs={},
 ):
@@ -43,6 +44,7 @@ def run(
         competition_format,
         has_gpu,
         checks,
+        determinism_check_enabled,
         read_kwargs,
         write_kwargs,
     )

@@ -23,10 +23,11 @@ class LocalRunner(Runner):
         competition_format: api.CompetitionFormat,
         has_gpu=False,
         checks=True,
+        determinism_check_enabled=False,
         read_kwargs={},
         write_kwargs={},
     ):
-        super().__init__(competition_format)
+        super().__init__(competition_format, determinism_check_enabled)
 
         self.module = module
         self.model_directory_path = model_directory_path
@@ -114,49 +115,6 @@ class LocalRunner(Runner):
             False,
         )
 
-    def start_dag(self):
-        x_train = utils.read(self.x_train_path, kwargs=self.read_kwargs)
-        x_test = utils.read(self.x_test_path, kwargs=self.read_kwargs)
-        y_train = utils.read(self.y_train_path, kwargs=self.read_kwargs)
-
-        _, prediction_column_names = Columns.from_model(self.column_names)
-
-        default_values = {
-            "number_of_features": self.number_of_features,
-            "model_directory_path": self.model_directory_path,
-            "id_column_name": self.column_names.id,
-            "prediction_column_name": self.column_names.first_target.output,
-            "prediction_column_names": prediction_column_names,
-            "column_names": self.column_names,
-            "has_gpu": self.has_gpu,
-            "has_trained": True,
-        }
-
-        if True:
-            logging.warn('call: train')
-            utils.smart_call(self.train_function, default_values, {
-                "X_train": x_train,
-                "x_train": x_train,
-                "Y_train": y_train,
-                "y_train": y_train,
-            })
-
-        if True:
-            logging.warn('call: infer')
-            prediction = utils.smart_call(self.infer_function, default_values, {
-                "X_test": x_test,
-                "x_test": x_test,
-            })
-
-            ensure.return_infer(
-                prediction,
-                self.column_names.id,
-                None,
-                self.column_names.prediction,
-            )
-
-        return prediction
-
     def timeseries_loop(
         self,
         moon: int,
@@ -207,6 +165,53 @@ class LocalRunner(Runner):
                 self.column_names.id,
                 self.column_names.moon,
                 self.column_names.outputs,
+            )
+
+        return prediction
+
+    def dag_loop(
+        self,
+        train: bool
+    ):
+        x_train = utils.read(self.x_train_path, kwargs=self.read_kwargs)
+        x_test = utils.read(self.x_test_path, kwargs=self.read_kwargs)
+        y_train = utils.read(self.y_train_path, kwargs=self.read_kwargs)
+
+        _, prediction_column_names = Columns.from_model(self.column_names)
+
+        default_values = {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "id_column_name": self.column_names.id,
+            "prediction_column_name": self.column_names.first_target.output,
+            "prediction_column_names": prediction_column_names,
+            "column_names": self.column_names,
+            "has_gpu": self.has_gpu,
+            "has_trained": train,
+        }
+
+        if train:
+            logging.warn('call: train')
+            utils.smart_call(self.train_function, default_values, {
+                "X_train": x_train,
+                "x_train": x_train,
+                "Y_train": y_train,
+                "y_train": y_train,
+            })
+
+        if True:
+            logging.warn('call: infer')
+            prediction = utils.smart_call(self.infer_function, default_values, {
+                "X_test": x_test,
+                "x_test": x_test,
+            })
+
+            ensure.return_infer(
+                prediction,
+                self.column_names.id,
+                None,
+                # TODO .prediction does not exists anymore
+                self.column_names.prediction,
             )
 
         return prediction

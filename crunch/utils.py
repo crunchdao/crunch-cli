@@ -288,10 +288,7 @@ def download(
         raise
 
 
-def exit_via(
-    error: "api.ApiException",
-    **kwargs
-):
+def exit_via(error: "api.ApiException"):
     print("\n---")
-    error.print_helper(**kwargs)
+    error.print_helper()
     exit(1)

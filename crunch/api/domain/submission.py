@@ -31,6 +31,12 @@ class Submission(Model):
     def number(self) -> int:
         return self._attrs["number"]
 
+    @property
+    def files(self):
+        from .submission_file import SubmissionFileCollection
+
+        return SubmissionFileCollection(self, self._client)
+
 
 class SubmissionCollection(Collection):
 

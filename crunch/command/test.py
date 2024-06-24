@@ -14,6 +14,7 @@ def test(
     round_number: str,
     has_gpu: bool,
     checks: bool,
+    determinism_check_enabled: bool,
 ):
     _, project = api.Client.from_project()
     competition = project.competition.reload()
@@ -33,6 +34,7 @@ def test(
         competition.format,
         has_gpu,
         checks,
+        determinism_check_enabled,
     )
 
     if prediction is not None:
