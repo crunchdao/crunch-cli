@@ -50,5 +50,6 @@ from .run import Run
 from .runner import RunnerRun
 from .score import Score
 from .submission import Submission
+from .submission_file import SubmissionFile
 from .target import Target
 from .user import User
