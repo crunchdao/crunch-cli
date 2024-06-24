@@ -156,5 +156,19 @@ def _print_success(
     project = submission.project
     competition = project.competition
 
+    files = [
+        file
+        for file in submission.files.list()
+        if file.found_hardcoded_string
+    ]
+
+    if len(files):
+        print("\nwarning: some of your files have hardcoded strings")
+
+        for file in files:
+            print(f"- {file.name}")
+
+        print()
+
     url = client.format_web_url(f"/competitions/{competition.name}/projects/{project.user_id}/submissions/{submission.number}")
     print(f"Find it on your dashboard: {url}")
