@@ -54,9 +54,11 @@ class Columns:
         inputs = collections.OrderedDict()
         outputs = collections.OrderedDict()
 
-        for key, value in column_names.targets.items():
-            inputs[key] = value.input
-            outputs[key] = value.output
+        for target_column_names in column_names.targets:
+            key = target_column_names.name
+
+            inputs[key] = target_column_names.input
+            outputs[key] = target_column_names.output
 
         return (
             Columns(inputs, _copy=False),

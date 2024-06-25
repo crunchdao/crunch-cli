@@ -83,9 +83,9 @@ def score(
     for metric in metrics:
         target_name = metric.target.name
 
-        target_column_names = column_names.targets.get(target_name)
+        target_column_names = column_names.get_target_by_name(target_name)
         if target_column_names is None:
-            logger.warn(f"unknown target column names - target_name={target_name} known_target_names={list(column_names.targets.keys())}")
+            logger.warn(f"unknown target column names - target_name={target_name} known_target_names={list(column_names.target_names)}")
             continue
 
         scorer = scorers.REGISTRY.get(metric.scorer_function)

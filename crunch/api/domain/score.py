@@ -12,17 +12,6 @@ from .prediction import Prediction
     undefined=dataclasses_json.Undefined.EXCLUDE
 )
 @dataclasses.dataclass(frozen=True)
-class ScoreSummary:
-
-    mean: str
-    metrics: typing.Dict[str, typing.Optional[float]]
-
-
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE
-)
-@dataclasses.dataclass(frozen=True)
 class ScoreDetail:
 
     key: typing.Union[str, int]
@@ -93,6 +82,7 @@ class ScoreCollection(Collection):
             self._client.api.list_scores(
                 self.prediction.project.competition.id,
                 self.prediction.project.user_id,
+                self.prediction.project.name,
                 self.prediction.id
             )
         )
@@ -110,24 +100,12 @@ class ScoreEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         prediction_id
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/predictions/{prediction_id}/scores"
-            ),
-            json=True
-        )
-
-    def get_score_summary(
-        self,
-        competition_identifier,
-        user_identifier,
-        prediction_id
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/predictions/{prediction_id}/scores/summary"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/predictions/{prediction_id}/scores"
             ),
             json=True
         )

@@ -259,6 +259,6 @@ class Client:
         )
 
         competition = client.competitions.get(project_info.competition_name)
-        project = competition.projects.get_reference(None, project_info.user_id)
+        project = competition.projects.get_reference(None, (project_info.user_id, project_info.project_name))
 
         return client, project

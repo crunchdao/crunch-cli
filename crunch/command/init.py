@@ -26,6 +26,7 @@ def _check_if_already_exists(directory: str, force: bool):
 def init(
     clone_token: str,
     competition_name: str,
+    project_name: str,
     directory: str,
     model_directory: str,
     force: bool,
@@ -45,6 +46,7 @@ def init(
     user_id = project_token.project.user_id
     project_info = utils.ProjectInfo(
         competition_name,
+        project_name,
         user_id
     )
 

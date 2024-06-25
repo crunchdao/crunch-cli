@@ -62,6 +62,7 @@ class SubmissionCollection(Collection):
             self._client.api.get_submission(
                 self.project.competition.id,
                 self.project.user_id,
+                self.project.name,
                 number
             )
         )
@@ -73,6 +74,7 @@ class SubmissionCollection(Collection):
             self._client.api.list_submissions(
                 self.project.competition.id,
                 self.project.user_id,
+                self.project.name,
             )
         )
 
@@ -90,6 +92,7 @@ class SubmissionCollection(Collection):
             self._client.api.create_submission(
                 self.project.competition.id,
                 self.project.user_id,
+                self.project.name,
                 message,
                 main_file_path,
                 model_directory_path,
@@ -112,11 +115,12 @@ class SubmissionEndpointMixin:
     def list_submissions(
         self,
         competition_identifier,
-        user_identifier
+        user_identifier,
+        project_identifier
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/submissions"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions"
             ),
             json=True
         )
@@ -125,11 +129,12 @@ class SubmissionEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         submission_number
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/submissions/{submission_number}"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions/{submission_number}"
             ),
             json=True
         )
@@ -138,6 +143,7 @@ class SubmissionEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         message,
         main_file_path,
         model_directory_path,
@@ -150,7 +156,7 @@ class SubmissionEndpointMixin:
 
         return self._result(
             self.post(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/submissions",
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
                 params={
                     "sse": sse,
                 },
