@@ -562,7 +562,7 @@ def cloud_executor(
             id_column_name,
             moon_column_name,
             {
-                target_name: api.TargetColumnNames(None, target_name, input, output)
+                api.TargetColumnNames(None, target_name, input, output)
                 for target_name, input, output in targets
             }
         )
