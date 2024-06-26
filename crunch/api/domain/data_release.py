@@ -98,6 +98,26 @@ class DataReleaseSplit:
         ]
 
 
+@dataclasses_json.dataclass_json(
+    letter_case=dataclasses_json.LetterCase.CAMEL,
+    undefined=dataclasses_json.Undefined.EXCLUDE,
+)
+@dataclasses.dataclass(frozen=True)
+class DataReleaseFeature:
+
+    group: str
+    name: str
+
+    @staticmethod
+    def from_dict_array(
+        input: typing.List[dict]
+    ):
+        return [
+            DataReleaseFeature.from_dict(x)
+            for x in input
+        ]
+
+
 class DataRelease(Model):
 
     resource_identifier_attribute = "number"
@@ -162,18 +182,29 @@ class DataRelease(Model):
     @property
     def splits(self) -> typing.Tuple[DataReleaseSplit]:
         splits = self._attrs.get("splits")
-        if not splits:
+        if splits is None:
             self.reload(include_splits=True)
             splits = self._attrs["splits"]
 
         return tuple(DataReleaseSplit.from_dict_array(splits))
 
+    @property
+    def features(self) -> typing.Tuple[DataReleaseFeature]:
+        features = self._attrs.get("features")
+        if features is None:
+            self.reload(include_features=True)
+            features = self._attrs["features"]
+
+        return tuple(DataReleaseFeature.from_dict_array(features))
+
     def reload(
         self,
-        include_splits: bool = False
+        include_splits=True,
+        include_features=True,
     ):
         return super().reload(
-            include_splits=include_splits
+            include_splits=include_splits,
+            include_features=include_features,
         )
 
 
@@ -253,19 +284,21 @@ class DataReleaseCollection(Collection):
     def get(
         self,
         number: typing.Union[int, str],
-        include_splits: bool = False
+        include_splits=True,
+        include_features=True,
     ) -> DataRelease:
         return self.prepare_model(
             self._client.api.get_data_release(
                 self.competition.id,
                 number,
-                include_splits=include_splits
+                include_splits=include_splits,
+                include_features=include_features,
             )
         )
 
     def list(
         self
-    ) -> typing.List[Competition]:
+    ) -> typing.List[DataRelease]:
         return self.prepare_models(
             self._client.api.list_data_releases(
                 self.competition.id
@@ -296,13 +329,15 @@ class DataReleaseEndpointMixin:
         self,
         competition_identifier,
         number,
-        include_splits: bool = False
+        include_splits=False,
+        include_features=False,
     ):
         return self._result(
             self.get(
                 f"/v1/competitions/{competition_identifier}/data-releases/{number}",
                 params={
-                    "includeSplits": include_splits
+                    "includeSplits": include_splits,
+                    "includeFeatures": include_features,
                 }
             ),
             json=True

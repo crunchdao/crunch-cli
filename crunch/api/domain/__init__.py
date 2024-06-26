@@ -17,6 +17,7 @@ from .data_release import (
     DataReleaseSplit,
     DataReleaseSplitGroup,
     DataReleaseSplitReduced,
+    DataReleaseFeature,
     DataFiles,
     OriginalFiles,
     DataFile,
