@@ -189,6 +189,10 @@ class DataRelease(Model):
         return tuple(DataReleaseSplit.from_dict_array(splits))
 
     @property
+    def default_feature_group(self) -> str:
+        return self._attrs["defaultFeatureGroup"]
+
+    @property
     def features(self) -> typing.Tuple[DataReleaseFeature]:
         features = self._attrs.get("features")
         if features is None:
