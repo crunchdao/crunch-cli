@@ -314,6 +314,11 @@ class CloudRunner(Runner):
                 check._attrs
                 for check in self.competition.checks
             ],
+            "default_feature_group": self.default_feature_group,
+            "features": [
+                feature.to_dict()
+                for feature in self.features
+            ]
         }
 
         with open(self.state_file, "w") as fd:
@@ -503,6 +508,8 @@ class CloudRunner(Runner):
         self.number_of_features = data_release.number_of_features
         self.column_names = data_release.column_names
         self.splits = data_release.splits
+        self.features = data_release.features
+        self.default_feature_group = data_release.default_feature_group
         data_files = data_release.data_files
 
         x_url = data_files.x.url

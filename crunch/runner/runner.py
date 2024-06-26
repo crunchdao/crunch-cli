@@ -4,7 +4,7 @@ import typing
 import pandas
 
 from .. import api
-from .columns import Columns
+from ..container import Columns
 
 
 class Runner(abc.ABC):

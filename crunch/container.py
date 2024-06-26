@@ -1,6 +1,8 @@
 import collections
 import typing
 
+if typing.TYPE_CHECKING:
+    from . import api
 
 STORAGE_PROPERTY = "_storage"
 
@@ -63,4 +65,47 @@ class Columns:
         return (
             Columns(inputs, _copy=False),
             Columns(outputs, _copy=False),
+        )
+
+
+class Features:
+
+    def __init__(
+        self,
+        items: typing.List["api.DataReleaseFeature"],
+        default_group_name: str
+    ):
+        storage = collections.defaultdict(list)  # `set` is losing order
+        storage[default_group_name]
+
+        for item in items:
+            values = storage[item.group]
+
+            if item.name not in values:
+                values.append(item.name)
+
+        self.storage = dict(storage)
+        self.default_group_name = default_group_name
+
+    def to_parameter_variants(
+        self,
+        base_name="feature_column_names",
+        separator="_",
+    ):
+        parameters = {
+            base_name: self.storage[self.default_group_name]
+        }
+
+        for group, names in self.storage.items():
+            key = f"{base_name}{separator}{group}"
+
+            parameters[key] = names
+
+        return parameters
+
+    @staticmethod
+    def from_data_release(data_release: "api.DataRelease"):
+        return Features(
+            data_release.features,
+            data_release.default_feature_group
         )

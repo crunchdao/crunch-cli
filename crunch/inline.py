@@ -26,6 +26,7 @@ class _Inline:
                 _,  # embargo
                 _,  # number of features
                 _,  # split keys
+                _,  # features
                 _,  # column names
                 (
                     x_train_path,
@@ -33,7 +34,7 @@ class _Inline:
                     x_test_path,
                     _,  # y_test_path
                     _,  # example_prediction
-                )
+                ),
             ) = command.download()
         except api.CrunchNotFoundException:
             command.download_no_data_available()
