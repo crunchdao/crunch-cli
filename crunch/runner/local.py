@@ -76,6 +76,7 @@ class LocalRunner(Runner):
                 self.embargo,
                 self.number_of_features,
                 self.keys,
+                self.features,
                 self.column_names,
                 (
                     self.x_train_path,
@@ -137,6 +138,7 @@ class LocalRunner(Runner):
             "embargo": self.embargo,
             "has_gpu": self.has_gpu,
             "has_trained": train,
+            **self.features.to_parameter_variants(),
         }
 
         if train:

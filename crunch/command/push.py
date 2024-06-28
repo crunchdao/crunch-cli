@@ -109,7 +109,7 @@ def push(
 
                     files.append(("modelFiles", (name, fd)))
 
-                print(f"export {competition.name}:project/{project.user_id}")
+                print(f"export {competition.name}:project/{project.user_id}/{project.name}")
                 if dry:
                     print("create dry (no upload)")
                 else:
@@ -170,5 +170,5 @@ def _print_success(
 
         print()
 
-    url = client.format_web_url(f"/competitions/{competition.name}/projects/{project.user_id}/submissions/{submission.number}")
+    url = client.format_web_url(f"/competitions/{competition.name}/projects/{project.user_id}/{project.name}/submissions/{submission.number}")
     print(f"Find it on your dashboard: {url}")

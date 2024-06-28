@@ -4,7 +4,7 @@ import dataclasses
 
 import click
 
-from .. import constants, utils, api
+from .. import constants, utils, api, container
 
 
 @dataclasses.dataclass
@@ -27,6 +27,7 @@ def _get_data_urls(
     int,
     int,
     typing.List[int],
+    container.Features,
     api.ColumnNames,
     typing.Tuple[DataFile, DataFile, DataFile, DataFile, DataFile]
 ]:
@@ -37,6 +38,7 @@ def _get_data_urls(
     column_names = data_release.column_names
     data_files: api.DataFiles = data_release.data_files
     splits = data_release.splits
+    features = container.Features.from_data_release(data_release)
 
     split_keys = [
         split.key
@@ -74,6 +76,7 @@ def _get_data_urls(
         embargo,
         number_of_features,
         split_keys,
+        features,
         column_names,
         (
             x_train,
@@ -128,6 +131,7 @@ def download(
         embargo,
         number_of_features,
         split_keys,
+        features,
         column_names,
         (
             x_train,
@@ -151,6 +155,7 @@ def download(
         embargo,
         number_of_features,
         split_keys,
+        features,
         column_names,
         (
             x_train.path,

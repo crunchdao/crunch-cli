@@ -16,7 +16,7 @@ import requests
 
 from .. import api, checker, orthogonalization, scoring
 from ..orthogonalization import _runner as orthogonalization_runner
-from .columns import Columns
+from ..container import Columns, Features
 
 
 class Reference:
@@ -224,6 +224,10 @@ class SandboxExecutor:
         self.splits = api.DataReleaseSplit.from_dict_array(self.state["splits"])
         self.metrics = api.Metric.from_dict_array(self.state["metrics"], None)
         self.checks = api.Check.from_dict_array(self.state["checks"], None)
+        self.features = Features(
+            api.DataReleaseFeature.from_dict_array(self.state["features"]),
+            self.state["default_feature_group"]
+        )
 
         full_x = read(self.x_path, True)
 
@@ -287,6 +291,7 @@ class SandboxExecutor:
                 "embargo": self.embargo,
                 "has_gpu": self.gpu,
                 "has_trained": self.train,
+                **self.features.to_parameter_variants(),
             }
 
             if self.train:

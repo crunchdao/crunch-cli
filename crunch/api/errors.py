@@ -124,6 +124,21 @@ class CrunchNotFoundException(ApiException):
 
         _print_contact()
 
+class CurrentPhaseNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str
+    ):
+        super().__init__(message)
+
+    def print_helper(self):
+        print("Current phase not found.")
+        print("")
+        print("The competition may be over or the server is not correctly configured.")
+
+        _print_contact()
+
 
 class DailySubmissionLimitExceededException(ApiException):
 
@@ -218,6 +233,7 @@ class ProjectNotFoundException(ApiException):
         print("Project not found.")
 
         client, project = Client.from_project()
+
         print("\nPlease follow this link to copy and paste your new setup command:")
         print(client.format_web_url(f'/competitions/{project.competition.name}/submit'))
 
