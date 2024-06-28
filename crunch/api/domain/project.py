@@ -108,7 +108,6 @@ class ProjectCollection(Collection):
             )
         )
 
-    # TODO Introduce an endpoint instead
     def list(
         self,
         user_identifier: typing.Union[int, str] = "@me",
@@ -263,7 +262,7 @@ class ProjectEndpointMixin:
 
         return self._result(
             self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/clone",
+                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/clone",
                 params=params
             ),
             json=True

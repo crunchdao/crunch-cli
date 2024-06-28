@@ -143,7 +143,10 @@ class EndpointClient(
             return self._result_sse(response, sse_handler, json)
 
         if json:
-            return response.json()
+            try:
+                return response.json()
+            except requests.exceptions.JSONDecodeError as json_error:
+                raise ValueError(f"could not parse json: `{response.text}`") from json_error
 
         if binary:
             return response.content
