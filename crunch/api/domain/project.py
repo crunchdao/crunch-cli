@@ -262,7 +262,7 @@ class ProjectEndpointMixin:
 
         return self._result(
             self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/clone",
+                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/clone",
                 params=params
             ),
             json=True
