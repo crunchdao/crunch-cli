@@ -108,7 +108,6 @@ class ProjectCollection(Collection):
             )
         )
 
-    # TODO Introduce an endpoint instead
     def list(
         self,
         user_identifier: typing.Union[int, str] = "@me",
