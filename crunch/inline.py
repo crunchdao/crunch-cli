@@ -5,7 +5,7 @@ import typing
 import click
 import pandas
 
-from . import api, command, constants, utils, orthogonalization, runner
+from . import api, command, constants, orthogonalization, runner, utils
 
 
 class _Inline:
@@ -16,9 +16,6 @@ class _Inline:
         self.has_gpu = has_gpu
 
         print(f"loaded inline runner with module: {module}")
-
-    def load_notebook(self, *args, **kwargs):
-        return load(*args, **kwargs)
 
     def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
         try:
@@ -105,6 +102,11 @@ class _Inline:
     @property
     def is_inside_runner(self):
         return runner.is_inside
+
+    def __getattr__(self, key):
+        import crunch
+
+        return getattr(crunch, key)
 
 
 def load(
