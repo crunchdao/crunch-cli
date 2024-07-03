@@ -61,7 +61,8 @@ def score(
         merged = merge(
             y_test,
             prediction,
-            column_names
+            column_names,
+            metrics,
         )
 
     elif competition_format == api.CompetitionFormat.DAG:
@@ -76,7 +77,8 @@ def score(
     else:
         raise ValueError(f"unsupported competition format: {competition_format}")
 
-    # print(merged)
+    if not len(merged):
+        raise ValueError(f"merged dataframe is empty: {merged}")
 
     scores = {}
 
