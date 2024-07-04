@@ -1,6 +1,7 @@
 import functools
 import logging
 import os
+import sys
 import typing
 
 import click
@@ -96,8 +97,10 @@ def init(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--no-quickstarter", is_flag=True, help="Disable quickstarter selection.")
 @click.option("--quickstarter-name", type=str, help="Pre-select a quickstarter.")
 @click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
+@click.option("--notebook", is_flag=True, help="Setup everything for a notebook environment.")
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
@@ -111,10 +114,34 @@ def setup(
     project_name: str,
     directory: str,
     model_directory_path: str,
+    no_quickstarter: bool,
     quickstarter_name: str,
     show_notebook_quickstarters: bool,
+    notebook: bool,
 ):
-    directory = _format_directory(directory, competition_name, project_name)
+    if notebook:
+        if force:
+            print("notebook `--force` is implicit", file=sys.stderr)
+
+        if no_quickstarter:
+            print("notebook `--no-quickstarter` is implicit", file=sys.stderr)
+
+        if quickstarter_name:
+            print("notebook `--quickstarter-name` is incompatible, ignoring it", file=sys.stderr)
+            quickstarter_name = None
+
+        if show_notebook_quickstarters:
+            print("notebook `--show-notebook-quickstarters` is incompatible, ignoring it", file=sys.stderr)
+            show_notebook_quickstarters = False
+
+        if directory != DIRECTORY_DEFAULT_FORMAT:
+            print("notebook `[directory]` is forced to '.'", file=sys.stderr)
+
+        force = True
+        no_quickstarter = True
+        directory = "."
+    else:
+        directory = _format_directory(directory, competition_name, project_name)
 
     try:
         command.setup(
@@ -126,6 +153,7 @@ def setup(
             model_directory_path,
             force,
             no_model,
+            not no_quickstarter,
             quickstarter_name,
             show_notebook_quickstarters,
         )

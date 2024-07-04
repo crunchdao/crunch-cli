@@ -12,6 +12,7 @@ def setup(
     model_directory: str,
     force: bool,
     no_model: bool,
+    show_quickstarters: bool,
     quickstarter_name: typing.Optional[str],
     show_notebook_quickstarters: bool,
 ):
@@ -34,8 +35,11 @@ def setup(
         for path, url in urls.items():
             utils.download(url, path)
     except api.NeverSubmittedException:
-        command.quickstarter(
-            quickstarter_name,
-            show_notebook_quickstarters,
-            True,
-        )
+        if show_quickstarters:
+            command.quickstarter(
+                quickstarter_name,
+                show_notebook_quickstarters,
+                True,
+            )
+        else:
+            print(f"you appear to have never submitted code before")
