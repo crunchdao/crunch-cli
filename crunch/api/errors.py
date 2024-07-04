@@ -26,7 +26,7 @@ class ApiException(Exception):
         self.message = message  # because python does not keep a reference himself...
         super().__init__(message)
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print(f"A problem occured: {self.message}")
 
         _print_contact()
@@ -37,7 +37,7 @@ class InternalServerException(ApiException):
     def __init__(self, message: str):
         super().__init__(message)
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print(f"An internal error occured: {self.message}")
 
         print(f"\nPlease contact an administrator.")
@@ -62,7 +62,7 @@ class ValidationFailedException(ApiException):
 
         self.field_errors = field_errors
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print(f"A validation error occured: {self.message}")
 
         print(json.dumps(self.field_errors, indent=4))
@@ -79,7 +79,7 @@ class CheckException(ApiException):
     def __init__(self, message: str):
         super().__init__(message)
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print(f"Checks failed with error: {self.message}")
 
 
@@ -94,7 +94,7 @@ class CompetitionNameNotFoundException(ApiException):
 
         self.competition_name = competition_name
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print(f"Competition `{self.competition_name}` not found.")
         _print_contact()
 
@@ -117,12 +117,13 @@ class CrunchNotFoundException(ApiException):
         self.round_number = round_number
         self.competition_name = competition_name
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print("Crunch not found.")
         print("")
         print("The competition may be over or the server is not correctly configured.")
 
         _print_contact()
+
 
 class CurrentPhaseNotFoundException(ApiException):
 
@@ -132,7 +133,7 @@ class CurrentPhaseNotFoundException(ApiException):
     ):
         super().__init__(message)
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print("Current phase not found.")
         print("")
         print("The competition may be over or the server is not correctly configured.")
@@ -151,7 +152,7 @@ class DailySubmissionLimitExceededException(ApiException):
 
         self.limit = limit
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print("Daily submission limit exceeded.")
 
         print(f"\nCurrent limit: {self.limit}")
@@ -170,7 +171,7 @@ class ForbiddenLibraryException(ApiException):
 
         self.packages = packages
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
         print("\nProblematic packages:")
@@ -191,16 +192,22 @@ class InvalidProjectTokenException(ApiException):
 
         self.token_type = token_type
 
-    def print_helper(self):
+    def print_helper(self, competition_name: str = None, **kwargs):
         from .client import Client
 
         print("Your token seems to have expired or is invalid.")
 
-        client = Client.from_env()
-        project_info = utils.read_project_info()
+        if competition_name is None:
+            competition_name = utils.try_get_competition_name()
 
-        print("\nPlease follow this link to copy and paste your new setup command:")
-        print(client.format_web_url(f'/competitions/{project_info.competition_name}/submit'))
+        client = Client.from_env()
+
+        if competition_name is not None:
+            print("\nPlease follow this link to copy and paste your new setup command:")
+            print(client.format_web_url(f'/competitions/{competition_name}/submit'))
+        else:
+            print("\nPlease go on the competition page and get a new setup command:")
+            print(client.format_web_url(f''))
 
         _print_contact()
 
@@ -210,7 +217,7 @@ class NeverSubmittedException(ApiException):
     def __init__(self, message: str):
         super().__init__(message)
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         raise NotImplementedError()
 
 
@@ -227,7 +234,7 @@ class ProjectNotFoundException(ApiException):
         self.competition_id = competition_id
         self.user_id = user_id
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         from .client import Client
 
         print("Project not found.")
@@ -251,7 +258,7 @@ class RunNotFoundException(ApiException):
 
         self.run_id = run_id
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print("Run not found.")
         print("")
         print("The run may have been removed or the project is not the owner.")
@@ -270,7 +277,7 @@ class RestrictedPhaseActionException(ApiException):
 
         self.phase_type = PhaseType[phase_type]
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print(f"This action cannot be done during the {self.phase_type.pretty()} phase.")
 
         _print_contact()
@@ -287,7 +294,7 @@ class RoundNotFoundException(ApiException):
 
         self.round_number = round_number
 
-    def print_helper(self):
+    def print_helper(self, **kwargs):
         print("Round not found.")
         print("")
         print("The competition may be over or the server is not correctly configured.")

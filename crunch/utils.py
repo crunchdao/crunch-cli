@@ -81,7 +81,7 @@ def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
         }, fd)
 
 
-def read_project_info() -> ProjectInfo:
+def read_project_info(raise_if_missing=True) -> ProjectInfo:
     old_content = _read_crunchdao_file(constants.OLD_PROJECT_FILE, False)
     if old_content is not None:
         return ProjectInfo(
@@ -90,15 +90,27 @@ def read_project_info() -> ProjectInfo:
             root["userId"],
         )
 
-    content = _read_crunchdao_file(constants.PROJECT_FILE, True)
+    content = _read_crunchdao_file(constants.PROJECT_FILE, raise_if_missing)
+    if not raise_if_missing and content is None:
+        return None
+
     root = json.loads(content)
 
     # TODO: need of a better system for handling file versions
     return ProjectInfo(
         root["competitionName"],
-        root.get("projectName") or "default", #  backward compatibility
+        root.get("projectName") or "default",  # backward compatibility
         root["userId"],
     )
+
+
+def try_get_competition_name():
+    project_info = read_project_info(False)
+
+    if project_info is None:
+        return None
+
+    return project_info.competition_name
 
 
 def read_token():
@@ -288,7 +300,7 @@ def download(
         raise
 
 
-def exit_via(error: "api.ApiException"):
+def exit_via(error: "api.ApiException", **kwargs):
     print("\n---")
-    error.print_helper()
+    error.print_helper(**kwargs)
     exit(1)
