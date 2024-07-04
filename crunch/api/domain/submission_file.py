@@ -71,6 +71,7 @@ class SubmissionFileCollection(Collection):
             self._client.api.list_submission_files(
                 self.submission.project.competition.id,
                 self.submission.project.user_id,
+                self.submission.project.name,
                 self.submission.number,
             )
         )
@@ -88,11 +89,12 @@ class SubmissionFileEndpointMixin:
         self,
         competition_identifier,
         user_identifier,
+        project_identifier,
         submission_number,
     ):
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/projects/{user_identifier}/submissions/{submission_number}/files"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions/{submission_number}/files"
             ),
             json=True
         )
