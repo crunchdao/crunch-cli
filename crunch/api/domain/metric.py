@@ -22,6 +22,7 @@ class ScorerFunction(enum.Enum):
 
 class ReducerFunction(enum.Enum):
 
+    NONE = "NONE"
     MEAN = "MEAN"
     PRODUCT_PLUS_MINUS_1 = "PRODUCT_PLUS_MINUS_1"
 
