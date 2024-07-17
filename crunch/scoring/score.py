@@ -21,18 +21,16 @@ class ScoredMetricDetail:
     value: float
 
 
-def _call_scorer(
+def _call_scorer_grouped(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
     column_names: api.ColumnNames,
     target_column_names: api.TargetColumnNames,
 ) -> typing.OrderedDict[int, float]:
-    target_column_name = target_column_names.input
-    prediction_column_name = target_column_names.output
-
-    if target_column_name == prediction_column_name:
-        target_column_name += "_x"
-        prediction_column_name += "_y"
+    (
+        target_column_name,
+        prediction_column_name
+    ) = target_column_names.merge_keys
 
     correlation = merged\
         .groupby(column_names.moon, group_keys=False)\
@@ -43,6 +41,75 @@ def _call_scorer(
         ))
 
     return collections.OrderedDict(correlation.items())
+
+
+def _call_scorer_full(
+    scorer: typing.Callable[[pandas.DataFrame, str, str], float],
+    merged: pandas.DataFrame,
+    target_column_names: api.TargetColumnNames,
+) -> typing.OrderedDict[int, float]:
+    (
+        target_column_name,
+        prediction_column_name
+    ) = target_column_names.merge_keys
+
+    return scorer(
+        merged,
+        target_column_name,
+        prediction_column_name,
+    )
+
+
+def _reduce(
+    logger: logging.Logger,
+    target_name: str,
+    all_details: typing.OrderedDict[str, float],
+    y_test_keys: typing.Set[typing.Union[str, int]],
+    metric: api.Metric,
+    scorer: typing.Callable[[pandas.DataFrame, str, str], float],
+    merged: pandas.DataFrame,
+    column_names: api.ColumnNames,
+    target_column_names: api.TargetColumnNames,
+):
+    details = {}
+    for moon, value in all_details.items():
+        popped = True
+
+        if moon in y_test_keys:
+            details[moon] = value
+
+            popped = False
+
+        logger.info(f"score - target_name={target_name} metric_name={metric.name} scorer_function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
+
+    if metric.reducer_function == api.ReducerFunction.NONE:
+        reducer_method = api.ReducerFunction.NONE.name
+
+        filtered = merged[merged[column_names.moon].isin(y_test_keys)]
+
+        value = _call_scorer_full(
+            scorer,
+            filtered,
+            target_column_names
+        )
+    else:
+        values = list(details.values())
+        values_count = len(values)
+
+        if values_count == 0:
+            reducer_method = "no-value"
+            value = None
+        elif values_count == 1:
+            reducer_method = "first"
+            value = values[0]
+        else:
+            reducer_method = metric.reducer_function.name
+            reducer = reducers.REGISTRY[metric.reducer_function]
+            value = reducer(values)
+
+    logger.info(f"score - target_name={target_name} metric_name={metric.name} scorer_function={metric.scorer_function.name} reducer={reducer_method} value={value}")
+
+    return value
 
 
 def score(
@@ -95,39 +162,24 @@ def score(
             logger.warn(f"unknown metric - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name}")
             continue
 
-        all_details = _call_scorer(
+        all_details = _call_scorer_grouped(
             scorer,
             merged,
             column_names,
             target_column_names
         )
 
-        details = {}
-        for moon, value in all_details.items():
-            popped = True
-
-            if moon in y_test_keys:
-                details[moon] = value
-
-                popped = False
-
-            logger.info(f"score - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
-
-        values = list(details.values())
-        values_count = len(values)
-
-        if values_count == 0:
-            reducer_method = "none"
-            value = None
-        elif values_count == 1:
-            reducer_method = "first"
-            value = values[0]
-        else:
-            reducer_method = metric.reducer_function.name
-            reducer = reducers.REGISTRY[metric.reducer_function]
-            value = reducer(values)
-
-        logger.info(f"score - metric={metric.name} scorer={metric.scorer_function.name} reducer={reducer_method} value={value}")
+        value = _reduce(
+            logger,
+            target_name,
+            all_details,
+            y_test_keys,
+            metric,
+            scorer,
+            merged,
+            column_names,
+            target_column_names,
+        )
 
         scores[metric.id] = ScoredMetric(
             value=value,
