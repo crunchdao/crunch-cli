@@ -212,8 +212,7 @@ class LocalRunner(Runner):
                 prediction,
                 self.column_names.id,
                 None,
-                # TODO .prediction does not exists anymore
-                self.column_names.prediction,
+                self.column_names.outputs,
             )
 
         return prediction
