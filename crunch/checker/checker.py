@@ -8,6 +8,14 @@ from . import functions
 
 CheckError = functions.CheckError
 
+
+def _change_message_and_raise(error: CheckError, suffix: str):
+    if not suffix:
+        raise error
+
+    raise CheckError(f"{error} on{suffix}") from error
+
+
 def _filter_checks(
     checks: typing.List[api.Check],
     scope: api.CheckFunctionScope
@@ -45,7 +53,7 @@ def _run_checks(
 
                 if moon is not None:
                     suffix = f" moon={moon}"
-                    
+
                 if prediction_column_name is not None:
                     suffix = f" column=`{prediction_column_name}`"
 
@@ -66,18 +74,13 @@ def _run_checks(
                     parameters
                 )
             except CheckError as error:
-                if moon is None:
-                    raise
-
-                raise CheckError(f"{error} on {column_names.moon}={moon} column={prediction_column_name}") from error
+                _change_message_and_raise(error, suffix)
             except Exception as exception:
-                raise CheckError(
-                    "failed to check"
-                ) from exception
+                raise CheckError("failed to check") from exception
 
         if function_descriptor.column_based:
             for prediction_column_name in column_names.outputs:
-                
+
                 do_call(prediction_column_name)
         else:
             do_call(None)
