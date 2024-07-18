@@ -1,29 +1,35 @@
-import collections
+import logging
 import typing
 
 import networkx
+import numpy
 import pandas
+from tqdm.auto import tqdm
 
-from ... import api
-
-MAPPING = collections.defaultdict(str)
-MAPPING[(0, 0, 0, 1)] = 'Cause of X'
-MAPPING[(1, 0, 0, 0)] = 'Consequence of X'
-MAPPING[(0, 0, 1, 1)] = 'Confounder'
-MAPPING[(1, 1, 0, 0)] = 'Collider'
-MAPPING[(1, 0, 1, 0)] = 'Mediator'
-MAPPING[(0, 0, 0, 0)] = 'Independent'
-MAPPING[(0, 0, 1, 0)] = 'Cause of Y'
-MAPPING[(0, 1, 0, 0)] = 'Consequence of Y'
-
+from ... import api, store
 
 # TODO too specific
 FROM_COLUMN_NAME = "from"
 TO_COLUMN_NAME = "to"
-PARENT_COLUMN_NAME = "parent"
+
+MAPPING = numpy.full(16, -1)
+MAPPING[0b0000] = 1  # 'Independent'
+MAPPING[0b0001] = 2  # 'Cause of X'
+MAPPING[0b0010] = 3  # 'Cause of Y'
+MAPPING[0b0011] = 4  # 'Confounder'
+MAPPING[0b0100] = 5  # 'Consequence of Y'
+MAPPING[0b1000] = 6  # 'Consequence of X'
+MAPPING[0b1010] = 7  # 'Mediator'
+MAPPING[0b1100] = 8  # 'Collider'
 
 
-def get_labels(graph: networkx.Graph):
+def get_labels(
+    key: typing.Union[str, int],
+    pivoted: pandas.DataFrame,
+
+    # do not change, local lookups are faster than globals
+    mapping=MAPPING,
+):
     """
     Classify the nodes of g as "collider", "confounder", etc., wrt the edge X→Y
 
@@ -42,126 +48,121 @@ def get_labels(graph: networkx.Graph):
     - The notions of "confounder", "collider", etc. only make sense for small, textbook graphs.
 
     Input:  g: nx.DiGraph object, with an edge X→Y
-    Output: dictionary, with the edges as keys (excluding 'X' and 'Y'), and
-
-    Example:
-
-        g = random_DAG()
-        g = shuffle_nodes(g)
-        g = highlight_edge(g)
-        get_labels(g)
+    Output: list of tuple, with the edges as keys (excluding 'X' and 'Y'): (dataset_id, node, value)
     """
 
-    assert 'X' in graph.nodes
-    assert 'Y' in graph.nodes
+    graph = networkx.from_pandas_adjacency(pivoted, create_using=networkx.DiGraph)
+    nodes = list(graph.nodes)
+
+    assert 'X' in nodes
+    assert 'Y' in nodes
     assert ('X', 'Y') in graph.edges
     assert networkx.is_directed_acyclic_graph(graph)
 
     A = networkx.adjacency_matrix(graph).todense()
-    A = pandas.DataFrame(A, index=graph.nodes, columns=graph.nodes)
 
-    result = {}
-    for node in graph.nodes:
-        if node in "XY":
-            continue
+    x_index = nodes.index('X')
+    y_index = nodes.index('Y')
 
-        B = A.loc[('X', 'Y', node), :].loc[:, ('X', 'Y', node)]
-        result[node] = MAPPING[tuple(B.values[[0, 1, 2, 2], [2, 2, 1, 0]])]
+    return [
+        (
+            key,
+            node,
+            mapping[
+                (A[x_index, index]) |
+                (A[y_index, index] << 1) |
+                (A[index, y_index] << 2) |
+                (A[index, x_index] << 3)
+            ]
+        )
+        for index, node in enumerate(nodes)
+        if node not in "XY"
+    ]
 
-    return result
 
-
-def process_prediction(
+def _process_prediction(
     prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
 ):
     # TODO support multiple target
-    for targe_column_names in column_names.targets:
-        prediction_column_name = targe_column_names.output
-        
-        prediction = prediction[[
+    prediction_column_name = column_names.first_target.output
+
+    prediction = prediction[[
+        column_names.id,
+        prediction_column_name
+    ]].copy()
+
+    # TODO too specific
+    id_column = prediction[column_names.id].str.split('_')
+    prediction[column_names.id] = id_column.str[:-2].str.join('_')
+    prediction[FROM_COLUMN_NAME] = id_column.str[-2]
+    prediction[TO_COLUMN_NAME] = id_column.str[-1]
+
+    groups = prediction.groupby(column_names.id)
+    if store.debug:
+        groups = tqdm(groups)
+
+    labelss: typing.List[tuple] = []
+    for key, group in groups:
+        pivoted = group.pivot(
+            index=FROM_COLUMN_NAME,
+            columns=TO_COLUMN_NAME,
+            values=prediction_column_name
+        )
+
+        labels = get_labels(key, pivoted)
+        labelss.extend(labels)
+
+    return pandas.DataFrame(
+        labelss,
+        columns=[
+            column_names.moon,
             column_names.id,
             prediction_column_name
-        ]].copy()
-
-        # TODO too specific
-        id_column = prediction[column_names.id].str.split('_')
-        prediction[column_names.id] = id_column.str[:-2].str.join('_')
-        prediction[FROM_COLUMN_NAME] = id_column.str[-2]
-        prediction[TO_COLUMN_NAME] = id_column.str[-1]
-
-        dataframes: typing.List[pandas.DataFrame] = []
-        for key, group in prediction.groupby(column_names.id):
-            group = group.pivot(
-                index=FROM_COLUMN_NAME,
-                columns=TO_COLUMN_NAME,
-                values=prediction_column_name
-            )
-
-            graph = networkx.from_pandas_adjacency(group, create_using=networkx.DiGraph)
-            labels = get_labels(graph)
-
-            dataframe = pandas.Series(labels) \
-                .sort_index() \
-                .to_frame(prediction_column_name) \
-                .reset_index(names=column_names.id)
-
-            dataframe[column_names.moon] = key
-            dataframes.append(dataframe)
-
-        return pandas.concat(dataframes)
+        ]
+    )
 
 
-def process_y(
-    y_test: typing.Dict[str, pandas.DataFrame],
+def _process_y(
+    y_test: typing.Dict[typing.Union[str, int], pandas.DataFrame],
     column_names: api.ColumnNames,
 ):
     # TODO support multiple target
-    for targe_column_names in column_names.targets:
-        target_column_name = targe_column_names.input
+    target_column_name = column_names.first_target.input
 
-        dataframes: typing.List[pandas.DataFrame] = []
-        for key, y in y_test.items():
-            edges = y.set_index(PARENT_COLUMN_NAME).unstack().reset_index()
-            edges.columns = [TO_COLUMN_NAME, FROM_COLUMN_NAME, target_column_name]
+    groups = y_test.items()
+    if store.debug:
+        groups = tqdm(groups)
 
-            group = edges.pivot(
-                index=FROM_COLUMN_NAME,
-                columns=TO_COLUMN_NAME,
-                values=target_column_name
-            )
+    labelss: typing.List[tuple] = []
+    for key, y in groups:
+        labels = get_labels(key, y)
+        labelss.extend(labels)
 
-            graph = networkx.from_pandas_adjacency(group, create_using=networkx.DiGraph)
-            labels = get_labels(graph)
-
-            dataframe = pandas.Series(labels)\
-                .sort_index()\
-                .to_frame(target_column_name)\
-                .reset_index(names=column_names.id)
-
-            dataframe[column_names.moon] = key
-            dataframes.append(dataframe)
-
-        return pandas.concat(dataframes)
+    return pandas.DataFrame(
+        labelss,
+        columns=[
+            column_names.moon,
+            column_names.id,
+            target_column_name
+        ]
+    )
 
 
 def merge(
-    y_test: typing.Dict[str, pandas.DataFrame],
+    y_test: typing.Dict[typing.Union[str, int], pandas.DataFrame],
     prediction: pandas.DataFrame,
     column_names: api.ColumnNames,
 ):
-    prediction = process_prediction(
+    prediction = _process_prediction(
         prediction,
         column_names,
     )
 
-    y_test = process_y(
+    y_test = _process_y(
         y_test,
         column_names,
     )
-
-    # print(prediction)
-    # print(y_test)
 
     return pandas.merge(
         y_test,

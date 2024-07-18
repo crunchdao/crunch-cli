@@ -4,6 +4,7 @@ import logging
 import typing
 
 import pandas
+import warnings
 
 from .. import api
 from . import reducers, scorers
@@ -32,13 +33,17 @@ def _call_scorer_grouped(
         prediction_column_name
     ) = target_column_names.merge_keys
 
-    correlation = merged\
-        .groupby(column_names.moon, group_keys=False)\
-        .apply(lambda group: scorer(
-            group,
-            target_column_name,
-            prediction_column_name,
-        ))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+
+        correlation = merged \
+            .groupby(column_names.moon, group_keys=False) \
+            .apply(lambda group: scorer(
+                group,
+                target_column_name,
+                prediction_column_name,
+            ))
 
     return collections.OrderedDict(correlation.items())
 
@@ -53,11 +58,14 @@ def _call_scorer_full(
         prediction_column_name
     ) = target_column_names.merge_keys
 
-    return scorer(
-        merged,
-        target_column_name,
-        prediction_column_name,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+
+        return scorer(
+            merged,
+            target_column_name,
+            prediction_column_name,
+        )
 
 
 def _reduce(
@@ -121,6 +129,7 @@ def score(
     metrics: typing.List[api.Metric],
     y_test_keys: typing.Collection[typing.Union[int, str]]
 ) -> typing.Dict[int, ScoredMetric]:
+    logger.warn(f"scoring - prediction.len={len(prediction)}")
 
     if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
@@ -143,6 +152,8 @@ def score(
 
     else:
         raise ValueError(f"unsupported competition format: {competition_format}")
+
+    logger.warn(f"merged - merged.len={len(merged)}")
 
     if not len(merged):
         raise ValueError(f"merged dataframe is empty: {merged}")
