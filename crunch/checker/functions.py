@@ -86,7 +86,7 @@ def ids(
         # TODO Too much specific
         if competition_format == api.CompetitionFormat.DAG:
             id_format = f"^(\\d+)_.*?$"
-            id_infos = example_prediction[id_column_name].str.extract(id_format)
+            id_infos = dataframe[id_column_name].str.extract(id_format)
 
             return id_infos[0]
 
