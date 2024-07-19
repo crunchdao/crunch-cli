@@ -77,27 +77,12 @@ def ids(
     DataFrame must already be filtered.
     """
 
-    def extract_ids(dataframe: pandas.DataFrame):
-        column = dataframe[id_column_name]
-
-        if competition_format == api.CompetitionFormat.TIMESERIES:
-            return column
-
-        # TODO Too much specific
-        if competition_format == api.CompetitionFormat.DAG:
-            id_format = f"^(\\d+)_.*?$"
-            id_infos = example_prediction[id_column_name].str.extract(id_format)
-
-            return id_infos[0]
-
-        raise ValueError(f"unsupported competition format: {competition_format}")
-
-    left = extract_ids(prediction)
+    left = prediction[id_column_name]
     if competition_format != api.CompetitionFormat.DAG:
         if left.duplicated().sum() > 0:
             raise CheckError(f"Duplicate ID(s)")
 
-    right = extract_ids(example_prediction)
+    right = example_prediction[id_column_name]
     if set(left) != set(right):
         raise CheckError(f"Different ID(s)")
 
