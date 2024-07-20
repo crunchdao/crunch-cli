@@ -221,6 +221,18 @@ class NeverSubmittedException(ApiException):
         raise NotImplementedError()
 
 
+class PredictionSubmissionNotAllowedException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+    ):
+        super().__init__(message)
+
+    def print_helper(self, **kwargs):
+        print("Prediction submission are not allowed for this competition.")
+
+
 class ProjectNotFoundException(ApiException):
 
     def __init__(

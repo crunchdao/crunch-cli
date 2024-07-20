@@ -1,7 +1,18 @@
 import typing
+import enum
 
 from ..resource import Collection, Model
 from .project import Project
+
+
+class SubmissionType(enum.Enum):
+
+    CODE = "CODE"
+    NOTEBOOK = "NOTEBOOK"
+    PREDICTION = "PREDICTION"
+
+    def __repr__(self):
+        return self.name
 
 
 class Submission(Model):
@@ -83,10 +94,10 @@ class SubmissionCollection(Collection):
         message: str,
         main_file_path: str,
         model_directory_path: str,
-        notebook: bool,
+        type: SubmissionType,
         preferred_packages_version: typing.Dict[str, str],
         files: typing.List[typing.Tuple],
-        sse_handler: typing.Callable[["sseclient.Event"], None]
+        sse_handler: typing.Optional[typing.Callable[["sseclient.Event"], None]] = None
     ):
         return self.prepare_model(
             self._client.api.create_submission(
@@ -96,7 +107,7 @@ class SubmissionCollection(Collection):
                 message,
                 main_file_path,
                 model_directory_path,
-                notebook,
+                type.name,
                 preferred_packages_version,
                 files,
                 sse_handler,
@@ -147,7 +158,7 @@ class SubmissionEndpointMixin:
         message,
         main_file_path,
         model_directory_path,
-        notebook,
+        type,
         preferred_packages_version,
         files,
         sse_handler=None,
@@ -164,7 +175,7 @@ class SubmissionEndpointMixin:
                     "message": message,
                     "mainFilePath": main_file_path,
                     "modelDirectoryPath": model_directory_path,
-                    "notebook": notebook,
+                    "type": type,
                     **{
                         f"preferredPackagesVersion[{key}]": value
                         for key, value in preferred_packages_version.items()
