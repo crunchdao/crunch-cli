@@ -132,7 +132,7 @@ def push(
                         message=message,
                         main_file_path=main_file_path,
                         model_directory_path=model_directory_path,
-                        notebook=False,
+                        type=api.SubmissionType.CODE,
                         preferred_packages_version=installed_packages_version,
                         files=files,
                         sse_handler=sse_handler
@@ -153,9 +153,6 @@ def _print_success(
     print("\n---")
     print(f"submission #{submission.number} succesfully uploaded!")
 
-    project = submission.project
-    competition = project.competition
-
     files = [
         file
         for file in submission.files.list()
@@ -168,7 +165,10 @@ def _print_success(
         for file in files:
             print(f"- {file.name}")
 
-        print()
+    print()
+
+    project = submission.project
+    competition = project.competition
 
     url = client.format_web_url(f"/competitions/{competition.name}/projects/{project.user_id}/{project.name}/submissions/{submission.number}")
-    print(f"Find it on your dashboard: {url}")
+    print(f"find it on your dashboard: {url}")
