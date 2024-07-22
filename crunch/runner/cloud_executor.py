@@ -323,7 +323,7 @@ class SandboxExecutor:
     def filter_train(self, dataframe: pandas.DataFrame):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
             # TODO Use split's key with (index(moon) - embargo)
-            return dataframe[dataframe[self.column_names.moon] < self.moon - self.embargo].copy()
+            return dataframe[dataframe[self.column_names.moon] < self.moon - self.embargo].reset_index()
 
         if self.competition_format == api.CompetitionFormat.DAG:
             dataframe: dict
@@ -344,7 +344,7 @@ class SandboxExecutor:
 
     def filter_test(self, dataframe: pandas.DataFrame):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
-            return dataframe[dataframe[self.column_names.moon] == self.moon].copy()
+            return dataframe[dataframe[self.column_names.moon] == self.moon].reset_index()
 
         if self.competition_format == api.CompetitionFormat.DAG:
             dataframe: dict
