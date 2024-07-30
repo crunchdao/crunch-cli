@@ -44,7 +44,7 @@ class LocalRunner(Runner):
         start = time.time()
 
         try:
-            super().start()
+            return super().start()
         finally:
             logging.warn(
                 'duration - time=%s',
