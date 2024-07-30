@@ -49,4 +49,4 @@ def run(
         write_kwargs,
     )
 
-    runner.start()
+    return runner.start()

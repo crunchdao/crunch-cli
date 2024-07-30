@@ -50,6 +50,8 @@ class Runner(abc.ABC):
 
         self.teardown()
 
+        return prediction
+
     def start_timeseries(self):
         predictions: typing.List[pandas.DataFrame] = []
 
