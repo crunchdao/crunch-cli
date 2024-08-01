@@ -23,6 +23,10 @@ MAPPING[0b1010] = 7  # 'Mediator'
 MAPPING[0b1100] = 8  # 'Collider'
 
 
+class BadGraphError(ValueError):
+    pass
+
+
 def get_labels(
     key: typing.Union[str, int],
     pivoted: pandas.DataFrame,
@@ -54,10 +58,17 @@ def get_labels(
     graph = networkx.from_pandas_adjacency(pivoted, create_using=networkx.DiGraph)
     nodes = list(graph.nodes)
 
-    assert 'X' in nodes
-    assert 'Y' in nodes
-    assert ('X', 'Y') in graph.edges
-    assert networkx.is_directed_acyclic_graph(graph)
+    if 'X' in nodes:
+        raise BadGraphError(f"X not in nodes for dataset `{key}`")
+
+    if 'Y' in nodes:
+        raise BadGraphError(f"Y not in nodes for dataset `{key}`")
+
+    if ('X', 'Y') in graph.edges:
+        raise BadGraphError(f"X and/or Y not in edges for dataset `{key}`")
+
+    if networkx.is_directed_acyclic_graph(graph):
+        raise BadGraphError(f"not a directed acyclic graph for dataset `{key}`")
 
     A = networkx.adjacency_matrix(graph).todense()
 
