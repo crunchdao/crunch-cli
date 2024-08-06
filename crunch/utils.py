@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import typing
+import time
 
 import click
 import joblib
@@ -253,24 +254,22 @@ def get_extension(url: str):
     raise click.Abort()
 
 
-def download(
+def _download_head(
     url: str,
     path: str,
-    log=True,
-    print=print,
-    progress_bar=True,
+    log: bool,
+    print: callable,
 ):
-    url_cut = cut_url(url)
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-
     logged = False
 
     try:
+        # TODO HEAD cannot be done via a presigned GET url
+        # TODO A better approach would be to continue to use the connection
         with requests.get(url, stream=True) as response:
             response.raise_for_status()
 
             file_length = response.headers.get("Content-Length", None)
-            file_length = int(file_length) if not None else None
+            file_length = int(file_length) if file_length is not None else None
 
             if log:
                 if file_length is not None:
@@ -278,26 +277,79 @@ def download(
                 else:
                     file_length_str = "unknown length"
 
-                print(f"download {path} from {url_cut} ({file_length_str})")
+                print(f"download {path} from {cut_url(url)} ({file_length_str})")
                 logged = True
 
-            progress = tqdm.tqdm(
-                total=file_length,
-                unit='iB',
-                unit_scale=True,
-                leave=False,
-                disable=not progress_bar
-            )
+            accept_ranges = response.headers.get("Accept-Ranges", None)
+            accept_ranges = "bytes" == accept_ranges
 
-            with open(path, 'wb') as fd, progress:
-                for chunk in response.iter_content(chunk_size=8192):
-                    progress.update(len(chunk))
-                    fd.write(chunk)
+            return file_length, accept_ranges
     except:
         if log and not logged:
-            print(f"downloading {path} from {url_cut}")
+            print(f"downloading {path} from {cut_url(url)}")
 
         raise
+
+
+def download(
+    url: str,
+    path: str,
+    log=True,
+    print=print,
+    progress_bar=True,
+    max_retry=10,
+):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+
+    file_length, accept_ranges = _download_head(url, path, log, print)
+
+    if not accept_ranges:
+        max_retry = 0
+
+    total_read = 0
+
+    with open(path, 'wb') as fd:
+        for retry in range(max_retry + 1):
+            last = retry == max_retry
+
+            headers = {
+                "Range": f"bytes={total_read}-"
+            } if retry else {}
+
+            try:
+                with requests.get(
+                    url,
+                    stream=True,
+                    headers=headers,
+                    timeout=30,
+                ) as response, open(path, 'wb') as fd:
+                    response.raise_for_status()
+
+                    with tqdm.tqdm(
+                        initial=total_read,
+                        total=file_length,
+                        unit='iB',
+                        unit_scale=True,
+                        leave=False,
+                        disable=not progress_bar
+                    ) as progress:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            read = len(chunk)
+                            total_read += read
+
+                            progress.update(read)
+                            fd.write(chunk)
+
+                    break
+            except (requests.exceptions.ConnectionError, KeyboardInterrupt) as error:
+                if last:
+                    raise
+
+                print(f"retrying {retry + 1}/{max_retry} at {total_read} bytes because of {error.__class__.__name__}: {str(error) or '(no message)'}")
+                time.sleep(1)
+            except BaseException:
+                print("base")
+                raise
 
 
 def exit_via(error: "api.ApiException", **kwargs):
