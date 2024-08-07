@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import subprocess
@@ -36,31 +37,31 @@ def link(tmp_directory: str, path: str, fake: bool = False):
 class CloudRunner(Runner):
 
     def __init__(
-        self,
-        competition: api.Competition,
-        run: api.RunnerRun,
-        # ---
-        context_directory: str,
-        state_file: str,
-        venv_directory: str,
-        data_directory: str,
-        code_directory: str,
-        main_file: str,
-        # ---
-        requirements_txt_path: str,
-        model_directory_path: str,
-        prediction_path: str,
-        trace_path: str,
-        # ---
-        log_secret: str,
-        train_frequency: str,
-        force_first_train: bool,
-        determinism_check_enabled: bool,
-        gpu: bool,
-        crunch_cli_commit_hash: str,
-        # ---
-        max_retry: int,
-        retry_seconds: int
+            self,
+            competition: api.Competition,
+            run: api.RunnerRun,
+            # ---
+            context_directory: str,
+            state_file: str,
+            venv_directory: str,
+            data_directory: str,
+            code_directory: str,
+            main_file: str,
+            # ---
+            requirements_txt_path: str,
+            model_directory_path: str,
+            prediction_path: str,
+            trace_path: str,
+            # ---
+            log_secret: str,
+            train_frequency: str,
+            force_first_train: bool,
+            determinism_check_enabled: bool,
+            gpu: bool,
+            crunch_cli_commit_hash: str,
+            # ---
+            max_retry: int,
+            retry_seconds: int
     ):
         super().__init__(competition.format, determinism_check_enabled)
 
@@ -173,9 +174,9 @@ class CloudRunner(Runner):
         return super().start_timeseries()
 
     def timeseries_loop(
-        self,
-        moon: int,
-        train: bool
+            self,
+            moon: int,
+            train: bool
     ) -> pandas.DataFrame:
         self.report_current("process loop", moon)
 
@@ -191,8 +192,8 @@ class CloudRunner(Runner):
         return super().start_dag()
 
     def dag_loop(
-        self,
-        train: bool
+            self,
+            train: bool
     ):
         return self.sandbox(train, -1)
 
@@ -235,7 +236,8 @@ class CloudRunner(Runner):
             ]
 
             has_model_changed = self.pre_model_files_modification != post_model_files_modification
-            self.log(f"model file_count={len(model_files)} files_size={model_files_size} has_changed={has_model_changed}")
+            self.log(
+                f"model file_count={len(model_files)} files_size={model_files_size} has_changed={has_model_changed}")
 
             if has_model_changed:
                 files.extend((
@@ -324,10 +326,11 @@ class CloudRunner(Runner):
         with open(self.state_file, "w") as fd:
             json.dump(state, fd)
 
-    def do_bash(
-        self,
-        arguments: list,
-        env_vars: dict = None
+    async def do_bash(
+            self,
+            arguments: list,
+            env_vars: dict = None,
+            log_max_lines: int = None
     ):
         env = None
         if env_vars:
@@ -339,18 +342,42 @@ class CloudRunner(Runner):
                     del env[key]
 
         self.log(f"executing command: {' '.join(arguments)}")
-        process = subprocess.Popen(arguments, env=env)
 
-        code = process.wait()
+        process = await asyncio.create_subprocess_exec(
+            arguments[0],
+            arguments[1:],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env
+        )
+
+        nb_line_printed = 0;
+
+        async def read_print_stream(stream, nb_line_printed=0):
+            while True:
+                line = await stream.readline()
+                if line and log_max_lines is not None and nb_line_printed <= log_max_lines:
+                    print(line)
+                    nb_line_printed += 1
+                else:
+                    break
+
+        await asyncio.gather(
+            read_print_stream(process.stdout, nb_line_printed),
+            read_print_stream(process.stderr, nb_line_printed)
+        )
+
+        code = await process.wait()
+
         if code != 0:
             self.log(f"command not exited correctly: {code}", error=True)
             exit(code)
 
     def bash(
-        self,
-        prefix: str,
-        arguments: list,
-        env: dict = None
+            self,
+            prefix: str,
+            arguments: list,
+            env: dict = None
     ):
         arguments = [
             "prefix",
@@ -359,17 +386,17 @@ class CloudRunner(Runner):
             *arguments
         ]
 
-        self.do_bash(arguments, env)
+        asyncio.run(self.do_bash(arguments, env))
 
     def bash2(
-        self,
-        arguments: list
+            self,
+            arguments: list
     ):
         self.bash(arguments[0], arguments)
 
     def pip(
-        self,
-        arguments: list
+            self,
+            arguments: list
     ):
         self.bash(
             "pip",
@@ -386,9 +413,9 @@ class CloudRunner(Runner):
         )
 
     def sandbox(
-        self,
-        train: bool,
-        moon: int
+            self,
+            train: bool,
+            moon: int
     ):
         with tempfile.TemporaryDirectory() as tmpdirname:
             self.bash2(["chmod", "a+rxw", tmpdirname])
@@ -446,6 +473,7 @@ class CloudRunner(Runner):
 
             # TODO move to a dedicated function
             args = []
+
             def append_value(value: typing.Any):
                 if isinstance(value, tuple):
                     for x in value:
@@ -469,7 +497,7 @@ class CloudRunner(Runner):
                     append_value(value)
 
             try:
-                self.do_bash(
+                asyncio.run(self.do_bash(
                     [
                         "sandbox", "-v", self.sandbox_restriction_flag,
                         "--",
@@ -482,8 +510,7 @@ class CloudRunner(Runner):
                     {
                         **self.venv_env,
                         "CRUNCH_AUTO_MONKEY_PATCH": "true",
-                    }
-                )
+                    }, log_max_lines=1000))
             except SystemExit:
                 self.report_trace(moon)
                 raise
@@ -558,9 +585,9 @@ class CloudRunner(Runner):
         return data_urls
 
     def download(
-        self,
-        url: str,
-        path: str
+            self,
+            url: str,
+            path: str
     ):
         return utils.download(
             url,
@@ -570,9 +597,9 @@ class CloudRunner(Runner):
         )
 
     def download_files(
-        self,
-        file_urls: dict,
-        directory_path: str
+            self,
+            file_urls: dict,
+            directory_path: str
     ) -> dict:
         files_modification = {}
         for relative_path, url in file_urls.items():
@@ -585,9 +612,9 @@ class CloudRunner(Runner):
         return files_modification
 
     def report_current(
-        self,
-        work: str,
-        moon: int = None
+            self,
+            work: str,
+            moon: int = None
     ):
         try:
             self.run.report_current(work, moon)
@@ -598,8 +625,8 @@ class CloudRunner(Runner):
             )
 
     def report_trace(
-        self,
-        moon: int
+            self,
+            moon: int
     ):
         try:
             content = "<no trace>"

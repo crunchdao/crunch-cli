@@ -21,3 +21,4 @@ scikit-learn
 scipy
 sseclient-py
 tqdm
+asyncio
