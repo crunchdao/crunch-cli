@@ -334,10 +334,10 @@ def download(
                         disable=not progress_bar
                     ) as progress:
                         for chunk in response.iter_content(chunk_size=8192):
-                            read = len(chunk)
-                            total_read += read
+                            chunk_size = len(chunk)
+                            total_read += chunk_size
 
-                            progress.update(read)
+                            progress.update(chunk_size)
                             fd.write(chunk)
 
                     break
