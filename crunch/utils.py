@@ -347,9 +347,6 @@ def download(
 
                 print(f"retrying {retry + 1}/{max_retry} at {total_read} bytes because of {error.__class__.__name__}: {str(error) or '(no message)'}")
                 time.sleep(1)
-            except BaseException:
-                print("base")
-                raise
 
 
 def exit_via(error: "api.ApiException", **kwargs):
