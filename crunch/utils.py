@@ -322,7 +322,7 @@ def download(
                     stream=True,
                     headers=headers,
                     timeout=30,
-                ) as response, open(path, 'wb') as fd:
+                ) as response:
                     response.raise_for_status()
 
                     with tqdm.tqdm(
