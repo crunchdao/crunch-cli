@@ -4,8 +4,8 @@ import json
 import logging
 import os
 import re
-import typing
 import time
+import typing
 
 import click
 import joblib
@@ -255,6 +255,7 @@ def get_extension(url: str):
 
 
 def _download_head(
+    session: requests.Session,
     url: str,
     path: str,
     log: bool,
@@ -265,7 +266,7 @@ def _download_head(
     try:
         # TODO HEAD cannot be done via a presigned GET url
         # TODO A better approach would be to continue to use the connection
-        with requests.get(url, stream=True) as response:
+        with session.get(url, stream=True) as response:
             response.raise_for_status()
 
             file_length = response.headers.get("Content-Length", None)
@@ -301,7 +302,10 @@ def download(
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
-    file_length, accept_ranges = _download_head(url, path, log, print)
+    session = requests.Session()
+    session.headers["Accept-Encoding"] = "identity"  # GitHub provide the range on the gzip-encoded response instead of re-encoding it
+
+    file_length, accept_ranges = _download_head(session, url, path, log, print)
 
     if not accept_ranges:
         max_retry = 0
@@ -313,11 +317,11 @@ def download(
             last = retry == max_retry
 
             headers = {
-                "Range": f"bytes={total_read}-"
+                "Range": f"bytes={total_read}-",
             } if retry else {}
 
             try:
-                with requests.get(
+                with session.get(
                     url,
                     stream=True,
                     headers=headers,
@@ -333,7 +337,7 @@ def download(
                         leave=False,
                         disable=not progress_bar
                     ) as progress:
-                        for chunk in response.iter_content(chunk_size=8192):
+                        for chunk in response.iter_content(chunk_size=1024 * 16):
                             chunk_size = len(chunk)
                             total_read += chunk_size
 
