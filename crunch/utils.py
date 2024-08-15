@@ -233,9 +233,17 @@ def smart_call(
 
 def cut_url(url: str):
     try:
-        return url[:url.index("?")]
+        url = url[:url.index("?")]
     except ValueError:
-        return url
+        pass
+
+    if url.startswith("http://"):
+        return url[5:]
+
+    if url.startswith("https://"):
+        return url[6:]
+
+    return url
 
 
 def get_extension(url: str):
