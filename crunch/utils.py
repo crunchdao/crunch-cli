@@ -237,11 +237,8 @@ def cut_url(url: str):
     except ValueError:
         pass
 
-    if url.startswith("http://"):
-        return url[5:]
-
-    if url.startswith("https://"):
-        return url[6:]
+    if url.startswith("http://") or url.startswith("https://"):
+        return url.replace("//", "", 1)
 
     return url
 
