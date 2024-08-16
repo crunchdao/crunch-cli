@@ -471,7 +471,10 @@ class CloudRunner(Runner):
             try:
                 self.do_bash(
                     [
-                        "sandbox", "-v", self.sandbox_restriction_flag,
+                        "sandbox",
+                        "--verbose",
+                        "--chown-directory", self.model_directory_path,
+                        self.sandbox_restriction_flag,
                         "--",
                         "prefix", "user-code",
                         "--",
