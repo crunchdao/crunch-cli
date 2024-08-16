@@ -267,32 +267,34 @@ def _download_head(
     print: callable,
 ):
     logged = False
+    response: requests.Response = None
 
     try:
-        # TODO HEAD cannot be done via a presigned GET url
-        # TODO A better approach would be to continue to use the connection
-        with session.get(url, stream=True) as response:
-            response.raise_for_status()
+        response = session.get(url, stream=True)
+        response.raise_for_status()
 
-            file_length = response.headers.get("Content-Length", None)
-            file_length = int(file_length) if file_length is not None else None
+        file_length = response.headers.get("Content-Length", None)
+        file_length = int(file_length) if file_length is not None else None
 
-            if log:
-                if file_length is not None:
-                    file_length_str = f"{file_length} bytes"
-                else:
-                    file_length_str = "unknown length"
+        if log:
+            if file_length is not None:
+                file_length_str = f"{file_length} bytes"
+            else:
+                file_length_str = "unknown length"
 
-                print(f"download {path} from {cut_url(url)} ({file_length_str})")
-                logged = True
+            print(f"download {path} from {cut_url(url)} ({file_length_str})")
+            logged = True
 
-            accept_ranges = response.headers.get("Accept-Ranges", None)
-            accept_ranges = "bytes" == accept_ranges
+        accept_ranges = response.headers.get("Accept-Ranges", None)
+        accept_ranges = "bytes" == accept_ranges
 
-            return file_length, accept_ranges
+        return file_length, accept_ranges, response
     except:
         if log and not logged:
             print(f"downloading {path} from {cut_url(url)}")
+        
+        if response is not None:
+            response.close()
 
         raise
 
@@ -310,7 +312,7 @@ def download(
     session = requests.Session()
     session.headers["Accept-Encoding"] = "identity"  # GitHub provide the range on the gzip-encoded response instead of re-encoding it
 
-    file_length, accept_ranges = _download_head(session, url, path, log, print)
+    file_length, accept_ranges, response = _download_head(session, url, path, log, print)
 
     if not accept_ranges:
         max_retry = 0
@@ -326,36 +328,42 @@ def download(
             } if retry else {}
 
             try:
-                with session.get(
+                response = response or session.get(
                     url,
                     stream=True,
                     headers=headers,
                     timeout=30,
-                ) as response:
-                    response.raise_for_status()
+                )
 
-                    with tqdm.tqdm(
-                        initial=total_read,
-                        total=file_length,
-                        unit='iB',
-                        unit_scale=True,
-                        leave=False,
-                        disable=not progress_bar
-                    ) as progress:
-                        for chunk in response.iter_content(chunk_size=1024 * 16):
-                            chunk_size = len(chunk)
-                            total_read += chunk_size
+                response.raise_for_status()
 
-                            progress.update(chunk_size)
-                            fd.write(chunk)
+                with tqdm.tqdm(
+                    initial=total_read,
+                    total=file_length,
+                    unit='iB',
+                    unit_scale=True,
+                    leave=False,
+                    disable=not progress_bar
+                ) as progress:
+                    for chunk in response.iter_content(chunk_size=1024 * 16):
+                        chunk_size = len(chunk)
+                        total_read += chunk_size
 
-                    break
+                        progress.update(chunk_size)
+                        fd.write(chunk)
+
+                break
             except (requests.exceptions.ConnectionError, KeyboardInterrupt) as error:
                 if last:
                     raise
 
                 print(f"retrying {retry + 1}/{max_retry} at {total_read} bytes because of {error.__class__.__name__}: {str(error) or '(no message)'}")
                 time.sleep(1)
+            finally:
+                if response is not None:
+                    response.close()
+
+                response = None
 
 
 def exit_via(error: "api.ApiException", **kwargs):
