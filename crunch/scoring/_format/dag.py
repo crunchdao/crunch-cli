@@ -80,10 +80,10 @@ def get_labels(
             key,
             node,
             mapping[
-                (A[x_index, index]) |
-                (A[y_index, index] << 1) |
-                (A[index, y_index] << 2) |
-                (A[index, x_index] << 3)
+                (A[x_index, index] << 3) |
+                (A[y_index, index] << 2) |
+                (A[index, y_index] << 1) |
+                (A[index, x_index])
             ]
         )
         for index, node in enumerate(nodes)
