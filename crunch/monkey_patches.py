@@ -1,9 +1,6 @@
 import functools
 import os
-import pathlib
-import logging
 import sys
-
 
 _APPLIED = False
 
@@ -15,6 +12,7 @@ def apply_all():
         return
 
     io_no_tty()
+    tqdm_init()
     tqdm_display()
     pathlib_str_functions()
     keras_model_verbosity()
@@ -32,6 +30,25 @@ def io_no_tty():
     for io in [sys.stdin, sys.stdout, sys.stderr]:
         if io:
             io.isatty = lambda: False
+
+
+TQDM_MININTERVAL = 10
+
+
+def tqdm_init():
+    import tqdm
+
+    original = tqdm.tqdm.__init__
+
+    def patched(*args, **kwargs):
+        mininterval = kwargs.get("mininterval")
+        if mininterval is None or not isinstance(mininterval, (int, float)) or mininterval < TQDM_MININTERVAL:
+            kwargs = kwargs.copy()
+            kwargs["mininterval"] = TQDM_MININTERVAL
+
+        return original(*args, **kwargs)
+
+    tqdm.tqdm.__init__ = patched
 
 
 def tqdm_display():
@@ -55,6 +72,8 @@ def tqdm_display():
 
 
 def pathlib_str_functions():
+    import pathlib
+
     functions = [
         str.startswith,
         str.endswith
@@ -121,6 +140,8 @@ def catboost_info_directory():
 
 
 def logging_file_handler():
+    import logging
+
     original = logging.FileHandler.__init__
 
     def patched(self: logging.FileHandler, filename: str, *args, **kwargs):
@@ -138,5 +159,5 @@ def pycaret_internal_logging():
         import pycaret.internal.logging
     except ModuleNotFoundError:
         return
-    
+
     pycaret.internal.logging.LOGGER = pycaret.internal.logging.create_logger("/dev/stdout")
