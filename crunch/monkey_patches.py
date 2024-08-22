@@ -34,6 +34,9 @@ def io_no_tty():
             io.isatty = lambda: False
 
 
+TQDM_MININTERVAL = 10
+
+
 def tqdm_display():
     import tqdm
 
@@ -48,7 +51,8 @@ def tqdm_display():
 
     tqdm.tqdm.__init__ = functools.partialmethod(
         tqdm.tqdm.__init__,
-        bar_format='{l_bar}{r_bar}'
+        bar_format='{l_bar}{r_bar}',
+        mininterval=TQDM_MININTERVAL,
     )
 
     tqdm.tqdm.display = tqdm_display
