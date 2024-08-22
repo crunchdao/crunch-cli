@@ -15,6 +15,7 @@ def apply_all():
         return
 
     io_no_tty()
+    tqdm_init()
     tqdm_display()
     pathlib_str_functions()
     keras_model_verbosity()
@@ -37,6 +38,22 @@ def io_no_tty():
 TQDM_MININTERVAL = 10
 
 
+def tqdm_init():
+    import tqdm
+
+    original = tqdm.tqdm.__init__
+
+    def patched(*args, **kwargs):
+        mininterval = kwargs.get("mininterval")
+        if mininterval is None or not isinstance(mininterval, (int, float)) or mininterval < TQDM_MININTERVAL:
+            kwargs = kwargs.copy()
+            kwargs["mininterval"] = TQDM_MININTERVAL
+
+        return original(*args, **kwargs)
+
+    tqdm.tqdm.__init__ = patched
+
+
 def tqdm_display():
     import tqdm
 
@@ -49,19 +66,11 @@ def tqdm_display():
 
         print(f"[tqdm:{pos}] {msg}")
 
-    original_init = tqdm.tqdm.__init__
+    tqdm.tqdm.__init__ = functools.partialmethod(
+        tqdm.tqdm.__init__,
+        bar_format='{l_bar}{r_bar}'
+    )
 
-    def patched_init(*args, **kwargs):
-        kwargs = kwargs.copy()
-        kwargs["bar_format"] = '{l_bar}{r_bar}'
-
-        mininterval = kwargs.get("mininterval")
-        if mininterval is None or not isinstance(mininterval, (int, float)) or mininterval < TQDM_MININTERVAL:
-            kwargs["mininterval"] = TQDM_MININTERVAL
-
-        return original_init(*args, **kwargs)
-
-    tqdm.tqdm.__init__ = patched_init
     tqdm.tqdm.display = tqdm_display
 
 
