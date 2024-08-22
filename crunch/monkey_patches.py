@@ -49,12 +49,19 @@ def tqdm_display():
 
         print(f"[tqdm:{pos}] {msg}")
 
-    tqdm.tqdm.__init__ = functools.partialmethod(
-        tqdm.tqdm.__init__,
-        bar_format='{l_bar}{r_bar}',
-        mininterval=TQDM_MININTERVAL,
-    )
+    original_init = tqdm.tqdm.__init__
 
+    def patched_init(*args, **kwargs):
+        kwargs = kwargs.copy()
+        kwargs["bar_format"] = '{l_bar}{r_bar}'
+
+        mininterval = kwargs.get("mininterval")
+        if mininterval is None or not isinstance(mininterval, (int, float)) or mininterval < TQDM_MININTERVAL:
+            kwargs["mininterval"] = TQDM_MININTERVAL
+
+        return original_init(*args, **kwargs)
+
+    tqdm.tqdm.__init__ = patched_init
     tqdm.tqdm.display = tqdm_display
 
 
@@ -142,5 +149,5 @@ def pycaret_internal_logging():
         import pycaret.internal.logging
     except ModuleNotFoundError:
         return
-    
+
     pycaret.internal.logging.LOGGER = pycaret.internal.logging.create_logger("/dev/stdout")
