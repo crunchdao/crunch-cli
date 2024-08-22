@@ -1,9 +1,6 @@
 import functools
 import os
-import pathlib
-import logging
 import sys
-
 
 _APPLIED = False
 
@@ -75,6 +72,8 @@ def tqdm_display():
 
 
 def pathlib_str_functions():
+    import pathlib
+
     functions = [
         str.startswith,
         str.endswith
@@ -141,6 +140,8 @@ def catboost_info_directory():
 
 
 def logging_file_handler():
+    import logging
+
     original = logging.FileHandler.__init__
 
     def patched(self: logging.FileHandler, filename: str, *args, **kwargs):
