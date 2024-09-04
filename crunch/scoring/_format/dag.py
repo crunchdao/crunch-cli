@@ -55,8 +55,8 @@ def get_labels(
     Output: list of tuple, with the edges as keys (excluding 'X' and 'Y'): (dataset_id, node, value)
     """
 
+    nodes = pivoted.columns.to_list()
     graph = networkx.from_pandas_adjacency(pivoted, create_using=networkx.DiGraph)
-    nodes = list(graph.nodes)
 
     if 'X' not in nodes:
         raise BadGraphError(f"X not in nodes for dataset `{key}`")
@@ -70,7 +70,7 @@ def get_labels(
     if not networkx.is_directed_acyclic_graph(graph):
         raise BadGraphError(f"not a directed acyclic graph for dataset `{key}`")
 
-    A = networkx.adjacency_matrix(graph).todense()
+    A = pivoted.values
 
     x_index = nodes.index('X')
     y_index = nodes.index('Y')
