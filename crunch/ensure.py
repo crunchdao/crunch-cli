@@ -19,6 +19,12 @@ def is_dataframe(input, name: str):
         raise click.Abort()
 
 
+def is_number(input, name: str):
+    if not isinstance(input, (int, float)):
+        logging.error(f"`%s` must be a number", name)
+        raise click.Abort()
+
+
 def return_infer(
     result,
     id_column_name: str,

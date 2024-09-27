@@ -1,4 +1,5 @@
 import abc
+import functools
 import typing
 
 import pandas
@@ -36,9 +37,13 @@ class Runner(abc.ABC):
             self.log("starting dag process...")
             prediction = self.start_dag()
 
+        elif self.competition_format == api.CompetitionFormat.STREAM:
+            self.log("starting stream loop...")
+            prediction = self.start_stream()
+
         else:
             raise ValueError(f"unsupported: {self.competition_format}")
-        
+
         if self.determinism_check_enabled:
             if self.deterministic:
                 self.log(f"determinism check: passed")
@@ -100,6 +105,42 @@ class Runner(abc.ABC):
     def dag_loop(
         self,
         train: bool
+    ) -> pandas.DataFrame:
+        ...
+
+    def start_stream(self):
+        predictions: typing.List[pandas.DataFrame] = []
+
+        target_column_names = self.column_names.targets
+        for index, target_column_name in enumerate(target_column_names):
+            self.log(f"looping stream=`{target_column_name.name}` ({index + 1}/{len(target_column_names)})")
+
+            prediction = self.stream_loop(target_column_name)
+
+            if self.deterministic:
+                prediction2 = self.stream_loop(target_column_name)
+                self.deterministic = prediction.equals(prediction2)
+                self.log(f"deterministic: {str(self.deterministic).lower()}")
+
+            predictions.append(prediction)
+
+        def merge(left: pandas.DataFrame, right: pandas.DataFrame):
+            return pandas.merge(
+                left,
+                right,
+                how="outer",
+                on=[
+                    self.column_names.moon,
+                    self.column_names.id
+                ]
+            )
+
+        return functools.reduce(merge, predictions)
+
+    @abc.abstractmethod
+    def stream_loop(
+        self,
+        target_column_name: api.TargetColumnNames,
     ) -> pandas.DataFrame:
         ...
 

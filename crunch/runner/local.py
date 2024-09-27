@@ -8,7 +8,7 @@ import pandas
 
 from .. import (api, checker, command, constants, ensure, monkey_patches,
                 tester, utils)
-from .runner import Runner, Columns
+from .runner import Columns, Runner
 
 
 class LocalRunner(Runner):
@@ -63,13 +63,26 @@ class LocalRunner(Runner):
         tester.install_logger()
         monkey_patches.display_add()
 
+    def _find_functions(self):
+        if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.DAG]:
+            self.train_function = ensure.is_function(self.module, "train")
+            self.infer_function = ensure.is_function(self.module, "infer")
+
+        elif self.competition_format == api.CompetitionFormat.STREAM:
+            self.load_function = ensure.is_function(self.module, "load")
+            self.tick_function = ensure.is_function(self.module, "tick")
+            self.predict_function = ensure.is_function(self.module, "predict")
+            self.dump_function = ensure.is_function(self.module, "dump")
+
+        else:
+            raise ValueError(f"unsupported competition format: {self.competition_format}")
+
     def initialize(self):
         logging.info('running local test')
         logging.warning("internet access isn't restricted, no check will be done")
         logging.info("")
 
-        self.train_function = ensure.is_function(self.module, "train")
-        self.infer_function = ensure.is_function(self.module, "infer")
+        self._find_functions()
 
         try:
             (
@@ -92,7 +105,7 @@ class LocalRunner(Runner):
             command.download_no_data_available()
             raise click.Abort()
 
-        if self.competition_format == api.CompetitionFormat.TIMESERIES:
+        if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.STREAM]:
             self.full_x = pandas.concat([
                 utils.read(self.x_train_path, kwargs=self.read_kwargs),
                 utils.read(self.x_test_path, kwargs=self.read_kwargs),
@@ -106,6 +119,7 @@ class LocalRunner(Runner):
             else:
                 self.full_y = utils.read(self.y_train_path, kwargs=self.read_kwargs)
 
+        if self.competition_format == api.CompetitionFormat.TIMESERIES:
             for dataframe in [self.full_x, self.full_y]:
                 dataframe.set_index(self.column_names.moon, drop=True, inplace=True)
 
@@ -216,6 +230,74 @@ class LocalRunner(Runner):
             )
 
         return prediction
+
+    def stream_loop(
+        self,
+        target_column_name: api.TargetColumnNames,
+    ) -> pandas.DataFrame:
+        default_values = {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "id_column_name": self.column_names.id,
+            "moon_column_name": self.column_names.moon,
+            "target_column_name": target_column_name.input,
+            "prediction_column_name": target_column_name.output,
+            "column_names": self.column_names,
+            "stream_name": target_column_name.name,
+            "embargo": self.embargo,
+            "has_gpu": self.has_gpu,
+            **self.features.to_parameter_variants(),
+        }
+
+        if True:
+            state = utils.smart_call(
+                self.load_function,
+                default_values
+            )
+
+        default_values["state"] = default_values["self"] = state
+
+        x = self.full_x[[
+            self.column_names.id,
+            self.column_names.moon,
+            target_column_name.input,
+        ]].copy()
+
+        logging.warning('call: tick and predict')
+
+        predicteds = []
+        for value in x[target_column_name.input]:
+            utils.smart_call(
+                self.tick_function,
+                default_values,
+                {
+                    "x": value,
+                    "X": value,
+                    "value": value,
+                }
+            )
+
+            k = 100  # TODO hardcoded value
+            predicted = utils.smart_call(
+                self.predict_function,
+                default_values,
+                {
+                    "k": k,
+                }
+            )
+
+            ensure.is_number(
+                predicted,
+                "predicted"
+            )
+
+            predicteds.append(predicted)
+
+        return pandas.DataFrame({
+            self.column_names.moon: x[self.column_names.moon],
+            self.column_names.id: x[self.column_names.id],
+            target_column_name.output: x[target_column_name.input],
+        })
 
     def finalize(self, prediction: pandas.DataFrame):
         prediction_path = os.path.join(
