@@ -129,7 +129,7 @@ def score(
     metrics: typing.List[api.Metric],
     y_test_keys: typing.Collection[typing.Union[int, str]]
 ) -> typing.Dict[int, ScoredMetric]:
-    logger.warn(f"scoring - prediction.len={len(prediction)}")
+    logger.warning(f"scoring - prediction.len={len(prediction)}")
 
     if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
@@ -153,7 +153,7 @@ def score(
     else:
         raise ValueError(f"unsupported competition format: {competition_format}")
 
-    logger.warn(f"merged - merged.len={len(merged)}")
+    logger.warning(f"merged - merged.len={len(merged)}")
 
     if not len(merged):
         raise ValueError(f"merged dataframe is empty: {merged}")
@@ -165,12 +165,12 @@ def score(
 
         target_column_names = column_names.get_target_by_name(target_name)
         if target_column_names is None:
-            logger.warn(f"unknown target column names - target_name={target_name} known_target_names={list(column_names.target_names)}")
+            logger.warning(f"unknown target column names - target_name={target_name} known_target_names={list(column_names.target_names)}")
             continue
 
         scorer = scorers.REGISTRY.get(metric.scorer_function)
         if scorer is None:
-            logger.warn(f"unknown metric - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name}")
+            logger.warning(f"unknown metric - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name}")
             continue
 
         all_details = _call_scorer_grouped(

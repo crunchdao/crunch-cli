@@ -38,9 +38,9 @@ def test(
     )
 
     if prediction is not None:
-        logging.warn('prediction=\n%s', prediction)
-        logging.warn('')
-        logging.warn('local test succesfully run!')
-        logging.warn('')
+        logging.warning('prediction=\n%s', prediction)
+        logging.warning('')
+        logging.warning('local test succesfully run!')
+        logging.warning('')
 
     return prediction

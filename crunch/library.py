@@ -116,4 +116,4 @@ def scan(
         logging.error('forbidden library: %s', package)
 
     if not len(forbidden):
-        logging.warn('no forbidden library found')
+        logging.warning('no forbidden library found')

@@ -46,13 +46,13 @@ class LocalRunner(Runner):
         try:
             return super().start()
         finally:
-            logging.warn(
+            logging.warning(
                 'duration - time=%s',
                 time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
             )
 
             memory_after = utils.get_process_memory()
-            logging.warn(
+            logging.warning(
                 'memory - before="%s" after="%s" consumed="%s"',
                 utils.format_bytes(memory_before),
                 utils.format_bytes(memory_after),
@@ -65,7 +65,7 @@ class LocalRunner(Runner):
 
     def initialize(self):
         logging.info('running local test')
-        logging.warn("internet access isn't restricted, no check will be done")
+        logging.warning("internet access isn't restricted, no check will be done")
         logging.info("")
 
         self.train_function = ensure.is_function(self.module, "train")
@@ -142,7 +142,7 @@ class LocalRunner(Runner):
         }
 
         if train:
-            logging.warn('call: train')
+            logging.warning('call: train')
             x_train = self.filter_embargo(self.full_x, moon)
             y_train = self.filter_embargo(self.full_y, moon)
 
@@ -154,7 +154,7 @@ class LocalRunner(Runner):
             })
 
         if True:
-            logging.warn('call: infer')
+            logging.warning('call: infer')
             x_test = self.filter_at(self.full_x, moon)
 
             prediction = utils.smart_call(self.infer_function, default_values, {
@@ -193,7 +193,7 @@ class LocalRunner(Runner):
         }
 
         if train:
-            logging.warn('call: train')
+            logging.warning('call: train')
             utils.smart_call(self.train_function, default_values, {
                 "X_train": x_train,
                 "x_train": x_train,
@@ -202,7 +202,7 @@ class LocalRunner(Runner):
             })
 
         if True:
-            logging.warn('call: infer')
+            logging.warning('call: infer')
             prediction = utils.smart_call(self.infer_function, default_values, {
                 "X_test": x_test,
                 "x_test": x_test,
@@ -223,7 +223,7 @@ class LocalRunner(Runner):
             "prediction.csv"
         )
 
-        logging.warn('save prediction - path=%s', prediction_path)
+        logging.warning('save prediction - path=%s', prediction_path)
         utils.write(prediction, prediction_path, kwargs={
             "index": False,
             **self.write_kwargs
@@ -240,7 +240,7 @@ class LocalRunner(Runner):
                     logging,
                 )
 
-                logging.warn(f"prediction is valid")
+                logging.warning(f"prediction is valid")
             except checker.CheckError as error:
                 if not isinstance(error.__cause__, checker.CheckError):
                     logging.exception(

@@ -64,7 +64,7 @@ class _Inline:
         try:
             library.scan(module=self.module)
 
-            logging.warn('')
+            logging.warning('')
 
             return tester.run(
                 self.module,
