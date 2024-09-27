@@ -1,4 +1,5 @@
 import logging
+import types
 import typing
 
 import click
@@ -22,6 +23,12 @@ def is_dataframe(input, name: str):
 def is_number(input, name: str):
     if not isinstance(input, (int, float)):
         logging.error(f"`%s` must be a number", name)
+        raise click.Abort()
+
+
+def is_generator(input, name: str):
+    if not isinstance(input, types.GeneratorType):
+        logging.error(f"`%s` must use yield", name)
         raise click.Abort()
 
 

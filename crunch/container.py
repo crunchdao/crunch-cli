@@ -1,4 +1,5 @@
 import collections
+import types
 import typing
 
 if typing.TYPE_CHECKING:
@@ -109,3 +110,78 @@ class Features:
             data_release.features,
             data_release.default_feature_group
         )
+
+
+class GeneratorWrapper:
+
+    ERROR_YIELD_MUST_BE_CALLED_BEFORE = "yield must be called once before the loop"
+    ERROR_PREVIOUS_VALUE_NOT_YIELD = "previous value not yield-ed"
+    ERROR_YIELD_NOT_CALLED = "yield not called"
+    ERROR_FIRST_YIELD_MUST_BE_NONE = "first yield must return None"
+    ERROR_MULTIPLE_YIELD = "multiple yield detected"
+    ERROR_WRONG_YIELD_CALL_COUNT_PREFIX = "yield not called enough time"
+
+    def __init__(
+        self,
+        iterators: typing.List[typing.Iterator],
+        consumer_factory: typing.Callable[[typing.Iterator], typing.Generator]
+    ):
+        self.ready = None
+        self.consumed = True
+
+        def inner():
+            zipped = zip(*iterators) if len(iterators) > 1 else iterators[0]
+
+            for value in zipped:
+                if self.ready is None:
+                    raise RuntimeError(self.ERROR_YIELD_MUST_BE_CALLED_BEFORE)
+
+                if not self.ready:
+                    raise RuntimeError(self.ERROR_PREVIOUS_VALUE_NOT_YIELD)
+
+                self.ready = False
+                self.consumed = False
+
+                yield value
+
+        stream = inner()
+        consumer = consumer_factory(stream)
+
+        if not isinstance(consumer, types.GeneratorType):
+            raise RuntimeError(self.ERROR_YIELD_NOT_CALLED)
+
+        if next(consumer) is not None:
+            raise ValueError(self.ERROR_FIRST_YIELD_MUST_BE_NONE)
+
+        self.ready = True
+        self.consumer = consumer
+
+    def collect(
+        self,
+        expected_size: int
+    ):
+        collected = []
+
+        for y in self.consumer:
+            collected.append(y)
+            self.ready = True
+
+            if self.consumed:
+                raise RuntimeError(self.ERROR_MULTIPLE_YIELD)
+
+            self.consumed = True
+
+        size = len(collected)
+        if size != expected_size:
+            raise ValueError(f"{self.ERROR_WRONG_YIELD_CALL_COUNT_PREFIX} ({size} / {expected_size})")
+
+        return collected
+
+    @staticmethod
+    def iterate(value: typing.Iterable):
+        return iter(value)
+
+    @staticmethod
+    def constant(value: typing.Any):
+        while True:
+            yield value

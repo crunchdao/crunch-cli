@@ -131,7 +131,7 @@ def score(
 ) -> typing.Dict[int, ScoredMetric]:
     logger.warning(f"scoring - prediction.len={len(prediction)}")
 
-    if competition_format == api.CompetitionFormat.TIMESERIES:
+    if competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.STREAM]:
         from ._format.timeseries import merge
 
         merged = merge(
