@@ -190,6 +190,9 @@ class _undefined:
     pass
 
 
+_smart_call_ignore = set()
+
+
 def smart_call(
     function: callable,
     default_values: dict,
@@ -202,11 +205,13 @@ def smart_call(
     }
 
     def warn(message: str):
-        if log:
-            logging.warn(f"{function.__name__}: {message}")
+        if log and message not in _smart_call_ignore:
+            _smart_call_ignore.add(message)
+            logging.warning(f"{function.__name__}: {message}")
 
     def debug(message: str):
-        if log:
+        if log and message not in _smart_call_ignore:
+            _smart_call_ignore.add(message)
             logging.debug(f"{function.__name__}: {message}")
 
     arguments = {}
@@ -292,7 +297,7 @@ def _download_head(
     except:
         if log and not logged:
             print(f"downloading {path} from {cut_url(url)}")
-        
+
         if response is not None:
             response.close()
 
