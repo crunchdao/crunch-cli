@@ -15,7 +15,7 @@ import pandas
 import requests
 
 from .. import api, checker, container, orthogonalization, scoring, utils
-from ..container import Columns, Features
+from ..container import Columns, Features, CallableIterable
 from ..orthogonalization import _runner as orthogonalization_runner
 
 
@@ -238,7 +238,9 @@ class SandboxExecutor:
         else:
             self.reset_trace()
 
-        write(prediction, self.prediction_path)
+        produce_nothing = self.train and self.competition_format == api.CompetitionFormat.STREAM
+        if not produce_nothing:
+            write(prediction, self.prediction_path)
 
     def process_linear(
         self,
@@ -316,47 +318,47 @@ class SandboxExecutor:
             "embargo": self.embargo,
             "has_gpu": self.gpu,
             "has_trained": self.train,
+            "horizon": 2,  # TODO load from competition
             **self.features.to_parameter_variants(),
         }
 
-        # TODO Implement train
-        # if self.train:
-        #     utils.smart_call(
-        #         train_function,
-        #         default_values,
-        #         {
-        #             "X_train": x_train,
-        #             "x_train": x_train,
-        #             "Y_train": y_train,
-        #             "y_train": y_train,
-        #         },
-        #         log=False
-        #     )
+        if self.train:
+            streams = [
+                CallableIterable.from_dataframe(x_train, target_column_name.input)
+                for target_column_name in self.column_names.targets
+            ]
 
-        # trained.value = True
-        # if self.orthogonalization_data_path:
-        #     orthogonalization_runner.restore()
-
-        wrapper = container.GeneratorWrapper(
-            [
-                container.GeneratorWrapper.constant(100),  # k
-                container.GeneratorWrapper.iterate(x_test[target_column_name.input]),
-            ],
-            lambda stream: utils.smart_call(
-                infer_function,
-                default_values, {
-                    "stream": stream,
-                }
+            utils.smart_call(
+                train_function,
+                default_values,
+                {
+                    "streams": streams,
+                },
+                log=False
             )
-        )
 
-        predicteds = wrapper.collect(len(x_test))
+            return None
+        else:
+            wrapper = container.GeneratorWrapper(
+                [
+                    # container.GeneratorWrapper.constant(100),  # k
+                    container.GeneratorWrapper.iterate(x_test[target_column_name.input]),
+                ],
+                lambda stream: utils.smart_call(
+                    infer_function,
+                    default_values, {
+                        "stream": stream,
+                    }
+                )
+            )
 
-        return pandas.DataFrame({
-            self.column_names.moon: x_test[self.column_names.moon],
-            self.column_names.id: x_test[self.column_names.id],
-            target_column_name.output: predicteds,
-        })
+            predicteds = wrapper.collect(len(x_test))
+
+            return pandas.DataFrame({
+                self.column_names.moon: x_test[self.column_names.moon],
+                self.column_names.id: x_test[self.column_names.id],
+                target_column_name.output: predicteds,
+            })
 
     def filter_train(self, dataframe: pandas.DataFrame):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
@@ -366,22 +368,10 @@ class SandboxExecutor:
 
             return dataframe
 
-        if self.competition_format == api.CompetitionFormat.DAG:
-            dataframe: dict
-
-            keys = [
-                split.key
-                for split in self.splits
-                if split.group == api.DataReleaseSplitGroup.TRAIN
-            ]
-
-            return {
-                key: value
-                for key, value in dataframe.items()
-                if key in keys
-            }
-
-        raise ValueError(f"unsupported: {self.competition_format}")
+        return self._filter_at_keys(
+            api.DataReleaseSplitGroup.TRAIN,
+            dataframe
+        )
 
     def filter_test(self, dataframe: pandas.DataFrame):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
@@ -390,10 +380,20 @@ class SandboxExecutor:
 
             return dataframe
 
+        return self._filter_at_keys(
+            api.DataReleaseSplitGroup.TEST,
+            dataframe
+        )
+
+    def _filter_at_keys(
+        self,
+        group: api.DataReleaseSplitGroup,
+        dataframe: pandas.DataFrame
+    ):
         keys = {
             split.key
             for split in self.splits
-            if split.group == api.DataReleaseSplitGroup.TEST
+            if split.group == group
         }
 
         if self.competition_format == api.CompetitionFormat.DAG:
@@ -404,15 +404,16 @@ class SandboxExecutor:
                 for key, value in dataframe.items()
                 if key in keys
             }
-        
-        if self.competition_format == api.CompetitionFormat.STREAM:
-            target_column_name = self.column_names.get_target_by_name(self.loop_key)
 
-            dataframe = dataframe[[
-                self.column_names.moon,
-                self.column_names.id,
-                target_column_name.input,
-            ]]
+        if self.competition_format == api.CompetitionFormat.STREAM:
+            if not self.train:
+                target_column_name = self.column_names.get_target_by_name(self.loop_key)
+
+                dataframe = dataframe[[
+                    self.column_names.moon,
+                    self.column_names.id,
+                    target_column_name.input,
+                ]]
 
             dataframe = dataframe[dataframe[self.column_names.moon].isin(keys)]
 

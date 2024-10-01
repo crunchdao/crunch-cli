@@ -5,7 +5,6 @@ import typing
 import pandas
 
 from .. import api
-from ..container import Columns
 
 
 class Runner(abc.ABC):
@@ -111,6 +110,9 @@ class Runner(abc.ABC):
     def start_stream(self):
         predictions: typing.List[pandas.DataFrame] = []
 
+        if not self.have_model:
+            self.stream_no_model()
+
         target_column_names = self.column_names.targets
         for index, target_column_name in enumerate(target_column_names):
             self.log(f"looping stream=`{target_column_name.name}` ({index + 1}/{len(target_column_names)})")
@@ -136,6 +138,15 @@ class Runner(abc.ABC):
             )
 
         return functools.reduce(merge, predictions)
+
+    def stream_have_model(self):
+        return self.have_model
+
+    @abc.abstractmethod
+    def stream_no_model(
+        self,
+    ) -> pandas.DataFrame:
+        ...
 
     @abc.abstractmethod
     def stream_loop(

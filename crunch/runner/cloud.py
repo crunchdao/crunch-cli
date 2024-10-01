@@ -201,6 +201,14 @@ class CloudRunner(Runner):
 
         return super().start_stream()
 
+    def stream_no_model(
+        self,
+    ) -> pandas.DataFrame:
+        return self.sandbox(
+            True,
+            -1
+        )
+
     def stream_loop(
         self,
         target_column_name: api.TargetColumnNames,

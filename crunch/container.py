@@ -3,6 +3,8 @@ import types
 import typing
 
 if typing.TYPE_CHECKING:
+    import pandas
+
     from . import api
 
 STORAGE_PROPERTY = "_storage"
@@ -185,3 +187,36 @@ class GeneratorWrapper:
     def constant(value: typing.Any):
         while True:
             yield value
+
+
+class CallableIterable:
+
+    def __init__(
+        self,
+        getter: typing.Callable[[], typing.Iterator],
+        length: int,
+    ):
+        self._getter = getter
+        self._length = length
+
+    def __iter__(self):
+        return self._getter()
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return f"iterable[{self._length}]"
+
+    def __len__(self):
+        return self._length
+
+    @staticmethod
+    def from_dataframe(
+        dataframe: "pandas.DataFrame",
+        column_name: str
+    ):
+        return CallableIterable(
+            lambda: dataframe[column_name].copy(),
+            len(dataframe)
+        )

@@ -8,8 +8,8 @@ import pandas
 
 from .. import (api, checker, command, constants, ensure, monkey_patches,
                 tester, utils)
-from ..container import GeneratorWrapper
-from .runner import Columns, Runner
+from ..container import CallableIterable, Columns, GeneratorWrapper
+from .runner import Runner
 
 
 class LocalRunner(Runner):
@@ -219,23 +219,45 @@ class LocalRunner(Runner):
 
         return prediction
 
+    def _get_stream_default_values(self):
+        return {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "column_names": self.column_names,
+            "embargo": self.embargo,
+            "has_gpu": self.has_gpu,
+            "horizon": 2,  # TODO load from competition parameters
+            **self.features.to_parameter_variants(),
+        }
+
+    def stream_have_model(self):
+        return True
+
+    def stream_no_model(
+        self,
+    ) -> pandas.DataFrame:
+        default_values = self._get_stream_default_values()
+
+        streams = [
+            CallableIterable.from_dataframe(self.full_x, target_column_name.input)
+            for target_column_name in self.column_names.targets
+        ]
+
+        logging.warning('call: train')
+
+        utils.smart_call(
+            self.train_function,
+            default_values,
+            {
+                "streams": streams,
+            }
+        )
+
     def stream_loop(
         self,
         target_column_name: api.TargetColumnNames,
     ) -> pandas.DataFrame:
-        default_values = {
-            "number_of_features": self.number_of_features,
-            "model_directory_path": self.model_directory_path,
-            "id_column_name": self.column_names.id,
-            "moon_column_name": self.column_names.moon,
-            "target_column_name": target_column_name.input,
-            "prediction_column_name": target_column_name.output,
-            "column_names": self.column_names,
-            "stream_name": target_column_name.name,
-            "embargo": self.embargo,
-            "has_gpu": self.has_gpu,
-            **self.features.to_parameter_variants(),
-        }
+        default_values = self._get_stream_default_values()
 
         x_data = self.full_x[[
             self.column_names.id,
@@ -243,27 +265,23 @@ class LocalRunner(Runner):
             target_column_name.input,
         ]].copy()
 
-        if True:
-            logging.warning('call: train')
-            # TODO Call train
+        logging.warning('call: infer')
 
-        if True:
-            logging.warning('call: infer')
-
-            wrapper = GeneratorWrapper(
-                [
-                    GeneratorWrapper.constant(100),  # k
-                    GeneratorWrapper.iterate(x_data[target_column_name.input]),
-                ],
-                lambda stream: utils.smart_call(
-                    self.infer_function,
-                    default_values, {
-                        "stream": stream,
-                    }
-                )
+        wrapper = GeneratorWrapper(
+            [
+                # GeneratorWrapper.constant(100),  # k
+                GeneratorWrapper.iterate(x_data[target_column_name.input]),
+            ],
+            lambda stream: utils.smart_call(
+                self.infer_function,
+                default_values,
+                {
+                    "stream": stream,
+                }
             )
+        )
 
-            predicteds = wrapper.collect(len(x_data))
+        predicteds = wrapper.collect(len(x_data))
 
         return pandas.DataFrame({
             self.column_names.moon: x_data[self.column_names.moon],
