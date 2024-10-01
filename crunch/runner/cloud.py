@@ -204,9 +204,10 @@ class CloudRunner(Runner):
     def stream_no_model(
         self,
     ) -> pandas.DataFrame:
-        return self.sandbox(
+        self.sandbox(
             True,
-            -1
+            -1,
+            return_result=False,
         )
 
     def stream_loop(
@@ -410,7 +411,8 @@ class CloudRunner(Runner):
     def sandbox(
         self,
         train: bool,
-        loop_key: typing.Union[int, str]
+        loop_key: typing.Union[int, str],
+        return_result=True,
     ):
         with tempfile.TemporaryDirectory() as tmpdirname:
             self.bash2(["chmod", "a+rxw", tmpdirname])
@@ -514,7 +516,8 @@ class CloudRunner(Runner):
                 self.report_trace(loop_key)
                 raise
 
-        return utils.read(self.prediction_path)
+        if return_result:
+            return utils.read(self.prediction_path)
 
     @property
     def venv_env(self):
