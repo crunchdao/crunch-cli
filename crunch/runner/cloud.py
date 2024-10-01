@@ -195,6 +195,29 @@ class CloudRunner(Runner):
         train: bool
     ):
         return self.sandbox(train, -1)
+    
+    def start_stream(self):
+        self.create_trace_file()
+
+        return super().start_stream()
+
+    def stream_no_model(
+        self,
+    ) -> pandas.DataFrame:
+        self.sandbox(
+            True,
+            -1,
+            return_result=False,
+        )
+
+    def stream_loop(
+        self,
+        target_column_name: api.TargetColumnNames,
+    ) -> pandas.DataFrame:
+        return self.sandbox(
+            False,
+            target_column_name.name
+        )
 
     def finalize(self, prediction: pandas.DataFrame):
         self.report_current("upload result")
@@ -388,7 +411,8 @@ class CloudRunner(Runner):
     def sandbox(
         self,
         train: bool,
-        moon: int
+        loop_key: typing.Union[int, str],
+        return_result=True,
     ):
         with tempfile.TemporaryDirectory() as tmpdirname:
             self.bash2(["chmod", "a+rxw", tmpdirname])
@@ -410,6 +434,7 @@ class CloudRunner(Runner):
             options = {
                 "competition-name": self.competition.name,
                 "competition-format": self.competition.format.name,
+                "split-key-type": self.competition.split_key_type.name,
                 # ---
                 "x": x_tmp_path,
                 "y": y_tmp_path,
@@ -431,7 +456,7 @@ class CloudRunner(Runner):
                 ],
                 # ---
                 "train": train,
-                "moon": moon,
+                "loop-key": loop_key,
                 "embargo": self.embargo,
                 "number-of-features": self.number_of_features,
                 "gpu": self.gpu,
@@ -488,10 +513,11 @@ class CloudRunner(Runner):
                     }
                 )
             except SystemExit:
-                self.report_trace(moon)
+                self.report_trace(loop_key)
                 raise
 
-        return utils.read(self.prediction_path)
+        if return_result:
+            return utils.read(self.prediction_path)
 
     @property
     def venv_env(self):

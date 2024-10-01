@@ -14,9 +14,9 @@ import typing
 import pandas
 import requests
 
-from .. import api, checker, orthogonalization, scoring
+from .. import api, checker, container, orthogonalization, scoring, utils
+from ..container import Columns, Features, CallableIterable
 from ..orthogonalization import _runner as orthogonalization_runner
-from ..container import Columns, Features
 
 
 class Reference:
@@ -27,40 +27,6 @@ class Reference:
 
 class undefined:
     pass
-
-
-def timeit(params: list):
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            kwargs.update(zip(
-                func.__code__.co_varnames[:func.__code__.co_argcount],
-                args
-            ))
-
-            start_time = time.perf_counter()
-            try:
-                return func(**kwargs)
-            finally:
-                end_time = time.perf_counter()
-                total_time = end_time - start_time
-
-                if params is not None:
-                    arguments = ", ".join([
-                        str(value) if name in params else "..."
-                        for name, value in kwargs.items()
-                    ])
-
-                    print(f'[debug] {func.__name__}({arguments}) took {total_time:.4f} seconds', file=sys.stderr)
-                else:
-                    print(f'[debug] {func.__name__} took {total_time:.4f} seconds', file=sys.stderr)
-
-        return wrapper
-
-    return decorator
-
-
-timeit_noarg = timeit(None)
 
 
 def ensure_function(module, name: str):
@@ -83,7 +49,7 @@ def ensure_dataframe(input, name: str):
         raise ValueError(f"{name} must be a dataframe")
 
 
-@timeit(["path"])
+@utils.timeit(["path"])
 def read(path: str, then_delete: bool) -> pandas.DataFrame:
     if path is None:
         return None
@@ -113,7 +79,7 @@ def delete(path: str):
         os.remove(path)
 
 
-@timeit(["path"])
+@utils.timeit(["path"])
 def write(dataframe: pandas.DataFrame, path: str) -> None:
     if path.endswith(".parquet"):
         dataframe.to_parquet(path, index=False)
@@ -121,48 +87,16 @@ def write(dataframe: pandas.DataFrame, path: str) -> None:
         dataframe.to_csv(path, index=False)
 
 
-@timeit([])
+@utils.timeit([])
 def ping(urls: typing.List[str]):
     for url in urls:
         try:
             requests.get(url)
 
             print(f"managed to have access to the internet: {url}", file=sys.stderr)
-            exit(1)
+            # exit(1)
         except requests.exceptions.RequestException as e:
             pass
-
-
-def call(function: callable, default_values: dict, specific_values: dict):
-    values = {
-        **default_values,
-        **specific_values
-    }
-
-    def error(message: str, level="debug"):
-        print(f"[{level}] {function.__name__}: {message}", file=sys.stderr)
-
-    arguments = {}
-    for name, parameter in inspect.signature(function).parameters.items():
-        name_str = str(parameter)
-        if name_str.startswith("*"):
-            error(f"unsupported parameter: {name_str}")
-            continue
-
-        if parameter.default != inspect.Parameter.empty:
-            error(f"skip parameter with default value: {name}={parameter.default}")
-            continue
-
-        value = values.get(name, undefined)
-        if value is undefined:
-            error(f"unknown parameter: {name}")
-            value = None
-
-        error(f"set {name}={value.__class__.__name__}", level="trace")
-        arguments[name] = value
-
-    handler = timeit_noarg(function)
-    return handler(**arguments)
 
 
 class SandboxExecutor:
@@ -186,7 +120,7 @@ class SandboxExecutor:
         ping_urls: typing.List[str],
         # ---
         train: bool,
-        moon: int,
+        loop_key: typing.Union[int, str],
         embargo: int,
         number_of_features: int,
         gpu: bool,
@@ -210,7 +144,7 @@ class SandboxExecutor:
         self.ping_urls = ping_urls
 
         self.train = train
-        self.moon = moon
+        self.loop_key = loop_key
         self.embargo = embargo
         self.number_of_features = number_of_features
         self.gpu = gpu
@@ -249,6 +183,9 @@ class SandboxExecutor:
                     y_raw = self.filter_train(full_y_raw)
 
                 self.setup_orthogonalization(y_train, y_raw, trained)
+        else:
+            x_train = None
+            y_train = None
 
         delete(self.y_path)
         delete(self.y_raw_path)
@@ -273,99 +210,214 @@ class SandboxExecutor:
 
             train_function = ensure_function(module, "train")
             infer_function = ensure_function(module, "infer")
-            
-            target_column_names, prediction_column_names = Columns.from_model(self.column_names)
 
-            default_values = {
-                "number_of_features": self.number_of_features,
-                "model_directory_path": self.model_directory_path,
-                "id_column_name": self.column_names.id,
-                "moon_column_name": self.column_names.moon,
-                "target_column_name": self.column_names.first_target.input,
-                "target_column_names": target_column_names,
-                "prediction_column_name": self.column_names.first_target.output,
-                "prediction_column_names": prediction_column_names,
-                "column_names": self.column_names,
-                "moon": self.moon,
-                "current_moon": self.moon,
-                "embargo": self.embargo,
-                "has_gpu": self.gpu,
-                "has_trained": self.train,
-                **self.features.to_parameter_variants(),
-            }
+            if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.DAG]:
+                prediction = self.process_linear(
+                    train_function,
+                    infer_function,
+                    x_train,
+                    y_train,
+                    x_test,
+                    trained
+                )
 
-            if self.train:
-                call(train_function, default_values, {
-                    "X_train": x_train,
-                    "x_train": x_train,
-                    "Y_train": y_train,
-                    "y_train": y_train,
-                })
+            elif self.competition_format == api.CompetitionFormat.STREAM:
+                prediction = self.process_async(
+                    train_function,
+                    infer_function,
+                    x_train,
+                    y_train,
+                    x_test
+                )
 
-                trained.value = True
-                if self.orthogonalization_data_path:
-                    orthogonalization_runner.restore()
-
-            prediction = call(infer_function, default_values, {
-                "X_test": x_test,
-                "x_test": x_test,
-            })
-
-            ensure_dataframe(prediction, "prediction")
+            else:
+                raise ValueError(f"unsupported competition format: {self.competition_format}")
         except BaseException:
             self.write_trace(sys.exc_info())
             raise
         else:
             self.reset_trace()
 
-        write(prediction, self.prediction_path)
+        produce_nothing = self.train and self.competition_format == api.CompetitionFormat.STREAM
+        if not produce_nothing:
+            write(prediction, self.prediction_path)
+
+    def process_linear(
+        self,
+        train_function: callable,
+        infer_function: callable,
+        x_train: typing.Union[pandas.DataFrame, typing.Dict[str, pandas.DataFrame]],
+        y_train: typing.Union[pandas.DataFrame, typing.Dict[str, pandas.DataFrame]],
+        x_test: typing.Union[pandas.DataFrame, typing.Dict[str, pandas.DataFrame]],
+        trained: Reference
+    ):
+        target_column_names, prediction_column_names = Columns.from_model(self.column_names)
+
+        default_values = {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "id_column_name": self.column_names.id,
+            "moon_column_name": self.column_names.moon,
+            "target_column_name": self.column_names.first_target.input,
+            "target_column_names": target_column_names,
+            "prediction_column_name": self.column_names.first_target.output,
+            "prediction_column_names": prediction_column_names,
+            "column_names": self.column_names,
+            "moon": self.loop_key,
+            "current_moon": self.loop_key,
+            "embargo": self.embargo,
+            "has_gpu": self.gpu,
+            "has_trained": self.train,
+            **self.features.to_parameter_variants(),
+        }
+
+        if self.train:
+            utils.smart_call(
+                train_function,
+                default_values,
+                {
+                    "X_train": x_train,
+                    "x_train": x_train,
+                    "Y_train": y_train,
+                    "y_train": y_train,
+                },
+                log=False
+            )
+
+            trained.value = True
+            if self.orthogonalization_data_path:
+                orthogonalization_runner.restore()
+
+        prediction = utils.smart_call(
+            infer_function,
+            default_values,
+            {
+                "X_test": x_test,
+                "x_test": x_test,
+            },
+            log=False
+        )
+
+        ensure_dataframe(prediction, "prediction")
+        return prediction
+
+    def process_async(
+        self,
+        train_function: callable,
+        infer_function: callable,
+        x_train: pandas.DataFrame,
+        y_train: pandas.DataFrame,
+        x_test: pandas.DataFrame
+    ):
+        target_column_name = self.column_names.get_target_by_name(self.loop_key)
+
+        default_values = {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "stream_name": self.loop_key,
+            "embargo": self.embargo,
+            "has_gpu": self.gpu,
+            "has_trained": self.train,
+            "horizon": 2,  # TODO load from competition
+            **self.features.to_parameter_variants(),
+        }
+
+        if self.train:
+            streams = [
+                CallableIterable.from_dataframe(x_train, target_column_name.input)
+                for target_column_name in self.column_names.targets
+            ]
+
+            utils.smart_call(
+                train_function,
+                default_values,
+                {
+                    "streams": streams,
+                },
+                log=False
+            )
+
+            return None
+        else:
+            wrapper = container.GeneratorWrapper(
+                [
+                    # container.GeneratorWrapper.constant(100),  # k
+                    container.GeneratorWrapper.iterate(x_test[target_column_name.input]),
+                ],
+                lambda stream: utils.smart_call(
+                    infer_function,
+                    default_values, {
+                        "stream": stream,
+                    }
+                )
+            )
+
+            predicteds = wrapper.collect(len(x_test))
+
+            return pandas.DataFrame({
+                self.column_names.moon: x_test[self.column_names.moon],
+                self.column_names.id: x_test[self.column_names.id],
+                target_column_name.output: predicteds,
+            })
 
     def filter_train(self, dataframe: pandas.DataFrame):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
             # TODO Use split's key with (index(moon) - embargo)
-            dataframe = dataframe[dataframe[self.column_names.moon] < self.moon - self.embargo].copy()
+            dataframe = dataframe[dataframe[self.column_names.moon] < self.loop_key - self.embargo].copy()
             dataframe.reset_index(inplace=True, drop=True)
 
             return dataframe
 
-        if self.competition_format == api.CompetitionFormat.DAG:
-            dataframe: dict
-
-            keys = [
-                split.key
-                for split in self.splits
-                if split.group == api.DataReleaseSplitGroup.TRAIN
-            ]
-
-            return {
-                key: value
-                for key, value in dataframe.items()
-                if key in keys
-            }
-
-        raise ValueError(f"unsupported: {self.competition_format}")
+        return self._filter_at_keys(
+            api.DataReleaseSplitGroup.TRAIN,
+            dataframe
+        )
 
     def filter_test(self, dataframe: pandas.DataFrame):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
-            dataframe = dataframe[dataframe[self.column_names.moon] == self.moon].copy()
+            dataframe = dataframe[dataframe[self.column_names.moon] == self.loop_key].copy()
             dataframe.reset_index(inplace=True, drop=True)
 
             return dataframe
 
+        return self._filter_at_keys(
+            api.DataReleaseSplitGroup.TEST,
+            dataframe
+        )
+
+    def _filter_at_keys(
+        self,
+        group: api.DataReleaseSplitGroup,
+        dataframe: pandas.DataFrame
+    ):
+        keys = {
+            split.key
+            for split in self.splits
+            if split.group == group
+        }
+
         if self.competition_format == api.CompetitionFormat.DAG:
             dataframe: dict
-
-            keys = [
-                split.key
-                for split in self.splits
-                if split.group == api.DataReleaseSplitGroup.TEST
-            ]
 
             return {
                 key: value
                 for key, value in dataframe.items()
                 if key in keys
             }
+
+        if self.competition_format == api.CompetitionFormat.STREAM:
+            if not self.train:
+                target_column_name = self.column_names.get_target_by_name(self.loop_key)
+
+                dataframe = dataframe[[
+                    self.column_names.moon,
+                    self.column_names.id,
+                    target_column_name.input,
+                ]]
+
+            dataframe = dataframe[dataframe[self.column_names.moon].isin(keys)]
+
+            return dataframe.copy()
 
         raise ValueError(f"unsupported: {self.competition_format}")
 

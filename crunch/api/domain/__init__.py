@@ -22,7 +22,10 @@ from .data_release import (
     OriginalFiles,
     DataFile,
 )
-from .enum_ import Language
+from .enum_ import (
+    Language,
+    SplitKeyType,
+)
 from .library import (
     Library,
     LibraryListInclude,

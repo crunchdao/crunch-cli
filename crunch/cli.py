@@ -484,7 +484,7 @@ def cloud(
     requirements_txt_path = os.path.join(code_directory, "requirements.txt")
     model_directory_path = os.path.join(code_directory, model_directory)
 
-    prediction_file_name = "prediction.csv"
+    prediction_file_name = "prediction.parquet"
     prediction_path = os.path.join(context_directory, prediction_file_name)
 
     trace_file_name = "trace.txt"
@@ -530,6 +530,7 @@ def cloud(
 @runner_group.command(help="Cloud executor, do not directly run!")
 @click.option("--competition-name", required=True)
 @click.option("--competition-format", required=True)
+@click.option("--split-key-type", required=True)
 # ---
 @click.option("--x", "x_path", required=True)
 @click.option("--y", "y_path", required=True)
@@ -545,7 +546,7 @@ def cloud(
 @click.option("--ping-url", "ping_urls", multiple=True)
 # ---
 @click.option("--train", required=True, type=bool)
-@click.option("--moon", required=True, type=int)
+@click.option("--loop-key", required=True, type=str)
 @click.option("--embargo", required=True, type=int)
 @click.option("--number-of-features", required=True, type=int)
 @click.option("--gpu", required=True, type=bool)
@@ -556,6 +557,7 @@ def cloud(
 def cloud_executor(
     competition_name: str,
     competition_format: str,
+    split_key_type: str,
     # ---
     x_path: str,
     y_path: str,
@@ -571,7 +573,7 @@ def cloud_executor(
     ping_urls: typing.List[str],
     # ---
     train: bool,
-    moon: int,
+    loop_key: str,
     embargo: int,
     number_of_features: int,
     gpu: bool,
@@ -587,6 +589,10 @@ def cloud_executor(
 
     from . import monkey_patches
     monkey_patches.apply_all()
+
+    split_key_type = api.SplitKeyType[split_key_type]
+    if split_key_type == api.SplitKeyType.INTEGER:
+        loop_key = int(loop_key)
 
     from .runner.cloud_executor import SandboxExecutor
     executor = SandboxExecutor(
@@ -607,7 +613,7 @@ def cloud_executor(
         ping_urls,
         # ---
         train,
-        moon,
+        loop_key,
         embargo,
         number_of_features,
         gpu,

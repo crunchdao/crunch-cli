@@ -79,13 +79,15 @@ class _Inline:
                 read_kwargs,
                 write_kwargs,
             )
+        except KeyboardInterrupt:
+            logging.error(f"Cancelled!")
         except click.Abort as abort:
             logging.error(f"Aborted!")
 
             if raise_abort:
                 raise abort
 
-            return None
+        return None
 
     def alpha_score(
         self,

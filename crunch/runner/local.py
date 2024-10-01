@@ -8,7 +8,8 @@ import pandas
 
 from .. import (api, checker, command, constants, ensure, monkey_patches,
                 tester, utils)
-from .runner import Runner, Columns
+from ..container import CallableIterable, Columns, GeneratorWrapper
+from .runner import Runner
 
 
 class LocalRunner(Runner):
@@ -92,7 +93,7 @@ class LocalRunner(Runner):
             command.download_no_data_available()
             raise click.Abort()
 
-        if self.competition_format == api.CompetitionFormat.TIMESERIES:
+        if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.STREAM]:
             self.full_x = pandas.concat([
                 utils.read(self.x_train_path, kwargs=self.read_kwargs),
                 utils.read(self.x_test_path, kwargs=self.read_kwargs),
@@ -106,6 +107,7 @@ class LocalRunner(Runner):
             else:
                 self.full_y = utils.read(self.y_train_path, kwargs=self.read_kwargs)
 
+        if self.competition_format == api.CompetitionFormat.TIMESERIES:
             for dataframe in [self.full_x, self.full_y]:
                 dataframe.set_index(self.column_names.moon, drop=True, inplace=True)
 
@@ -216,6 +218,76 @@ class LocalRunner(Runner):
             )
 
         return prediction
+
+    def _get_stream_default_values(self):
+        return {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "column_names": self.column_names,
+            "embargo": self.embargo,
+            "has_gpu": self.has_gpu,
+            "horizon": 2,  # TODO load from competition parameters
+            **self.features.to_parameter_variants(),
+        }
+
+    def stream_have_model(self):
+        return True
+
+    def stream_no_model(
+        self,
+    ) -> pandas.DataFrame:
+        default_values = self._get_stream_default_values()
+
+        streams = [
+            CallableIterable.from_dataframe(self.full_x, target_column_name.input)
+            for target_column_name in self.column_names.targets
+        ]
+
+        logging.warning('call: train')
+
+        utils.smart_call(
+            self.train_function,
+            default_values,
+            {
+                "streams": streams,
+            }
+        )
+
+    def stream_loop(
+        self,
+        target_column_name: api.TargetColumnNames,
+    ) -> pandas.DataFrame:
+        default_values = self._get_stream_default_values()
+
+        x_data = self.full_x[[
+            self.column_names.id,
+            self.column_names.moon,
+            target_column_name.input,
+        ]].copy()
+
+        logging.warning('call: infer')
+
+        wrapper = GeneratorWrapper(
+            [
+                # GeneratorWrapper.constant(100),  # k
+                GeneratorWrapper.iterate(x_data[target_column_name.input]),
+            ],
+            lambda stream: utils.smart_call(
+                self.infer_function,
+                default_values,
+                {
+                    "stream": stream,
+                }
+            )
+        )
+
+        predicteds = wrapper.collect(len(x_data))
+
+        return pandas.DataFrame({
+            self.column_names.moon: x_data[self.column_names.moon],
+            self.column_names.id: x_data[self.column_names.id],
+            target_column_name.output: predicteds,
+        })
 
     def finalize(self, prediction: pandas.DataFrame):
         prediction_path = os.path.join(
