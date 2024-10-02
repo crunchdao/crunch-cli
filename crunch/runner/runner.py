@@ -126,18 +126,7 @@ class Runner(abc.ABC):
 
             predictions.append(prediction)
 
-        def merge(left: pandas.DataFrame, right: pandas.DataFrame):
-            return pandas.merge(
-                left,
-                right,
-                how="outer",
-                on=[
-                    self.column_names.moon,
-                    self.column_names.id
-                ]
-            )
-
-        return functools.reduce(merge, predictions)
+        return pandas.concat(predictions)
 
     def stream_have_model(self):
         return self.have_model

@@ -221,6 +221,7 @@ class TargetColumnNames:
 
     id: int
     name: str
+    side: str
     input: str
     output: str
 
@@ -247,6 +248,9 @@ class ColumnNames:
 
     id: str
     moon: str
+    side: str
+    input: str
+    output: str
     targets: typing.List[TargetColumnNames]
 
     @property

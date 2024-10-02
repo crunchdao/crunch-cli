@@ -93,7 +93,7 @@ class LocalRunner(Runner):
             command.download_no_data_available()
             raise click.Abort()
 
-        if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.STREAM]:
+        if self.competition_format == api.CompetitionFormat.TIMESERIES:
             self.full_x = pandas.concat([
                 utils.read(self.x_train_path, kwargs=self.read_kwargs),
                 utils.read(self.x_test_path, kwargs=self.read_kwargs),
@@ -107,7 +107,19 @@ class LocalRunner(Runner):
             else:
                 self.full_y = utils.read(self.y_train_path, kwargs=self.read_kwargs)
 
-        if self.competition_format == api.CompetitionFormat.TIMESERIES:
+            self.full_x = pandas.concat([
+                utils.read(self.x_train_path, kwargs=self.read_kwargs),
+                utils.read(self.x_test_path, kwargs=self.read_kwargs),
+            ])
+
+            if self.y_test_path:
+                self.full_y = pandas.concat([
+                    utils.read(self.y_train_path, kwargs=self.read_kwargs),
+                    utils.read(self.y_test_path, kwargs=self.read_kwargs),
+                ])
+            else:
+                self.full_y = utils.read(self.y_train_path, kwargs=self.read_kwargs)
+
             for dataframe in [self.full_x, self.full_y]:
                 dataframe.set_index(self.column_names.moon, drop=True, inplace=True)
 
@@ -219,6 +231,15 @@ class LocalRunner(Runner):
 
         return prediction
 
+    def start_stream(self):
+        self.x_test = utils.read(self.x_test_path, kwargs=self.read_kwargs)
+        # self.x_test = pandas.concat([
+        #     utils.read(self.x_train_path, kwargs=self.read_kwargs),
+        #     self.x_test
+        # ])
+
+        return super().start_stream()
+
     def _get_stream_default_values(self):
         return {
             "number_of_features": self.number_of_features,
@@ -237,13 +258,20 @@ class LocalRunner(Runner):
         self,
     ) -> pandas.DataFrame:
         default_values = self._get_stream_default_values()
+        stream_names = set(self.column_names.target_names)
 
-        streams = [
-            CallableIterable.from_dataframe(self.full_x, target_column_name.input)
-            for target_column_name in self.column_names.targets
-        ]
+        x_train = utils.read(self.x_train_path, kwargs=self.read_kwargs)
 
-        logging.warning('call: train')
+        streams = []
+        for stream_name, group in x_train.groupby(self.column_names.id):
+            if stream_name not in stream_names:
+                continue
+
+            parts = utils.split_at_nans(group, self.column_names.side)
+            for part in parts:
+                streams.append(CallableIterable.from_dataframe(part, self.column_names.side))
+
+        logging.warning(f'call: train - stream.len={len(streams)}')
 
         utils.smart_call(
             self.train_function,
@@ -259,29 +287,40 @@ class LocalRunner(Runner):
     ) -> pandas.DataFrame:
         default_values = self._get_stream_default_values()
 
-        x_data = self.full_x[[
-            self.column_names.id,
+        x_data = self.x_test[[
             self.column_names.moon,
-            target_column_name.input,
-        ]].copy()
+            self.column_names.id,
+            self.column_names.side,
+        ]]
 
-        logging.warning('call: infer')
+        x_data = x_data[x_data[self.column_names.id] == target_column_name.name]
 
-        wrapper = GeneratorWrapper(
-            [
-                # GeneratorWrapper.constant(100),  # k
-                GeneratorWrapper.iterate(x_data[target_column_name.input]),
-            ],
-            lambda stream: utils.smart_call(
-                self.infer_function,
-                default_values,
-                {
-                    "stream": stream,
-                }
+        stream_datas = [
+            part[self.column_names.side]
+            for part in utils.split_at_nans(x_data, self.column_names.side)
+        ]
+
+        predicteds = []
+        for index, stream_data in enumerate(stream_datas):
+            logging.warning(f'call: infer ({index+ 1}/{len(stream_datas)})')
+
+            wrapper = GeneratorWrapper(
+                [
+                    GeneratorWrapper.iterate(stream_data),
+                ],
+                lambda stream: utils.smart_call(
+                    self.infer_function,
+                    default_values,
+                    {
+                        "stream": stream,
+                    }
+                )
             )
-        )
 
-        predicteds = wrapper.collect(len(x_data))
+            collecteds = wrapper.collect(len(stream_data))
+            predicteds.extend(collecteds)
+
+        x_data.dropna(subset=[self.column_names.side], inplace=True)
 
         return pandas.DataFrame({
             self.column_names.moon: x_data[self.column_names.moon],

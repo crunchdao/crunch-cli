@@ -411,3 +411,24 @@ def timeit(params: list):
 
 
 timeit_noarg = timeit(None)
+
+
+def split_at_nans(
+    dataframe: pandas.DataFrame,
+    column_name: str,
+    keep_empty=False,
+):
+    dataframe = dataframe.reset_index(drop=True)
+
+    indices = dataframe.index[dataframe[column_name].isna()].tolist()
+    indices = [-1] + indices + [len(dataframe)]
+
+    parts = []
+    for i in range(len(indices) - 1):
+        start = indices[i] + 1
+        end = indices[i + 1]
+
+        if start != end or keep_empty:
+            parts.append(dataframe.iloc[start:end])
+    
+    return parts
