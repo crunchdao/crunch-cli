@@ -134,7 +134,7 @@ class Runner(abc.ABC):
     @abc.abstractmethod
     def stream_no_model(
         self,
-    ) -> pandas.DataFrame:
+    ):
         ...
 
     @abc.abstractmethod

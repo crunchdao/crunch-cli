@@ -221,9 +221,9 @@ class TargetColumnNames:
 
     id: int
     name: str
-    side: str
-    input: str
-    output: str
+    side: typing.Optional[str]
+    input: typing.Optional[str]
+    output: typing.Optional[str]
 
     @property
     def merge_keys(self):
@@ -248,9 +248,9 @@ class ColumnNames:
 
     id: str
     moon: str
-    side: str
-    input: str
-    output: str
+    side: typing.Optional[str]
+    input: typing.Optional[str]
+    output: typing.Optional[str]
     targets: typing.List[TargetColumnNames]
 
     @property

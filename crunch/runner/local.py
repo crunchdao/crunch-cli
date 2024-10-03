@@ -256,7 +256,7 @@ class LocalRunner(Runner):
 
     def stream_no_model(
         self,
-    ) -> pandas.DataFrame:
+    ):
         default_values = self._get_stream_default_values()
         stream_names = set(self.column_names.target_names)
 
