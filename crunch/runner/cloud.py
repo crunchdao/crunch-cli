@@ -463,8 +463,16 @@ class CloudRunner(Runner):
                 # ---
                 "id-column-name": self.column_names.id,
                 "moon-column-name": self.column_names.moon,
+                "side-column-name": self.column_names.side or "",
+                "input-column-name": self.column_names.input or "",
+                "output-column-name": self.column_names.output or "",
                 "target": [
-                    (target_column_names.name, target_column_names.input, target_column_names.output)
+                    (
+                        target_column_names.name,
+                        target_column_names.side or "",
+                        target_column_names.input or "",
+                        target_column_names.output or ""
+                    )
                     for target_column_names in self.column_names.targets
                 ],
             }

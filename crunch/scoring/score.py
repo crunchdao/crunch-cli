@@ -2,9 +2,9 @@ import collections
 import dataclasses
 import logging
 import typing
+import warnings
 
 import pandas
-import warnings
 
 from .. import api
 from . import reducers, scorers
@@ -22,6 +22,23 @@ class ScoredMetricDetail:
     value: float
 
 
+def merge_keys(
+    column_names: api.ColumnNames,
+    target_column_names: api.TargetColumnNames,
+):
+    input = target_column_names.input or column_names.input
+    output = target_column_names.output or column_names.output
+
+    if input == output:
+        input += "_x"
+        output += "_y"
+
+    return (
+        input,
+        output,
+    )
+
+
 def _call_scorer_grouped(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
@@ -31,8 +48,7 @@ def _call_scorer_grouped(
     (
         target_column_name,
         prediction_column_name
-    ) = target_column_names.merge_keys
-
+    ) = merge_keys(column_names, target_column_names)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
@@ -51,12 +67,13 @@ def _call_scorer_grouped(
 def _call_scorer_full(
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
+    column_names: api.ColumnNames,
     target_column_names: api.TargetColumnNames,
 ) -> typing.OrderedDict[int, float]:
     (
         target_column_name,
         prediction_column_name
-    ) = target_column_names.merge_keys
+    ) = merge_keys(column_names, target_column_names)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
@@ -98,7 +115,8 @@ def _reduce(
         value = _call_scorer_full(
             scorer,
             filtered,
-            target_column_names
+            column_names,
+            target_column_names,
         )
     else:
         values = list(details.values())
@@ -131,7 +149,7 @@ def score(
 ) -> typing.Dict[int, ScoredMetric]:
     logger.warning(f"scoring - prediction.len={len(prediction)}")
 
-    if competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.STREAM]:
+    if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
 
         merged = merge(
@@ -150,11 +168,21 @@ def score(
             column_names,
         )
 
+    elif competition_format == api.CompetitionFormat.STREAM:
+        from ._format.stream import merge
+
+        merged = merge(
+            y_test,
+            prediction,
+            column_names,
+        )
+
     else:
         raise ValueError(f"unsupported competition format: {competition_format}")
 
     logger.warning(f"merged - merged.len={len(merged)}")
 
+    breakpoint()
     if not len(merged):
         raise ValueError(f"merged dataframe is empty: {merged}")
 
