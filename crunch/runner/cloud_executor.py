@@ -1,21 +1,20 @@
 import datetime
-import functools
 import gc
 import importlib
-import inspect
 import json
 import logging
 import os
 import sys
-import time
+import enum
 import traceback
 import typing
+import importlib.util
 
 import pandas
 import requests
 
 from .. import api, checker, container, orthogonalization, scoring, utils
-from ..container import Columns, Features, CallableIterable
+from ..container import Columns, Features, CallableIterable, GeneratorWrapper
 from ..orthogonalization import _runner as orthogonalization_runner
 
 
@@ -25,8 +24,13 @@ class Reference:
         self.value = initial_value
 
 
-class undefined:
-    pass
+class NamedFile(enum.Enum):
+
+    X = "X"
+    Y = "Y"
+
+    def __repr__(self):
+        return self.name
 
 
 def ensure_function(module, name: str):
@@ -171,8 +175,8 @@ class SandboxExecutor:
         if self.train:
             full_y = read(self.y_path, True)
 
-            x_train = self.filter_train(full_x)
-            y_train = self.filter_train(full_y)
+            x_train = self.filter_train(full_x, NamedFile.X)
+            y_train = self.filter_train(full_y, NamedFile.Y)
 
             del full_y
 
@@ -180,7 +184,7 @@ class SandboxExecutor:
                 full_y_raw = None
                 if self.y_raw_path:
                     full_y_raw = read(self.y_raw_path, True)
-                    y_raw = self.filter_train(full_y_raw)
+                    y_raw = self.filter_train(full_y_raw, NamedFile.Y)
 
                 self.setup_orthogonalization(y_train, y_raw, trained)
         else:
@@ -192,7 +196,7 @@ class SandboxExecutor:
         delete(self.y_raw_path)
         delete(self.orthogonalization_data_path)
 
-        x_test = self.filter_test(full_x)
+        x_test = self.filter_test(full_x, NamedFile.X)
         del full_x
 
         gc.collect()
@@ -322,10 +326,11 @@ class SandboxExecutor:
             **self.features.to_parameter_variants(),
         }
 
+        side_column_name: str = self.column_names.side
         if self.train:
             streams = [
-                CallableIterable.from_dataframe(x_train, target_column_name.input)
-                for target_column_name in self.column_names.targets
+                CallableIterable.from_dataframe(part, side_column_name)
+                for part in utils.split_at_nans(x_train, side_column_name)
             ]
 
             utils.smart_call(
@@ -339,28 +344,39 @@ class SandboxExecutor:
 
             return None
         else:
-            wrapper = container.GeneratorWrapper(
-                [
-                    # container.GeneratorWrapper.constant(100),  # k
-                    container.GeneratorWrapper.iterate(x_test[target_column_name.input]),
-                ],
-                lambda stream: utils.smart_call(
-                    infer_function,
-                    default_values, {
-                        "stream": stream,
-                    }
-                )
-            )
+            stream_datas = [
+                part[side_column_name]
+                for part in utils.split_at_nans(x_test, side_column_name)
+            ]
 
-            predicteds = wrapper.collect(len(x_test))
+            predicteds = []
+            for index, stream_data in enumerate(stream_datas):
+                logging.warning(f'call: infer ({index+ 1}/{len(stream_datas)})')
+
+                wrapper = GeneratorWrapper(
+                    [
+                        GeneratorWrapper.iterate(stream_data),
+                    ],
+                    lambda stream: utils.smart_call(
+                        infer_function,
+                        default_values, {
+                            "stream": stream,
+                        }
+                    )
+                )
+
+                collecteds = wrapper.collect(len(stream_data))
+                predicteds.extend(collecteds)
+
+            x_test.dropna(subset=[self.column_names.side], inplace=True)
 
             return pandas.DataFrame({
                 self.column_names.moon: x_test[self.column_names.moon],
                 self.column_names.id: x_test[self.column_names.id],
-                target_column_name.output: predicteds,
+                self.column_names.output: predicteds,
             })
 
-    def filter_train(self, dataframe: pandas.DataFrame):
+    def filter_train(self, dataframe: pandas.DataFrame, named_file: NamedFile):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
             # TODO Use split's key with (index(moon) - embargo)
             dataframe = dataframe[dataframe[self.column_names.moon] < self.loop_key - self.embargo].copy()
@@ -370,10 +386,15 @@ class SandboxExecutor:
 
         return self._filter_at_keys(
             api.DataReleaseSplitGroup.TRAIN,
-            dataframe
+            dataframe,
+            named_file,
         )
 
-    def filter_test(self, dataframe: pandas.DataFrame):
+    def filter_test(
+        self,
+        dataframe: pandas.DataFrame,
+        named_file: NamedFile,
+    ):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
             dataframe = dataframe[dataframe[self.column_names.moon] == self.loop_key].copy()
             dataframe.reset_index(inplace=True, drop=True)
@@ -382,38 +403,43 @@ class SandboxExecutor:
 
         return self._filter_at_keys(
             api.DataReleaseSplitGroup.TEST,
-            dataframe
+            dataframe,
+            named_file,
         )
 
     def _filter_at_keys(
         self,
         group: api.DataReleaseSplitGroup,
-        dataframe: pandas.DataFrame
+        input: typing.Union[pandas.DataFrame, typing.Dict[str, pandas.DataFrame]],
+        named_file: NamedFile,
     ):
-        keys = {
-            split.key
-            for split in self.splits
-            if split.group == group
-        }
+        keys = { split.key for split in self.splits if split.group == group }
 
         if self.competition_format == api.CompetitionFormat.DAG:
-            dataframe: dict
+            dataframes = typing.cast(typing.Dict[str, pandas.DataFrame], input)
 
             return {
                 key: value
-                for key, value in dataframe.items()
+                for key, value in dataframes.items()
                 if key in keys
             }
 
         if self.competition_format == api.CompetitionFormat.STREAM:
-            if not self.train:
-                target_column_name = self.column_names.get_target_by_name(self.loop_key)
+            dataframe = typing.cast(pandas.DataFrame, input)
+            target_column_name = self.column_names.get_target_by_name(self.loop_key)
 
-                dataframe = dataframe[[
-                    self.column_names.moon,
-                    self.column_names.id,
-                    target_column_name.input,
-                ]]
+            column_name = self.column_names.side
+            if named_file == NamedFile.Y:
+                column_name = self.column_names.input
+
+            dataframe = dataframe[[
+                self.column_names.moon,
+                self.column_names.id,
+                column_name,
+            ]]
+
+            if not self.train:
+                dataframe = dataframe[dataframe[self.column_names.id] == target_column_name.name]
 
             dataframe = dataframe[dataframe[self.column_names.moon].isin(keys)]
 

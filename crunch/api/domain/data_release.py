@@ -225,19 +225,6 @@ class TargetColumnNames:
     input: typing.Optional[str]
     output: typing.Optional[str]
 
-    @property
-    def merge_keys(self):
-        input = self.input
-        output = self.output
-
-        if input == output:
-            input += "_x"
-            output += "_y"
-        
-        return (
-            input,
-            output,
-        )
 
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,

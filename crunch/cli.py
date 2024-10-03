@@ -553,7 +553,10 @@ def cloud(
 # ---
 @click.option("--id-column-name", required=True)
 @click.option("--moon-column-name", required=True)
-@click.option("--target", "targets", required=True, multiple=True, nargs=3)
+@click.option("--side-column-name", required=True)
+@click.option("--input-column-name", required=True)
+@click.option("--output-column-name", required=True)
+@click.option("--target", "targets", required=True, multiple=True, nargs=4)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
@@ -580,7 +583,10 @@ def cloud_executor(
     # ---
     id_column_name: str,
     moon_column_name: str,
-    targets: typing.List[typing.Tuple[str, str, str]],
+    side_column_name: str,
+    input_column_name: str,
+    output_column_name: str,
+    targets: typing.List[typing.Tuple[str, str, str, str]],
 ):
     from .runner import is_inside
     if not is_inside:
@@ -621,10 +627,13 @@ def cloud_executor(
         api.ColumnNames(
             id_column_name,
             moon_column_name,
-            {
-                api.TargetColumnNames(None, target_name, input, output)
-                for target_name, input, output in targets
-            }
+            side_column_name or None,
+            input_column_name or None,
+            output_column_name or None,
+            [
+                api.TargetColumnNames(0, target_name, side or None, input or None, output or None)
+                for target_name, side, input, output in targets
+            ]
         )
     )
 
