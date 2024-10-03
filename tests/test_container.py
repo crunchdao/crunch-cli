@@ -55,18 +55,21 @@ class ColumnsTest(unittest.TestCase):
 
     def test_from_model(self):
         column_names = ColumnNames(
-            id=None,
-            moon=None,
+            id="",
+            moon="",
+            side=None,
+            input=None,
+            output=None,
             targets=[
-                TargetColumnNames(None, "a", "b", "c"),
-                TargetColumnNames(None, "d", "e", "f")
+                TargetColumnNames(0, "a", "side_a", "in_a", "out_a"),
+                TargetColumnNames(0, "b", "side_b", "in_b", "out_b")
             ]
         )
 
         inputs, outputs = Columns.from_model(column_names)
 
-        self.assertEqual("{a: 'b', d: 'e'}", repr(inputs))
-        self.assertEqual("{a: 'c', d: 'f'}", repr(outputs))
+        self.assertEqual("{a: 'in_a', b: 'in_b'}", repr(inputs))
+        self.assertEqual("{a: 'out_a', b: 'out_b'}", repr(outputs))
 
     def test_no_external_access(self):
         columns = Columns(collections.OrderedDict(a="b"))
