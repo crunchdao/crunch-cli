@@ -354,9 +354,7 @@ class SandboxExecutor:
                 logging.warning(f'call: infer ({index+ 1}/{len(stream_datas)})')
 
                 wrapper = GeneratorWrapper(
-                    [
-                        GeneratorWrapper.iterate(stream_data),
-                    ],
+                    iter(stream_data),
                     lambda stream: utils.smart_call(
                         infer_function,
                         default_values, {
