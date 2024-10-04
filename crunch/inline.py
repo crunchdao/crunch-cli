@@ -104,7 +104,6 @@ class _Inline:
 
         return x_train, x_test
 
-
     def test(
         self,
         force_first_train=True,
@@ -112,7 +111,7 @@ class _Inline:
         raise_abort=False,
         round_number="@current",
         no_checks=False,
-        no_determinism_check=False,
+        no_determinism_check: typing.Optional[bool] = None,
         read_kwargs={},
         write_kwargs={},
     ):
@@ -124,7 +123,6 @@ class _Inline:
 
         try:
             library.scan(module=self.module)
-
             logging.warning('')
 
             return tester.run(
@@ -136,7 +134,7 @@ class _Inline:
                 competition_format,
                 self.has_gpu,
                 not no_checks,
-                not no_determinism_check,
+                no_determinism_check,
                 read_kwargs,
                 write_kwargs,
             )
