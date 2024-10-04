@@ -280,7 +280,8 @@ def local_options(f):
         click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check."),
         click.option("--round-number", default="@current", help="Change round number to get the data from."),
         click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`."),
-        click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
+        click.option("--no-checks", is_flag=True, help="Disable final predictions checks."),
+        click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check."),
     ]
 
     return functools.reduce(lambda f, option: option(f), options, f)
@@ -378,15 +379,7 @@ def runner_group():
 
 
 @runner_group.command(help="Run your code locally.")
-@click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
-@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
-@click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
-@click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
-@click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
-@click.option("--round-number", default="@current", help="Change round number to get the data from.")
-@click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
-@click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
-@click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check.")
+@local_options
 def local(
     main_file_path: str,
     model_directory_path: str,
