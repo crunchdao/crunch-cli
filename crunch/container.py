@@ -186,7 +186,7 @@ class GeneratorWrapper:
         return collected
 
 
-class CallableIterable:
+class CallableIterable(typing.Iterable):
 
     def __init__(
         self,
@@ -211,10 +211,16 @@ class CallableIterable:
     @staticmethod
     def from_dataframe(
         dataframe: "pandas.DataFrame",
-        column_name: str
+        column_name: str,
+        mapper: typing.Optional[typing.Callable[[float], typing.Any]] = None
     ):
+        if mapper:
+            getter = lambda: iter(map(mapper, dataframe[column_name].copy()))
+        else:
+            getter = lambda: iter(dataframe[column_name].copy())
+
         return CallableIterable(
-            lambda: dataframe[column_name].copy(),
+            getter,
             len(dataframe)
         )
 
