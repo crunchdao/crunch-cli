@@ -1,9 +1,10 @@
-import importlib
+import importlib.util
 import logging
 import os
 import sys
+import typing
 
-from .. import tester, api
+from .. import api, tester
 
 
 def test(
@@ -14,7 +15,7 @@ def test(
     round_number: str,
     has_gpu: bool,
     checks: bool,
-    determinism_check_enabled: bool,
+    no_determinism_check: typing.Optional[bool],
 ):
     _, project = api.Client.from_project()
     competition = project.competition.reload()
@@ -34,7 +35,7 @@ def test(
         competition.format,
         has_gpu,
         checks,
-        determinism_check_enabled,
+        no_determinism_check,
     )
 
     if prediction is not None:

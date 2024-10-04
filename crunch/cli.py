@@ -407,6 +407,9 @@ def local(
         library.scan(requirements_file=constants.REQUIREMENTS_TXT)
         logging.warning('')
 
+    if no_determinism_check == False:
+        no_determinism_check = None
+
     try:
         command.test(
             main_file_path,
@@ -416,7 +419,7 @@ def local(
             round_number,
             has_gpu,
             not no_checks,
-            not no_determinism_check,
+            no_determinism_check,
         )
     except api.ApiException as error:
         utils.exit_via(error)
