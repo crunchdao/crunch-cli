@@ -1,3 +1,4 @@
+import functools
 import logging
 import sys
 import typing
@@ -5,7 +6,15 @@ import typing
 import click
 import pandas
 
-from . import api, command, constants, orthogonalization, runner, utils
+from . import (api, command, constants, container, orthogonalization, runner,
+               utils)
+
+LoadedData = typing.Union[
+    pandas.DataFrame,
+    typing.Dict[str, pandas.DataFrame]
+]
+
+Streams = typing.List[typing.Iterable[container.StreamMessage]]
 
 
 class _Inline:
@@ -17,14 +26,25 @@ class _Inline:
 
         print(f"loaded inline runner with module: {module}")
 
-    def load_data(self, **kwargs) -> typing.Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]:
+    @functools.cached_property
+    def _competition_format(self):
+        _, project = api.Client.from_project()
+        competition = project.competition.reload()
+
+        return competition.format
+
+    def load_data(self, **kwargs) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
+        if self._competition_format == api.CompetitionFormat.STREAM:
+            logging.error(f"Please call `.load_streams()` instead.")
+            return None, None, None
+
         try:
             (
                 _,  # embargo
                 _,  # number of features
                 _,  # split keys
                 _,  # features
-                _,  # column names
+                _,  # column_names
                 (
                     x_train_path,
                     y_train_path,
@@ -43,6 +63,48 @@ class _Inline:
 
         return x_train, y_train, x_test
 
+    def load_streams(self, **kwargs) -> typing.Tuple[Streams, Streams]:
+        if self._competition_format != api.CompetitionFormat.STREAM:
+            logging.error(f"Please call `.load_data()` instead.")
+            return None, None
+
+        try:
+            (
+                _,  # embargo
+                _,  # number of features
+                _,  # split keys
+                _,  # features
+                column_names,
+                (
+                    x_train_path,
+                    _,  # y_train_path
+                    x_test_path,
+                    _,  # y_test_path
+                    _,  # example_prediction
+                ),
+            ) = command.download()
+        except api.CrunchNotFoundException:
+            command.download_no_data_available()
+            raise click.Abort()
+
+        x_train = utils.read(x_train_path, kwargs=kwargs)
+        x_test = utils.read(x_test_path, kwargs=kwargs)
+
+        def as_iterators(dataframe: pandas.DataFrame):
+            column_name = typing.cast(str, column_names.side)
+
+            return [
+                container.CallableIterable.from_dataframe(part, column_name, container.StreamMessage)
+                for _, group in dataframe.groupby(column_names.id)
+                for part in utils.split_at_nans(group, column_name)
+            ]
+
+        x_train = as_iterators(x_train)
+        x_test = as_iterators(x_test)
+
+        return x_train, x_test
+
+
     def test(
         self,
         force_first_train=True,
@@ -56,8 +118,7 @@ class _Inline:
     ):
         from . import library, tester
 
-        _, project = api.Client.from_project()
-        competition = project.competition.reload()
+        competition_format = self._competition_format
 
         tester.install_logger()
 
@@ -72,7 +133,7 @@ class _Inline:
                 force_first_train,
                 train_frequency,
                 round_number,
-                competition.format,
+                competition_format,
                 self.has_gpu,
                 not no_checks,
                 not no_determinism_check,
