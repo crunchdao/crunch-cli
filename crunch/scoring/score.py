@@ -182,7 +182,6 @@ def score(
 
     logger.warning(f"merged - merged.len={len(merged)}")
 
-    breakpoint()
     if not len(merged):
         raise ValueError(f"merged dataframe is empty: {merged}")
 
