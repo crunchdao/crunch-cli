@@ -2,7 +2,7 @@ import collections
 import unittest
 
 from crunch.api import ColumnNames, DataReleaseFeature, TargetColumnNames
-from crunch.container import Columns, Features, GeneratorWrapper
+from crunch.container import Columns, Features, GeneratorWrapper, StreamMessage
 
 
 class ColumnsTest(unittest.TestCase):
@@ -156,9 +156,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             GeneratorWrapper(
-                [
-                    GeneratorWrapper.iterate([1, 2, 3])
-                ],
+                iter([1, 2, 3]),
                 consumer
             )
 
@@ -173,9 +171,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             GeneratorWrapper(
-                [
-                    GeneratorWrapper.iterate([1, 2, 3])
-                ],
+                iter([1, 2, 3]),
                 consumer
             ).collect(3)
 
@@ -187,9 +183,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             GeneratorWrapper(
-                [
-                    GeneratorWrapper.iterate([1, 2, 3])
-                ],
+                iter([1, 2, 3]),
                 consumer
             )
 
@@ -201,9 +195,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
         with self.assertRaises(ValueError) as context:
             GeneratorWrapper(
-                [
-                    GeneratorWrapper.iterate([1, 2, 3])
-                ],
+                iter([1, 2, 3]),
                 consumer
             )
 
@@ -219,9 +211,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             GeneratorWrapper(
-                [
-                    GeneratorWrapper.iterate([1, 2, 3])
-                ],
+                iter([1, 2, 3]),
                 consumer
             ).collect(3)
 
@@ -240,9 +230,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
             with self.assertRaises(ValueError) as context:
                 GeneratorWrapper(
-                    [
-                        GeneratorWrapper.iterate([1, 2, 3])
-                    ],
+                    iter([1, 2, 3]),
                     consumer
                 ).collect(3)
 
@@ -262,9 +250,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
             with self.assertRaises(ValueError) as context:
                 GeneratorWrapper(
-                    [
-                        GeneratorWrapper.iterate([1, 2, 3])
-                    ],
+                    iter([1, 2, 3]),
                     consumer
                 ).collect(3)
 
@@ -274,31 +260,101 @@ class GeneratorWrapperTest(unittest.TestCase):
         def consumer(stream: iter):
             yield
 
-            for x in stream:
-                yield x * 2
+            for message in stream:
+                yield message.x * 2
 
         collected = GeneratorWrapper(
-            [
-                GeneratorWrapper.iterate([1, 2, 3])
-            ],
+            iter([1, 2, 3]),
             consumer
         ).collect(3)
 
         self.assertListEqual([2, 4, 6], collected)
 
-    def test_working_multiple(self):
-        def consumer(stream: iter):
-            yield
 
-            for x, y in stream:
-                yield (x + y) * 2
+class StreamMessageTest(unittest.TestCase):
 
-        collected = GeneratorWrapper(
-            [
-                GeneratorWrapper.iterate([1, 2, 3]),
-                GeneratorWrapper.iterate([4, 5, 6]),
-            ],
-            consumer
-        ).collect(3)
+    def test_get_item(self):
+        message = StreamMessage(42)
 
-        self.assertListEqual([10, 14, 18], collected)
+        self.assertEqual(42, message["x"])
+
+        with self.assertRaises(AttributeError) as context:
+            message["a"]
+
+        self.assertEqual("'StreamMessage' object has no attribute 'a'", str(context.exception))
+
+    def test_get_attr(self):
+        message = StreamMessage(42)
+
+        self.assertEqual(42, message.x)
+
+    def test_set_item_x(self):
+        message = StreamMessage(42)
+
+        with self.assertRaises(AttributeError) as context:
+            message["x"] = 21
+
+        self.assertEqual("Cannot set key 'x' - object is immutable", str(context.exception))
+
+    def test_set_attr_x(self):
+        message = StreamMessage(42)
+
+        with self.assertRaises(AttributeError) as context:
+            message.x = 21
+
+        self.assertEqual("Cannot set attribute 'x' - object is immutable", str(context.exception))
+
+    def test_set_item_other(self):
+        message = StreamMessage(42)
+
+        with self.assertRaises(AttributeError) as context:
+            message["a"] = 21
+
+        self.assertEqual("Cannot set key 'a' - object is immutable", str(context.exception))
+
+    def test_set_attr_other(self):
+        message = StreamMessage(42)
+
+        with self.assertRaises(AttributeError) as context:
+            message.a = 21
+
+        self.assertEqual("Cannot set attribute 'a' - object is immutable", str(context.exception))
+
+    def test_iter(self):
+        message = StreamMessage(42)
+
+        self.assertEqual(["x"], list(message))
+
+        iterator = iter(message)
+        self.assertEqual("x", next(iterator))
+        self.assertEqual(None, next(iterator, None))
+
+    def test_repr(self):
+        message = StreamMessage(42)
+
+        self.assertEqual("{x: 42}", repr(message))
+
+    def test_str(self):
+        message = StreamMessage(42)
+
+        self.assertEqual("StreamMessage({x: 42})", str(message))
+
+    def test_get(self):
+        message = StreamMessage(42)
+
+        self.assertEqual("StreamMessage({x: 42})", str(message))
+
+    def test_keys(self):
+        message = StreamMessage(42)
+
+        self.assertEqual({"x"}, message.keys())
+
+    def test_values(self):
+        message = StreamMessage(42)
+
+        self.assertEqual([42], list(message.values()))
+
+    def test_items(self):
+        message = StreamMessage(42)
+
+        self.assertEqual([("x", 42)], list(message.items()))
