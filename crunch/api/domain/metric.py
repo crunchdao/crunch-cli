@@ -16,6 +16,8 @@ class ScorerFunction(enum.Enum):
     RECALL = "RECALL"
     SPEARMAN = "SPEARMAN"
 
+    CUSTOM_ENDERSGAME_PROFIT_AND_LOSS_WITH_TRANSACTION_COST = "CUSTOM_ENDERSGAME_PROFIT_AND_LOSS_WITH_TRANSACTION_COST"
+
     def __repr__(self):
         return self.name
 
@@ -23,6 +25,7 @@ class ScorerFunction(enum.Enum):
 class ReducerFunction(enum.Enum):
 
     NONE = "NONE"
+    SUM = "SUM"
     MEAN = "MEAN"
     PRODUCT_PLUS_MINUS_1 = "PRODUCT_PLUS_MINUS_1"
 
