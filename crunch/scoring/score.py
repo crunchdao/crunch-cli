@@ -97,15 +97,15 @@ def _reduce(
     target_column_names: api.TargetColumnNames,
 ):
     details = {}
-    for moon, value in all_details.items():
+    for key, value in all_details.items():
         popped = True
 
-        if moon in y_test_keys:
-            details[moon] = value
+        if key in y_test_keys:
+            details[key] = value
 
             popped = False
 
-        logger.info(f"score - target_name={target_name} metric_name={metric.name} scorer_function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
+        logger.info(f"score - target_name={target_name} metric_name={metric.name} scorer_function={metric.scorer_function.name} key=`{key}` value={value} popped={popped}")
 
     if metric.reducer_function == api.ReducerFunction.NONE:
         reducer_method = api.ReducerFunction.NONE.name
@@ -200,9 +200,14 @@ def score(
             logger.warning(f"unknown metric - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name}")
             continue
 
+        dataframe = merged
+        if competition_format == api.CompetitionFormat.STREAM:
+            dataframe = merged[merged[column_names.id] == target_name] \
+                .set_index(column_names.moon)
+
         all_details = _call_scorer_grouped(
             scorer,
-            merged,
+            dataframe,
             column_names,
             target_column_names
         )
@@ -214,7 +219,7 @@ def score(
             y_test_keys,
             metric,
             scorer,
-            merged,
+            dataframe,
             column_names,
             target_column_names,
         )
