@@ -323,7 +323,7 @@ class LocalRunner(Runner):
         return pandas.DataFrame({
             self.column_names.moon: x_data[self.column_names.moon],
             self.column_names.id: x_data[self.column_names.id],
-            target_column_name.output: predicteds,
+            self.column_names.output: predicteds,
         })
 
     def finalize(self, prediction: pandas.DataFrame):
