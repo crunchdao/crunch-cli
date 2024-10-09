@@ -1,20 +1,21 @@
 import datetime
+import enum
 import gc
 import importlib
+import importlib.util
 import json
 import logging
 import os
 import sys
-import enum
 import traceback
 import typing
-import importlib.util
 
 import pandas
 import requests
 
-from .. import api, checker, container, orthogonalization, scoring, utils
-from ..container import Columns, Features, CallableIterable, GeneratorWrapper
+from .. import api, checker, orthogonalization, scoring, utils
+from ..container import (CallableIterable, Columns, Features, GeneratorWrapper,
+                         StreamMessage)
 from ..orthogonalization import _runner as orthogonalization_runner
 
 
@@ -329,7 +330,7 @@ class SandboxExecutor:
         side_column_name: str = self.column_names.side
         if self.train:
             streams = [
-                CallableIterable.from_dataframe(part, side_column_name)
+                CallableIterable.from_dataframe(part, side_column_name, StreamMessage)
                 for part in utils.split_at_nans(x_train, side_column_name)
             ]
 
@@ -411,7 +412,11 @@ class SandboxExecutor:
         input: typing.Union[pandas.DataFrame, typing.Dict[str, pandas.DataFrame]],
         named_file: NamedFile,
     ):
-        keys = { split.key for split in self.splits if split.group == group }
+        keys = {
+            split.key
+            for split in self.splits
+            if split.group == group
+        }
 
         if self.competition_format == api.CompetitionFormat.DAG:
             dataframes = typing.cast(typing.Dict[str, pandas.DataFrame], input)
