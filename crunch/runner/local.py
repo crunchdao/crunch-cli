@@ -8,7 +8,8 @@ import pandas
 
 from .. import (api, checker, command, constants, ensure, monkey_patches,
                 tester, utils)
-from ..container import CallableIterable, Columns, GeneratorWrapper
+from ..container import (CallableIterable, Columns, GeneratorWrapper,
+                         StreamMessage)
 from .runner import Runner
 
 
@@ -269,7 +270,7 @@ class LocalRunner(Runner):
 
             parts = utils.split_at_nans(group, self.column_names.side)
             for part in parts:
-                streams.append(CallableIterable.from_dataframe(part, self.column_names.side))
+                streams.append(CallableIterable.from_dataframe(part, self.column_names.side, StreamMessage))
 
         logging.warning(f'call: train - stream.len={len(streams)}')
 
