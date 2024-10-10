@@ -81,7 +81,7 @@ class CheckCollection(Collection):
 
     def list(
         self
-    ) -> Check:
+    ) -> typing.List[Check]:
         return self.prepare_models(
             self._client.api.list_checks(
                 self.competition.id
