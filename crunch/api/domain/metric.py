@@ -119,7 +119,7 @@ class MetricCollection(Collection):
 
     def list(
         self
-    ) -> Metric:
+    ) -> typing.List[Metric]:
         return self.prepare_models(
             self._client.api.list_metrics(
                 self.competition.id,
