@@ -113,7 +113,7 @@ def spearman(
     return score
 
 
-def custom_endersgame_profit_and_loss_with_transaction_cost(
+def custom__mid_one__profit_and_loss_with_transaction_cost(
     group: pandas.DataFrame,
     target_column_name: str,
     prediction_column_name: str,
@@ -135,5 +135,5 @@ REGISTRY = {
     api.ScorerFunction.RECALL: recall,
     api.ScorerFunction.SPEARMAN: spearman,
 
-    api.ScorerFunction.CUSTOM_ENDERSGAME_PROFIT_AND_LOSS_WITH_TRANSACTION_COST: custom_endersgame_profit_and_loss_with_transaction_cost,
+    api.ScorerFunction.CUSTOM__MID_ONE__PROFIT_AND_LOSS_WITH_TRANSACTION_COST: custom__mid_one__profit_and_loss_with_transaction_cost,
 }
