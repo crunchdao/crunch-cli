@@ -78,7 +78,7 @@ def ids(
     """
 
     left = prediction[id_column_name]
-    if competition_format != api.CompetitionFormat.DAG:
+    if competition_format == api.CompetitionFormat.TIMESERIES:
         if left.duplicated().sum() > 0:
             raise CheckError(f"Duplicate ID(s)")
 
