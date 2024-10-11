@@ -20,6 +20,7 @@ class ScoredMetric:
 class ScoredMetricDetail:
     key: typing.Union[str, int]
     value: float
+    reduced: bool
 
 
 def merge_keys(
@@ -240,7 +241,11 @@ def score(
         scores[metric.id] = ScoredMetric(
             value=value,
             details=[
-                ScoredMetricDetail(key, value)
+                ScoredMetricDetail(
+                    key,
+                    value,
+                    key not in y_test_keys
+                )
                 for key, value in all_details.items()
             ],
         )
