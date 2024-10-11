@@ -1,4 +1,5 @@
 import collections
+import datetime
 import types
 import typing
 
@@ -168,10 +169,24 @@ class GeneratorWrapper:
         self,
         expected_size: int
     ):
-        collected = []
+        values: typing.List[typing.Any] = []
+        durations: typing.List[datetime.timedelta] = []
 
-        for y in self.consumer:
-            collected.append(y)
+        sentinel = object()
+
+        iterator = self.consumer
+        while True:
+            start = datetime.datetime.now()
+
+            y = next(iterator, sentinel)
+            if y is sentinel:
+                break
+
+            took = datetime.datetime.now() - start
+
+            values.append(y)
+            durations.append(took)
+
             self.ready = True
 
             if self.consumed:
@@ -179,11 +194,11 @@ class GeneratorWrapper:
 
             self.consumed = True
 
-        size = len(collected)
+        size = len(values)
         if size != expected_size:
             raise ValueError(f"{self.ERROR_WRONG_YIELD_CALL_COUNT_PREFIX} ({size} / {expected_size})")
 
-        return collected
+        return values, durations
 
 
 class CallableIterable(typing.Iterable):

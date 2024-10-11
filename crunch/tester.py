@@ -27,14 +27,14 @@ def run(
     force_first_train: bool,
     train_frequency: int,
     round_number: str,
-    competition_format: api.CompetitionFormat,
+    competition: api.Competition,
     has_gpu=False,
     checks=True,
     no_determinism_check: typing.Optional[bool] = True,
     read_kwargs={},
     write_kwargs={},
 ):
-    if competition_format == api.CompetitionFormat.STREAM:
+    if competition.format == api.CompetitionFormat.STREAM:
         if no_determinism_check == False:
             logging.warning("determinism check not available for stream competitions")
             logging.warning("")
@@ -50,7 +50,7 @@ def run(
         force_first_train,
         train_frequency,
         round_number,
-        competition_format,
+        competition,
         has_gpu,
         checks,
         not no_determinism_check,

@@ -212,11 +212,11 @@ class CloudRunner(Runner):
 
     def stream_loop(
         self,
-        target_column_name: api.TargetColumnNames,
+        target_column_names: api.TargetColumnNames,
     ) -> pandas.DataFrame:
         return self.sandbox(
             False,
-            target_column_name.name
+            target_column_names.name
         )
 
     def finalize(self, prediction: pandas.DataFrame):

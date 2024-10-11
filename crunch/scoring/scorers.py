@@ -113,6 +113,14 @@ def spearman(
     return score
 
 
+def meta__execution_time(
+    group: pandas.DataFrame,
+    target_column_name: None,
+    prediction_column_name: str,
+):
+    return group[prediction_column_name].mean()
+
+
 def custom__mid_one__profit_and_loss_with_transaction_cost(
     group: pandas.DataFrame,
     target_column_name: str,
@@ -134,6 +142,8 @@ REGISTRY = {
     api.ScorerFunction.RANDOM: random,
     api.ScorerFunction.RECALL: recall,
     api.ScorerFunction.SPEARMAN: spearman,
+
+    api.ScorerFunction.META__EXECUTION_TIME: meta__execution_time,
 
     api.ScorerFunction.CUSTOM__MID_ONE__PROFIT_AND_LOSS_WITH_TRANSACTION_COST: custom__mid_one__profit_and_loss_with_transaction_cost,
 }

@@ -113,14 +113,14 @@ class Runner(abc.ABC):
         if not self.have_model:
             self.stream_no_model()
 
-        target_column_names = self.column_names.targets
-        for index, target_column_name in enumerate(target_column_names):
-            self.log(f"looping stream=`{target_column_name.name}` ({index + 1}/{len(target_column_names)})")
+        target_column_namess = self.column_names.targets
+        for index, target_column_names in enumerate(target_column_namess):
+            self.log(f"looping stream=`{target_column_names.name}` ({index + 1}/{len(target_column_namess)})")
 
-            prediction = self.stream_loop(target_column_name)
+            prediction = self.stream_loop(target_column_names)
 
             if self.deterministic:
-                prediction2 = self.stream_loop(target_column_name)
+                prediction2 = self.stream_loop(target_column_names)
                 self.deterministic = prediction.equals(prediction2)
                 self.log(f"deterministic: {str(self.deterministic).lower()}")
 

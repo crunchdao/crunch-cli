@@ -263,12 +263,13 @@ class GeneratorWrapperTest(unittest.TestCase):
             for message in stream:
                 yield message.x * 2
 
-        collected = GeneratorWrapper(
+        values, durations = GeneratorWrapper(
             iter([1, 2, 3]),
             consumer
         ).collect(3)
 
-        self.assertListEqual([2, 4, 6], collected)
+        self.assertListEqual([2, 4, 6], values)
+        self.assertEqual(3, len(durations))
 
 
 class StreamMessageTest(unittest.TestCase):

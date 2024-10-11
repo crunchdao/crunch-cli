@@ -13,7 +13,7 @@ import typing
 import pandas
 import requests
 
-from .. import api, checker, orthogonalization, scoring, utils
+from .. import api, checker, meta, orthogonalization, scoring, utils
 from ..container import (CallableIterable, Columns, Features, GeneratorWrapper,
                          StreamMessage)
 from ..orthogonalization import _runner as orthogonalization_runner
@@ -314,16 +314,12 @@ class SandboxExecutor:
         y_train: pandas.DataFrame,
         x_test: pandas.DataFrame
     ):
-        target_column_name = self.column_names.get_target_by_name(self.loop_key)
-
         default_values = {
             "number_of_features": self.number_of_features,
             "model_directory_path": self.model_directory_path,
-            "stream_name": self.loop_key,
             "embargo": self.embargo,
             "has_gpu": self.gpu,
             "has_trained": self.train,
-            "horizon": 2,  # TODO load from competition
             **self.features.to_parameter_variants(),
         }
 
@@ -345,12 +341,21 @@ class SandboxExecutor:
 
             return None
         else:
+            target_column_names = self.column_names.get_target_by_name(self.loop_key)
+            assert target_column_names is not None, f"target not found: {self.loop_key}"
+
             stream_datas = [
                 part[side_column_name]
                 for part in utils.split_at_nans(x_test, side_column_name)
             ]
 
-            predicteds = []
+            time_meta_metrics = meta.filter_metrics(
+                self.metrics,
+                target_column_names.name,
+                api.ScorerFunction.META__EXECUTION_TIME
+            )
+
+            predicteds, durations = [], []
             for index, stream_data in enumerate(stream_datas):
                 logging.warning(f'call: infer ({index+ 1}/{len(stream_datas)})')
 
@@ -364,15 +369,22 @@ class SandboxExecutor:
                     )
                 )
 
-                collecteds = wrapper.collect(len(stream_data))
-                predicteds.extend(collecteds)
+                collected_values, collected_durations = wrapper.collect(len(stream_data))
+                predicteds.extend(collected_values)
+
+                if len(time_meta_metrics):
+                    durations.extend(collected_durations)
 
             x_test.dropna(subset=[self.column_names.side], inplace=True)
 
             return pandas.DataFrame({
-                self.column_names.moon: x_test[self.column_names.moon],
-                self.column_names.id: x_test[self.column_names.id],
-                self.column_names.output: predicteds,
+                self.column_names.moon: x_test[self.column_names.moon].values,
+                self.column_names.id: x_test[self.column_names.id].values,
+                self.column_names.output: pandas.Series(predicteds),
+                **{
+                    meta.to_column_name(metric, self.column_names.output): pandas.Series(durations).astype(int)
+                    for metric in time_meta_metrics
+                }
             })
 
     def filter_train(self, dataframe: pandas.DataFrame, named_file: NamedFile):
