@@ -32,7 +32,7 @@ def test(
         force_first_train,
         train_frequency,
         round_number,
-        competition.format,
+        competition,
         has_gpu,
         checks,
         no_determinism_check,

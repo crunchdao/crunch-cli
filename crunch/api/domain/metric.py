@@ -16,7 +16,13 @@ class ScorerFunction(enum.Enum):
     RECALL = "RECALL"
     SPEARMAN = "SPEARMAN"
 
+    META__EXECUTION_TIME = "META__EXECUTION_TIME"
+
     CUSTOM__MID_ONE__PROFIT_AND_LOSS_WITH_TRANSACTION_COST = "CUSTOM__MID_ONE__PROFIT_AND_LOSS_WITH_TRANSACTION_COST"
+
+    @property
+    def is_meta(self):
+        return self.name.startswith("META__")
 
     def __repr__(self):
         return self.name

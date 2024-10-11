@@ -6,7 +6,7 @@ import warnings
 
 import pandas
 
-from .. import api
+from .. import api, meta
 from . import reducers, scorers
 
 
@@ -25,10 +25,16 @@ class ScoredMetricDetail:
 def merge_keys(
     column_names: api.ColumnNames,
     target_column_names: api.TargetColumnNames,
+    metric: api.Metric,
 ):
-    input = target_column_names.input or column_names.input
     output = target_column_names.output or column_names.output
 
+    if metric.scorer_function.is_meta:
+        output = meta.to_column_name(metric, output)
+
+        return None, output
+
+    input = target_column_names.input or column_names.input
     if input == output:
         input += "_x"
         output += "_y"
@@ -40,6 +46,7 @@ def merge_keys(
 
 
 def _call_scorer_grouped(
+    metric: api.Metric,
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
     column_names: api.ColumnNames,
@@ -48,7 +55,7 @@ def _call_scorer_grouped(
     (
         target_column_name,
         prediction_column_name
-    ) = merge_keys(column_names, target_column_names)
+    ) = merge_keys(column_names, target_column_names, metric)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
@@ -65,6 +72,7 @@ def _call_scorer_grouped(
 
 
 def _call_scorer_full(
+    metric: api.Metric,
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
     column_names: api.ColumnNames,
@@ -73,7 +81,7 @@ def _call_scorer_full(
     (
         target_column_name,
         prediction_column_name
-    ) = merge_keys(column_names, target_column_names)
+    ) = merge_keys(column_names, target_column_names, metric)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
@@ -113,6 +121,7 @@ def _reduce(
         filtered = merged[merged[column_names.moon].isin(y_test_keys)]
 
         value = _call_scorer_full(
+            metric,
             scorer,
             filtered,
             column_names,
@@ -152,6 +161,7 @@ def score(
     if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
 
+        # TODO Add support for meta-metrics
         merged = merge(
             y_test,
             prediction,
@@ -162,6 +172,7 @@ def score(
     elif competition_format == api.CompetitionFormat.DAG:
         from ._format.dag import merge
 
+        # TODO Add support for meta-metrics
         merged = merge(
             y_test,
             prediction,
@@ -175,6 +186,7 @@ def score(
             y_test,
             prediction,
             column_names,
+            metrics,
         )
 
     else:
@@ -206,6 +218,7 @@ def score(
                 .set_index(column_names.moon)
 
         all_details = _call_scorer_grouped(
+            metric,
             scorer,
             dataframe,
             column_names,
