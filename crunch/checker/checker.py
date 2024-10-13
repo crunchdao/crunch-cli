@@ -78,12 +78,14 @@ def _run_checks(
             except Exception as exception:
                 raise CheckError("failed to check") from exception
 
-        if function_descriptor.column_based:
-            for prediction_column_name in column_names.outputs:
-
-                do_call(prediction_column_name)
+        if competition_format == api.CompetitionFormat.STREAM:
+            do_call(column_names.output)
         else:
-            do_call(None)
+            if function_descriptor.column_based:
+                for prediction_column_name in column_names.outputs:
+                    do_call(prediction_column_name)
+            else:
+                do_call(None)
 
 
 def run_via_api(

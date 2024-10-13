@@ -3,12 +3,14 @@ import typing
 
 from ..identifiers import CompetitionIdentifierType
 from ..resource import Collection, Model
+from .enum_ import SplitKeyType
 
 
 class CompetitionFormat(enum.Enum):
 
     TIMESERIES = "TIMESERIES"
     DAG = "DAG"
+    STREAM = "STREAM"
 
     def __repr__(self):
         return self.name
@@ -25,6 +27,10 @@ class Competition(Model):
     @property
     def format(self):
         return CompetitionFormat[self._attrs["format"]]
+
+    @property
+    def split_key_type(self):
+        return SplitKeyType[self._attrs["splitKeyType"]]
 
     @property
     def checks(self):

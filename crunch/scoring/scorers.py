@@ -10,7 +10,7 @@ def balanced_accuracy(
     prediction_column_name: str,
 ) -> float:
     import sklearn.metrics
-    
+
     target = group[target_column_name]
     prediction = group[prediction_column_name]
 
@@ -113,6 +113,27 @@ def spearman(
     return score
 
 
+def meta__execution_time(
+    group: pandas.DataFrame,
+    target_column_name: None,
+    prediction_column_name: str,
+):
+    return group[prediction_column_name].mean()
+
+
+def custom__mid_one__profit_and_loss_with_transaction_cost(
+    group: pandas.DataFrame,
+    target_column_name: str,
+    prediction_column_name: str,
+):
+    EPSILON = 0.01
+
+    profit_and_loss = group[target_column_name] * numpy.sign(group[prediction_column_name])
+    transactions_cost = (group[prediction_column_name] != 0).sum() * EPSILON
+
+    return profit_and_loss - transactions_cost
+
+
 REGISTRY = {
     api.ScorerFunction.BALANCED_ACCURACY: balanced_accuracy,
     api.ScorerFunction.DOT_PRODUCT: dot_product,
@@ -121,4 +142,8 @@ REGISTRY = {
     api.ScorerFunction.RANDOM: random,
     api.ScorerFunction.RECALL: recall,
     api.ScorerFunction.SPEARMAN: spearman,
+
+    api.ScorerFunction.META__EXECUTION_TIME: meta__execution_time,
+
+    api.ScorerFunction.CUSTOM__MID_ONE__PROFIT_AND_LOSS_WITH_TRANSACTION_COST: custom__mid_one__profit_and_loss_with_transaction_cost,
 }

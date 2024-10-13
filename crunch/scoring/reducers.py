@@ -21,6 +21,7 @@ def product_plus_minus_1(
 
 REGISTRY = {
     api.ReducerFunction.NONE: none,
+    api.ReducerFunction.SUM: sum,
     api.ReducerFunction.MEAN: statistics.mean,
     api.ReducerFunction.PRODUCT_PLUS_MINUS_1: product_plus_minus_1,
 }

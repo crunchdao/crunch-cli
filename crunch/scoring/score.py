@@ -2,11 +2,11 @@ import collections
 import dataclasses
 import logging
 import typing
-
-import pandas
 import warnings
 
-from .. import api
+import pandas
+
+from .. import api, meta
 from . import reducers, scorers
 
 
@@ -20,9 +20,34 @@ class ScoredMetric:
 class ScoredMetricDetail:
     key: typing.Union[str, int]
     value: float
+    reduced: bool
+
+
+def merge_keys(
+    column_names: api.ColumnNames,
+    target_column_names: api.TargetColumnNames,
+    metric: api.Metric,
+):
+    output = target_column_names.output or column_names.output
+
+    if metric.scorer_function.is_meta:
+        output = meta.to_column_name(metric, output)
+
+        return None, output
+
+    input = target_column_names.input or column_names.input
+    if input == output:
+        input += "_x"
+        output += "_y"
+
+    return (
+        input,
+        output,
+    )
 
 
 def _call_scorer_grouped(
+    metric: api.Metric,
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
     column_names: api.ColumnNames,
@@ -31,8 +56,7 @@ def _call_scorer_grouped(
     (
         target_column_name,
         prediction_column_name
-    ) = target_column_names.merge_keys
-
+    ) = merge_keys(column_names, target_column_names, metric)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
@@ -49,14 +73,16 @@ def _call_scorer_grouped(
 
 
 def _call_scorer_full(
+    metric: api.Metric,
     scorer: typing.Callable[[pandas.DataFrame, str, str], float],
     merged: pandas.DataFrame,
+    column_names: api.ColumnNames,
     target_column_names: api.TargetColumnNames,
 ) -> typing.OrderedDict[int, float]:
     (
         target_column_name,
         prediction_column_name
-    ) = target_column_names.merge_keys
+    ) = merge_keys(column_names, target_column_names, metric)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
@@ -80,15 +106,15 @@ def _reduce(
     target_column_names: api.TargetColumnNames,
 ):
     details = {}
-    for moon, value in all_details.items():
+    for key, value in all_details.items():
         popped = True
 
-        if moon in y_test_keys:
-            details[moon] = value
+        if key in y_test_keys:
+            details[key] = value
 
             popped = False
 
-        logger.info(f"score - target_name={target_name} metric_name={metric.name} scorer_function={metric.scorer_function.name} moon={moon} value={value} popped={popped}")
+        logger.info(f"score - target_name={target_name} metric_name={metric.name} scorer_function={metric.scorer_function.name} key=`{key}` value={value} popped={popped}")
 
     if metric.reducer_function == api.ReducerFunction.NONE:
         reducer_method = api.ReducerFunction.NONE.name
@@ -96,9 +122,11 @@ def _reduce(
         filtered = merged[merged[column_names.moon].isin(y_test_keys)]
 
         value = _call_scorer_full(
+            metric,
             scorer,
             filtered,
-            target_column_names
+            column_names,
+            target_column_names,
         )
     else:
         values = list(details.values())
@@ -134,6 +162,7 @@ def score(
     if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
 
+        # TODO Add support for meta-metrics
         merged = merge(
             y_test,
             prediction,
@@ -144,10 +173,21 @@ def score(
     elif competition_format == api.CompetitionFormat.DAG:
         from ._format.dag import merge
 
+        # TODO Add support for meta-metrics
         merged = merge(
             y_test,
             prediction,
             column_names,
+        )
+
+    elif competition_format == api.CompetitionFormat.STREAM:
+        from ._format.stream import merge
+
+        merged = merge(
+            y_test,
+            prediction,
+            column_names,
+            metrics,
         )
 
     else:
@@ -173,9 +213,15 @@ def score(
             logger.warning(f"unknown metric - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name}")
             continue
 
+        dataframe = merged
+        if competition_format == api.CompetitionFormat.STREAM:
+            dataframe = merged[merged[column_names.id] == target_name] \
+                .set_index(column_names.moon)
+
         all_details = _call_scorer_grouped(
+            metric,
             scorer,
-            merged,
+            dataframe,
             column_names,
             target_column_names
         )
@@ -187,7 +233,7 @@ def score(
             y_test_keys,
             metric,
             scorer,
-            merged,
+            dataframe,
             column_names,
             target_column_names,
         )
@@ -195,7 +241,11 @@ def score(
         scores[metric.id] = ScoredMetric(
             value=value,
             details=[
-                ScoredMetricDetail(key, value)
+                ScoredMetricDetail(
+                    key,
+                    value,
+                    key not in y_test_keys
+                )
                 for key, value in all_details.items()
             ],
         )

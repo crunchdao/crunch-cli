@@ -27,13 +27,22 @@ def run(
     force_first_train: bool,
     train_frequency: int,
     round_number: str,
-    competition_format: api.CompetitionFormat,
+    competition: api.Competition,
     has_gpu=False,
     checks=True,
-    determinism_check_enabled=True,
+    no_determinism_check: typing.Optional[bool] = True,
     read_kwargs={},
     write_kwargs={},
 ):
+    if competition.format == api.CompetitionFormat.STREAM:
+        if no_determinism_check == False:
+            logging.warning("determinism check not available for stream competitions")
+            logging.warning("")
+
+        no_determinism_check = True
+    elif no_determinism_check is None:
+        no_determinism_check = False
+
     from .runner.local import LocalRunner
     runner = LocalRunner(
         module,
@@ -41,10 +50,10 @@ def run(
         force_first_train,
         train_frequency,
         round_number,
-        competition_format,
+        competition,
         has_gpu,
         checks,
-        determinism_check_enabled,
+        not no_determinism_check,
         read_kwargs,
         write_kwargs,
     )

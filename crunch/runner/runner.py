@@ -1,10 +1,10 @@
 import abc
+import functools
 import typing
 
 import pandas
 
 from .. import api
-from ..container import Columns
 
 
 class Runner(abc.ABC):
@@ -36,9 +36,13 @@ class Runner(abc.ABC):
             self.log("starting dag process...")
             prediction = self.start_dag()
 
+        elif self.competition_format == api.CompetitionFormat.STREAM:
+            self.log("starting stream loop...")
+            prediction = self.start_stream()
+
         else:
             raise ValueError(f"unsupported: {self.competition_format}")
-        
+
         if self.determinism_check_enabled:
             if self.deterministic:
                 self.log(f"determinism check: passed")
@@ -100,6 +104,43 @@ class Runner(abc.ABC):
     def dag_loop(
         self,
         train: bool
+    ) -> pandas.DataFrame:
+        ...
+
+    def start_stream(self):
+        predictions: typing.List[pandas.DataFrame] = []
+
+        if not self.have_model:
+            self.stream_no_model()
+
+        target_column_namess = self.column_names.targets
+        for index, target_column_names in enumerate(target_column_namess):
+            self.log(f"looping stream=`{target_column_names.name}` ({index + 1}/{len(target_column_namess)})")
+
+            prediction = self.stream_loop(target_column_names)
+
+            if self.deterministic:
+                prediction2 = self.stream_loop(target_column_names)
+                self.deterministic = prediction.equals(prediction2)
+                self.log(f"deterministic: {str(self.deterministic).lower()}")
+
+            predictions.append(prediction)
+
+        return pandas.concat(predictions)
+
+    def stream_have_model(self):
+        return self.have_model
+
+    @abc.abstractmethod
+    def stream_no_model(
+        self,
+    ):
+        ...
+
+    @abc.abstractmethod
+    def stream_loop(
+        self,
+        target_column_name: api.TargetColumnNames,
     ) -> pandas.DataFrame:
         ...
 

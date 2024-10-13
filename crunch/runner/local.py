@@ -1,3 +1,5 @@
+import functools
+import itertools
 import logging
 import os
 import time
@@ -6,9 +8,11 @@ import typing
 import click
 import pandas
 
-from .. import (api, checker, command, constants, ensure, monkey_patches,
+from .. import (api, checker, command, constants, ensure, meta, monkey_patches,
                 tester, utils)
-from .runner import Runner, Columns
+from ..container import (CallableIterable, Columns, GeneratorWrapper,
+                         StreamMessage)
+from .runner import Runner
 
 
 class LocalRunner(Runner):
@@ -20,14 +24,14 @@ class LocalRunner(Runner):
         force_first_train: bool,
         train_frequency: int,
         round_number: str,
-        competition_format: api.CompetitionFormat,
+        competition: api.Competition,
         has_gpu=False,
         checks=True,
         determinism_check_enabled=False,
         read_kwargs={},
         write_kwargs={},
     ):
-        super().__init__(competition_format, determinism_check_enabled)
+        super().__init__(competition.format, determinism_check_enabled)
 
         self.module = module
         self.model_directory_path = model_directory_path
@@ -38,6 +42,8 @@ class LocalRunner(Runner):
         self.checks = checks
         self.read_kwargs = read_kwargs
         self.write_kwargs = write_kwargs
+
+        self.metrics = competition.metrics.list()
 
     def start(self):
         memory_before = utils.get_process_memory()
@@ -93,6 +99,19 @@ class LocalRunner(Runner):
             raise click.Abort()
 
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
+            self.full_x = pandas.concat([
+                utils.read(self.x_train_path, kwargs=self.read_kwargs),
+                utils.read(self.x_test_path, kwargs=self.read_kwargs),
+            ])
+
+            if self.y_test_path:
+                self.full_y = pandas.concat([
+                    utils.read(self.y_train_path, kwargs=self.read_kwargs),
+                    utils.read(self.y_test_path, kwargs=self.read_kwargs),
+                ])
+            else:
+                self.full_y = utils.read(self.y_train_path, kwargs=self.read_kwargs)
+
             self.full_x = pandas.concat([
                 utils.read(self.x_train_path, kwargs=self.read_kwargs),
                 utils.read(self.x_test_path, kwargs=self.read_kwargs),
@@ -216,6 +235,114 @@ class LocalRunner(Runner):
             )
 
         return prediction
+
+    def start_stream(self):
+        self.x_test = utils.read(self.x_test_path, kwargs=self.read_kwargs)
+        # self.x_test = pandas.concat([
+        #     utils.read(self.x_train_path, kwargs=self.read_kwargs),
+        #     self.x_test
+        # ])
+
+        return super().start_stream()
+
+    def _get_stream_default_values(self):
+        return {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "column_names": self.column_names,
+            "embargo": self.embargo,
+            "has_gpu": self.has_gpu,
+            "horizon": 2,  # TODO load from competition parameters
+            **self.features.to_parameter_variants(),
+        }
+
+    def stream_have_model(self):
+        return True
+
+    def stream_no_model(
+        self,
+    ):
+        default_values = self._get_stream_default_values()
+        stream_names = set(self.column_names.target_names)
+
+        x_train = utils.read(self.x_train_path, kwargs=self.read_kwargs)
+
+        streams = []
+        for stream_name, group in x_train.groupby(self.column_names.id):
+            if stream_name not in stream_names:
+                continue
+
+            parts = utils.split_at_nans(group, self.column_names.side)
+            for part in parts:
+                streams.append(CallableIterable.from_dataframe(part, self.column_names.side, StreamMessage))
+
+        logging.warning(f'call: train - stream.len={len(streams)}')
+
+        utils.smart_call(
+            self.train_function,
+            default_values,
+            {
+                "streams": streams,
+            }
+        )
+
+    def stream_loop(
+        self,
+        target_column_names: api.TargetColumnNames,
+    ) -> pandas.DataFrame:
+        default_values = self._get_stream_default_values()
+
+        x_data = self.x_test[[
+            self.column_names.moon,
+            self.column_names.id,
+            self.column_names.side,
+        ]]
+
+        x_data = x_data[x_data[self.column_names.id] == target_column_names.name]
+
+        stream_datas = [
+            part[self.column_names.side]
+            for part in utils.split_at_nans(x_data, self.column_names.side)
+        ]
+
+        time_meta_metrics = meta.filter_metrics(
+            self.metrics,
+            target_column_names.name,
+            api.ScorerFunction.META__EXECUTION_TIME
+        )
+
+        predicteds, durations = [], []
+        for index, stream_data in enumerate(stream_datas):
+            logging.warning(f'call: infer ({index + 1}/{len(stream_datas)})')
+
+            wrapper = GeneratorWrapper(
+                iter(stream_data),
+                lambda stream: utils.smart_call(
+                    self.infer_function,
+                    default_values,
+                    {
+                        "stream": stream,
+                    }
+                )
+            )
+
+            collected_values, collected_durations = wrapper.collect(len(stream_data))
+            predicteds.extend(collected_values)
+
+            if len(time_meta_metrics):
+                durations.extend(collected_durations)
+
+        x_data.dropna(subset=[self.column_names.side], inplace=True)
+
+        return pandas.DataFrame({
+            self.column_names.moon: x_data[self.column_names.moon].values,
+            self.column_names.id: x_data[self.column_names.id].values,
+            self.column_names.output: pandas.Series(predicteds),
+            **{
+                meta.to_column_name(metric, self.column_names.output): pandas.Series(durations).astype(int)
+                for metric in time_meta_metrics
+            }
+        })
 
     def finalize(self, prediction: pandas.DataFrame):
         prediction_path = os.path.join(

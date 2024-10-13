@@ -280,7 +280,8 @@ def local_options(f):
         click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check."),
         click.option("--round-number", default="@current", help="Change round number to get the data from."),
         click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`."),
-        click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
+        click.option("--no-checks", is_flag=True, help="Disable final predictions checks."),
+        click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check."),
     ]
 
     return functools.reduce(lambda f, option: option(f), options, f)
@@ -378,15 +379,7 @@ def runner_group():
 
 
 @runner_group.command(help="Run your code locally.")
-@click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
-@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
-@click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
-@click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
-@click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
-@click.option("--round-number", default="@current", help="Change round number to get the data from.")
-@click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
-@click.option("--no-checks", is_flag=True, help="Disable final predictions checks.")
-@click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check.")
+@local_options
 def local(
     main_file_path: str,
     model_directory_path: str,
@@ -407,6 +400,9 @@ def local(
         library.scan(requirements_file=constants.REQUIREMENTS_TXT)
         logging.warning('')
 
+    if no_determinism_check == False:
+        no_determinism_check = None
+
     try:
         command.test(
             main_file_path,
@@ -416,7 +412,7 @@ def local(
             round_number,
             has_gpu,
             not no_checks,
-            not no_determinism_check,
+            no_determinism_check,
         )
     except api.ApiException as error:
         utils.exit_via(error)
@@ -484,7 +480,7 @@ def cloud(
     requirements_txt_path = os.path.join(code_directory, "requirements.txt")
     model_directory_path = os.path.join(code_directory, model_directory)
 
-    prediction_file_name = "prediction.csv"
+    prediction_file_name = "prediction.parquet"
     prediction_path = os.path.join(context_directory, prediction_file_name)
 
     trace_file_name = "trace.txt"
@@ -530,6 +526,7 @@ def cloud(
 @runner_group.command(help="Cloud executor, do not directly run!")
 @click.option("--competition-name", required=True)
 @click.option("--competition-format", required=True)
+@click.option("--split-key-type", required=True)
 # ---
 @click.option("--x", "x_path", required=True)
 @click.option("--y", "y_path", required=True)
@@ -545,17 +542,21 @@ def cloud(
 @click.option("--ping-url", "ping_urls", multiple=True)
 # ---
 @click.option("--train", required=True, type=bool)
-@click.option("--moon", required=True, type=int)
+@click.option("--loop-key", required=True, type=str)
 @click.option("--embargo", required=True, type=int)
 @click.option("--number-of-features", required=True, type=int)
 @click.option("--gpu", required=True, type=bool)
 # ---
 @click.option("--id-column-name", required=True)
 @click.option("--moon-column-name", required=True)
-@click.option("--target", "targets", required=True, multiple=True, nargs=3)
+@click.option("--side-column-name", required=True)
+@click.option("--input-column-name", required=True)
+@click.option("--output-column-name", required=True)
+@click.option("--target", "targets", required=True, multiple=True, nargs=4)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
+    split_key_type: str,
     # ---
     x_path: str,
     y_path: str,
@@ -571,14 +572,17 @@ def cloud_executor(
     ping_urls: typing.List[str],
     # ---
     train: bool,
-    moon: int,
+    loop_key: str,
     embargo: int,
     number_of_features: int,
     gpu: bool,
     # ---
     id_column_name: str,
     moon_column_name: str,
-    targets: typing.List[typing.Tuple[str, str, str]],
+    side_column_name: str,
+    input_column_name: str,
+    output_column_name: str,
+    targets: typing.List[typing.Tuple[str, str, str, str]],
 ):
     from .runner import is_inside
     if not is_inside:
@@ -587,6 +591,10 @@ def cloud_executor(
 
     from . import monkey_patches
     monkey_patches.apply_all()
+
+    split_key_type = api.SplitKeyType[split_key_type]
+    if split_key_type == api.SplitKeyType.INTEGER:
+        loop_key = int(loop_key)
 
     from .runner.cloud_executor import SandboxExecutor
     executor = SandboxExecutor(
@@ -607,7 +615,7 @@ def cloud_executor(
         ping_urls,
         # ---
         train,
-        moon,
+        loop_key,
         embargo,
         number_of_features,
         gpu,
@@ -615,10 +623,13 @@ def cloud_executor(
         api.ColumnNames(
             id_column_name,
             moon_column_name,
-            {
-                api.TargetColumnNames(None, target_name, input, output)
-                for target_name, input, output in targets
-            }
+            side_column_name or None,
+            input_column_name or None,
+            output_column_name or None,
+            [
+                api.TargetColumnNames(0, target_name, side or None, input or None, output or None)
+                for target_name, side, input, output in targets
+            ]
         )
     )
 
