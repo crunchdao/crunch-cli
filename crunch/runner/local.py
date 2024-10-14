@@ -249,11 +249,8 @@ class LocalRunner(Runner):
         return {
             "number_of_features": self.number_of_features,
             "model_directory_path": self.model_directory_path,
-            "column_names": self.column_names,
             "embargo": self.embargo,
             "has_gpu": self.has_gpu,
-            "horizon": 2,  # TODO load from competition parameters
-            **self.features.to_parameter_variants(),
         }
 
     def stream_have_model(self):
