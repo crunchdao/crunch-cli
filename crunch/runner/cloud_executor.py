@@ -319,8 +319,6 @@ class SandboxExecutor:
             "model_directory_path": self.model_directory_path,
             "embargo": self.embargo,
             "has_gpu": self.gpu,
-            "has_trained": self.train,
-            **self.features.to_parameter_variants(),
         }
 
         side_column_name: str = self.column_names.side
