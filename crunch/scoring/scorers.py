@@ -126,7 +126,7 @@ def custom__mid_one__profit_and_loss_with_transaction_cost(
     target_column_name: str,
     prediction_column_name: str,
 ):
-    EPSILON = 0.001
+    EPSILON = 0.0025
 
     profit_and_loss = group[target_column_name] * numpy.sign(group[prediction_column_name])
     transactions_cost = (group[prediction_column_name] != 0).sum() * EPSILON
