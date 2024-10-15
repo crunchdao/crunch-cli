@@ -4,6 +4,7 @@ coloredlogs
 dataclasses_json
 gitignorefile
 humanfriendly
+importlib_metadata
 inflection
 inquirer
 joblib
@@ -21,3 +22,4 @@ scikit-learn
 scipy
 sseclient-py
 tqdm
+importlib_metadata

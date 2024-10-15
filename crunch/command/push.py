@@ -67,18 +67,10 @@ def push(
     dry: bool,
     export_path: str = None,
 ):
-    import pkg_resources
-
     client, project = api.Client.from_project()
     competition = project.competition
 
-    installed_packages_version = {}
-    if include_installed_packages_version:
-        installed_packages_version = {
-            package.project_name: package.version
-            for package in pkg_resources.working_set
-            if utils.is_valid_version(package.version)
-        }
+    installed_packages_version = utils.pip_freeze() if include_installed_packages_version else {}
 
     fds = []
 

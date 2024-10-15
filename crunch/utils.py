@@ -160,6 +160,28 @@ def to_unix_path(input: str):
         .replace("//", "/")
 
 
+def pip_freeze():
+    import importlib_metadata
+
+    working_set = {}
+
+    installed_packages = {
+        package
+        for packages in importlib_metadata.packages_distributions().values()
+        for package in packages
+    }
+
+    for package in installed_packages:
+        version = importlib_metadata.version(package)
+
+        if not is_valid_version(version):
+            continue
+
+        working_set[package] = version
+
+    return working_set
+
+
 def is_valid_version(input: str):
     import packaging.version
 
@@ -430,5 +452,5 @@ def split_at_nans(
 
         if start != end or keep_empty:
             parts.append(dataframe.iloc[start:end])
-    
+
     return parts
