@@ -355,7 +355,7 @@ class SandboxExecutor:
 
             predicteds, durations = [], []
             for index, stream_data in enumerate(stream_datas):
-                logging.warning(f'call: infer ({index+ 1}/{len(stream_datas)})')
+                print(f'call: infer ({index+ 1}/{len(stream_datas)})')
 
                 wrapper = GeneratorWrapper(
                     iter(stream_data),
