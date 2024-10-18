@@ -180,8 +180,8 @@ class CloudRunner(Runner):
         self.report_current("process loop", moon)
 
         return self.sandbox(
-            train=train,
-            loop_key=moon,
+            train,
+            moon,
         )
 
     def start_dag(self):
@@ -194,9 +194,7 @@ class CloudRunner(Runner):
         self,
         train: bool
     ):
-        return self.sandbox(
-            train=train,
-        )
+        return self.sandbox(train, -1)
     
     def start_stream(self):
         self.create_trace_file()
@@ -205,9 +203,10 @@ class CloudRunner(Runner):
 
     def stream_no_model(
         self,
-    ):
+    ) -> pandas.DataFrame:
         self.sandbox(
-            train=True,
+            True,
+            -1,
             return_result=False,
         )
 
@@ -216,8 +215,8 @@ class CloudRunner(Runner):
         target_column_names: api.TargetColumnNames,
     ) -> pandas.DataFrame:
         return self.sandbox(
-            train=False,
-            stream_name=target_column_names.name
+            False,
+            target_column_names.name
         )
 
     def finalize(self, prediction: pandas.DataFrame):
@@ -411,10 +410,8 @@ class CloudRunner(Runner):
 
     def sandbox(
         self,
-        *,
         train: bool,
-        loop_key: typing.Union[int, str] = -1,
-        stream_name: typing.Optional[str] = None,
+        loop_key: typing.Union[int, str],
         return_result=True,
     ):
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -460,7 +457,6 @@ class CloudRunner(Runner):
                 # ---
                 "train": train,
                 "loop-key": loop_key,
-                "stream-name": stream_name,
                 "embargo": self.embargo,
                 "number-of-features": self.number_of_features,
                 "gpu": self.gpu,
@@ -525,7 +521,7 @@ class CloudRunner(Runner):
                     }
                 )
             except SystemExit:
-                self.report_trace(stream_name or loop_key)
+                self.report_trace(loop_key)
                 raise
 
         if return_result:

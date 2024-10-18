@@ -543,7 +543,6 @@ def cloud(
 # ---
 @click.option("--train", required=True, type=bool)
 @click.option("--loop-key", required=True, type=str)
-@click.option("--stream-name", required=False, type=str)
 @click.option("--embargo", required=True, type=int)
 @click.option("--number-of-features", required=True, type=int)
 @click.option("--gpu", required=True, type=bool)
@@ -574,7 +573,6 @@ def cloud_executor(
     # ---
     train: bool,
     loop_key: str,
-    stream_name: str,
     embargo: int,
     number_of_features: int,
     gpu: bool,
@@ -618,7 +616,6 @@ def cloud_executor(
         # ---
         train,
         loop_key,
-        stream_name,
         embargo,
         number_of_features,
         gpu,
