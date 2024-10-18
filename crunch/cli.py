@@ -592,9 +592,11 @@ def cloud_executor(
     from . import monkey_patches
     monkey_patches.apply_all()
 
-    split_key_type = api.SplitKeyType[split_key_type]
-    if split_key_type == api.SplitKeyType.INTEGER:
-        loop_key = int(loop_key)
+    if competition_format == api.CompetitionFormat.TIMESERIES:
+        split_key_type = api.SplitKeyType[split_key_type]
+
+        if split_key_type == api.SplitKeyType.INTEGER:
+            loop_key = int(loop_key)
 
     from .runner.cloud_executor import SandboxExecutor
     executor = SandboxExecutor(
