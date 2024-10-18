@@ -126,6 +126,7 @@ class SandboxExecutor:
         # ---
         train: bool,
         loop_key: typing.Union[int, str],
+        stream_name: typing.Optional[str],
         embargo: int,
         number_of_features: int,
         gpu: bool,
@@ -150,6 +151,7 @@ class SandboxExecutor:
 
         self.train = train
         self.loop_key = loop_key
+        self.stream_name = stream_name
         self.embargo = embargo
         self.number_of_features = number_of_features
         self.gpu = gpu
@@ -339,8 +341,8 @@ class SandboxExecutor:
 
             return None
         else:
-            target_column_names = self.column_names.get_target_by_name(self.loop_key)
-            assert target_column_names is not None, f"target not found: {self.loop_key}"
+            target_column_names = self.column_names.get_target_by_name(self.stream_name)
+            assert target_column_names is not None, f"target not found: {self.stream_name}"
 
             stream_datas = [
                 part[side_column_name]
@@ -439,7 +441,7 @@ class SandboxExecutor:
 
         if self.competition_format == api.CompetitionFormat.STREAM:
             dataframe = typing.cast(pandas.DataFrame, input)
-            target_column_name = self.column_names.get_target_by_name(self.loop_key)
+            target_column_name = self.column_names.get_target_by_name(self.stream_name)
 
             column_name = self.column_names.side
             if named_file == NamedFile.Y:
