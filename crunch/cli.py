@@ -592,6 +592,8 @@ def cloud_executor(
     from . import monkey_patches
     monkey_patches.apply_all()
 
+    competition_format = api.CompetitionFormat[competition_format]
+
     if competition_format == api.CompetitionFormat.TIMESERIES:
         split_key_type = api.SplitKeyType[split_key_type]
 
@@ -601,7 +603,7 @@ def cloud_executor(
     from .runner.cloud_executor import SandboxExecutor
     executor = SandboxExecutor(
         competition_name,
-        api.CompetitionFormat[competition_format],
+        competition_format,
         # ---
         x_path,
         y_path,
