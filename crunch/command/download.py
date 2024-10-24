@@ -29,14 +29,14 @@ def _get_data_urls(
     typing.List[int],
     container.Features,
     api.ColumnNames,
-    typing.Tuple[DataFile, DataFile, DataFile, DataFile, DataFile]
+    typing.Dict[str, DataFile]
 ]:
     data_release = round.phases.get_submission().get_data_release()
 
     embargo = data_release.embargo
     number_of_features = data_release.number_of_features
     column_names = data_release.column_names
-    data_files: api.DataFiles = data_release.data_files
+    data_files = data_release.data_files
     splits = data_release.splits
     features = container.Features.from_data_release(data_release)
 
@@ -49,14 +49,11 @@ def _get_data_urls(
         )
     ]
 
-    def get_file(file_name: str) -> DataFile:
-        key = file_name.lower()
-        data_file: api.DataFile = getattr(data_files, key)
-
+    def get_file(data_file: api.DataFile) -> DataFile:
         url = data_file.url
         path = os.path.join(
             data_directory,
-            f"{file_name}.{utils.get_extension(url)}"
+            utils.get_name(url)
         )
 
         return DataFile(
@@ -66,25 +63,16 @@ def _get_data_urls(
             data_file.signed
         )
 
-    x_train = get_file("X_train")
-    y_train = get_file("y_train")
-    x_test = get_file("X_test")
-    y_test = get_file("y_test")
-    example_prediction = get_file("example_prediction")
-
     return (
         embargo,
         number_of_features,
         split_keys,
         features,
         column_names,
-        (
-            x_train,
-            y_train,
-            x_test,
-            y_test,
-            example_prediction
-        )
+        {
+            key: get_file(value)
+            for key, value in data_files.items()
+        }
     )
 
 
@@ -133,23 +121,14 @@ def download(
         split_keys,
         features,
         column_names,
-        (
-            x_train,
-            y_train,
-            x_test,
-            y_test,
-            example_prediction,
-        )
+        data_files,
     ) = _get_data_urls(
         round,
         constants.DOT_DATA_DIRECTORY,
     )
-
-    _download(x_train, force)
-    _download(y_train, force)
-    _download(x_test, force)
-    _download(y_test, force)
-    _download(example_prediction, force)
+    
+    for data_file in data_files.values():
+        _download(data_file, force)
 
     return (
         embargo,
@@ -157,13 +136,11 @@ def download(
         split_keys,
         features,
         column_names,
-        (
-            x_train.path,
-            y_train.path,
-            x_test.path,
-            y_test.path if y_test.has_size else None,
-            example_prediction.path,
-        )
+        {
+            key: value
+            for key, value in data_files.items()
+            if value.has_size
+        }
     )
 
 

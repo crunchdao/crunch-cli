@@ -288,6 +288,12 @@ def get_extension(url: str):
     raise click.Abort()
 
 
+def get_name(url: str):
+    url = cut_url(url)
+
+    return os.path.basename(url)
+
+
 def _download_head(
     session: requests.Session,
     url: str,
@@ -335,10 +341,13 @@ def download(
     print=print,
     progress_bar=True,
     max_retry=10,
+    session: typing.Optional[requests.Session] = None
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
-    session = requests.Session()
+    if session is None:
+        session = requests.Session()
+
     session.headers["Accept-Encoding"] = "identity"  # GitHub provide the range on the gzip-encoded response instead of re-encoding it
 
     file_length, accept_ranges, response = _download_head(session, url, path, log, print)
