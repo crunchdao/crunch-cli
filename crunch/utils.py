@@ -288,6 +288,12 @@ def get_extension(url: str):
     raise click.Abort()
 
 
+def get_name(url: str):
+    url = cut_url(url)
+
+    return os.path.basename(url)
+
+
 def _download_head(
     session: requests.Session,
     url: str,

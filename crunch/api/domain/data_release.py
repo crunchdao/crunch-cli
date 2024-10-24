@@ -44,6 +44,9 @@ class DataFiles:
     y_test: DataFile
     example_prediction: DataFile
 
+    def items(self):
+        return vars(self).items()
+
 
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
@@ -57,6 +60,9 @@ class OriginalFiles:
     y_raw: typing.Optional[DataFile]
     example_prediction: DataFile
     orthogonalization_data: typing.Optional[DataFile]
+
+    def items(self):
+        return vars(self).items()
 
 
 class DataReleaseSplitGroup(enum.Enum):
@@ -168,10 +174,10 @@ class DataRelease(Model):
             self.reload()
             files = self._attrs["dataFiles"]
 
-        if "xTrain" in files:
+        if "xTrain" in files and "yTrain" in files:
             return DataFiles.from_dict(files)
 
-        if "x" in files:
+        if "x" in files and "y" in files:
             return OriginalFiles.from_dict(files)
 
         return types.MappingProxyType({
