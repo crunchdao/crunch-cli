@@ -26,6 +26,7 @@ class DataReleaseTargetResolution(enum.Enum):
 @dataclasses.dataclass(frozen=True)
 class DataFile:
 
+    name: str
     url: str
     size: int
     signed: bool
