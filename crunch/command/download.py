@@ -10,8 +10,8 @@ from .. import constants, utils, api, container
 @dataclasses.dataclass
 class DataFile:
 
-    url: str
     path: str
+    url: str
     size: int
     signed: bool
 
@@ -53,12 +53,12 @@ def _get_data_urls(
         url = data_file.url
         path = os.path.join(
             data_directory,
-            utils.get_name(url)
+            data_file.name
         )
 
         return DataFile(
-            url,
             path,
+            url,
             data_file.size,
             data_file.signed
         )
