@@ -21,15 +21,16 @@ class DataReleaseTargetResolution(enum.Enum):
 
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE
+    undefined=dataclasses_json.Undefined.EXCLUDE,
 )
 @dataclasses.dataclass(frozen=True)
 class DataFile:
 
-    name: str
     url: str
     size: int
     signed: bool
+    # TODO Make me mandatory
+    name: str = None
 
 
 @dataclasses.dataclass(frozen=True)

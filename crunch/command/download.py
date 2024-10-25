@@ -7,6 +7,15 @@ import click
 from .. import constants, utils, api, container
 
 
+# TODO Remove me
+LEGACY_NAME_MAPPING = {
+    "x_train": "X_train",
+    "y_train": "y_train",
+    "x_test": "X_test",
+    "y_test": "y_test",
+    "example_prediction": "example_prediction",
+}
+
 @dataclasses.dataclass
 class DataFile:
 
@@ -49,11 +58,11 @@ def _get_data_urls(
         )
     ]
 
-    def get_file(data_file: api.DataFile) -> DataFile:
+    def get_file(data_file: api.DataFile, key: str) -> DataFile:
         url = data_file.url
         path = os.path.join(
             data_directory_path,
-            data_file.name
+            data_file.name or (f"{LEGACY_NAME_MAPPING[key]}.{utils.get_extension(url)}")
         )
 
         return DataFile(
@@ -70,7 +79,7 @@ def _get_data_urls(
         features,
         column_names,
         {
-            key: get_file(value)
+            key: get_file(value, key)
             for key, value in data_files.items()
         }
     )
