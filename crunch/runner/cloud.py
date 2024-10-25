@@ -195,7 +195,7 @@ class CloudRunner(Runner):
         train: bool
     ):
         return self.sandbox(train, -1)
-    
+
     def start_stream(self):
         self.create_trace_file()
 
@@ -203,7 +203,7 @@ class CloudRunner(Runner):
 
     def stream_no_model(
         self,
-    ) -> pandas.DataFrame:
+    ):
         self.sandbox(
             True,
             -1,
@@ -213,6 +213,24 @@ class CloudRunner(Runner):
     def stream_loop(
         self,
         target_column_names: api.TargetColumnNames,
+    ) -> pandas.DataFrame:
+        return self.sandbox(
+            False,
+            target_column_names.name
+        )
+
+    def spatial_train(
+        self,
+    ) -> None:
+        self.sandbox(
+            True,
+            -1,
+            return_result=False,
+        )
+
+    def spatial_loop(
+        self,
+        target_column_names: api.TargetColumnNames
     ) -> pandas.DataFrame:
         return self.sandbox(
             False,
@@ -408,38 +426,74 @@ class CloudRunner(Runner):
             self.venv_env
         )
 
+    @typing.overload
+    def sandbox(
+        self,
+        train: bool,
+        loop_key: typing.Union[int, str],
+        return_result: typing.Literal[True] = True,
+    ) -> pandas.DataFrame:
+        ...
+
+    @typing.overload
+    def sandbox(
+        self,
+        train: bool,
+        loop_key: typing.Union[int, str],
+        return_result: typing.Literal[False],
+    ) -> None:
+        ...
+
     def sandbox(
         self,
         train: bool,
         loop_key: typing.Union[int, str],
         return_result=True,
     ):
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            self.bash2(["chmod", "a+rxw", tmpdirname])
+        is_regular = self.competition_format != api.CompetitionFormat.SPATIAL
 
-            y_tmp_path = link(tmpdirname, self.y_path, fake=not train)
-            x_tmp_path = link(tmpdirname, self.x_path)
-            y_raw_tmp_path = link(tmpdirname, self.y_raw_path)
-            orthogonalization_data_tmp_path = link(tmpdirname, self.orthogonalization_data_path)
+        tmpdirname = (
+            tempfile.TemporaryDirectory()
+            if is_regular
+            else None
+        )
 
-            tmp_paths = filter(bool, [
-                y_tmp_path,
-                x_tmp_path,
-                y_raw_tmp_path,
-                orthogonalization_data_tmp_path,
-            ])
+        try:
+            if is_regular:
+                self.bash2(["chmod", "a+rxw", tmpdirname])
 
-            self.bash2(["chmod", "a+r", *tmp_paths])
+                y_tmp_path = link(tmpdirname, self.y_path, fake=not train)
+                x_tmp_path = link(tmpdirname, self.x_path)
+                y_raw_tmp_path = link(tmpdirname, self.y_raw_path)
+                orthogonalization_data_tmp_path = link(tmpdirname, self.orthogonalization_data_path)
+
+                tmp_paths = filter(bool, [
+                    y_tmp_path,
+                    x_tmp_path,
+                    y_raw_tmp_path,
+                    orthogonalization_data_tmp_path,
+                ])
+
+                self.bash2(["chmod", "a+r", *tmp_paths])
+                
+                path_options = {
+                    "x": x_tmp_path,
+                    "y": y_tmp_path,
+                    "y-raw": y_raw_tmp_path,
+                    "orthogonalization-data": orthogonalization_data_tmp_path,
+                }
+            else:
+                self.bash2(["chmod", "a+r", self.data_directory])
+
+                path_options = {}
 
             options = {
                 "competition-name": self.competition.name,
                 "competition-format": self.competition.format.name,
                 "split-key-type": self.competition.split_key_type.name,
                 # ---
-                "x": x_tmp_path,
-                "y": y_tmp_path,
-                "y-raw": y_raw_tmp_path,
-                "orthogonalization-data": orthogonalization_data_tmp_path,
+                "data-directory": self.data_directory,
+                **path_options,
                 # ---
                 "main-file": self.main_file,
                 "code-directory": self.code_directory,
@@ -479,6 +533,7 @@ class CloudRunner(Runner):
 
             # TODO move to a dedicated function
             args = []
+
             def append_value(value: typing.Any):
                 if isinstance(value, tuple):
                     for x in value:
@@ -501,28 +556,30 @@ class CloudRunner(Runner):
                     args.append(f"--{key}")
                     append_value(value)
 
-            try:
-                self.do_bash(
-                    [
-                        "sandbox",
-                        "--verbose",
-                        "--chown-directory", self.model_directory_path,
-                        self.sandbox_restriction_flag,
-                        "--",
-                        "prefix", "user-code",
-                        "--",
-                        "python3", "-u",
-                        "-m", "crunch", "runner", "cloud-executor",
-                        *args
-                    ],
-                    {
-                        **self.venv_env,
-                        "CRUNCH_AUTO_MONKEY_PATCH": "true",
-                    }
-                )
-            except SystemExit:
-                self.report_trace(loop_key)
-                raise
+            self.do_bash(
+                [
+                    "sandbox",
+                    "--verbose",
+                    "--chown-directory", self.model_directory_path,
+                    self.sandbox_restriction_flag,
+                    "--",
+                    "prefix", "user-code",
+                    "--",
+                    "python3", "-u",
+                    "-m", "crunch", "runner", "cloud-executor",
+                    *args
+                ],
+                {
+                    **self.venv_env,
+                    "CRUNCH_AUTO_MONKEY_PATCH": "true",
+                }
+            )
+        except SystemExit:
+            self.report_trace(loop_key)
+            raise
+        finally:
+            if tmpdirname is not None:
+                tmpdirname.cleanup()
 
         if return_result:
             return utils.read(self.prediction_path)
@@ -549,42 +606,51 @@ class CloudRunner(Runner):
         self.default_feature_group = data_release.default_feature_group
         data_files = data_release.data_files
 
-        x_url = data_files.x.url
-        self.x_path = os.path.join(
-            self.data_directory,
-            f"x.{utils.get_extension(x_url)}"
-        )
-
-        y_url = data_files.y.url
-        self.y_path = os.path.join(
-            self.data_directory,
-            f"y.{utils.get_extension(y_url)}"
-        )
-
-        data_urls = {
-            self.x_path: x_url,
-            self.y_path: y_url,
-        }
-
-        self.y_raw_path = None
-        if data_files.y_raw:
-            y_raw_url = data_files.y_raw.url
-            self.y_raw_path = os.path.join(
+        if self.competition_format != api.CompetitionFormat.SPATIAL:
+            x_url = data_files.x.url
+            self.x_path = os.path.join(
                 self.data_directory,
-                f"y_raw.{utils.get_extension(y_raw_url)}"
+                f"x.{utils.get_extension(x_url)}"
             )
 
-            data_urls[self.y_raw_path] = y_raw_url
-
-        self.orthogonalization_data_path = None
-        if data_files.orthogonalization_data:
-            orthogonalization_data_url = data_files.orthogonalization_data.url
-            self.orthogonalization_data_path = os.path.join(
+            y_url = data_files.y.url
+            self.y_path = os.path.join(
                 self.data_directory,
-                f"orthogonalization_data.{utils.get_extension(orthogonalization_data_url)}"
+                f"y.{utils.get_extension(y_url)}"
             )
 
-            data_urls[self.orthogonalization_data_path] = orthogonalization_data_url
+            data_urls = {
+                self.x_path: x_url,
+                self.y_path: y_url,
+            }
+
+            self.y_raw_path = None
+            if data_files.y_raw:
+                y_raw_url = data_files.y_raw.url
+                self.y_raw_path = os.path.join(
+                    self.data_directory,
+                    f"y_raw.{utils.get_extension(y_raw_url)}"
+                )
+
+                data_urls[self.y_raw_path] = y_raw_url
+
+            self.orthogonalization_data_path = None
+            if data_files.orthogonalization_data:
+                orthogonalization_data_url = data_files.orthogonalization_data.url
+                self.orthogonalization_data_path = os.path.join(
+                    self.data_directory,
+                    f"orthogonalization_data.{utils.get_extension(orthogonalization_data_url)}"
+                )
+
+                data_urls[self.orthogonalization_data_path] = orthogonalization_data_url
+        else:
+            data_urls = {
+                os.path.join(
+                    self.data_directory,
+                    data_file.name
+                ): data_file.url
+                for data_file in data_files.values()
+            }
 
         self.keys = sorted([
             split.key

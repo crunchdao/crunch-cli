@@ -528,10 +528,11 @@ def cloud(
 @click.option("--competition-format", required=True)
 @click.option("--split-key-type", required=True)
 # ---
-@click.option("--x", "x_path", required=True)
-@click.option("--y", "y_path", required=True)
+@click.option("--x", "x_path", default=None)
+@click.option("--y", "y_path", default=None)
 @click.option("--y-raw", "y_raw_path", default=None)
 @click.option("--orthogonalization-data", "orthogonalization_data_path", default=None)
+@click.option("--data-directory", "data_directory_path", default=None)
 # ---
 @click.option("--main-file", required=True)
 @click.option("--code-directory", required=True)
@@ -562,6 +563,7 @@ def cloud_executor(
     y_path: str,
     y_raw_path: str,
     orthogonalization_data_path: str,
+    data_directory_path: str,
     # ---
     main_file: str,
     code_directory: str,
@@ -609,6 +611,7 @@ def cloud_executor(
         y_path,
         y_raw_path,
         orthogonalization_data_path,
+        data_directory_path,
         # ---
         main_file,
         code_directory,
