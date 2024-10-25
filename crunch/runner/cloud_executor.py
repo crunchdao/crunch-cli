@@ -157,7 +157,7 @@ class SandboxExecutor:
         self.gpu = gpu
 
         self.column_names = column_names
-    
+
     def load_data(self, trained: Reference):
         if self.competition_format == api.CompetitionFormat.SPATIAL:
             return None, None, None
@@ -192,9 +192,8 @@ class SandboxExecutor:
         del full_x
 
         gc.collect()
-    
-        return x_train, y_train, x_test
 
+        return x_train, y_train, x_test
 
     def start(self):
         ping(self.ping_urls)
@@ -431,7 +430,7 @@ class SandboxExecutor:
         else:
             target_column_names = self.column_names.get_target_by_name(self.loop_key)
             assert target_column_names is not None, f"target not found: {self.loop_key}"
-            
+
             # TODO Make dynamic or come from the API
             test_directory_path = os.path.join(self.data_directory_path, "test")
 
@@ -445,15 +444,19 @@ class SandboxExecutor:
                 matching_data_file_name
             ) if matching_data_file_name else None
 
-            return utils.smart_call(
+            prediction = utils.smart_call(
                 infer_function,
-                default_values, {
+                default_values,
+                {
                     "test_directory_path": test_directory_path,
                     "test_data_file_path": test_data_file_path,
                     "data_file_path": test_data_file_path,
                     "target_name": target_column_names.name,
                 }
             )
+
+            ensure_dataframe(prediction, "prediction")
+            return prediction
 
     def filter_train(self, dataframe: pandas.DataFrame, named_file: NamedFile):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
