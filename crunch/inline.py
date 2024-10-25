@@ -34,6 +34,10 @@ class _Inline:
         return competition
 
     def load_data(self, **kwargs) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
+        if self._competition.format == api.CompetitionFormat.SPATIAL:
+            logging.error(f"Please follow the competition instructions to load the data.")
+            return None, None, None
+
         if self._competition.format == api.CompetitionFormat.STREAM:
             logging.error(f"Please call `.load_streams()` instead.")
             return None, None, None
@@ -64,6 +68,10 @@ class _Inline:
         return x_train, y_train, x_test
 
     def load_streams(self, **kwargs) -> typing.Tuple[Streams, Streams]:
+        if self._competition.format == api.CompetitionFormat.SPATIAL:
+            logging.error(f"Please follow the competition instructions to load the data.")
+            return None, None
+
         if self._competition.format != api.CompetitionFormat.STREAM:
             logging.error(f"Please call `.load_data()` instead.")
             return None, None
