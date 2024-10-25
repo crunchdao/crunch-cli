@@ -21,6 +21,7 @@ from .data_release import (
     DataFiles,
     OriginalFiles,
     DataFile,
+    KnownData,
 )
 from .enum_ import (
     Language,

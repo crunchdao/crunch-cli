@@ -32,6 +32,16 @@ class DataFile:
     signed: bool
 
 
+@dataclasses.dataclass(frozen=True)
+class KnownData:
+
+    X_TRAIN = "X_train"
+    Y_TRAIN = "y_train"
+    X_TEST = "X_test"
+    Y_TEST = "y_test"
+    EXAMPLE_PREDICTION = "example_prediction"
+
+
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
     undefined=dataclasses_json.Undefined.EXCLUDE

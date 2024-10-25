@@ -457,3 +457,11 @@ def split_at_nans(
             parts.append(dataframe.iloc[start:end])
 
     return parts
+
+
+def find_first(directory: str, prefix: str):
+    prefix_with_dot = prefix + "."
+
+    for name in os.listdir(directory):
+        if name == prefix or name.startswith(prefix_with_dot):
+            return name

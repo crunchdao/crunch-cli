@@ -22,7 +22,7 @@ class DataFile:
 
 def _get_data_urls(
     round: api.Round,
-    data_directory: str,
+    data_directory_path: str,
 ) -> typing.Tuple[
     int,
     int,
@@ -52,7 +52,7 @@ def _get_data_urls(
     def get_file(data_file: api.DataFile) -> DataFile:
         url = data_file.url
         path = os.path.join(
-            data_directory,
+            data_directory_path,
             data_file.name
         )
 
@@ -113,7 +113,8 @@ def download(
     competition = project.competition
     round = competition.rounds.get(round_number)
 
-    os.makedirs(constants.DOT_DATA_DIRECTORY, exist_ok=True)
+    data_directory_path = constants.DOT_DATA_DIRECTORY
+    os.makedirs(data_directory_path, exist_ok=True)
 
     (
         embargo,
@@ -124,7 +125,7 @@ def download(
         data_files,
     ) = _get_data_urls(
         round,
-        constants.DOT_DATA_DIRECTORY,
+        data_directory_path,
     )
     
     for data_file in data_files.values():
@@ -136,6 +137,7 @@ def download(
         split_keys,
         features,
         column_names,
+        data_directory_path,
         {
             key: value
             for key, value in data_files.items()
