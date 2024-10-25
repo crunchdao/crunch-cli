@@ -7,6 +7,15 @@ import click
 from .. import constants, utils, api, container
 
 
+# TODO Remove me
+LEGACY_NAME_MAPPING = {
+    "x_train": "X_train",
+    "y_train": "y_train",
+    "x_test": "X_test",
+    "y_test": "y_test",
+    "example_prediction": "example_prediction",
+}
+
 @dataclasses.dataclass
 class DataFile:
 
@@ -22,7 +31,7 @@ class DataFile:
 
 def _get_data_urls(
     round: api.Round,
-    data_directory: str,
+    data_directory_path: str,
 ) -> typing.Tuple[
     int,
     int,
@@ -49,11 +58,11 @@ def _get_data_urls(
         )
     ]
 
-    def get_file(data_file: api.DataFile) -> DataFile:
+    def get_file(data_file: api.DataFile, key: str) -> DataFile:
         url = data_file.url
         path = os.path.join(
-            data_directory,
-            data_file.name
+            data_directory_path,
+            data_file.name or (f"{LEGACY_NAME_MAPPING[key]}.{utils.get_extension(url)}")
         )
 
         return DataFile(
@@ -70,7 +79,7 @@ def _get_data_urls(
         features,
         column_names,
         {
-            key: get_file(value)
+            key: get_file(value, key)
             for key, value in data_files.items()
         }
     )
@@ -113,7 +122,8 @@ def download(
     competition = project.competition
     round = competition.rounds.get(round_number)
 
-    os.makedirs(constants.DOT_DATA_DIRECTORY, exist_ok=True)
+    data_directory_path = constants.DOT_DATA_DIRECTORY
+    os.makedirs(data_directory_path, exist_ok=True)
 
     (
         embargo,
@@ -124,7 +134,7 @@ def download(
         data_files,
     ) = _get_data_urls(
         round,
-        constants.DOT_DATA_DIRECTORY,
+        data_directory_path,
     )
     
     for data_file in data_files.values():
@@ -136,6 +146,7 @@ def download(
         split_keys,
         features,
         column_names,
+        data_directory_path,
         {
             key: value
             for key, value in data_files.items()

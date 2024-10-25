@@ -9,6 +9,9 @@ from .. import api
 
 class Runner(abc.ABC):
 
+    force_first_train: bool
+    column_names: api.ColumnNames
+
     def __init__(
         self,
         competition_format: api.CompetitionFormat,
@@ -39,6 +42,10 @@ class Runner(abc.ABC):
         elif self.competition_format == api.CompetitionFormat.STREAM:
             self.log("starting stream loop...")
             prediction = self.start_stream()
+
+        elif self.competition_format == api.CompetitionFormat.SPATIAL:
+            self.log("starting spatial loop...")
+            prediction = self.start_spatial()
 
         else:
             raise ValueError(f"unsupported: {self.competition_format}")
@@ -141,6 +148,41 @@ class Runner(abc.ABC):
     def stream_loop(
         self,
         target_column_name: api.TargetColumnNames,
+    ) -> pandas.DataFrame:
+        ...
+
+    def start_spatial(self):
+        predictions: typing.List[pandas.DataFrame] = []
+
+        if self.force_first_train:
+            prediction = self.spatial_train()
+
+        target_column_namess = self.column_names.targets
+        for index, target_column_names in enumerate(target_column_namess):
+            self.log(f"looping target=`{target_column_names.name}` ({index + 1}/{len(target_column_namess)})")
+
+            prediction = self.spatial_loop(target_column_names)
+
+            if self.deterministic:
+                prediction2 = self.spatial_loop(target_column_names)
+                self.deterministic = prediction.equals(prediction2)
+                self.log(f"deterministic: {str(self.deterministic).lower()}")
+
+            prediction["sample"] = target_column_names.name
+            predictions.append(prediction)
+
+        return pandas.concat(predictions)
+
+    @abc.abstractmethod
+    def spatial_train(
+        self,
+    ) -> None:
+        ...
+
+    @abc.abstractmethod
+    def spatial_loop(
+        self,
+        target_column_names: api.TargetColumnNames
     ) -> pandas.DataFrame:
         ...
 

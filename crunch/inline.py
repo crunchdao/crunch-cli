@@ -33,7 +33,16 @@ class _Inline:
 
         return competition
 
-    def load_data(self, **kwargs) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
+    def load_data(
+        self,
+        round_number="@current",
+        force=False,
+        **kwargs,
+    ) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
+        if self._competition.format == api.CompetitionFormat.SPATIAL:
+            logging.error(f"Please follow the competition instructions to load the data.")
+            return None, None, None
+
         if self._competition.format == api.CompetitionFormat.STREAM:
             logging.error(f"Please call `.load_streams()` instead.")
             return None, None, None
@@ -45,14 +54,16 @@ class _Inline:
                 _,  # split keys
                 _,  # features
                 _,  # column_names
-                (
-                    x_train_path,
-                    y_train_path,
-                    x_test_path,
-                    _,  # y_test_path
-                    _,  # example_prediction
-                ),
-            ) = command.download()
+                _,  # data_directory_path,
+                data_paths,
+            ) = command.download(
+                round_number=round_number,
+                force=force,
+            )
+
+            x_train_path = data_paths.get(api.KnownData.X_TRAIN)
+            y_train_path = data_paths.get(api.KnownData.Y_TRAIN)
+            x_test_path = data_paths.get(api.KnownData.X_TEST)
         except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
@@ -63,7 +74,16 @@ class _Inline:
 
         return x_train, y_train, x_test
 
-    def load_streams(self, **kwargs) -> typing.Tuple[Streams, Streams]:
+    def load_streams(
+        self,
+        round_number="@current",
+        force=False,
+        **kwargs,
+    ) -> typing.Tuple[Streams, Streams]:
+        if self._competition.format == api.CompetitionFormat.SPATIAL:
+            logging.error(f"Please follow the competition instructions to load the data.")
+            return None, None
+
         if self._competition.format != api.CompetitionFormat.STREAM:
             logging.error(f"Please call `.load_data()` instead.")
             return None, None
@@ -75,14 +95,15 @@ class _Inline:
                 _,  # split keys
                 _,  # features
                 column_names,
-                (
-                    x_train_path,
-                    _,  # y_train_path
-                    x_test_path,
-                    _,  # y_test_path
-                    _,  # example_prediction
-                ),
-            ) = command.download()
+                _,  # data_directory_path,
+                data_paths,
+            ) = command.download(
+                round_number=round_number,
+                force=force,
+            )
+
+            x_train_path = data_paths.get(api.KnownData.X_TRAIN)
+            x_test_path = data_paths.get(api.KnownData.X_TEST)
         except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
