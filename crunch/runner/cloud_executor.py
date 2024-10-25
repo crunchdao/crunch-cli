@@ -115,6 +115,7 @@ class SandboxExecutor:
         y_path: str,
         y_raw_path: str,
         orthogonalization_data_path: str,
+        data_directory_path: str,
         # ---
         main_file: str,
         code_directory: str,
@@ -139,6 +140,7 @@ class SandboxExecutor:
         self.y_path = y_path
         self.y_raw_path = y_raw_path
         self.orthogonalization_data_path = orthogonalization_data_path
+        self.data_directory_path = data_directory_path
 
         self.main_file = main_file
         self.code_directory = code_directory
@@ -155,23 +157,12 @@ class SandboxExecutor:
         self.gpu = gpu
 
         self.column_names = column_names
-
-    def start(self):
-        ping(self.ping_urls)
-
-        self.state = read(self.state_file, False)
-        self.splits = api.DataReleaseSplit.from_dict_array(self.state["splits"])
-        self.metrics = api.Metric.from_dict_array(self.state["metrics"], None)
-        self.checks = api.Check.from_dict_array(self.state["checks"], None)
-        self.features = Features(
-            api.DataReleaseFeature.from_dict_array(self.state["features"]),
-            self.state["default_feature_group"]
-        )
+    
+    def load_data(self, trained: Reference):
+        if self.competition_format == api.CompetitionFormat.SPATIAL:
+            return None, None, None
 
         full_x = read(self.x_path, True)
-
-        # keep local
-        trained = Reference(False)
 
         if self.train:
             full_y = read(self.y_path, True)
@@ -201,6 +192,25 @@ class SandboxExecutor:
         del full_x
 
         gc.collect()
+    
+        return x_train, y_train, x_test
+
+
+    def start(self):
+        ping(self.ping_urls)
+
+        self.state = read(self.state_file, False)
+        self.splits = api.DataReleaseSplit.from_dict_array(self.state["splits"])
+        self.metrics = api.Metric.from_dict_array(self.state["metrics"], None)
+        self.checks = api.Check.from_dict_array(self.state["checks"], None)
+        self.features = Features(
+            api.DataReleaseFeature.from_dict_array(self.state["features"]),
+            self.state["default_feature_group"]
+        )
+
+        # keep local
+        trained = Reference(False)
+        x_train, y_train, x_test = self.load_data(trained)
 
         try:
             spec = importlib.util.spec_from_file_location(
@@ -223,7 +233,7 @@ class SandboxExecutor:
                     x_train,
                     y_train,
                     x_test,
-                    trained
+                    trained,
                 )
 
             elif self.competition_format == api.CompetitionFormat.STREAM:
@@ -232,7 +242,13 @@ class SandboxExecutor:
                     infer_function,
                     x_train,
                     y_train,
-                    x_test
+                    x_test,
+                )
+
+            if self.competition_format == api.CompetitionFormat.SPATIAL:
+                prediction = self.process_unstructured(
+                    train_function,
+                    infer_function,
                 )
 
             else:
@@ -243,7 +259,7 @@ class SandboxExecutor:
         else:
             self.reset_trace()
 
-        produce_nothing = self.train and self.competition_format == api.CompetitionFormat.STREAM
+        produce_nothing = self.train and self.competition_format in [api.CompetitionFormat.STREAM, api.CompetitionFormat.SPATIAL]
         if not produce_nothing:
             write(prediction, self.prediction_path)
 
@@ -384,6 +400,60 @@ class SandboxExecutor:
                     for metric in time_meta_metrics
                 }
             })
+
+    def process_unstructured(
+        self,
+        train_function: callable,
+        infer_function: callable,
+    ):
+        default_values = {
+            "number_of_features": self.number_of_features,
+            "model_directory_path": self.model_directory_path,
+            "data_directory_path": self.data_directory_path,
+            "embargo": self.embargo,
+            "has_gpu": self.gpu,
+        }
+
+        if self.train:
+            # TODO Make dynamic or come from the API
+            train_directory_path = os.path.join(self.data_directory_path, "train")
+
+            utils.smart_call(
+                train_function,
+                default_values,
+                {
+                    "train_directory_path": train_directory_path,
+                },
+                log=False
+            )
+
+            return None
+        else:
+            target_column_names = self.column_names.get_target_by_name(self.loop_key)
+            assert target_column_names is not None, f"target not found: {self.loop_key}"
+            
+            # TODO Make dynamic or come from the API
+            test_directory_path = os.path.join(self.data_directory_path, "test")
+
+            matching_data_file_name = utils.find_first(
+                test_directory_path,
+                target_column_names.name
+            )
+
+            test_data_file_path = os.path.join(
+                test_directory_path,
+                matching_data_file_name
+            ) if matching_data_file_name else None
+
+            return utils.smart_call(
+                infer_function,
+                default_values, {
+                    "test_directory_path": test_directory_path,
+                    "test_data_file_path": test_data_file_path,
+                    "data_file_path": test_data_file_path,
+                    "target_name": target_column_names.name,
+                }
+            )
 
     def filter_train(self, dataframe: pandas.DataFrame, named_file: NamedFile):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
