@@ -49,14 +49,13 @@ class _Inline:
                 _,  # split keys
                 _,  # features
                 _,  # column_names
-                (
-                    x_train_path,
-                    y_train_path,
-                    x_test_path,
-                    _,  # y_test_path
-                    _,  # example_prediction
-                ),
+                _,  # data_directory_path,
+                data_paths,
             ) = command.download()
+
+            x_train_path = data_paths.get(api.KnownData.X_TRAIN)
+            y_train_path = data_paths.get(api.KnownData.Y_TRAIN)
+            x_test_path = data_paths.get(api.KnownData.X_TEST)
         except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
@@ -83,14 +82,12 @@ class _Inline:
                 _,  # split keys
                 _,  # features
                 column_names,
-                (
-                    x_train_path,
-                    _,  # y_train_path
-                    x_test_path,
-                    _,  # y_test_path
-                    _,  # example_prediction
-                ),
+                _,  # data_directory_path,
+                data_paths,
             ) = command.download()
+
+            x_train_path = data_paths.get(api.KnownData.X_TRAIN)
+            x_test_path = data_paths.get(api.KnownData.X_TEST)
         except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
