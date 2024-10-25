@@ -33,7 +33,12 @@ class _Inline:
 
         return competition
 
-    def load_data(self, **kwargs) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
+    def load_data(
+        self,
+        round_number="@current",
+        force=False,
+        **kwargs,
+    ) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
         if self._competition.format == api.CompetitionFormat.SPATIAL:
             logging.error(f"Please follow the competition instructions to load the data.")
             return None, None, None
@@ -51,7 +56,10 @@ class _Inline:
                 _,  # column_names
                 _,  # data_directory_path,
                 data_paths,
-            ) = command.download()
+            ) = command.download(
+                round_number=round_number,
+                force=force,
+            )
 
             x_train_path = data_paths.get(api.KnownData.X_TRAIN)
             y_train_path = data_paths.get(api.KnownData.Y_TRAIN)
@@ -66,7 +74,12 @@ class _Inline:
 
         return x_train, y_train, x_test
 
-    def load_streams(self, **kwargs) -> typing.Tuple[Streams, Streams]:
+    def load_streams(
+        self,
+        round_number="@current",
+        force=False,
+        **kwargs,
+    ) -> typing.Tuple[Streams, Streams]:
         if self._competition.format == api.CompetitionFormat.SPATIAL:
             logging.error(f"Please follow the competition instructions to load the data.")
             return None, None
@@ -84,7 +97,10 @@ class _Inline:
                 column_names,
                 _,  # data_directory_path,
                 data_paths,
-            ) = command.download()
+            ) = command.download(
+                round_number=round_number,
+                force=force,
+            )
 
             x_train_path = data_paths.get(api.KnownData.X_TRAIN)
             x_test_path = data_paths.get(api.KnownData.X_TEST)
