@@ -22,4 +22,3 @@ scikit-learn
 scipy
 sseclient-py
 tqdm
-importlib_metadata
