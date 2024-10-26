@@ -14,6 +14,24 @@ store.load_from_env()
 DIRECTORY_DEFAULT_FORMAT = "{competitionName}-{projectName}"
 
 
+ENVIRONMENT_PRODUCTION = "production"
+ENVIRONMENT_STAGING = "staging"
+ENVIRONMENT_DEVELOPMENT = "development"
+
+ENVIRONMENT_ALIASES = {
+    "prod": ENVIRONMENT_PRODUCTION,
+    "test": ENVIRONMENT_STAGING,
+    "dev": ENVIRONMENT_DEVELOPMENT,
+    "local": ENVIRONMENT_DEVELOPMENT,
+}
+
+ENVIRONMENTS = {
+    ENVIRONMENT_PRODUCTION: (constants.API_BASE_URL_PRODUCTION, constants.WEB_BASE_URL_PRODUCTION),
+    ENVIRONMENT_STAGING: (constants.API_BASE_URL_STAGING, constants.WEB_BASE_URL_STAGING),
+    ENVIRONMENT_DEVELOPMENT: (constants.API_BASE_URL_DEVELOPMENT, constants.WEB_BASE_URL_DEVELOPMENT),
+}
+
+
 def _format_directory(directory: str, competition_name: str, project_name: str):
     directory = directory \
         .replace("{competitionName}", competition_name) \
@@ -23,30 +41,48 @@ def _format_directory(directory: str, competition_name: str, project_name: str):
 
 
 @click.group()
-@click.version_option(
-    __version__.__version__,
-    package_name="__version__.__title__"
-)
+@click.version_option(__version__.__version__, package_name="__version__.__title__")
 @click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
-@click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_DEFAULT, help="Set the API base url.")
-@click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_DEFAULT, help="Set the Web base url.")
-@click.option("--staging", is_flag=True, help="Connect to the staging environment.")
+@click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_PRODUCTION, help="Set the API base url.")
+@click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_PRODUCTION, help="Set the Web base url.")
+@click.option("--staging", is_flag=True, help="[DEPRECATED] Connect to the staging environment.")
+@click.option("--environment", "--env", "environment_name", help="Connect to another environment.")
 def cli(
     debug: bool,
     api_base_url: str,
     web_base_url: str,
     staging: bool,
+    environment_name: str,
 ):
     store.debug = debug
     store.api_base_url = api_base_url
     store.web_base_url = web_base_url
 
     if staging:
-        print("environment: forcing staging urls")
-        print(f"environment: ignoring ${constants.API_BASE_URL_ENV_VAR} and ${constants.WEB_BASE_URL_ENV_VAR}")
+        if environment_name:
+            print("option `--staging` is deprecated, ignoring it", file=sys.stderr)
+        else:
+            print("option `--staging` is deprecated, prefer `--environment staging`", file=sys.stderr)
+            environment_name = ENVIRONMENT_STAGING
 
-        store.api_base_url = constants.API_BASE_URL_STAGING
-        store.web_base_url = constants.WEB_BASE_URL_STAGING
+    environment_name = ENVIRONMENT_ALIASES.get(environment_name) or environment_name
+    if environment_name in ENVIRONMENTS:
+        print(f"environment: forcing {environment_name} urls, ignoring ${constants.API_BASE_URL_ENV_VAR} and ${constants.WEB_BASE_URL_ENV_VAR}")
+
+        store.api_base_url, store.web_base_url = ENVIRONMENTS[environment_name]
+    elif environment_name:
+        print(f"environment: unknown environment `{environment_name}`, ignoring it")
+
+
+@cli.command(help="Test if the server is online.")
+def ping():
+    client = api.Client.from_env()
+
+    try:
+        client.competitions.get(1)
+        print("server is up!")
+    except BaseException as exception:
+        print(f"server is down? ({exception})")
 
 
 @cli.command(help="Initialize an empty workspace directory.")
