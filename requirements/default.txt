@@ -3,7 +3,6 @@ click
 coloredlogs
 dataclasses_json
 gitignorefile
-humanfriendly
 importlib_metadata
 inflection
 inquirer
