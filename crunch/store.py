@@ -1,9 +1,9 @@
 import os
 
 import dotenv
-import humanfriendly
 
 from . import constants
+from .external import humanfriendly
 
 debug: bool = None
 web_base_url: str = None

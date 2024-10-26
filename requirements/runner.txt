@@ -3,9 +3,7 @@ click
 
 dataclasses_json
 
-humanfriendly
 
-inflection
 
 joblib
 
