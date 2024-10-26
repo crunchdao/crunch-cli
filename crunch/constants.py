@@ -29,3 +29,7 @@ API_BASE_URL_DEVELOPMENT = "http://localhost:8000/"
 WEB_BASE_URL_PRODUCTION = "https://hub.crunchdao.com/"
 WEB_BASE_URL_STAGING = "https://hub.crunchdao.io/"
 WEB_BASE_URL_DEVELOPMENT = "http://localhost:3000/"
+
+# TODO Change me when renamed
+COMPETITIONS_REPOSITORY = "crunchdao/quickstarters"
+COMPETITIONS_BRANCH = "feat/broad-1"

@@ -2,6 +2,7 @@ import functools
 import logging
 import os
 import sys
+import traceback
 import typing
 
 import click
@@ -677,6 +678,192 @@ def cloud_executor(
     )
 
     executor.start()
+
+
+@cli.group(name="organizer")
+@click.argument('competition_name')
+@click.pass_context
+def organize_group(
+    context: click.Context,
+    competition_name: str,
+):
+    client = api.Client.from_env()
+
+    try:
+        competition = client.competitions.get(competition_name)
+    except api.errors.CompetitionNameNotFoundException:
+        print(f"competition {competition_name} not found", file=sys.stderr)
+        raise click.Abort()
+    except api.ApiException as error:
+        utils.exit_via(error)
+
+    context.obj = competition
+
+
+@organize_group.command()
+@click.pass_context
+def x(
+    context: click.Context,
+):
+    print(context.obj)
+
+
+@organize_group.group(name="test")
+def organize_test_group():
+    pass
+
+
+@organize_test_group.group(name="scoring")
+@click.option("--script-file", "script_file_path", type=click.Path(dir_okay=False, readable=True), required=False)
+@click.option("--github-repository", default=constants.COMPETITIONS_REPOSITORY, required=False)
+@click.option("--github-branch", default=constants.COMPETITIONS_BRANCH, required=False)
+@click.pass_context
+def scoring_group(
+    context: click.Context,
+    script_file_path: str,
+    github_repository: str,
+    github_branch: str,
+):
+    from . import custom
+
+    competition: api.Competition = context.obj
+
+    if script_file_path is None:
+        loader = custom.GithubCodeLoader(
+            competition.name,
+            repository=github_repository,
+            branch=github_branch,
+        )
+    else:
+        loader = custom.LocalCodeLoader(
+            script_file_path,
+        )
+
+    context.obj = (competition, loader)
+
+
+LOWER_PHASE_TYPES = list(map(lambda x: x.name, [
+    api.PhaseType.SUBMISSION,
+    api.PhaseType.OUT_OF_SAMPLE,
+]))
+
+
+@scoring_group.command(name="check")
+@click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
+@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
+@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
+@click.pass_context
+def scoring_check(
+    context: click.Context,
+    data_directory_path: str,
+    prediction_file_path: str,
+    phase_type_string: str,
+):
+    from . import custom
+
+    competition, loader = typing.cast(
+        typing.Tuple[
+            api.Competition,
+            custom.CodeLoader,
+        ],
+        context.obj
+    )
+
+    phase_type = api.PhaseType[phase_type_string]
+
+    try:
+        custom.check(
+            custom.ScoringModule.load(loader),
+            phase_type,
+            competition.metrics.list(),
+            utils.read(prediction_file_path),
+            data_directory_path
+        )
+
+        print(f"\n\nPrediction is valid!")
+    except custom.ParticipantVisibleError as error:
+        print(f"\n\nPrediction is not valid: {error}")
+    except api.ApiException as error:
+        utils.exit_via(error)
+    except BaseException as error:
+        print(f"\n\nPrediction check function failed: {error}")
+
+        traceback.print_exc()
+
+
+@scoring_group.command(name="score")
+@click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
+@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
+@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
+@click.pass_context
+def scoring_score(
+    context: click.Context,
+    data_directory_path: str,
+    prediction_file_path: str,
+    phase_type_string: str,
+):
+    from . import custom
+
+    competition, loader = typing.cast(
+        typing.Tuple[
+            api.Competition,
+            custom.CodeLoader,
+        ],
+        context.obj
+    )
+
+    phase_type = api.PhaseType[phase_type_string]
+
+    try:
+        metrics = competition.metrics.list()
+        results = custom.score(
+            custom.ScoringModule.load(loader),
+            phase_type,
+            metrics,
+            utils.read(prediction_file_path),
+            data_directory_path,
+        )
+
+        metric_by_id = {
+            metric.id: metric
+            for metric in metrics
+        }
+
+        print(f"\n\nPrediction is scorable!")
+
+        rows = [
+            (
+                metric_by_id[metric_id].target.name,
+                metric_by_id[metric_id].name,
+                str(scored_metric.value)
+            )
+            for metric_id, scored_metric in results.items()
+        ]
+
+        rows.insert(0, ("Target", "Metric", "Score"))
+
+        max_length_per_columns = [
+            max((len(row[index]) for row in rows))
+            for index in range(3)
+        ]
+
+        print(f"\nResults:")
+        for row in rows:
+            print("  ", end="")
+
+            for column_index, value in enumerate(row):
+                width = max_length_per_columns[column_index] + 3
+                print(value.ljust(width), end="")
+
+            print()
+    except custom.ParticipantVisibleError as error:
+        print(f"\n\nPrediction is not scorable: {error}")
+    except api.ApiException as error:
+        utils.exit_via(error)
+    except BaseException as error:
+        print(f"\n\nPrediction score function failed: {error}")
+
+        traceback.print_exc()
 
 
 if __name__ == '__main__':
