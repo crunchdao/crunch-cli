@@ -2,9 +2,8 @@ import json
 import sys
 import typing
 
-import inflection
-
 from .. import utils
+from ..external import inflection
 from .domain import *
 
 

@@ -4,7 +4,6 @@ coloredlogs
 dataclasses_json
 gitignorefile
 importlib_metadata
-inflection
 inquirer
 joblib
 networkx
