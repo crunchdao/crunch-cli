@@ -13,7 +13,7 @@ from . import reducers, scorers
 @dataclasses.dataclass
 class ScoredMetric:
     value: typing.Optional[float]
-    details: typing.List["ScoredMetricDetail"]
+    details: typing.List["ScoredMetricDetail"] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass

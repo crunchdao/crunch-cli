@@ -77,6 +77,9 @@ class OriginalFiles:
         return vars(self).items()
 
 
+DataFilesUnion = typing.Union[DataFiles, OriginalFiles, typing.Dict[str, DataFile]]
+
+
 class DataReleaseSplitGroup(enum.Enum):
 
     TRAIN = "TRAIN"
@@ -95,6 +98,9 @@ class DataReleaseSplitReduced(enum.Enum):
         return self.name
 
 
+SplitKeyPythonType = typing.Union[str, int]
+
+
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
     undefined=dataclasses_json.Undefined.EXCLUDE,
@@ -102,7 +108,7 @@ class DataReleaseSplitReduced(enum.Enum):
 @dataclasses.dataclass(frozen=True)
 class DataReleaseSplit:
 
-    key: typing.Union[str, int]
+    key: SplitKeyPythonType
     group: DataReleaseSplitGroup
     reduced: typing.Optional[DataReleaseSplitReduced] = None
 
@@ -180,7 +186,7 @@ class DataRelease(Model):
         return DataReleaseTargetResolution[self._attrs["target_resolution"]]
 
     @property
-    def data_files(self) -> typing.Union[DataFiles, OriginalFiles, typing.Dict[str, DataFile]]:
+    def data_files(self) -> DataFilesUnion:
         files = self._attrs.get("dataFiles")
         if not files:
             self.reload()
@@ -198,13 +204,13 @@ class DataRelease(Model):
         })
 
     @property
-    def splits(self) -> typing.Tuple[DataReleaseSplit]:
+    def splits(self) -> typing.List[DataReleaseSplit]:
         splits = self._attrs.get("splits")
         if splits is None:
             self.reload(include_splits=True)
             splits = self._attrs["splits"]
 
-        return tuple(DataReleaseSplit.from_dict_array(splits))
+        return list(DataReleaseSplit.from_dict_array(splits))
 
     @property
     def default_feature_group(self) -> str:
