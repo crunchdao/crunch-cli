@@ -31,6 +31,7 @@ class DataFile:
     signed: bool
     # TODO Make me mandatory
     name: str = None
+    compressed: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
