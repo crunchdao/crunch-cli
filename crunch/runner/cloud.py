@@ -216,6 +216,11 @@ class CloudRunner(Runner):
             target_column_names.name
         )
 
+    def start_spatial(self):
+        self.create_trace_file()
+
+        return super().start_spatial()
+
     def spatial_train(
         self,
     ) -> None:
