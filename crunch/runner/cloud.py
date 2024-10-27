@@ -485,7 +485,7 @@ class CloudRunner(Runner):
                     "orthogonalization-data": orthogonalization_data_tmp_path,
                 }
             else:
-                self.bash2(["chmod", "a+r", self.data_directory])
+                self.bash2(["chmod", "-R", "a+r", self.data_directory])
 
                 path_options = {}
 
