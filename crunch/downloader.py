@@ -68,6 +68,7 @@ def save_one(
     data_file: PreparedDataFile,
     force: bool,
     print=print,
+    progress_bar=True,
 ):
     if data_file is None:
         return
@@ -91,7 +92,7 @@ def save_one(
             print(f"{data_file.path}: signature missing, cannot download file without being authenticated")
             raise click.Abort()
 
-        utils.download(data_file.url, data_file.path, log=False)
+        utils.download(data_file.url, data_file.path, log=False, progress_bar=progress_bar)
         return True
 
     if not download():
@@ -157,9 +158,10 @@ def save_all(
     data_files: typing.Dict[str, PreparedDataFile],
     force: bool,
     print=print,
+    progress_bar=True,
 ):
     for data_file in data_files.values():
-        save_one(data_file, force, print)
+        save_one(data_file, force, print, progress_bar)
 
     return {
         key: value.path

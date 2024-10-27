@@ -616,6 +616,7 @@ class CloudRunner(Runner):
             ),
             False,
             self.log,
+            progress_bar=False,
         )
 
     def download(
