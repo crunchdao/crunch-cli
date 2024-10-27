@@ -10,7 +10,7 @@ import urllib.parse
 import pandas
 import requests
 
-from .. import api, store, utils
+from .. import api, store, utils, downloader
 from .runner import Runner
 
 CONFLICTING_GPU_PACKAGES = [
@@ -139,10 +139,7 @@ class CloudRunner(Runner):
         if self.log("downloading data..."):
             self.report_current("download data")
 
-            data_urls = self.get_data_urls()
-
-            for path, url in data_urls.items():
-                self.download(url, path)
+            self.prepare_data()
 
             self.initialize_state()
             self.bash2(["chmod", "a+r", self.state_file])
@@ -595,7 +592,7 @@ class CloudRunner(Runner):
             "VIRTUAL_ENV_PROMPT": "(env) ",
         }
 
-    def get_data_urls(self) -> typing.Dict[str, str]:
+    def prepare_data(self):
         data_release = self.run.data
 
         self.embargo = data_release.embargo
@@ -606,59 +603,20 @@ class CloudRunner(Runner):
         self.default_feature_group = data_release.default_feature_group
         data_files = data_release.data_files
 
-        if self.competition_format != api.CompetitionFormat.SPATIAL:
-            x_url = data_files.x.url
-            self.x_path = os.path.join(
-                self.data_directory,
-                f"x.{utils.get_extension(x_url)}"
-            )
-
-            y_url = data_files.y.url
-            self.y_path = os.path.join(
-                self.data_directory,
-                f"y.{utils.get_extension(y_url)}"
-            )
-
-            data_urls = {
-                self.x_path: x_url,
-                self.y_path: y_url,
-            }
-
-            self.y_raw_path = None
-            if data_files.y_raw:
-                y_raw_url = data_files.y_raw.url
-                self.y_raw_path = os.path.join(
-                    self.data_directory,
-                    f"y_raw.{utils.get_extension(y_raw_url)}"
-                )
-
-                data_urls[self.y_raw_path] = y_raw_url
-
-            self.orthogonalization_data_path = None
-            if data_files.orthogonalization_data:
-                orthogonalization_data_url = data_files.orthogonalization_data.url
-                self.orthogonalization_data_path = os.path.join(
-                    self.data_directory,
-                    f"orthogonalization_data.{utils.get_extension(orthogonalization_data_url)}"
-                )
-
-                data_urls[self.orthogonalization_data_path] = orthogonalization_data_url
-        else:
-            data_urls = {
-                os.path.join(
-                    self.data_directory,
-                    data_file.name
-                ): data_file.url
-                for data_file in data_files.values()
-            }
-
         self.keys = sorted([
             split.key
             for split in self.splits
             if split.group == api.DataReleaseSplitGroup.TEST
         ])
 
-        return data_urls
+        downloader.save_all(
+            downloader.prepare_all(
+                self.data_directory,
+                data_files,
+            ),
+            False,
+            self.log,
+        )
 
     def download(
         self,
