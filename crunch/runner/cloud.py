@@ -454,7 +454,7 @@ class CloudRunner(Runner):
     ):
         is_regular = self.competition_format != api.CompetitionFormat.SPATIAL
 
-        tmpdirname = (
+        temporary_directory = (
             tempfile.TemporaryDirectory()
             if is_regular
             else None
@@ -462,12 +462,14 @@ class CloudRunner(Runner):
 
         try:
             if is_regular:
-                self.bash2(["chmod", "a+rxw", tmpdirname])
+                temporary_directory_name = temporary_directory.name
 
-                y_tmp_path = link(tmpdirname, self.y_path, fake=not train)
-                x_tmp_path = link(tmpdirname, self.x_path)
-                y_raw_tmp_path = link(tmpdirname, self.y_raw_path)
-                orthogonalization_data_tmp_path = link(tmpdirname, self.orthogonalization_data_path)
+                self.bash2(["chmod", "a+rxw", temporary_directory_name])
+
+                y_tmp_path = link(temporary_directory_name, self.y_path, fake=not train)
+                x_tmp_path = link(temporary_directory_name, self.x_path)
+                y_raw_tmp_path = link(temporary_directory_name, self.y_raw_path)
+                orthogonalization_data_tmp_path = link(temporary_directory_name, self.orthogonalization_data_path)
 
                 tmp_paths = filter(bool, [
                     y_tmp_path,
@@ -580,8 +582,8 @@ class CloudRunner(Runner):
             self.report_trace(loop_key)
             raise
         finally:
-            if tmpdirname is not None:
-                tmpdirname.cleanup()
+            if temporary_directory is not None:
+                temporary_directory.cleanup()
 
         if return_result:
             return utils.read(self.prediction_path)
