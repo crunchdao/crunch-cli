@@ -36,9 +36,9 @@ class DataFile:
 @dataclasses.dataclass(frozen=True)
 class KnownData:
 
-    X_TRAIN = "X_train"
+    X_TRAIN = "x_train"
     Y_TRAIN = "y_train"
-    X_TEST = "X_test"
+    X_TEST = "x_test"
     Y_TEST = "y_test"
     X = "x"
     Y = "y"
