@@ -373,7 +373,7 @@ class LocalRunner(Runner):
         # TODO Make dynamic or come from the API
         test_directory_path = os.path.join(self.data_directory_path, "test")
 
-        matching_data_file_name = utils.find_first(
+        matching_data_file_name = utils.find_first_file(
             test_directory_path,
             target_column_names.name
         )

@@ -459,9 +459,13 @@ def split_at_nans(
     return parts
 
 
-def find_first(directory: str, prefix: str):
+def find_first_file(directory: str, prefix: str):
     prefix_with_dot = prefix + "."
 
     for name in os.listdir(directory):
+        path = os.path.join(directory, name)
+        if os.path.isdir(path):
+            continue
+
         if name == prefix or name.startswith(prefix_with_dot):
             return name
