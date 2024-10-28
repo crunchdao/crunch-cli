@@ -244,7 +244,7 @@ class SandboxExecutor:
                     x_test,
                 )
 
-            if self.competition_format == api.CompetitionFormat.SPATIAL:
+            elif self.competition_format == api.CompetitionFormat.SPATIAL:
                 prediction = self.process_unstructured(
                     train_function,
                     infer_function,

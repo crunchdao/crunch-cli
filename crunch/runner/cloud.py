@@ -454,30 +454,33 @@ class CloudRunner(Runner):
     ):
         is_regular = self.competition_format != api.CompetitionFormat.SPATIAL
 
-        tmpdirname = (
-            tempfile.TemporaryDirectory()
-            if is_regular
-            else None
-        )
+        temporary_directory: tempfile.TemporaryDirectory = None
 
         try:
             if is_regular:
-                self.bash2(["chmod", "a+rxw", tmpdirname])
+                assert self.x_path is not None
 
-                y_tmp_path = link(tmpdirname, self.y_path, fake=not train)
-                x_tmp_path = link(tmpdirname, self.x_path)
-                y_raw_tmp_path = link(tmpdirname, self.y_raw_path)
-                orthogonalization_data_tmp_path = link(tmpdirname, self.orthogonalization_data_path)
+                temporary_directory = tempfile.TemporaryDirectory()
+                temporary_directory_name = temporary_directory.name
 
-                tmp_paths = filter(bool, [
-                    y_tmp_path,
+                self.bash2(["chmod", "a+rxw", temporary_directory_name])
+
+                x_tmp_path = link(temporary_directory_name, self.x_path)
+                y_tmp_path = link(temporary_directory_name, self.y_path, fake=not train)
+                y_raw_tmp_path = link(temporary_directory_name, self.y_raw_path)
+                orthogonalization_data_tmp_path = link(temporary_directory_name, self.orthogonalization_data_path)
+
+                self.bash2([
+                    "chmod",
+                    "a+r",
                     x_tmp_path,
-                    y_raw_tmp_path,
-                    orthogonalization_data_tmp_path,
+                    *filter(bool, [
+                        y_tmp_path,
+                        y_raw_tmp_path,
+                        orthogonalization_data_tmp_path,
+                    ])
                 ])
 
-                self.bash2(["chmod", "a+r", *tmp_paths])
-                
                 path_options = {
                     "x": x_tmp_path,
                     "y": y_tmp_path,
@@ -580,8 +583,8 @@ class CloudRunner(Runner):
             self.report_trace(loop_key)
             raise
         finally:
-            if tmpdirname is not None:
-                tmpdirname.cleanup()
+            if temporary_directory is not None:
+                temporary_directory.cleanup()
 
         if return_result:
             return utils.read(self.prediction_path)
@@ -614,7 +617,7 @@ class CloudRunner(Runner):
             if split.group == api.DataReleaseSplitGroup.TEST
         ])
 
-        downloader.save_all(
+        file_paths = downloader.save_all(
             downloader.prepare_all(
                 self.data_directory,
                 data_files,
@@ -623,6 +626,11 @@ class CloudRunner(Runner):
             self.log,
             progress_bar=False,
         )
+
+        self.x_path = file_paths.get(api.KnownData.X)
+        self.y_path = file_paths.get(api.KnownData.Y)
+        self.y_raw_path = file_paths.get(api.KnownData.Y_RAW)
+        self.orthogonalization_data_path = file_paths.get(api.KnownData.ORTHOGONALIZATION_DATA)
 
     def download(
         self,
