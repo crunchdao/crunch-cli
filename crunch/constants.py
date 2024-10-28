@@ -32,4 +32,4 @@ WEB_BASE_URL_DEVELOPMENT = "http://localhost:3000/"
 
 # TODO Change me when renamed
 COMPETITIONS_REPOSITORY = "crunchdao/quickstarters"
-COMPETITIONS_BRANCH = "feat/broad-1"
+COMPETITIONS_BRANCH = "master"
