@@ -458,6 +458,8 @@ class CloudRunner(Runner):
 
         try:
             if is_regular:
+                assert self.x_path is not None
+
                 temporary_directory = tempfile.TemporaryDirectory()
                 temporary_directory_name = temporary_directory.name
 
@@ -468,14 +470,16 @@ class CloudRunner(Runner):
                 y_raw_tmp_path = link(temporary_directory_name, self.y_raw_path)
                 orthogonalization_data_tmp_path = link(temporary_directory_name, self.orthogonalization_data_path)
 
-                tmp_paths = filter(bool, [
-                    y_tmp_path,
+                self.bash2([
+                    "chmod",
+                    "a+r",
                     x_tmp_path,
-                    y_raw_tmp_path,
-                    orthogonalization_data_tmp_path,
+                    *filter(bool, [
+                        y_tmp_path,
+                        y_raw_tmp_path,
+                        orthogonalization_data_tmp_path,
+                    ])
                 ])
-
-                self.bash2(["chmod", "a+r", *tmp_paths])
 
                 path_options = {
                     "x": x_tmp_path,
