@@ -390,7 +390,7 @@ class LocalRunner(Runner):
     def finalize(self, prediction: pandas.DataFrame):
         prediction_path = os.path.join(
             constants.DOT_DATA_DIRECTORY,
-            "prediction.csv"
+            "prediction.parquet"
         )
 
         logging.warning('save prediction - path=%s', prediction_path)
@@ -398,6 +398,7 @@ class LocalRunner(Runner):
             "index": False,
             **self.write_kwargs
         })
+        print("done")
 
         if self.checks and self.competition_format != api.CompetitionFormat.SPATIAL:
             example_prediction = utils.read(self.example_prediction_path)
