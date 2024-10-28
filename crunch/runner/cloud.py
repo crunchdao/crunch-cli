@@ -530,7 +530,8 @@ class CloudRunner(Runner):
                         target_column_names.name,
                         target_column_names.side or "",
                         target_column_names.input or "",
-                        target_column_names.output or ""
+                        target_column_names.output or "",
+                        target_column_names.file_path or ""
                     )
                     for target_column_names in self.column_names.targets
                 ],

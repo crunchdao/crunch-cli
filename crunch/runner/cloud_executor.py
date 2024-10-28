@@ -414,15 +414,9 @@ class SandboxExecutor:
         }
 
         if self.train:
-            # TODO Make dynamic or come from the API
-            train_directory_path = os.path.join(self.data_directory_path, "train")
-
             utils.smart_call(
                 train_function,
                 default_values,
-                {
-                    "train_directory_path": train_directory_path,
-                },
                 log=False
             )
 
@@ -431,26 +425,16 @@ class SandboxExecutor:
             target_column_names = self.column_names.get_target_by_name(self.loop_key)
             assert target_column_names is not None, f"target not found: {self.loop_key}"
 
-            # TODO Make dynamic or come from the API
-            test_directory_path = os.path.join(self.data_directory_path, "test")
-
-            matching_data_file_name = utils.find_first_file(
-                test_directory_path,
-                target_column_names.name
-            )
-
-            test_data_file_path = os.path.join(
-                test_directory_path,
-                matching_data_file_name
-            ) if matching_data_file_name else None
+            data_file_path = os.path.join(
+                self.data_directory_path,
+                target_column_names.file_path
+            ) if target_column_names.file_path else None
 
             prediction = utils.smart_call(
                 infer_function,
                 default_values,
                 {
-                    "test_directory_path": test_directory_path,
-                    "test_data_file_path": test_data_file_path,
-                    "data_file_path": test_data_file_path,
+                    "data_file_path": data_file_path,
                     "target_name": target_column_names.name,
                 }
             )

@@ -26,12 +26,11 @@ class DataReleaseTargetResolution(enum.Enum):
 @dataclasses.dataclass(frozen=True)
 class DataFile:
 
+    name: str
     url: str
     size: int
     signed: bool
-    # TODO Make me mandatory
-    name: str = None
-    compressed: bool = False
+    compressed: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -253,6 +252,7 @@ class TargetColumnNames:
     side: typing.Optional[str]
     input: typing.Optional[str]
     output: typing.Optional[str]
+    file_path: typing.Optional[str]
 
 
 @dataclasses_json.dataclass_json(
