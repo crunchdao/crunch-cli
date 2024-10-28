@@ -345,6 +345,7 @@ class LocalRunner(Runner):
 
     def _get_spatial_default_values(self):
         return {
+            "data_directory_path": self.data_directory_path,
             "model_directory_path": self.model_directory_path,
             "column_names": self.column_names,
             "target_names": self.column_names.target_names,
@@ -355,44 +356,30 @@ class LocalRunner(Runner):
     def spatial_train(
         self,
     ):
-        # TODO Make dynamic or come from the API
-        train_directory_path = os.path.join(self.data_directory_path, "train")
-
-        default_values = self._get_spatial_default_values()
-
         logging.warning('call: train')
-        utils.smart_call(self.train_function, default_values, {
-            "train_directory_path": train_directory_path,
-            "data_directory_path": train_directory_path,
-        })
+        utils.smart_call(
+            self.train_function,
+            self._get_spatial_default_values()
+        )
 
     def spatial_loop(
         self,
         target_column_names: api.TargetColumnNames
     ) -> pandas.DataFrame:
-        # TODO Make dynamic or come from the API
-        test_directory_path = os.path.join(self.data_directory_path, "test")
+        data_file_path = os.path.join(
+            self.data_directory_path,
+            target_column_names.file_path
+        ) if target_column_names.file_path else None
 
-        matching_data_file_name = utils.find_first_file(
-            test_directory_path,
-            target_column_names.name
-        )
-
-        test_data_file_path = os.path.join(
-            test_directory_path,
-            matching_data_file_name
-        ) if matching_data_file_name else None
-
-        logging.warning('call: infer')
+        logging.warning(f'call: infer ({target_column_names.name})')
 
         prediction = utils.smart_call(
             self.infer_function,
             self._get_spatial_default_values(),
             {
-                "test_directory_path": test_directory_path,
-                "test_data_file_path": test_data_file_path,
-                "data_file_path": test_data_file_path,
+                "data_file_path": data_file_path,
                 "target_name": target_column_names.name,
+                "target_name": target_column_names.file_path,
             }
         )
 
