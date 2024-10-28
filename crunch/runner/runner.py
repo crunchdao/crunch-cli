@@ -155,7 +155,7 @@ class Runner(abc.ABC):
         predictions: typing.List[pandas.DataFrame] = []
 
         if self.force_first_train:
-            prediction = self.spatial_train()
+            self.spatial_train()
 
         target_column_namess = self.column_names.targets
         for index, target_column_names in enumerate(target_column_namess):

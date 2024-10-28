@@ -398,7 +398,6 @@ class LocalRunner(Runner):
             "index": False,
             **self.write_kwargs
         })
-        print("done")
 
         if self.checks and self.competition_format != api.CompetitionFormat.SPATIAL:
             example_prediction = utils.read(self.example_prediction_path)
