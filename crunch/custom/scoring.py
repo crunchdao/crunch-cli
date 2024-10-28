@@ -43,6 +43,7 @@ def _call(
             ),
             lambda x: x.target
         )
+        if not target.virtual
     ]
 
     target_names = list({

@@ -41,6 +41,10 @@ class Target(Model):
     def display_name(self) -> str:
         return self._attrs["displayName"]
 
+    @property
+    def virtual(self) -> bool:
+        return self._attrs["virtual"]
+
 
 class TargetCollection(Collection):
 
