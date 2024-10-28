@@ -82,14 +82,14 @@ def save_one(
 
         if not data_file.has_size:
             print(f"{data_file.path}: skip, not given by server")
-            return False
+            return None
 
         exists = os.path.exists(data_file.path)
         if not force and exists:
             stat = os.stat(data_file.path)
             if stat.st_size == data_file.size:
                 print(f"{data_file.path}: already exists, file length match")
-                return True
+                return False
 
         if not data_file.signed:
             print(f"{data_file.path}: signature missing, cannot download file without being authenticated")
@@ -98,7 +98,8 @@ def save_one(
         utils.download(data_file.url, data_file.path, log=False, progress_bar=progress_bar)
         return True
 
-    if not download():
+    has_new_content = download()
+    if has_new_content is None:
         return
 
     if not data_file.compressed:
@@ -113,9 +114,12 @@ def save_one(
         f".{zip_file_name}.uncompressed"
     )
 
-    if not force and os.path.exists(uncompressed_marker):
-        print(f"{zip_file_path}: already uncompressed, marker is present")
-        return True
+    if os.path.exists(uncompressed_marker):
+        if has_new_content:
+            os.unlink(uncompressed_marker)
+        elif not force:
+            print(f"{zip_file_path}: already uncompressed, marker is present")
+            return
 
     with tempfile.TemporaryDirectory(
         prefix=f"{zip_file_name}.",
@@ -164,7 +168,7 @@ def save_all(
     progress_bar=True,
 ):
     for data_file in data_files.values():
-        save_one(data_file, force, print, progress_bar)
+        save_one(data_file, force, print, True)
 
     return {
         key: value.path
