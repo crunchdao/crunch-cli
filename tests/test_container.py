@@ -61,8 +61,8 @@ class ColumnsTest(unittest.TestCase):
             input=None,
             output=None,
             targets=[
-                TargetColumnNames(0, "a", "side_a", "in_a", "out_a"),
-                TargetColumnNames(0, "b", "side_b", "in_b", "out_b")
+                TargetColumnNames(0, "a", "side_a", "in_a", "out_a", None),
+                TargetColumnNames(0, "b", "side_b", "in_b", "out_b", None)
             ]
         )
 
