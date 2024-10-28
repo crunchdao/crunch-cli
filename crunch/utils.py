@@ -335,10 +335,13 @@ def download(
     print=print,
     progress_bar=True,
     max_retry=10,
+    session: typing.Optional[requests.Session] = None
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
-    session = requests.Session()
+    if session is None:
+        session = requests.Session()
+
     session.headers["Accept-Encoding"] = "identity"  # GitHub provide the range on the gzip-encoded response instead of re-encoding it
 
     file_length, accept_ranges, response = _download_head(session, url, path, log, print)
@@ -454,3 +457,15 @@ def split_at_nans(
             parts.append(dataframe.iloc[start:end])
 
     return parts
+
+
+def find_first_file(directory: str, prefix: str):
+    prefix_with_dot = prefix + "."
+
+    for name in os.listdir(directory):
+        path = os.path.join(directory, name)
+        if os.path.isdir(path):
+            continue
+
+        if name == prefix or name.startswith(prefix_with_dot):
+            return name

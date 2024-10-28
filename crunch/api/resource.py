@@ -42,7 +42,7 @@ class Model:
         return hash(f"{self.__class__.__name__}:{self.id}")
 
     @property
-    def id(self):
+    def id(self) -> typing.Union[int, str]:
         return self._attrs.get(self.id_attribute)
 
     @property

@@ -11,6 +11,7 @@ class CompetitionFormat(enum.Enum):
     TIMESERIES = "TIMESERIES"
     DAG = "DAG"
     STREAM = "STREAM"
+    SPATIAL = "SPATIAL"
 
     def __repr__(self):
         return self.name

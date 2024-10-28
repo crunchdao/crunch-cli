@@ -21,7 +21,7 @@ class DataReleaseTargetResolution(enum.Enum):
 
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE
+    undefined=dataclasses_json.Undefined.EXCLUDE,
 )
 @dataclasses.dataclass(frozen=True)
 class DataFile:
@@ -29,6 +29,23 @@ class DataFile:
     url: str
     size: int
     signed: bool
+    # TODO Make me mandatory
+    name: str = None
+    compressed: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class KnownData:
+
+    X_TRAIN = "X_train"
+    Y_TRAIN = "y_train"
+    X_TEST = "X_test"
+    Y_TEST = "y_test"
+    X = "x"
+    Y = "y"
+    Y_RAW = "y_raw"
+    EXAMPLE_PREDICTION = "example_prediction"
+    ORTHOGONALIZATION_DATA = "orthogonalization_data"
 
 
 @dataclasses_json.dataclass_json(
@@ -44,6 +61,9 @@ class DataFiles:
     y_test: DataFile
     example_prediction: DataFile
 
+    def items(self):
+        return vars(self).items()
+
 
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
@@ -57,6 +77,12 @@ class OriginalFiles:
     y_raw: typing.Optional[DataFile]
     example_prediction: DataFile
     orthogonalization_data: typing.Optional[DataFile]
+
+    def items(self):
+        return vars(self).items()
+
+
+DataFilesUnion = typing.Union[DataFiles, OriginalFiles, typing.Dict[str, DataFile]]
 
 
 class DataReleaseSplitGroup(enum.Enum):
@@ -77,6 +103,9 @@ class DataReleaseSplitReduced(enum.Enum):
         return self.name
 
 
+SplitKeyPythonType = typing.Union[str, int]
+
+
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
     undefined=dataclasses_json.Undefined.EXCLUDE,
@@ -84,7 +113,7 @@ class DataReleaseSplitReduced(enum.Enum):
 @dataclasses.dataclass(frozen=True)
 class DataReleaseSplit:
 
-    key: typing.Union[str, int]
+    key: SplitKeyPythonType
     group: DataReleaseSplitGroup
     reduced: typing.Optional[DataReleaseSplitReduced] = None
 
@@ -162,16 +191,16 @@ class DataRelease(Model):
         return DataReleaseTargetResolution[self._attrs["target_resolution"]]
 
     @property
-    def data_files(self) -> typing.Union[DataFiles, OriginalFiles, typing.Dict[str, DataFile]]:
+    def data_files(self) -> DataFilesUnion:
         files = self._attrs.get("dataFiles")
         if not files:
             self.reload()
             files = self._attrs["dataFiles"]
 
-        if "xTrain" in files:
+        if "xTrain" in files and "yTrain" in files:
             return DataFiles.from_dict(files)
 
-        if "x" in files:
+        if "x" in files and "y" in files:
             return OriginalFiles.from_dict(files)
 
         return types.MappingProxyType({
@@ -180,13 +209,13 @@ class DataRelease(Model):
         })
 
     @property
-    def splits(self) -> typing.Tuple[DataReleaseSplit]:
+    def splits(self) -> typing.List[DataReleaseSplit]:
         splits = self._attrs.get("splits")
         if splits is None:
             self.reload(include_splits=True)
             splits = self._attrs["splits"]
 
-        return tuple(DataReleaseSplit.from_dict_array(splits))
+        return list(DataReleaseSplit.from_dict_array(splits))
 
     @property
     def default_feature_group(self) -> str:

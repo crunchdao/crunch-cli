@@ -84,16 +84,18 @@ class LocalRunner(Runner):
                 self.keys,
                 self.features,
                 self.column_names,
-                (
-                    self.x_train_path,
-                    self.y_train_path,
-                    self.x_test_path,
-                    self.y_test_path,
-                    self.example_prediction_path
-                )
+                self.data_directory_path,
+                self.data_paths,
             ) = command.download(
                 round_number=self.round_number
             )
+
+            if self.competition_format != api.CompetitionFormat.SPATIAL:
+                self.x_train_path = self.data_paths.get(api.KnownData.X_TRAIN)
+                self.y_train_path = self.data_paths.get(api.KnownData.Y_TRAIN)
+                self.x_test_path = self.data_paths.get(api.KnownData.X_TEST)
+                self.y_test_path = self.data_paths.get(api.KnownData.Y_TEST)
+                self.example_prediction_path = self.data_paths.get(api.KnownData.EXAMPLE_PREDICTION)
         except api.CrunchNotFoundException:
             command.download_no_data_available()
             raise click.Abort()
@@ -341,6 +343,63 @@ class LocalRunner(Runner):
             }
         })
 
+    def _get_spatial_default_values(self):
+        return {
+            "model_directory_path": self.model_directory_path,
+            "column_names": self.column_names,
+            "target_names": self.column_names.target_names,
+            "has_gpu": self.has_gpu,
+            "has_trained": True,
+        }
+
+    def spatial_train(
+        self,
+    ):
+        # TODO Make dynamic or come from the API
+        train_directory_path = os.path.join(self.data_directory_path, "train")
+
+        default_values = self._get_spatial_default_values()
+
+        logging.warning('call: train')
+        utils.smart_call(self.train_function, default_values, {
+            "train_directory_path": train_directory_path,
+            "data_directory_path": train_directory_path,
+        })
+
+    def spatial_loop(
+        self,
+        target_column_names: api.TargetColumnNames
+    ) -> pandas.DataFrame:
+        # TODO Make dynamic or come from the API
+        test_directory_path = os.path.join(self.data_directory_path, "test")
+
+        matching_data_file_name = utils.find_first_file(
+            test_directory_path,
+            target_column_names.name
+        )
+
+        test_data_file_path = os.path.join(
+            test_directory_path,
+            matching_data_file_name
+        ) if matching_data_file_name else None
+
+        logging.warning('call: infer')
+
+        prediction = utils.smart_call(
+            self.infer_function,
+            self._get_spatial_default_values(),
+            {
+                "test_directory_path": test_directory_path,
+                "test_data_file_path": test_data_file_path,
+                "data_file_path": test_data_file_path,
+                "target_name": target_column_names.name,
+            }
+        )
+
+        ensure.is_dataframe(prediction, "prediction")
+
+        return prediction
+
     def finalize(self, prediction: pandas.DataFrame):
         prediction_path = os.path.join(
             constants.DOT_DATA_DIRECTORY,
@@ -353,7 +412,7 @@ class LocalRunner(Runner):
             **self.write_kwargs
         })
 
-        if self.checks:
+        if self.checks and self.competition_format != api.CompetitionFormat.SPATIAL:
             example_prediction = utils.read(self.example_prediction_path)
 
             try:

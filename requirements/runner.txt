@@ -20,3 +20,6 @@ requests-toolbelt
 
 sseclient-py
 tqdm
+
+# TODO Remove me once competition is over
+spatialdata-plot

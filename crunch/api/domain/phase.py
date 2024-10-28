@@ -14,6 +14,15 @@ class PhaseType(enum.Enum):
     def __repr__(self):
         return self.name
 
+    def slug(self):
+        if self == PhaseType.SUBMISSION:
+            return "submission"
+
+        if self == PhaseType.OUT_OF_SAMPLE:
+            return "out-of-sample"
+
+        return self._default_slug()
+
     def pretty(self):
         if self == PhaseType.SUBMISSION:
             return "Submission"
@@ -21,7 +30,11 @@ class PhaseType(enum.Enum):
         if self == PhaseType.OUT_OF_SAMPLE:
             return "Out-of-Sample"
 
+        return self._default_slug()
+
+    def _default_slug(self):
         return str(self).lower().replace("_", "-")
+
 
 
 class Phase(Model):

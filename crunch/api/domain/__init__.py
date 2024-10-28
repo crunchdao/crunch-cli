@@ -14,13 +14,16 @@ from .data_release import (
     ColumnNames,
     TargetColumnNames,
     DataReleaseTargetResolution,
+    SplitKeyPythonType,
     DataReleaseSplit,
     DataReleaseSplitGroup,
     DataReleaseSplitReduced,
     DataReleaseFeature,
+    DataFile,
     DataFiles,
     OriginalFiles,
-    DataFile,
+    DataFilesUnion,
+    KnownData,
 )
 from .enum_ import (
     Language,
