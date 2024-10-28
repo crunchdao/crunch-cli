@@ -16,6 +16,8 @@ LEGACY_NAME_MAPPING = {
     "y_train": "y_train",
     "x_test": "X_test",
     "y_test": "y_test",
+    "x": "X",
+    "y": "y",
     "example_prediction": "example_prediction",
 }
 
@@ -41,6 +43,7 @@ def prepare_all(
     return {
         key: prepare_one(data_directory_path, value, key)
         for key, value in data_files.items()
+        if value is not None
     }
 
 

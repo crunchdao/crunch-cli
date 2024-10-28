@@ -41,7 +41,11 @@ class KnownData:
     Y_TRAIN = "y_train"
     X_TEST = "X_test"
     Y_TEST = "y_test"
+    X = "x"
+    Y = "y"
+    Y_RAW = "y_raw"
     EXAMPLE_PREDICTION = "example_prediction"
+    ORTHOGONALIZATION_DATA = "orthogonalization_data"
 
 
 @dataclasses_json.dataclass_json(

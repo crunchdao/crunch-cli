@@ -454,20 +454,17 @@ class CloudRunner(Runner):
     ):
         is_regular = self.competition_format != api.CompetitionFormat.SPATIAL
 
-        temporary_directory = (
-            tempfile.TemporaryDirectory()
-            if is_regular
-            else None
-        )
+        temporary_directory: tempfile.TemporaryDirectory = None
 
         try:
             if is_regular:
+                temporary_directory = tempfile.TemporaryDirectory()
                 temporary_directory_name = temporary_directory.name
 
                 self.bash2(["chmod", "a+rxw", temporary_directory_name])
 
-                y_tmp_path = link(temporary_directory_name, self.y_path, fake=not train)
                 x_tmp_path = link(temporary_directory_name, self.x_path)
+                y_tmp_path = link(temporary_directory_name, self.y_path, fake=not train)
                 y_raw_tmp_path = link(temporary_directory_name, self.y_raw_path)
                 orthogonalization_data_tmp_path = link(temporary_directory_name, self.orthogonalization_data_path)
 
@@ -479,7 +476,7 @@ class CloudRunner(Runner):
                 ])
 
                 self.bash2(["chmod", "a+r", *tmp_paths])
-                
+
                 path_options = {
                     "x": x_tmp_path,
                     "y": y_tmp_path,
@@ -610,51 +607,13 @@ class CloudRunner(Runner):
         self.default_feature_group = data_release.default_feature_group
         data_files = data_release.data_files
 
-        if self.competition_format != api.CompetitionFormat.SPATIAL:
-            x_url = data_files.x.url
-            self.x_path = os.path.join(
-                self.data_directory,
-                f"x.{utils.get_extension(x_url)}"
-            )
-
-            y_url = data_files.y.url
-            self.y_path = os.path.join(
-                self.data_directory,
-                f"y.{utils.get_extension(y_url)}"
-            )
-
-            data_urls = {
-                self.x_path: x_url,
-                self.y_path: y_url,
-            }
-
-            self.y_raw_path = None
-            if data_files.y_raw:
-                y_raw_url = data_files.y_raw.url
-                self.y_raw_path = os.path.join(
-                    self.data_directory,
-                    f"y_raw.{utils.get_extension(y_raw_url)}"
-                )
-
-                data_urls[self.y_raw_path] = y_raw_url
-
-            self.orthogonalization_data_path = None
-            if data_files.orthogonalization_data:
-                orthogonalization_data_url = data_files.orthogonalization_data.url
-                self.orthogonalization_data_path = os.path.join(
-                    self.data_directory,
-                    f"orthogonalization_data.{utils.get_extension(orthogonalization_data_url)}"
-                )
-
-                data_urls[self.orthogonalization_data_path] = orthogonalization_data_url
-
         self.keys = sorted([
             split.key
             for split in self.splits
             if split.group == api.DataReleaseSplitGroup.TEST
         ])
 
-        downloader.save_all(
+        file_paths = downloader.save_all(
             downloader.prepare_all(
                 self.data_directory,
                 data_files,
@@ -663,6 +622,11 @@ class CloudRunner(Runner):
             self.log,
             progress_bar=False,
         )
+
+        self.x_path = file_paths.get(api.KnownData.X)
+        self.y_path = file_paths.get(api.KnownData.Y)
+        self.y_raw_path = file_paths.get(api.KnownData.Y_RAW)
+        self.orthogonalization_data_path = file_paths.get(api.KnownData.ORTHOGONALIZATION_DATA)
 
     def download(
         self,
