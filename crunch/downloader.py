@@ -168,7 +168,7 @@ def save_all(
     progress_bar=True,
 ):
     for data_file in data_files.values():
-        save_one(data_file, force, print, True)
+        save_one(data_file, force, print, progress_bar)
 
     return {
         key: value.path
