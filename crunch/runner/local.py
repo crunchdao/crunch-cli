@@ -379,7 +379,6 @@ class LocalRunner(Runner):
             {
                 "data_file_path": data_file_path,
                 "target_name": target_column_names.name,
-                "target_name": target_column_names.file_path,
             }
         )
 
