@@ -186,10 +186,12 @@ class Client:
         self,
         api_base_url: str,
         web_base_url: str,
-        auth: Auth
+        auth: Auth,
+        project_info: typing.Optional[utils.ProjectInfo] = None
     ):
         self.api = EndpointClient(api_base_url, auth)
         self.web_base_url = web_base_url
+        self.project_info = project_info
 
     @property
     def competitions(self):
@@ -258,7 +260,8 @@ class Client:
         client = Client(
             store.api_base_url,
             store.web_base_url,
-            PushTokenAuth(push_token)
+            PushTokenAuth(push_token),
+            project_info,
         )
 
         competition = client.competitions.get(project_info.competition_name)

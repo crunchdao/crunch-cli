@@ -24,6 +24,7 @@ from .data_release import (
     OriginalFiles,
     DataFilesUnion,
     KnownData,
+    SizeVariant,
 )
 from .enum_ import (
     Language,

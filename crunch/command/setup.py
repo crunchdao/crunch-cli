@@ -15,6 +15,7 @@ def setup(
     show_quickstarters: bool,
     quickstarter_name: typing.Optional[str],
     show_notebook_quickstarters: bool,
+    data_size_variant: api.SizeVariant,
 ):
     command.init(
         clone_token,
@@ -22,8 +23,10 @@ def setup(
         project_name,
         directory,
         model_directory,
-        force
+        force,
+        data_size_variant,
     )
+
     _, project = api.Client.from_project()
 
     try:

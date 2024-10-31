@@ -30,6 +30,7 @@ def init(
     directory: str,
     model_directory: str,
     force: bool,
+    data_size_variant=api.SizeVariant.DEFAULT
 ):
     should_delete = _check_if_already_exists(directory, force)
 
@@ -47,7 +48,8 @@ def init(
     project_info = utils.ProjectInfo(
         competition_name,
         project_name,
-        user_id
+        user_id,
+        data_size_variant,
     )
 
     utils.write_project_info(project_info, directory)
