@@ -32,6 +32,11 @@ ENVIRONMENTS = {
     ENVIRONMENT_DEVELOPMENT: (constants.API_BASE_URL_DEVELOPMENT, constants.WEB_BASE_URL_DEVELOPMENT),
 }
 
+DATA_SIZE_VARIANTS = [
+    api.SizeVariant.DEFAULT.name.lower(),
+    api.SizeVariant.LARGE.name.lower(),
+]
+
 
 def _format_directory(directory: str, competition_name: str, project_name: str):
     directory = directory \
@@ -107,12 +112,12 @@ def init(
 
     try:
         command.init(
-            clone_token=clone_token,
-            competition_name=competition_name,
-            project_name=project_name,
-            directory=directory,
-            model_directory=model_directory_path,
-            force=force,
+            clone_token,
+            competition_name,
+            project_name,
+            directory,
+            model_directory_path,
+            force,
         )
 
         if not no_data:
@@ -140,6 +145,7 @@ def init(
 @click.option("--quickstarter-name", type=str, help="Pre-select a quickstarter.")
 @click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
 @click.option("--notebook", is_flag=True, help="Setup everything for a notebook environment.")
+@click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
@@ -157,6 +163,7 @@ def setup(
     quickstarter_name: str,
     show_notebook_quickstarters: bool,
     notebook: bool,
+    data_size_variant_raw: str,
 ):
     if notebook:
         if force:
@@ -182,6 +189,8 @@ def setup(
     else:
         directory = _format_directory(directory, competition_name, project_name)
 
+    data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
+
     try:
         command.setup(
             clone_token,
@@ -195,6 +204,7 @@ def setup(
             not no_quickstarter,
             quickstarter_name,
             show_notebook_quickstarters,
+            data_size_variant,
         )
 
         if not no_data:
@@ -336,14 +346,22 @@ def test(
 
 @cli.command(help="Download the data locally.")
 @click.option("--round-number", default="@current")
+@click.option("--force", is_flag=True, help="Force the download of the data.")
+@click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use alternative version of the data.")
 def download(
-    round_number: str
+    round_number: str,
+    force: bool,
+    size_variant_raw: str,
 ):
     utils.change_root()
 
+    size_variant = api.SizeVariant[size_variant_raw.upper()]
+
     try:
         command.download(
-            round_number=round_number
+            round_number,
+            force,
+            size_variant,
         )
     except api.CrunchNotFoundException:
         command.download_no_data_available()

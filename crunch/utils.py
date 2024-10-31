@@ -63,6 +63,7 @@ class ProjectInfo:
     competition_name: str
     project_name: str
     user_id: str
+    size_variant: api.SizeVariant
 
 
 def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
@@ -81,6 +82,7 @@ def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
             "competitionName": info.competition_name,
             "projectName": info.project_name,
             "userId": info.user_id,
+            "sizeVariant": info.size_variant.name,
         }, fd)
 
 
@@ -99,11 +101,17 @@ def read_project_info(raise_if_missing=True) -> ProjectInfo:
 
     root = json.loads(content)
 
+    try:
+        size_variant = api.SizeVariant[root["sizeVariant"]]
+    except:
+        size_variant = api.SizeVariant.DEFAULT
+
     # TODO: need of a better system for handling file versions
     return ProjectInfo(
         root["competitionName"],
         root.get("projectName") or "default",  # backward compatibility
         root["userId"],
+        size_variant,
     )
 
 

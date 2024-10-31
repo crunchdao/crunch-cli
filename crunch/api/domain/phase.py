@@ -69,12 +69,16 @@ class Phase(Model):
             client=self._client
         )
 
-    def get_data_release(self):
+    def get_data_release(
+        self,
+        size_variant: typing.Optional["data_release.SizeVariant"]
+    ):
         from .data_release import DataReleaseCollection, DataRelease
 
         attrs = self._client.api.get_submission_phase_data_release(
             self.round.competition.resource_identifier,
             self.round.resource_identifier,
+            size_variant.name if size_variant else None,
         )
 
         competition = self.round.competition
@@ -173,11 +177,17 @@ class PhaseEndpointMixin:
     def get_submission_phase_data_release(
         self,
         competition_identifier,
-        round_identifier
+        round_identifier,
+        size_variant,
     ):
+        params = {}
+        if size_variant:
+            params["sizeVariant"] = size_variant
+
         return self._result(
             self.get(
-                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/submission/data-release"
+                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/submission/data-release",
+                params=params
             ),
             json=True
         )

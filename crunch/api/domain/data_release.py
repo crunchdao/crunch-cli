@@ -146,6 +146,15 @@ class DataReleaseFeature:
         ]
 
 
+class SizeVariant(enum.Enum):
+
+    DEFAULT = "DEFAULT"
+    LARGE = "LARGE"
+
+    def __repr__(self):
+        return self.name
+
+
 class DataRelease(Model):
 
     resource_identifier_attribute = "number"
