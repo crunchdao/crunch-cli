@@ -13,6 +13,7 @@ from .. import (api, checker, command, constants, ensure, meta, monkey_patches,
 from ..container import (CallableIterable, Columns, GeneratorWrapper,
                          StreamMessage)
 from .runner import Runner
+from .collector import MemoryPredictionCollector, FilePredictionCollector
 
 
 class LocalRunner(Runner):
@@ -32,7 +33,17 @@ class LocalRunner(Runner):
         write_kwargs: dict,
         logger: logging.Logger,
     ):
-        super().__init__(competition.format, determinism_check_enabled)
+        collector = (
+            MemoryPredictionCollector()
+            if competition.format != api.CompetitionFormat.SPATIAL
+            else FilePredictionCollector()
+        )
+
+        super().__init__(
+            collector,
+            competition.format,
+            determinism_check_enabled
+        )
 
         self.module = module
         self.model_directory_path = model_directory_path
@@ -420,19 +431,17 @@ class LocalRunner(Runner):
 
         return prediction
 
-    def finalize(self, prediction: pandas.DataFrame):
+    def finalize(self):
         prediction_path = os.path.join(
             constants.DOT_DATA_DIRECTORY,
             "prediction.parquet"
         )
 
         self.log('save prediction - path=%s' % prediction_path, important=True)
-        utils.write(prediction, prediction_path, kwargs={
-            "index": False,
-            **self.write_kwargs
-        })
+        self.prediction_collector.persist(prediction_path)
 
         if self.checks and self.competition_format != api.CompetitionFormat.SPATIAL:
+            prediction = utils.read(prediction_path)
             example_prediction = utils.read(self.example_prediction_path)
 
             try:
@@ -455,8 +464,6 @@ class LocalRunner(Runner):
                     self.log("check failed - message=`%s`" % error, error=True)
 
                 return None
-
-        return prediction
 
     def log(self, message: str, important=False, error=False):
         if error:
