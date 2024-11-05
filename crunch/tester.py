@@ -5,20 +5,25 @@ from . import api
 
 _logged_installed = False
 
+logger = logging.getLogger("crunch-cli:tester")
+logger.parent = None
+
 
 def install_logger():
     global _logged_installed
-    if _logged_installed:
-        return
 
-    import coloredlogs
-    coloredlogs.install(
-        level=logging.INFO,
-        fmt='%(asctime)s %(message)s',
-        datefmt='%H:%M:%S',
-    )
+    if not _logged_installed:
+        import coloredlogs
+        coloredlogs.install(
+            level=logging.INFO,
+            logger=logger,
+            fmt='%(asctime)s %(message)s',
+            datefmt='%H:%M:%S',
+        )
 
-    _logged_installed = True
+        _logged_installed = True
+
+    return logger
 
 
 def run(
@@ -36,8 +41,8 @@ def run(
 ):
     if competition.format == api.CompetitionFormat.STREAM:
         if no_determinism_check == False:
-            logging.warning("determinism check not available for stream competitions")
-            logging.warning("")
+            logger.warning("determinism check not available for stream competitions")
+            logger.warning("")
 
         no_determinism_check = True
     elif no_determinism_check is None:
@@ -56,6 +61,7 @@ def run(
         not no_determinism_check,
         read_kwargs,
         write_kwargs,
+        logger,
     )
 
     return runner.start()

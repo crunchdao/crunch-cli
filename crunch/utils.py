@@ -229,7 +229,8 @@ def smart_call(
     function: callable,
     default_values: dict,
     specific_values={},
-    log=True
+    log=True,
+    logger=logging.getLogger()
 ):
     values = {
         **default_values,
@@ -239,12 +240,12 @@ def smart_call(
     def warn(message: str):
         if log and message not in _smart_call_ignore:
             _smart_call_ignore.add(message)
-            logging.warning(f"{function.__name__}: {message}")
+            logger.warning(f"{function.__name__}: {message}")
 
     def debug(message: str):
         if log and message not in _smart_call_ignore:
             _smart_call_ignore.add(message)
-            logging.debug(f"{function.__name__}: {message}")
+            logger.debug(f"{function.__name__}: {message}")
 
     arguments = {}
     for name, parameter in inspect.signature(function).parameters.items():

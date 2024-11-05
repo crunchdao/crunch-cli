@@ -101,7 +101,8 @@ def find_forbidden(
 
 def scan(
     module: typing.Any = None,
-    requirements_file: str = None
+    requirements_file: str = None,
+    logger: logging.Logger = logging.getLogger()
 ):
     forbidden = set()
 
@@ -113,7 +114,7 @@ def scan(
         forbidden = find_forbidden(packages, False)
 
     for package in forbidden:
-        logging.error('forbidden library: %s', package)
+        logger.error('forbidden library: %s', package)
 
     if not len(forbidden):
-        logging.warning('no forbidden library found')
+        logger.warning('no forbidden library found')

@@ -320,12 +320,10 @@ class CloudRunner(Runner):
             for fd in fds:
                 fd.close()
 
-        return prediction
-
     def teardown(self):
         self.report_current(f"shutting down")
 
-    def log(self, message: str, error=False):
+    def log(self, message: str, important=False, error=False):
         file = sys.stderr if error else sys.stdout
         prefix = f"<runner/{file.name[4:-1]}>"
 

@@ -7,7 +7,7 @@ import click
 import pandas
 
 from . import (api, command, constants, container, orthogonalization, runner,
-               utils)
+               tester, utils)
 
 LoadedData = typing.Union[
     pandas.DataFrame,
@@ -19,9 +19,16 @@ Streams = typing.List[typing.Iterable[container.StreamMessage]]
 
 class _Inline:
 
-    def __init__(self, module: typing.Any, model_directory: str, has_gpu=False):
+    def __init__(
+        self,
+        module: typing.Any,
+        model_directory: str,
+        logger: logging.Logger,
+        has_gpu=False,
+    ):
         self.module = module
         self.model_directory = model_directory
+        self.logger = logger
         self.has_gpu = has_gpu
 
         print(f"loaded inline runner with module: {module}")
@@ -40,11 +47,11 @@ class _Inline:
         **kwargs,
     ) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
         if self._competition.format == api.CompetitionFormat.SPATIAL:
-            logging.error(f"Please follow the competition instructions to load the data.")
+            self.logger.error(f"Please follow the competition instructions to load the data.")
             return None, None, None
 
         if self._competition.format == api.CompetitionFormat.STREAM:
-            logging.error(f"Please call `.load_streams()` instead.")
+            self.logger.error(f"Please call `.load_streams()` instead.")
             return None, None, None
 
         try:
@@ -81,11 +88,11 @@ class _Inline:
         **kwargs,
     ) -> typing.Tuple[Streams, Streams]:
         if self._competition.format == api.CompetitionFormat.SPATIAL:
-            logging.error(f"Please follow the competition instructions to load the data.")
+            self.logger.error(f"Please follow the competition instructions to load the data.")
             return None, None
 
         if self._competition.format != api.CompetitionFormat.STREAM:
-            logging.error(f"Please call `.load_data()` instead.")
+            self.logger.error(f"Please call `.load_data()` instead.")
             return None, None
 
         try:
@@ -140,11 +147,9 @@ class _Inline:
 
         competition = self._competition
 
-        tester.install_logger()
-
         try:
-            library.scan(module=self.module)
-            logging.warning('')
+            library.scan(module=self.module, logger=self.logger)
+            self.logger.warning('')
 
             return tester.run(
                 self.module,
@@ -160,9 +165,9 @@ class _Inline:
                 write_kwargs,
             )
         except KeyboardInterrupt:
-            logging.error(f"Cancelled!")
+            self.logger.error(f"Cancelled!")
         except click.Abort as abort:
-            logging.error(f"Aborted!")
+            self.logger.error(f"Aborted!")
 
             if raise_abort:
                 raise abort
@@ -202,4 +207,5 @@ def load(
     else:
         module = module_or_module_name
 
-    return _Inline(module, model_directory)
+    logger = tester.install_logger()
+    return _Inline(module, model_directory, logger)
