@@ -1,5 +1,3 @@
-import functools
-import itertools
 import logging
 import os
 import time
@@ -12,8 +10,8 @@ from .. import (api, checker, command, constants, ensure, meta, monkey_patches,
                 tester, utils)
 from ..container import (CallableIterable, Columns, GeneratorWrapper,
                          StreamMessage)
+from .collector import FilePredictionCollector, MemoryPredictionCollector
 from .runner import Runner
-from .collector import MemoryPredictionCollector, FilePredictionCollector
 
 
 class LocalRunner(Runner):
