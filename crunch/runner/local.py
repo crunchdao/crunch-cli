@@ -25,11 +25,12 @@ class LocalRunner(Runner):
         train_frequency: int,
         round_number: str,
         competition: api.Competition,
-        has_gpu=False,
-        checks=True,
-        determinism_check_enabled=False,
-        read_kwargs={},
-        write_kwargs={},
+        has_gpu: bool,
+        checks: bool,
+        determinism_check_enabled: bool,
+        read_kwargs: dict,
+        write_kwargs: dict,
+        logger: logging.Logger,
     ):
         super().__init__(competition.format, determinism_check_enabled)
 
@@ -42,6 +43,7 @@ class LocalRunner(Runner):
         self.checks = checks
         self.read_kwargs = read_kwargs
         self.write_kwargs = write_kwargs
+        self.logger = logger
 
         self.metrics = competition.metrics.list()
 
@@ -52,17 +54,22 @@ class LocalRunner(Runner):
         try:
             return super().start()
         finally:
-            logging.warning(
-                'duration - time=%s',
-                time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
+            self.log(
+                'duration - time=%s' % (
+                    time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
+                ),
+                important=True,
             )
 
             memory_after = utils.get_process_memory()
-            logging.warning(
-                'memory - before="%s" after="%s" consumed="%s"',
-                utils.format_bytes(memory_before),
-                utils.format_bytes(memory_after),
-                utils.format_bytes(memory_after - memory_before)
+            self.log(
+                'memory - before="%s" after="%s" consumed="%s"' % (
+                    utils.format_bytes(memory_before),
+                    utils.format_bytes(memory_after),
+                    utils.format_bytes(memory_after - memory_before)
+                ),
+                important=True,
+
             )
 
     def setup(self):
@@ -70,12 +77,12 @@ class LocalRunner(Runner):
         monkey_patches.display_add()
 
     def initialize(self):
-        logging.info('running local test')
-        logging.warning("internet access isn't restricted, no check will be done")
-        logging.info("")
+        self.log('running local test')
+        self.log("internet access isn't restricted, no check will be done", important=True)
+        self.log("")
 
-        self.train_function = ensure.is_function(self.module, "train")
-        self.infer_function = ensure.is_function(self.module, "infer")
+        self.train_function = ensure.is_function(self.module, "train", logger=self.logger)
+        self.infer_function = ensure.is_function(self.module, "infer", logger=self.logger)
 
         try:
             (
@@ -163,31 +170,42 @@ class LocalRunner(Runner):
         }
 
         if train:
-            logging.warning('call: train')
+            self.log('call: train', important=True)
             x_train = self.filter_embargo(self.full_x, moon)
             y_train = self.filter_embargo(self.full_y, moon)
 
-            utils.smart_call(self.train_function, default_values, {
-                "X_train": x_train,
-                "x_train": x_train,
-                "Y_train": y_train,
-                "y_train": y_train,
-            })
+            utils.smart_call(
+                self.train_function,
+                default_values,
+                {
+                    "X_train": x_train,
+                    "x_train": x_train,
+                    "Y_train": y_train,
+                    "y_train": y_train,
+                },
+                logger=self.logger,
+            )
 
         if True:
-            logging.warning('call: infer')
+            self.log('call: infer', important=True)
             x_test = self.filter_at(self.full_x, moon)
 
-            prediction = utils.smart_call(self.infer_function, default_values, {
-                "X_test": x_test,
-                "x_test": x_test,
-            })
+            prediction = utils.smart_call(
+                self.infer_function,
+                default_values,
+                {
+                    "X_test": x_test,
+                    "x_test": x_test,
+                },
+                logger=self.logger,
+            )
 
             ensure.return_infer(
                 prediction,
                 self.column_names.id,
                 self.column_names.moon,
                 self.column_names.outputs,
+                logger=self.logger,
             )
 
         return prediction
@@ -214,26 +232,37 @@ class LocalRunner(Runner):
         }
 
         if train:
-            logging.warning('call: train')
-            utils.smart_call(self.train_function, default_values, {
-                "X_train": x_train,
-                "x_train": x_train,
-                "Y_train": y_train,
-                "y_train": y_train,
-            })
+            self.log('call: train', important=True)
+            utils.smart_call(
+                self.train_function,
+                default_values,
+                {
+                    "X_train": x_train,
+                    "x_train": x_train,
+                    "Y_train": y_train,
+                    "y_train": y_train,
+                },
+                logger=self.logger,
+            )
 
         if True:
-            logging.warning('call: infer')
-            prediction = utils.smart_call(self.infer_function, default_values, {
-                "X_test": x_test,
-                "x_test": x_test,
-            })
+            self.log('call: infer', important=True)
+            prediction = utils.smart_call(
+                self.infer_function,
+                default_values,
+                {
+                    "X_test": x_test,
+                    "x_test": x_test,
+                },
+                logger=self.logger,
+            )
 
             ensure.return_infer(
                 prediction,
                 self.column_names.id,
                 None,
                 self.column_names.outputs,
+                logger=self.logger,
             )
 
         return prediction
@@ -275,14 +304,15 @@ class LocalRunner(Runner):
             for part in parts:
                 streams.append(CallableIterable.from_dataframe(part, self.column_names.side, StreamMessage))
 
-        logging.warning(f'call: train - stream.len={len(streams)}')
+        self.log(f'call: train - stream.len={len(streams)}', important=True)
 
         utils.smart_call(
             self.train_function,
             default_values,
             {
                 "streams": streams,
-            }
+            },
+            logger=self.logger,
         )
 
     def stream_loop(
@@ -312,7 +342,7 @@ class LocalRunner(Runner):
 
         predicteds, durations = [], []
         for index, stream_data in enumerate(stream_datas):
-            logging.warning(f'call: infer ({index + 1}/{len(stream_datas)})')
+            self.log(f'call: infer ({index + 1}/{len(stream_datas)})', important=True)
 
             wrapper = GeneratorWrapper(
                 iter(stream_data),
@@ -322,7 +352,8 @@ class LocalRunner(Runner):
                     {
                         "stream": stream,
                     }
-                )
+                ),
+                logger=self.logger,
             )
 
             collected_values, collected_durations = wrapper.collect(len(stream_data))
@@ -356,10 +387,12 @@ class LocalRunner(Runner):
     def spatial_train(
         self,
     ):
-        logging.warning('call: train')
+        self.log('call: train', important=True)
+
         utils.smart_call(
             self.train_function,
-            self._get_spatial_default_values()
+            self._get_spatial_default_values(),
+            logger=self.logger,
         )
 
     def spatial_loop(
@@ -371,7 +404,7 @@ class LocalRunner(Runner):
             target_column_names.file_path
         ) if target_column_names.file_path else None
 
-        logging.warning(f'call: infer ({target_column_names.name})')
+        self.log(f'call: infer ({target_column_names.name})', important=True)
 
         prediction = utils.smart_call(
             self.infer_function,
@@ -379,10 +412,11 @@ class LocalRunner(Runner):
             {
                 "data_file_path": data_file_path,
                 "target_name": target_column_names.name,
-            }
+            },
+            logger=self.logger,
         )
 
-        ensure.is_dataframe(prediction, "prediction")
+        ensure.is_dataframe(prediction, "prediction", logger=self.logger)
 
         return prediction
 
@@ -392,7 +426,7 @@ class LocalRunner(Runner):
             "prediction.parquet"
         )
 
-        logging.warning('save prediction - path=%s', prediction_path)
+        self.log('save prediction - path=%s' % prediction_path, important=True)
         utils.write(prediction, prediction_path, kwargs={
             "index": False,
             **self.write_kwargs
@@ -406,29 +440,31 @@ class LocalRunner(Runner):
                     prediction,
                     example_prediction,
                     self.column_names,
-                    logging,
+                    self.logger,
                 )
 
-                logging.warning(f"prediction is valid")
+                self.log(f"prediction is valid", important=True)
             except checker.CheckError as error:
                 if not isinstance(error.__cause__, checker.CheckError):
-                    logging.exception(
+                    self.logger.exception(
                         "check failed - message=`%s`",
                         error,
                         exc_info=error.__cause__
                     )
                 else:
-                    logging.error("check failed - message=`%s`", error)
+                    self.log("check failed - message=`%s`" % error, error=True)
 
                 return None
 
         return prediction
 
-    def log(self, message: str, error=False):
+    def log(self, message: str, important=False, error=False):
         if error:
-            logging.error(message)
+            self.logger.error(message)
+        elif important:
+            self.logger.warning(message)
         else:
-            logging.info(message)
+            self.logger.info(message)
 
         return True
 

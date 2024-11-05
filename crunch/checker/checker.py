@@ -71,7 +71,8 @@ def _run_checks(
                         "column_names": column_names,
                         "competition_format": competition_format,
                     },
-                    parameters
+                    parameters,
+                    logger=logger,
                 )
             except CheckError as error:
                 _change_message_and_raise(error, suffix)

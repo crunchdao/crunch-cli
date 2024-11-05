@@ -204,5 +204,5 @@ class Runner(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def log(self, message: str, error=False):
+    def log(self, message: str, important=False, error=False):
         ...
