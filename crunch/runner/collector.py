@@ -101,7 +101,8 @@ class FilePredictionCollector(PredictionCollector):
         self._close()
 
     def _reset(self):
-        self.writer.close()
+        if self.writer is not None:
+            self.writer.close()
 
         self.writer = None
         self.schema = None
