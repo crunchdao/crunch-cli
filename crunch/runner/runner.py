@@ -4,6 +4,7 @@ import typing
 
 import pandas
 
+from .collector import PredictionCollector
 from .. import api
 
 
@@ -14,9 +15,11 @@ class Runner(abc.ABC):
 
     def __init__(
         self,
+        prediction_collector: PredictionCollector,
         competition_format: api.CompetitionFormat,
         determinism_check_enabled=False,
     ):
+        self.prediction_collector = prediction_collector
         self.competition_format = competition_format
 
         self.determinism_check_enabled = determinism_check_enabled
@@ -31,24 +34,28 @@ class Runner(abc.ABC):
             self.have_model,
         ) = self.initialize()
 
-        if self.competition_format == api.CompetitionFormat.TIMESERIES:
-            self.log("starting timeseries loop...")
-            prediction = self.start_timeseries()
+        try:
+            if self.competition_format == api.CompetitionFormat.TIMESERIES:
+                self.log("starting timeseries loop...")
+                self.start_timeseries()
 
-        elif self.competition_format == api.CompetitionFormat.DAG:
-            self.log("starting dag process...")
-            prediction = self.start_dag()
+            elif self.competition_format == api.CompetitionFormat.DAG:
+                self.log("starting dag process...")
+                self.start_dag()
 
-        elif self.competition_format == api.CompetitionFormat.STREAM:
-            self.log("starting stream loop...")
-            prediction = self.start_stream()
+            elif self.competition_format == api.CompetitionFormat.STREAM:
+                self.log("starting stream loop...")
+                self.start_stream()
 
-        elif self.competition_format == api.CompetitionFormat.SPATIAL:
-            self.log("starting spatial loop...")
-            prediction = self.start_spatial()
+            elif self.competition_format == api.CompetitionFormat.SPATIAL:
+                self.log("starting spatial loop...")
+                self.start_spatial()
 
-        else:
-            raise ValueError(f"unsupported: {self.competition_format}")
+            else:
+                raise ValueError(f"unsupported: {self.competition_format}")
+        except:
+            self.prediction_collector.discard()
+            raise
 
         if self.determinism_check_enabled:
             if self.deterministic:
@@ -56,16 +63,12 @@ class Runner(abc.ABC):
             else:
                 self.log(f"determinism check: failed", error=True)
 
-        prediction = self.finalize(prediction)
+        self.finalize()
         self.log("ended")
 
         self.teardown()
 
-        return prediction
-
     def start_timeseries(self):
-        predictions: typing.List[pandas.DataFrame] = []
-
         for index, moon in enumerate(self.keys):
             train, forced_train = False, False
             if self.train_frequency != 0 and moon % self.train_frequency == 0:
@@ -85,9 +88,7 @@ class Runner(abc.ABC):
                 self.deterministic = prediction.equals(prediction2)
                 self.log(f"deterministic: {str(self.deterministic).lower()}")
 
-            predictions.append(prediction)
-
-        return pandas.concat(predictions)
+            self.prediction_collector.append(prediction)
 
     @abc.abstractmethod
     def timeseries_loop(
@@ -99,13 +100,12 @@ class Runner(abc.ABC):
 
     def start_dag(self):
         prediction = self.dag_loop(True)
+        self.prediction_collector.append(prediction)
 
         if self.deterministic:
             prediction2 = self.dag_loop(False)
             self.deterministic = prediction.equals(prediction2)
             self.log(f"deterministic: {str(self.deterministic).lower()}")
-
-        return prediction
 
     @abc.abstractmethod
     def dag_loop(
@@ -115,8 +115,6 @@ class Runner(abc.ABC):
         ...
 
     def start_stream(self):
-        predictions: typing.List[pandas.DataFrame] = []
-
         if not self.have_model:
             self.stream_no_model()
 
@@ -131,9 +129,7 @@ class Runner(abc.ABC):
                 self.deterministic = prediction.equals(prediction2)
                 self.log(f"deterministic: {str(self.deterministic).lower()}")
 
-            predictions.append(prediction)
-
-        return pandas.concat(predictions)
+            self.prediction_collector.append(prediction)
 
     def stream_have_model(self):
         return self.have_model
@@ -152,8 +148,6 @@ class Runner(abc.ABC):
         ...
 
     def start_spatial(self):
-        predictions: typing.List[pandas.DataFrame] = []
-
         if self.force_first_train:
             self.spatial_train()
 
@@ -169,9 +163,7 @@ class Runner(abc.ABC):
                 self.log(f"deterministic: {str(self.deterministic).lower()}")
 
             prediction["sample"] = target_column_names.name
-            predictions.append(prediction)
-
-        return pandas.concat(predictions)
+            self.prediction_collector.append(prediction)
 
     @abc.abstractmethod
     def spatial_train(
@@ -197,7 +189,7 @@ class Runner(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def finalize(self, prediction: pandas.DataFrame):
+    def finalize(self):
         ...
 
     def teardown(self):

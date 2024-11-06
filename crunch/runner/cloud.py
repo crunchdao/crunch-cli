@@ -10,7 +10,8 @@ import urllib.parse
 import pandas
 import requests
 
-from .. import api, store, utils, downloader
+from .. import api, downloader, store, utils
+from .collector import MemoryPredictionCollector
 from .runner import Runner
 
 CONFLICTING_GPU_PACKAGES = [
@@ -62,7 +63,11 @@ class CloudRunner(Runner):
         max_retry: int,
         retry_seconds: int
     ):
-        super().__init__(competition.format, determinism_check_enabled)
+        super().__init__(
+            MemoryPredictionCollector(),
+            competition.format,
+            determinism_check_enabled
+        )
 
         self.competition = competition
         self.run = run
@@ -239,19 +244,12 @@ class CloudRunner(Runner):
             target_column_names.name
         )
 
-    def finalize(self, prediction: pandas.DataFrame):
+    def finalize(self):
         self.report_current("upload result")
         self.log("uploading result...")
 
         prediction_file_name = os.path.basename(self.prediction_path)
-
-        utils.write(
-            prediction,
-            self.prediction_path,
-            kwargs=dict(
-                index=False
-            )
-        )
+        self.prediction_collector.persist(self.prediction_path)
 
         fds = []
         try:
