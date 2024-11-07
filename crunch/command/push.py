@@ -59,6 +59,38 @@ def _list_model_files(
         yield path, name
 
 
+def is_valid_version(input: str):
+    from ..external import packaging__version
+
+    try:
+        packaging__version.Version(input)
+        return True
+    except:
+        return False
+
+
+def pip_freeze():
+    import importlib_metadata
+
+    working_set = {}
+
+    installed_packages = {
+        package
+        for packages in importlib_metadata.packages_distributions().values()
+        for package in packages
+    }
+
+    for package in installed_packages:
+        version = importlib_metadata.version(package)
+
+        if not is_valid_version(version):
+            continue
+
+        working_set[package] = version
+
+    return working_set
+
+
 def push(
     message: str,
     main_file_path: str,
@@ -70,7 +102,7 @@ def push(
     client, project = api.Client.from_project()
     competition = project.competition
 
-    installed_packages_version = utils.pip_freeze() if include_installed_packages_version else {}
+    installed_packages_version = pip_freeze() if include_installed_packages_version else {}
 
     fds = []
 

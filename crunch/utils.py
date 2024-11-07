@@ -170,38 +170,6 @@ def to_unix_path(input: str):
         .replace("//", "/")
 
 
-def pip_freeze():
-    import importlib_metadata
-
-    working_set = {}
-
-    installed_packages = {
-        package
-        for packages in importlib_metadata.packages_distributions().values()
-        for package in packages
-    }
-
-    for package in installed_packages:
-        version = importlib_metadata.version(package)
-
-        if not is_valid_version(version):
-            continue
-
-        working_set[package] = version
-
-    return working_set
-
-
-def is_valid_version(input: str):
-    import packaging.version
-
-    try:
-        packaging.version.Version(input)
-        return True
-    except:
-        return False
-
-
 def get_process_memory() -> int:
     import psutil
     process = psutil.Process(os.getpid())
