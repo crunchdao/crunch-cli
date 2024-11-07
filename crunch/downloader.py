@@ -76,26 +76,35 @@ def save_one(
     if data_file is None:
         return
 
+    file_size = data_file.size
+    file_path = data_file.path
+    file_name = os.path.basename(file_path)
+    parent_directory_path = os.path.dirname(file_path)
+
+    uncompressed_marker = os.path.join(
+        parent_directory_path,
+        f".{file_name}.uncompressed"
+    )
+
+    local_size = _read_size(file_path, uncompressed_marker)
+
     def download():
-        file_length_str = f" ({data_file.size} bytes)" if data_file.has_size else ""
-        print(f"{data_file.path}: download from {utils.cut_url(data_file.url)}" + file_length_str)
+        file_length_str = f" ({file_size} bytes)" if data_file.has_size else ""
+        print(f"{file_path}: download from {utils.cut_url(data_file.url)}" + file_length_str)
 
         if not data_file.has_size:
-            print(f"{data_file.path}: skip, not given by server")
+            print(f"{file_path}: skip, not given by server")
             return None
 
-        exists = os.path.exists(data_file.path)
-        if not force and exists:
-            stat = os.stat(data_file.path)
-            if stat.st_size == data_file.size:
-                print(f"{data_file.path}: already exists, file length match")
-                return False
+        if not force and local_size == file_size:
+            print(f"{file_path}: already exists, file length match")
+            return False
 
         if not data_file.signed:
-            print(f"{data_file.path}: signature missing, cannot download file without being authenticated")
+            print(f"{file_path}: signature missing, cannot download file without being authenticated")
             raise click.Abort()
 
-        utils.download(data_file.url, data_file.path, log=False, progress_bar=progress_bar)
+        utils.download(data_file.url, file_path, log=False, progress_bar=progress_bar)
         return True
 
     has_new_content = download()
@@ -105,42 +114,74 @@ def save_one(
     if not data_file.compressed:
         return
 
-    zip_file_path = data_file.path
-    zip_file_name = os.path.basename(zip_file_path)
-    zip_parent_directory_path = os.path.dirname(zip_file_path)
-
-    uncompressed_marker = os.path.join(
-        zip_parent_directory_path,
-        f".{zip_file_name}.uncompressed"
-    )
-
     if os.path.exists(uncompressed_marker):
         if has_new_content:
             os.unlink(uncompressed_marker)
         elif not force:
-            print(f"{zip_file_path}: already uncompressed, marker is present")
+            print(f"{file_path}: already uncompressed, marker is present")
             return
 
     with tempfile.TemporaryDirectory(
-        prefix=f"{zip_file_name}.",
-        dir=zip_parent_directory_path
+        prefix=f"{file_name}.",
+        dir=parent_directory_path
     ) as temporary_directory_path:
-        print(f"{zip_file_path}: uncompress into {temporary_directory_path}")
-        _uncompress(zip_file_path, temporary_directory_path)
+        print(f"{file_path}: uncompress into {temporary_directory_path}")
+        _uncompress(file_path, temporary_directory_path)
 
         for name in os.listdir(temporary_directory_path):
             if name == "__MACOSX":
                 continue
 
             source_path = os.path.join(temporary_directory_path, name)
-            destination_path = os.path.join(zip_parent_directory_path, name)
+            destination_path = os.path.join(parent_directory_path, name)
 
             if os.path.exists(destination_path):
                 shutil.rmtree(destination_path)
 
-            shutil.move(source_path, zip_parent_directory_path)
+            shutil.move(source_path, parent_directory_path)
 
-        open(uncompressed_marker, 'w').close()
+    with open(uncompressed_marker, 'w') as fd:
+        fd.write(str(file_size))
+
+    os.unlink(file_path)
+
+
+def save_all(
+    data_files: typing.Dict[str, PreparedDataFile],
+    force: bool,
+    print=print,
+    progress_bar=True,
+):
+    for data_file in data_files.values():
+        save_one(data_file, force, print, progress_bar)
+
+    return {
+        key: value.path
+        for key, value in data_files.items()
+        if value.has_size
+    }
+
+
+def _read_size(
+    file_path: str,
+    marker_file_path: str
+):
+    try:
+        with open(marker_file_path, "r") as fd:
+            content = fd.read()
+
+        return int(content)
+    except (FileNotFoundError, ValueError):
+        pass
+
+    try:
+        stat = os.stat(file_path)
+
+        return stat.st_size
+    except FileNotFoundError:
+        pass
+
+    return None
 
 
 def _uncompress(
@@ -159,19 +200,3 @@ def _uncompress(
     else:
         with zipfile.ZipFile(zip_file_path, "r") as zipfd:
             zipfd.extractall(output_directory_path)
-
-
-def save_all(
-    data_files: typing.Dict[str, PreparedDataFile],
-    force: bool,
-    print=print,
-    progress_bar=True,
-):
-    for data_file in data_files.values():
-        save_one(data_file, force, print, progress_bar)
-
-    return {
-        key: value.path
-        for key, value in data_files.items()
-        if value.has_size
-    }
