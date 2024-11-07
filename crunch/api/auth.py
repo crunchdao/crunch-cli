@@ -1,4 +1,5 @@
 import abc
+import re
 import typing
 
 
@@ -12,6 +13,12 @@ class Auth(metaclass=abc.ABCMeta):
         data: typing.Optional[dict],
     ):
         ...
+
+    def strip(
+        self,
+        error_message: str,
+    ) -> str:
+        return error_message
 
 
 class NoneAuth(Auth):
@@ -64,6 +71,16 @@ class PushTokenAuth(Auth):
             data["pushToken"] = self._token
         else:
             params["pushToken"] = self._token
+
+    def strip(
+        self,
+        error_message: str,
+    ):
+        return re.sub(
+            r"pushToken=\w+",
+            "pushToken=HIDDEN",
+            error_message
+        )
 
 
 class RunTokenAuth(Auth):

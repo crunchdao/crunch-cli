@@ -6,6 +6,7 @@ import urllib.parse
 import requests
 import sseclient
 import tqdm
+import urllib3
 
 from .. import constants, store, utils
 from .auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
@@ -113,6 +114,9 @@ class EndpointClient(
                 files=files,
                 **kwargs,
             )
+        except requests.exceptions.RequestException as error:
+            self._strip_secrets(error)
+            raise error
         finally:
             if progress is not None:
                 progress.close()
@@ -124,10 +128,40 @@ class EndpointClient(
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as error:
+            self._strip_secrets(error)
+
             content = error.response.json()
             converted = convert_error(content)
 
             raise converted
+
+    def _strip_secrets(self, error: BaseException):
+        if not self.auth_:
+            return None
+        
+        args = list(error.args)
+
+        for index, arg in enumerate(args):
+            if isinstance(arg, BaseException):
+                self._strip_secrets(arg)
+
+                if isinstance(arg, urllib3.exceptions.RequestError):
+                    arg.url = self.auth_.strip(arg.url) or arg.url
+
+                continue
+
+            if not isinstance(arg, str):
+                continue
+
+            new_arg = self.auth_.strip(arg)
+            if new_arg is not None:
+                args[index] = new_arg
+        
+        error.args = tuple(args)
+
+        cause = error.__cause__
+        if cause is not None:
+            self._strip_secrets(cause)
 
     def _result(
         self,
@@ -139,10 +173,15 @@ class EndpointClient(
         assert not (json and binary)
         self._raise_for_status(response)
 
-        if sse_handler and response.headers.get("content-type") == "text/event-stream":
+        content_type = response.headers.get("content-type")
+
+        if sse_handler and content_type == "text/event-stream":
             return self._result_sse(response, sse_handler, json)
 
         if json:
+            if content_type != "application/json":
+                raise ValueError(f"server did not return json: `{content_type}`: `{response.text}`")
+
             try:
                 return response.json()
             except requests.exceptions.JSONDecodeError as json_error:
