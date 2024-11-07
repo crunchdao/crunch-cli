@@ -4,9 +4,11 @@ import typing
 import urllib.parse
 
 import requests
-import sseclient
 import tqdm
 import urllib3
+
+if typing.TYPE_CHECKING:
+    from ..external import sseclient
 
 from .. import constants, store, utils
 from .auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
@@ -138,7 +140,7 @@ class EndpointClient(
     def _strip_secrets(self, error: BaseException):
         if not self.auth_:
             return None
-        
+
         args = list(error.args)
 
         for index, arg in enumerate(args):
@@ -156,7 +158,7 @@ class EndpointClient(
             new_arg = self.auth_.strip(arg)
             if new_arg is not None:
                 args[index] = new_arg
-        
+
         error.args = tuple(args)
 
         cause = error.__cause__
@@ -195,9 +197,11 @@ class EndpointClient(
     def _result_sse(
         self,
         response: requests.Response,
-        sse_handler: typing.Callable[[sseclient.Event], None],
+        sse_handler: typing.Callable[["sseclient.Event"], None],
         as_json=False,
     ):
+        from ..external import sseclient
+
         client = sseclient.SSEClient(response)
         for event in client.events():
             is_error = event.event.startswith("error:")
