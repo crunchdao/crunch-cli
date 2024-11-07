@@ -2,7 +2,6 @@ astor
 click
 coloredlogs
 dataclasses_json
-gitignorefile
 importlib_metadata
 inquirer
 joblib
@@ -18,7 +17,6 @@ requests-toolbelt
 requirements-parser
 scikit-learn
 scipy
-sseclient-py
 tqdm
 
 # TODO Remove me once competition is over

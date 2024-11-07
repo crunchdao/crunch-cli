@@ -1,8 +1,11 @@
-import typing
 import enum
+import typing
 
 from ..resource import Collection, Model
 from .project import Project
+
+if typing.TYPE_CHECKING:
+    from ...external import sseclient
 
 
 class SubmissionType(enum.Enum):
