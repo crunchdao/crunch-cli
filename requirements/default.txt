@@ -6,6 +6,7 @@ importlib_metadata
 inquirer
 joblib
 networkx
+packaging
 pandas
 psutil
 pyarrow
