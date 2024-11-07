@@ -322,7 +322,7 @@ def _download_head(
             else:
                 file_length_str = "unknown length"
 
-            print(f"download {path} from {cut_url(url)} ({file_length_str})")
+            print(f"{path}: download from {cut_url(url)} ({file_length_str})")
             logged = True
 
         accept_ranges = response.headers.get("Accept-Ranges", None)
@@ -369,7 +369,6 @@ def download(
         dir=os.path.dirname(path),
     ) as temporary_directory_path:
         source_file_path = os.path.join(temporary_directory_path, file_name)
-        print(source_file_path)
         destination_file_path = path
 
         with open(source_file_path, 'wb') as fd:
