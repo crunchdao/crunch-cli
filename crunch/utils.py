@@ -5,7 +5,9 @@ import json
 import logging
 import os
 import re
+import shutil
 import sys
+import tempfile
 import time
 import typing
 
@@ -360,51 +362,69 @@ def download(
 
     total_read = 0
 
-    with open(path, 'wb') as fd:
-        for retry in range(max_retry + 1):
-            last = retry == max_retry
+    file_name = os.path.basename(path)
 
-            headers = {
-                "Range": f"bytes={total_read}-",
-            } if retry else {}
+    with tempfile.TemporaryDirectory(
+        prefix=f"{file_name}.",
+        dir=os.path.dirname(path),
+    ) as temporary_directory_path:
+        source_file_path = os.path.join(temporary_directory_path, file_name)
+        print(source_file_path)
+        destination_file_path = path
 
-            try:
-                response = response or session.get(
-                    url,
-                    stream=True,
-                    headers=headers,
-                    timeout=30,
-                )
+        with open(source_file_path, 'wb') as fd:
+            for retry in range(max_retry + 1):
+                last = retry == max_retry
 
-                response.raise_for_status()
+                headers = {
+                    "Range": f"bytes={total_read}-",
+                } if retry else {}
 
-                with tqdm.tqdm(
-                    initial=total_read,
-                    total=file_length,
-                    unit='iB',
-                    unit_scale=True,
-                    leave=False,
-                    disable=not progress_bar
-                ) as progress:
-                    for chunk in response.iter_content(chunk_size=1024 * 16):
-                        chunk_size = len(chunk)
-                        total_read += chunk_size
+                try:
+                    response = response or session.get(
+                        url,
+                        stream=True,
+                        headers=headers,
+                        timeout=30,
+                    )
 
-                        progress.update(chunk_size)
-                        fd.write(chunk)
+                    response.raise_for_status()
 
-                break
-            except (requests.exceptions.ConnectionError, KeyboardInterrupt) as error:
-                if last:
-                    raise
+                    with tqdm.tqdm(
+                        initial=total_read,
+                        total=file_length,
+                        unit='iB',
+                        unit_scale=True,
+                        leave=False,
+                        disable=not progress_bar
+                    ) as progress:
+                        for chunk in response.iter_content(chunk_size=1024 * 16):
+                            chunk_size = len(chunk)
+                            total_read += chunk_size
 
-                print(f"retrying {retry + 1}/{max_retry} at {total_read} bytes because of {error.__class__.__name__}: {str(error) or '(no message)'}")
-                time.sleep(1)
-            finally:
-                if response is not None:
-                    response.close()
+                            progress.update(chunk_size)
+                            fd.write(chunk)
 
-                response = None
+                    break
+                except (requests.exceptions.ConnectionError, KeyboardInterrupt) as error:
+                    if last:
+                        raise
+
+                    print(f"retrying {retry + 1}/{max_retry} at {total_read} bytes because of {error.__class__.__name__}: {str(error) or '(no message)'}")
+                    time.sleep(1)
+                finally:
+                    if response is not None:
+                        response.close()
+
+                    response = None
+
+        if os.path.exists(destination_file_path):
+            os.unlink(destination_file_path)
+
+        shutil.move(
+            source_file_path,
+            destination_file_path
+        )
 
 
 def exit_via(error: "api.ApiException", **kwargs):
