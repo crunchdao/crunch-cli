@@ -27,7 +27,7 @@ def _list_files(
 def _list_code_files(
     model_directory_path: str
 ):
-    import gitignorefile
+    from ..external import gitignorefile
 
     ignore_files = [
         *constants.IGNORED_FILES,

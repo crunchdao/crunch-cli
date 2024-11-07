@@ -2,7 +2,6 @@ astor
 click
 coloredlogs
 dataclasses_json
-gitignorefile
 importlib_metadata
 inquirer
 joblib
