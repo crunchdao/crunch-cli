@@ -360,9 +360,9 @@ class LocalRunner(Runner):
                     default_values,
                     {
                         "stream": stream,
-                    }
+                    },
+                    logger=self.logger,
                 ),
-                logger=self.logger,
             )
 
             collected_values, collected_durations = wrapper.collect(len(stream_data))
