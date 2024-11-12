@@ -347,15 +347,19 @@ def test(
 @cli.command(help="Download the data locally.")
 @click.option("--round-number", default="@current")
 @click.option("--force", is_flag=True, help="Force the download of the data.")
-@click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use alternative version of the data.")
+@click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
 def download(
     round_number: str,
     force: bool,
-    size_variant_raw: str,
+    size_variant_raw: typing.Optional[str],
 ):
     utils.change_root()
 
-    size_variant = api.SizeVariant[size_variant_raw.upper()]
+    size_variant = (
+        api.SizeVariant[size_variant_raw.upper()]
+        if size_variant_raw is not None
+        else None
+    )
 
     try:
         command.download(
