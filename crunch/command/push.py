@@ -59,6 +59,17 @@ def _list_model_files(
         yield path, name
 
 
+def _print_sse_handler(event):
+    data = event.data
+    if isinstance(data, dict):
+        data = " ".join(
+            f"{key}={value}"
+            for key, value in data.items()
+        )
+
+    print(f"server: {event.event}: {data}")
+
+
 def push(
     message: str,
     main_file_path: str,
@@ -78,9 +89,12 @@ def push(
         with tempfile.NamedTemporaryFile(prefix="submission-", suffix=".tar", dir=constants.DOT_CRUNCHDAO_DIRECTORY) as tmp:
             with tarfile.open(fileobj=tmp, mode="w") as tar:
                 for file in _list_code_files(model_directory_path):
-                    print(f"compress {file}")
+                    size = os.path.getsize(file)
+                    print(f"compress {file} ({utils.format_bytes(size)})")
+
                     tar.add(file)
 
+            total_size = tmp.tell()
             tmp.seek(0)
 
             if export_path:
@@ -94,31 +108,20 @@ def push(
                 ]
 
                 for path, name in _list_model_files(model_directory_path):
-                    print(f"model {name}")
+                    size = os.path.getsize(path)
+                    print(f"model {name} ({utils.format_bytes(size)})")
 
                     fd = open(path, "rb")
                     fds.append(fd)
 
                     files.append(("modelFiles", (name, fd)))
+                    total_size += size
 
                 print(f"export {competition.name}:project/{project.user_id}/{project.name}")
                 if dry:
                     print("create dry (no upload)")
                 else:
-                    print("create on server")
-
-                    if store.debug:
-                        def sse_handler(event):
-                            data = event.data
-                            if isinstance(data, dict):
-                                data = " ".join(
-                                    f"{key}={value}"
-                                    for key, value in data.items()
-                                )
-
-                            print(f"server: {event.event}: {data}")
-                    else:
-                        sse_handler = None
+                    print(f"create on server ({utils.format_bytes(total_size)})")
 
                     submission = project.submissions.create(
                         message=message,
@@ -127,7 +130,7 @@ def push(
                         type=api.SubmissionType.CODE,
                         preferred_packages_version=installed_packages_version,
                         files=files,
-                        sse_handler=sse_handler
+                        sse_handler=_print_sse_handler if store.debug else None
                     )
 
                     _print_success(client, submission)
