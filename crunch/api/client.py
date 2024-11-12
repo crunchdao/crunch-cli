@@ -78,28 +78,37 @@ class EndpointClient(
 
         progress: tqdm.tqdm = None
 
-        if files is not None and store.debug:
+        if files is not None:
             import requests_toolbelt
 
             fields = [
-                *((
+                *files
+            ]
+
+            if isinstance(data, dict):
+                fields.extend((
                     (key, str(value))
                     for key, value in data.items()
-                ) if data is not None else []),
-                *files,
-            ]
+                ))
+            elif isinstance(data, (list, tuple)):
+                fields.extend(data)
+            elif data is not None:
+                raise ValueError(f"unsupported data: {data}")
+
+            encoder = requests_toolbelt.MultipartEncoder(fields)
 
             progress = tqdm.tqdm(
                 desc="upload",
                 unit="B",
                 unit_scale=True,
-                unit_divisor=1024
+                unit_divisor=1024,
+                total=encoder.len,
             )
 
             def callback(monitor: requests_toolbelt.MultipartEncoderMonitor):
                 progress.update(monitor.bytes_read - progress.n)
-
-            encoder = requests_toolbelt.MultipartEncoder(fields)
+                if progress.total == progress.n:
+                    progress.refresh(progress.lock_args)
 
             headers["Content-Type"] = encoder.content_type
             data = requests_toolbelt.MultipartEncoderMonitor(encoder, callback)
