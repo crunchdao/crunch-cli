@@ -1,11 +1,10 @@
 import abc
-import functools
 import typing
 
 import pandas
 
-from .collector import PredictionCollector
 from .. import api
+from .collector import PredictionCollector
 
 
 class Runner(abc.ABC):
