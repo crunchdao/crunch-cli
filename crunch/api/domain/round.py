@@ -1,10 +1,12 @@
 import typing
-import pandas
 import tempfile
 
 from ..identifiers import RoundIdentifierType
 from ..resource import Collection, Model
 from .competition import Competition
+
+if typing.TYPE_CHECKING:
+    import pandas
 
 
 class Round(Model):
@@ -41,7 +43,7 @@ class Round(Model):
 
     def orthogonalize(
         self,
-        dataframe: pandas.DataFrame,
+        dataframe: "pandas.DataFrame",
         timeout=60
     ):
         from .score import Score
