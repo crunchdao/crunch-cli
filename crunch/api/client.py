@@ -91,8 +91,10 @@ class EndpointClient(
                 fields.extend((
                     (key, str(value))
                     for key, value in data.items()
+                    if value is not None
                 ))
             elif isinstance(data, (list, tuple)):
+                # TODO Filter `None`s?
                 fields.extend(data)
             elif data is not None:
                 raise ValueError(f"unsupported data: {data}")
