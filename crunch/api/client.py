@@ -61,12 +61,14 @@ class EndpointClient(
     def __init__(
         self,
         base_url: str,
-        auth: Auth
+        auth: Auth,
+        show_progress: bool,
     ):
         super().__init__()
 
         self.base_url = base_url
         self.auth_ = auth
+        self.show_progress = show_progress
 
     def request(self, method, url, *args, **kwargs):
         headers = kwargs.pop("headers", {})
@@ -96,23 +98,26 @@ class EndpointClient(
                 raise ValueError(f"unsupported data: {data}")
 
             encoder = requests_toolbelt.MultipartEncoder(fields)
-
-            progress = tqdm.tqdm(
-                desc="upload",
-                unit="B",
-                unit_scale=True,
-                unit_divisor=1024,
-                total=encoder.len,
-            )
-
-            def callback(monitor: requests_toolbelt.MultipartEncoderMonitor):
-                progress.update(monitor.bytes_read - progress.n)
-                if progress.total == progress.n:
-                    progress.refresh(progress.lock_args)
-
             headers["Content-Type"] = encoder.content_type
-            data = requests_toolbelt.MultipartEncoderMonitor(encoder, callback)
             files = None
+
+            if not self.show_progress:
+                data = encoder
+            else:
+                progress = tqdm.tqdm(
+                    desc="upload",
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    total=encoder.len,
+                )
+
+                def callback(monitor: requests_toolbelt.MultipartEncoderMonitor):
+                    progress.update(monitor.bytes_read - progress.n)
+                    if progress.total == progress.n:
+                        progress.refresh(progress.lock_args)
+
+                data = requests_toolbelt.MultipartEncoderMonitor(encoder, callback)
 
         try:
             return super().request(
@@ -239,9 +244,11 @@ class Client:
         api_base_url: str,
         web_base_url: str,
         auth: Auth,
-        project_info: typing.Optional[utils.ProjectInfo] = None
+        project_info: typing.Optional[utils.ProjectInfo] = None,
+        *,
+        show_progress = True,
     ):
-        self.api = EndpointClient(api_base_url, auth)
+        self.api = EndpointClient(api_base_url, auth, show_progress)
         self.web_base_url = web_base_url
         self.project_info = project_info
 
@@ -285,7 +292,9 @@ class Client:
 
     @staticmethod
     def from_env(
-        auth: typing.Optional[Auth] = None
+        auth: typing.Optional[Auth] = None,
+        *,
+        show_progress=True,
     ):
         store.load_from_env()
 
@@ -299,11 +308,15 @@ class Client:
         return Client(
             store.api_base_url,
             store.web_base_url,
-            auth
+            auth,
+            show_progress=show_progress,
         )
 
     @staticmethod
-    def from_project() -> typing.Tuple["Client", Project]:
+    def from_project(
+        *,
+        show_progress=True,
+    ) -> typing.Tuple["Client", Project]:
         store.load_from_env()
 
         project_info = utils.read_project_info()
@@ -314,6 +327,7 @@ class Client:
             store.web_base_url,
             PushTokenAuth(push_token),
             project_info,
+            show_progress=show_progress,
         )
 
         competition = client.competitions.get(project_info.competition_name)

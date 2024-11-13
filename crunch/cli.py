@@ -550,7 +550,7 @@ def cloud(
     trace_path = os.path.join(context_directory, trace_file_name)
 
     auth = api.auth.RunTokenAuth(run_token)
-    client = api.Client.from_env(auth)
+    client = api.Client.from_env(auth, show_progress=False)
 
     competition = client.competitions.get(competition_name)
     run = client.get_runner_run(run_id)
