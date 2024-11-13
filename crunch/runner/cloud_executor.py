@@ -14,9 +14,9 @@ import pandas
 import requests
 
 from .. import api, checker, meta, orthogonalization, scoring, utils
-from ..container import (CallableIterable, Columns, Features, GeneratorWrapper,
-                         StreamMessage)
+from ..container import Columns, Features, GeneratorWrapper
 from ..orthogonalization import _runner as orthogonalization_runner
+from .shared import split_streams
 
 
 class Reference:
@@ -336,12 +336,8 @@ class SandboxExecutor:
             "has_gpu": self.gpu,
         }
 
-        side_column_name: str = self.column_names.side
         if self.train:
-            streams = [
-                CallableIterable.from_dataframe(part, side_column_name, StreamMessage)
-                for part in utils.split_at_nans(x_train, side_column_name)
-            ]
+            streams = split_streams(x_train, self.column_names)
 
             utils.smart_call(
                 train_function,
@@ -354,6 +350,8 @@ class SandboxExecutor:
 
             return None
         else:
+            side_column_name: str = self.column_names.side
+
             target_column_names = self.column_names.get_target_by_name(self.loop_key)
             assert target_column_names is not None, f"target not found: {self.loop_key}"
 

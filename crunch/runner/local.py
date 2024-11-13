@@ -6,12 +6,11 @@ import typing
 import click
 import pandas
 
-from .. import (api, checker, command, constants, ensure, meta, monkey_patches,
-                tester, utils)
-from ..container import (CallableIterable, Columns, GeneratorWrapper,
-                         StreamMessage)
+from .. import (api, checker, command, constants, container, ensure, meta,
+                monkey_patches, tester, utils)
 from .collector import FilePredictionCollector, MemoryPredictionCollector
 from .runner import Runner
+from .shared import split_streams
 
 
 class LocalRunner(Runner):
@@ -158,7 +157,7 @@ class LocalRunner(Runner):
         moon: int,
         train: bool
     ) -> pandas.DataFrame:
-        target_column_names, prediction_column_names = Columns.from_model(self.column_names)
+        target_column_names, prediction_column_names = container.Columns.from_model(self.column_names)
 
         default_values = {
             "number_of_features": self.number_of_features,
@@ -227,7 +226,7 @@ class LocalRunner(Runner):
         x_test = utils.read(self.x_test_path, kwargs=self.read_kwargs)
         y_train = utils.read(self.y_train_path, kwargs=self.read_kwargs)
 
-        _, prediction_column_names = Columns.from_model(self.column_names)
+        _, prediction_column_names = container.Columns.from_model(self.column_names)
 
         default_values = {
             "number_of_features": self.number_of_features,
@@ -300,18 +299,9 @@ class LocalRunner(Runner):
         self,
     ):
         default_values = self._get_stream_default_values()
-        stream_names = set(self.column_names.target_names)
 
         x_train = utils.read(self.x_train_path, kwargs=self.read_kwargs)
-
-        streams = []
-        for stream_name, group in x_train.groupby(self.column_names.id):
-            if stream_name not in stream_names:
-                continue
-
-            parts = utils.split_at_nans(group, self.column_names.side)
-            for part in parts:
-                streams.append(CallableIterable.from_dataframe(part, self.column_names.side, StreamMessage))
+        streams = split_streams(x_train, self.column_names)
 
         self.log(f'call: train - stream.len={len(streams)}', important=True)
 
@@ -353,7 +343,7 @@ class LocalRunner(Runner):
         for index, stream_data in enumerate(stream_datas):
             self.log(f'call: infer ({index + 1}/{len(stream_datas)})', important=True)
 
-            wrapper = GeneratorWrapper(
+            wrapper = container.GeneratorWrapper(
                 iter(stream_data),
                 lambda stream: utils.smart_call(
                     self.infer_function,
