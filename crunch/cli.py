@@ -617,6 +617,8 @@ def cloud(
 @click.option("--input-column-name", required=True)
 @click.option("--output-column-name", required=True)
 @click.option("--target", "targets", required=True, multiple=True, nargs=5)
+# ---
+@click.option("--write-index", required=True, type=bool)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
@@ -648,6 +650,8 @@ def cloud_executor(
     input_column_name: str,
     output_column_name: str,
     targets: typing.List[typing.Tuple[str, str, str, str, str]],
+    # ---
+    write_index: bool,
 ):
     from .runner import is_inside
     if not is_inside:
@@ -707,7 +711,9 @@ def cloud_executor(
                 )
                 for target_name, side, input, output, file_path in targets
             ]
-        )
+        ),
+        # ---
+        write_index,
     )
 
     executor.start()

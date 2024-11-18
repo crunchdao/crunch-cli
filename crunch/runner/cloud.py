@@ -64,7 +64,10 @@ class CloudRunner(Runner):
         retry_seconds: int
     ):
         super().__init__(
-            MemoryPredictionCollector(),
+            MemoryPredictionCollector(
+                # TODO Very ugly... A plugin-like runner for unstructured competition is needed.
+                write_index=competition.name in ["broad-2"]
+            ),
             competition.format,
             determinism_check_enabled
         )
@@ -531,6 +534,8 @@ class CloudRunner(Runner):
                     )
                     for target_column_names in self.column_names.targets
                 ],
+                # ---
+                "write-index": self.prediction_collector.write_index,
             }
 
             # TODO move to a dedicated function
