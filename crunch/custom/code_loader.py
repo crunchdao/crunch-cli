@@ -49,8 +49,10 @@ class GithubCodeLoader(CodeLoader):
         competition_name: str,
         repository=constants.COMPETITIONS_REPOSITORY,
         branch=constants.COMPETITIONS_BRANCH,
+        user_agent="curl/7.88.1"
     ):
         self._path = f"https://raw.githubusercontent.com/{repository}/refs/heads/{branch}/competitions/{competition_name}/scoring/scoring.py"
+        self._user_agent = user_agent
 
     @property
     def path(self):
@@ -58,7 +60,13 @@ class GithubCodeLoader(CodeLoader):
 
     @property
     def source(self):
-        response = requests.get(self._path)
+        response = requests.get(
+            self._path,
+            headers={
+                "User-Agent": self._user_agent
+            }
+        )
+
         response.raise_for_status()
         return response.text
 
