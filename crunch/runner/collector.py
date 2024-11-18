@@ -35,7 +35,12 @@ class PredictionCollector(abc.ABC):
 
 class MemoryPredictionCollector(PredictionCollector):
 
-    def __init__(self):
+    def __init__(
+        self,
+        write_index=False,
+    ):
+        self.write_index = write_index
+
         self.dataframes: typing.List[pandas.DataFrame] = []
 
     def append(self, prediction):
@@ -49,7 +54,7 @@ class MemoryPredictionCollector(PredictionCollector):
             dataframe,
             file_path,
             kwargs={
-                "index": False,
+                "index": self.write_index,
             }
         )
 
