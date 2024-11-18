@@ -85,11 +85,11 @@ def delete(path: str):
 
 
 @utils.timeit(["path"])
-def write(dataframe: pandas.DataFrame, path: str) -> None:
+def write(dataframe: pandas.DataFrame, path: str, index=False) -> None:
     if path.endswith(".parquet"):
-        dataframe.to_parquet(path, index=False)
+        dataframe.to_parquet(path, index=index)
     else:
-        dataframe.to_csv(path, index=False)
+        dataframe.to_csv(path, index=index)
 
 
 @utils.timeit([])
@@ -100,7 +100,7 @@ def ping(urls: typing.List[str]):
 
             print(f"managed to have access to the internet: {url}", file=sys.stderr)
             # exit(1)
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             pass
 
 
@@ -131,7 +131,9 @@ class SandboxExecutor:
         number_of_features: int,
         gpu: bool,
         # ---
-        column_names: api.ColumnNames
+        column_names: api.ColumnNames,
+        # ---
+        write_index: bool,
     ):
         self.competition_name = competition_name
         self.competition_format = competition_format
@@ -157,6 +159,8 @@ class SandboxExecutor:
         self.gpu = gpu
 
         self.column_names = column_names
+
+        self.write_index = write_index
 
     def load_data(self, trained: Reference):
         if self.competition_format == api.CompetitionFormat.SPATIAL:
@@ -260,7 +264,11 @@ class SandboxExecutor:
 
         produce_nothing = self.train and self.competition_format in [api.CompetitionFormat.STREAM, api.CompetitionFormat.SPATIAL]
         if not produce_nothing:
-            write(prediction, self.prediction_path)
+            write(
+                prediction,
+                self.prediction_path,
+                index=self.write_index
+            )
 
     def process_linear(
         self,

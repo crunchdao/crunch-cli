@@ -534,6 +534,8 @@ class CloudRunner(Runner):
                     )
                     for target_column_names in self.column_names.targets
                 ],
+                # ---
+                "write-index": self.prediction_collector.write_index,
             }
 
             # TODO move to a dedicated function
