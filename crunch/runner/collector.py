@@ -58,8 +58,6 @@ class MemoryPredictionCollector(PredictionCollector):
             }
         )
 
-        dataframe.to_parquet(file_path, index=False)
-
     def discard(self):
         self._clear()
 
