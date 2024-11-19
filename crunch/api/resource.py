@@ -125,8 +125,9 @@ class Collection:
         collection = self.list()
 
         if isinstance(collection, types.GeneratorType):
-            for _ in range(start):
-                next(collection)
+            if start:
+                for _ in range(start):
+                    next(collection)
 
             arguments = list(filter(bool, (start, stop, step)))
             for _ in range(*arguments):
@@ -134,7 +135,7 @@ class Collection:
 
             return GeneratorExit
 
-        return collection[start, stop]
+        return collection[start:stop]
 
     def list(self) -> typing.List[T]:
         raise NotImplementedError
