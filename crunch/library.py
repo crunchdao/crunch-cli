@@ -88,7 +88,11 @@ def find_forbidden(
     client = api.Client.from_env()
 
     libraries = client.libraries.list(
-        include=api.LibraryListInclude.ALL if allow_standard else api.LibraryListInclude.THIRD_PARTY
+        standard=(
+            None
+            if allow_standard
+            else False
+        )
     )
 
     whitelist = set()
