@@ -34,6 +34,7 @@ from .domain.submission_file import SubmissionFileEndpointMixin
 from .domain.target import TargetEndpointMixin
 from .domain.user import UserCollection, UserEndpointMixin
 from .errors import convert_error
+from .pagination import PageRequest
 
 
 class EndpointClient(
@@ -69,6 +70,7 @@ class EndpointClient(
         self.base_url = base_url
         self.auth_ = auth
         self.show_progress = show_progress
+        self.page_size = 100
 
     def request(self, method, url, *args, **kwargs):
         headers = kwargs.pop("headers", {})
@@ -237,6 +239,33 @@ class EndpointClient(
                 return event.data
 
             sse_handler(event)
+
+    def _paginated(
+        self,
+        requester: typing.Callable[[PageRequest], requests.Response],
+        page_size: typing.Optional[int] = None
+    ):
+        if not page_size:
+            page_size = self.page_size
+
+        page_request = PageRequest(0, page_size)
+        while True:
+            response = requester(page_request)
+            self._raise_for_status(response)
+
+            try:
+                json = response.json()
+            except requests.exceptions.JSONDecodeError as json_error:
+                raise ValueError(f"could not parse json: `{response.text}`") from json_error
+
+            content = json["content"]
+            for item in content:
+                yield item
+
+            if len(content) != json["pageSize"]:
+                break
+
+            page_request = page_request.next()
 
 
 class Client:

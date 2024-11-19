@@ -2,6 +2,7 @@
 Heavily inspired (copied) from https://github.com/docker/docker-py/blob/main/docker/models/resource.py.
 """
 
+import types
 import typing
 
 
@@ -107,10 +108,33 @@ class Collection:
         return iter(self.list())
 
     def __getitem__(self, key) -> T:
-        return self.list()[key]
+        if isinstance(key, slice):
+            return self.__getslice__(key.start, key.stop, key.step)
 
-    def __getslice__(self, from_, to):
-        return self.list()[from_, to]
+        collection = self.list()
+
+        if isinstance(collection, types.GeneratorType):
+            for _ in range(key):
+                next(collection)
+
+            return next(collection)
+
+        return collection[key]
+
+    def __getslice__(self, start, stop, step):
+        collection = self.list()
+
+        if isinstance(collection, types.GeneratorType):
+            for _ in range(start):
+                next(collection)
+
+            arguments = list(filter(bool, (start, stop, step)))
+            for _ in range(*arguments):
+                yield next(collection)
+
+            return GeneratorExit
+
+        return collection[start, stop]
 
     def list(self) -> typing.List[T]:
         raise NotImplementedError
@@ -157,7 +181,16 @@ class Collection:
         raise Exception(f"can't create {self.model.__name__} from {attrs}")
 
     def prepare_models(self, attrs_list, *args) -> typing.List[T]:
+        if isinstance(attrs_list, types.GeneratorType):
+            return self._prepare_models_with_yield(attrs_list, args)
+
         return [
             self.prepare_model(attrs, *args)
             for attrs in attrs_list
         ]
+
+    def _prepare_models_with_yield(self, attrs_list, args):
+        for attrs in attrs_list:
+            yield self.prepare_model(attrs, *args)
+
+        return GeneratorExit
