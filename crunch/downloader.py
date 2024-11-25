@@ -136,7 +136,10 @@ def save_one(
             destination_path = os.path.join(parent_directory_path, name)
 
             if os.path.exists(destination_path):
-                shutil.rmtree(destination_path)
+                if os.path.isdir(destination_path):
+                    shutil.rmtree(destination_path)
+                else:
+                    os.unlink(destination_path)
 
             shutil.move(source_path, parent_directory_path)
 
