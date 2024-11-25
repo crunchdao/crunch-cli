@@ -8,6 +8,11 @@ REQUIREMENTS_TXT = "requirements.txt"
 CONVERTED_MAIN_PY = "__converted_main.py"
 DEFAULT_MODEL_DIRECTORY = "resources"
 
+MACOS_HIDDEN_FILES = [
+    "__MACOSX",
+    ".DS_Store",
+]
+
 IGNORED_FILES = [
     ".git/",
     f"{DOT_CRUNCHDAO_DIRECTORY}/",
