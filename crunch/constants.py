@@ -8,12 +8,18 @@ REQUIREMENTS_TXT = "requirements.txt"
 CONVERTED_MAIN_PY = "__converted_main.py"
 DEFAULT_MODEL_DIRECTORY = "resources"
 
+MACOS_HIDDEN_FILES = [
+    "__MACOSX",
+    ".DS_Store",
+]
+
 IGNORED_FILES = [
     ".git/",
     f"{DOT_CRUNCHDAO_DIRECTORY}/",
     f"{DOT_DATA_DIRECTORY}/",
-    f"__pycache__/",
-    f".env",
+    "__pycache__/",
+    ".env",
+    *MACOS_HIDDEN_FILES,
 ]
 
 DEBUG_ENV_VAR = "CRUNCH_DEBUG"

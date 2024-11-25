@@ -8,7 +8,7 @@ import zipfile
 
 import click
 
-from . import api, utils
+from . import api, utils, constants
 
 # TODO Remove me
 LEGACY_NAME_MAPPING = {
@@ -129,7 +129,7 @@ def save_one(
         _uncompress(file_path, temporary_directory_path)
 
         for name in os.listdir(temporary_directory_path):
-            if name == "__MACOSX":
+            if name in constants.MACOS_HIDDEN_FILES:
                 continue
 
             source_path = os.path.join(temporary_directory_path, name)
