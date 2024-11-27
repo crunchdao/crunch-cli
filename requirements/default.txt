@@ -12,6 +12,8 @@ psutil
 pyarrow
 pytest
 python-dotenv
+pyyaml
+redbaron
 requests
 requests-toolbelt
 requirements-parser
