@@ -5,7 +5,6 @@ OLD_PROJECT_FILE = "project"
 PROJECT_FILE = "project.json"
 DOT_GITIGNORE_FILE = ".gitignore"
 REQUIREMENTS_TXT = "requirements.txt"
-CONVERTED_MAIN_PY = "__converted_main.py"
 DEFAULT_MODEL_DIRECTORY = "resources"
 
 MACOS_HIDDEN_FILES = [

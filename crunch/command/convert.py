@@ -20,6 +20,7 @@ def convert_cells_to_file(
         _requirements,
     ) = extract_cells(cells, print)
 
+    if not override and os.path.exists(python_file_path):
         override = click.prompt(
             f"file {python_file_path} already exists, override?",
             type=bool,
