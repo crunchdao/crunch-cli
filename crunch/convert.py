@@ -315,7 +315,7 @@ def _extract_markdown_cell(
 
 def extract_cells(
     cells: typing.List[typing.Any],
-    print: typing.Callable[[str], None],
+    print: typing.Callable[[str], None] = print,
 ) -> typing.Tuple[str, typing.List[str]]:
     packages: typing.Dict[str, Requirement] = {}
     module: typing.List[str] = []
