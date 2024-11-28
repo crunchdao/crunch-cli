@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import os
 import re
@@ -5,7 +6,6 @@ import typing
 
 import redbaron
 import yaml
-from requirements.requirement import Requirement
 
 import requirements
 
@@ -29,6 +29,20 @@ _COMMENT = (
 
 _DOT = "."
 _KV_DIVIDER = "---"
+
+
+@dataclasses.dataclass()
+class EmbedFile:
+    path: str
+    normalized_path: str
+    content: str
+
+
+@dataclasses.dataclass()
+class Requirement:
+    name: str
+    extras: typing.Optional[typing.List[str]]
+    specs: typing.Optional[typing.List[str]]
 
 
 def strip_packages(name: str):
@@ -143,13 +157,13 @@ def _convert_import(log: typing.Callable[[str], None], node: redbaron.Node):
 
     version = _extract_import_version(log, node)
 
-    packages = set()
+    names = set()
     for path in paths:
         name = strip_packages(path)
         if name:
-            packages.add(name)
+            names.add(name)
 
-    return packages, version
+    return names, version
 
 
 def _add_to_packages(log: typing.Callable[[str], None], packages: dict, node: redbaron.Node):
@@ -178,7 +192,7 @@ def _extract_code_cell(
     cell_source: typing.List[str],
     log: typing.Callable[[str], None],
     module: typing.List[str],
-    packages: typing.Dict[str, Requirement],
+    packages: typing.Dict[str, typing.Tuple[typing.List[str], typing.List[str]]],
 ):
     source = "\n".join(
         re.sub(r"^\s*?(!|%)", r"#\1", line)
@@ -229,11 +243,14 @@ def _extract_code_cell(
 def _extract_markdown_cell(
     cell_source: typing.List[str],
     log: typing.Callable[[str], None],
-    embed_files: typing.Dict[str, str],
+    embed_files: typing.Dict[str, EmbedFile],
 ):
     if not len(cell_source):
         log(f"skip since empty")
         return
+
+    def get_full_source():
+        return "\n".join(cell_source)
 
     iterator = iter(cell_source)
 
@@ -267,33 +284,42 @@ def _extract_markdown_cell(
         raise NotebookCellParseError(
             f"file not specified",
             None,
-            source,
+            get_full_source(),
         )
 
     normalized_file_path = os.path.normpath(file_path).replace("\\", "/")
-    if normalized_file_path in embed_files:
+    lower_file_path = normalized_file_path.lower()
+
+    previous = embed_files.get(lower_file_path)
+    if previous is not None:
         raise NotebookCellParseError(
             f"file `{file_path}` specified multiple time",
-            None,
-            source,
+            f"file `{file_path}` is conflicting with `{previous.path}`",
+            get_full_source(),
         )
 
-    content = "\n".join((
-        line
-        for line in iterator
-    ))
+    content = "\n".join(iterator)
 
-    embed_files[normalized_file_path] = content
-    log(f"embed {normalized_file_path}: {len(content)} characters")
+    embed_files[lower_file_path] = EmbedFile(
+        file_path,
+        normalized_file_path,
+        content,
+    )
+
+    log(f"embed {lower_file_path}: {len(content)} characters")
 
 
 def extract_cells(
     cells: typing.List[typing.Any],
     print: typing.Callable[[str], None] = print,
-) -> typing.Tuple[str, typing.List[str]]:
-    packages: typing.Dict[str, Requirement] = {}
+) -> typing.Tuple[
+    str,
+    typing.List[EmbedFile],
+    typing.List[Requirement],
+]:
+    packages: typing.Dict[str, typing.Tuple[typing.List[str], typing.List[str]]] = {}
     module: typing.List[str] = []
-    embed_files: typing.Dict[str, str] = {}
+    embed_files: typing.Dict[str, EmbedFile] = {}
 
     for index, cell in enumerate(cells):
         cell_id = cell["metadata"].get("id") or f"cell_{index}"
@@ -326,16 +352,16 @@ def extract_cells(
 
     source_code = "\n".join(module)
     requirements = [
-        {
-            "name": name,
-            "extras": requirement[0] if requirement is not None else None,
-            "specs": requirement[1] if requirement is not None else None,
-        }
+        Requirement(
+            name,
+            requirement[0] if requirement is not None else None,
+            requirement[1] if requirement is not None else None,
+        )
         for name, requirement in packages.items()
     ]
 
     return (
         source_code,
-        embed_files,
+        list(embed_files.values()),
         requirements,
     )

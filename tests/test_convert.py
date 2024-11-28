@@ -2,8 +2,8 @@ import textwrap
 import typing
 import unittest
 
-from crunch.convert import (InconsistantLibraryVersionError,
-                            NotebookCellParseError,
+from crunch.convert import (EmbedFile, InconsistantLibraryVersionError,
+                            NotebookCellParseError, Requirement,
                             RequirementVersionParseError, extract_cells)
 
 
@@ -94,21 +94,9 @@ class ImportTest(unittest.TestCase):
         ])
 
         self.assertEqual([
-            {
-                "name": "hello",
-                "extras": None,
-                "specs": None,
-            },
-            {
-                "name": "world",
-                "extras": [],
-                "specs": ["==42"],
-            },
-            {
-                "name": "extras",
-                "extras": ["big"],
-                "specs": [">4.2"],
-            }
+            Requirement("hello", None, None),
+            Requirement("world", [], ["==42"]),
+            Requirement("extras", ["big"], [">4.2"]),
         ], requirements)
 
     def test_inconsistant_version(self):
@@ -139,7 +127,7 @@ class EmbedFilesTest(unittest.TestCase):
         ) = extract_cells([
             _cell("a", "markdown", [
                 "---",
-                "file: a",
+                "file: ./a.txt",
                 "---",
                 "# Hello World",
                 "from a embed markdown file",
@@ -147,9 +135,7 @@ class EmbedFilesTest(unittest.TestCase):
         ])
 
         self.assertEqual("", source_code)
-        self.assertEqual({
-            "a": "# Hello World\nfrom a embed markdown file"
-        }, embed_files)
+        self.assertEqual([EmbedFile("./a.txt", "a.txt", "# Hello World\nfrom a embed markdown file")], embed_files)
         self.assertEqual([], requirements)
 
     def test_root_not_a_dict(self):
