@@ -42,7 +42,11 @@ def strip_packages(name: str):
     return name[:index]
 
 
-class NotebookCellParseError(ValueError):
+class ConverterError(ValueError):
+    pass
+
+
+class NotebookCellParseError(ConverterError):
 
     def __init__(
         self,
@@ -59,13 +63,13 @@ class NotebookCellParseError(ValueError):
         self.cell_source = cell_source
 
 
-class RequirementVersionParseError(ValueError):
+class RequirementVersionParseError(ConverterError):
 
     def __init__(self, message) -> None:
         super().__init__(message)
 
 
-class InconsistantLibraryVersionError(ValueError):
+class InconsistantLibraryVersionError(ConverterError):
 
     def __init__(
         self,
