@@ -53,26 +53,16 @@ class NotebookCellParseError(ValueError):
         cell_id: str = None,
     ) -> None:
         super().__init__(message)
-        self.code = 400
         self.parser_error = parser_error
         self.cell_index = cell_index
         self.cell_id = cell_id
         self.cell_source = cell_source
-
-    def get_error_body(self) -> dict:
-        return {
-            "cellIndex": self.cell_index,
-            "cellId": self.cell_id,
-            "cellSource": self.cell_source,
-            "parserError": self.parser_error
-        }
 
 
 class RequirementVersionParseError(ValueError):
 
     def __init__(self, message) -> None:
         super().__init__(message)
-        self.code = 409
 
 
 class InconsistantLibraryVersionError(ValueError):
@@ -85,29 +75,9 @@ class InconsistantLibraryVersionError(ValueError):
         new: typing.List[str]
     ) -> None:
         super().__init__(message)
-        self.code = 409
         self.package_name = package_name
         self.old = old
         self.new = new
-
-    def get_error_body(self) -> dict:
-        def to_requirements(tuple: tuple):
-            extras, specs = tuple
-
-            output = self.package_name
-
-            if extras and len(extras):
-                output += f"[{','.join(extras)}]"
-
-            if specs and len(specs):
-                output += ','.join(specs)
-
-            return output
-
-        return {
-            "oldRequirements": to_requirements(self.old),
-            "newRequirements": to_requirements(self.new),
-        }
 
 
 def _cut_crlf(input: str):
