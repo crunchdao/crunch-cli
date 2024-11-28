@@ -276,11 +276,9 @@ def push(
         path_without_extension = os.path.join(dirpath, file_name)
 
         notebook_file_path = f"{path_without_extension}.ipynb"
-
         if not os.path.exists(notebook_file_path):
             raise click.Abort()
 
-        main_file_path = constants.CONVERTED_MAIN_PY
         command.convert(notebook_file_path, main_file_path)
         converted = True
 

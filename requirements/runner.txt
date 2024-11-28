@@ -12,6 +12,8 @@ pandas
 pyarrow
 
 python-dotenv
+
+
 requests
 requests-toolbelt
 
