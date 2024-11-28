@@ -5,7 +5,7 @@ import typing
 import click
 
 from .. import constants
-from ..convert import extract_cells
+from ..convert import ConverterError, extract_cells
 
 
 def convert_cells_to_file(
@@ -40,11 +40,15 @@ def convert(
     python_file_path: str,
     override: bool = False,
 ):
-    with open(notebook_file_path) as fd:
-        notebook = json.load(fd)
+    try:
+        with open(notebook_file_path) as fd:
+            notebook = json.load(fd)
 
-    convert_cells_to_file(
-        notebook.get("cells", []),
-        python_file_path,
-        override
-    )
+        convert_cells_to_file(
+            notebook.get("cells", []),
+            python_file_path,
+            override
+        )
+    except ConverterError as error:
+        print(f"convert failed: {error}")
+        raise click.Abort()
