@@ -226,6 +226,8 @@ class SandboxExecutor:
             sys.path.insert(0, self.code_directory)
             spec.loader.exec_module(module)
 
+            print("[debug] user code loaded")
+
             train_function = ensure_function(module, "train")
             infer_function = ensure_function(module, "infer")
 
