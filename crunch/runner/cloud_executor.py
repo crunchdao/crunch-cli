@@ -262,8 +262,8 @@ class SandboxExecutor:
         else:
             self.reset_trace()
 
-        produce_nothing = self.train and self.competition_format in [api.CompetitionFormat.STREAM, api.CompetitionFormat.SPATIAL]
-        if not produce_nothing:
+        print(f"produced dataframe - len={len(prediction) if not None else None}")
+        if prediction is not None:
             write(
                 prediction,
                 self.prediction_path,
