@@ -4,15 +4,14 @@ import typing
 
 import click
 
-from .. import constants
-from ..convert import ConverterError, extract_cells
-
 
 def convert_cells_to_file(
     cells: typing.List[typing.Any],
     python_file_path: str,
     override: bool = False,
 ):
+    from ..convert import extract_cells
+
     (
         source_code,
         # TODO Include them in the submission, prompt for replace?
@@ -40,6 +39,8 @@ def convert(
     python_file_path: str,
     override: bool = False,
 ):
+    from ..convert import ConverterError
+
     try:
         with open(notebook_file_path) as fd:
             notebook = json.load(fd)
