@@ -264,7 +264,7 @@ class SandboxExecutor:
         else:
             self.reset_trace()
 
-        print(f"produced dataframe - len={len(prediction) if not None else None}")
+        print(f"[debug] produced dataframe - len={len(prediction) if prediction is not None else None}")
         if prediction is not None:
             write(
                 prediction,
