@@ -226,6 +226,8 @@ class SandboxExecutor:
             sys.path.insert(0, self.code_directory)
             spec.loader.exec_module(module)
 
+            print("[debug] user code loaded")
+
             train_function = ensure_function(module, "train")
             infer_function = ensure_function(module, "infer")
 
@@ -262,8 +264,8 @@ class SandboxExecutor:
         else:
             self.reset_trace()
 
-        produce_nothing = self.train and self.competition_format in [api.CompetitionFormat.STREAM, api.CompetitionFormat.SPATIAL]
-        if not produce_nothing:
+        print(f"[debug] produced dataframe - len={len(prediction) if prediction is not None else None}")
+        if prediction is not None:
             write(
                 prediction,
                 self.prediction_path,
