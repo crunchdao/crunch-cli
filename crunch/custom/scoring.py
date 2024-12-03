@@ -95,7 +95,7 @@ def score(
     prediction: pandas.DataFrame,
     data_directory_path: str,
     logger=print,
-):
+) -> typing.Dict[int, scoring.ScoredMetric]:
     metric_ids = {
         metric.id
         for metric in metrics
