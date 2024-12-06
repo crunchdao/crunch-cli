@@ -872,16 +872,20 @@ def scoring_score(
             (
                 metric_by_id[metric_id].target.name,
                 metric_by_id[metric_id].name,
-                str(scored_metric.value)
+                str(scored_metric.value),
+                " ".join((
+                    f"{detail.key}={detail.value}"
+                    for detail in scored_metric.details
+                ))
             )
             for metric_id, scored_metric in results.items()
         ]
 
-        rows.insert(0, ("Target", "Metric", "Score"))
+        rows.insert(0, ("Target", "Metric", "Score", "Details"))
 
         max_length_per_columns = [
             max((len(row[index]) for row in rows))
-            for index in range(3)
+            for index in range(len(rows[0]))
         ]
 
         print(f"\nResults:")

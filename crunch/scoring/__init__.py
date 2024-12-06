@@ -1,1 +1,1 @@
-from .score import score, ScoredMetric
+from .score import score, ScoredMetric, ScoredMetricDetail
