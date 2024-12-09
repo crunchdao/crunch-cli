@@ -1,5 +1,8 @@
+import contextlib
 import dataclasses
+import datetime
 import functools
+import gc
 import inspect
 import json
 import logging
@@ -480,3 +483,31 @@ def split_at_nans(
             parts.append(dataframe.iloc[start:end])
 
     return parts
+
+
+class NestedLog:
+
+    def __init__(self, printer=print):
+        self._depth = 0
+        self._printer = printer
+
+    @property
+    def padding(self):
+        return "  " * self._depth
+
+    @contextlib.contextmanager
+    def __call__(self, action: str):
+        start = datetime.datetime.now()
+        self._printer(f"{start} {self.padding} {action}")
+
+        try:
+            self._depth += 1
+
+            yield True
+        finally:
+            self._depth -= 1
+
+            gc.collect()
+
+            end = datetime.datetime.now()
+            self._printer(f"{start} {self.padding} {action} took {end - start}")
