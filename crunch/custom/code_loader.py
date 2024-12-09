@@ -1,10 +1,15 @@
 import abc
 import os
 import types
+import typing
 
 import requests
 
 from .. import constants
+
+
+class NoCodeFoundError(RuntimeError):
+    pass
 
 
 class CodeLoadError(ImportError):
@@ -14,26 +19,26 @@ class CodeLoadError(ImportError):
 class CodeLoader(abc.ABC):
 
     def load(self):
-        name = "scoring.py"
-        path = self.path
+        location = self.location
+        name = os.path.basename(location)
 
         try:
             module = types.ModuleType(name)
             module.__loader__ = self
-            module.__file__ = path
-            module.__path__ = [os.path.dirname(path)]
+            module.__file__ = location
+            module.__path__ = [os.path.dirname(location)]
             module.__package__ = name.rpartition('.')[0]
 
-            code = compile(self.source, path, 'exec')
+            code = compile(self.source, location, 'exec')
             exec(code, module.__dict__)
         except BaseException as exception:
-            raise CodeLoadError(f"could not load {path}") from exception
+            raise CodeLoadError(f"could not load {location}") from exception
 
         return module
 
     @property
     @abc.abstractmethod
-    def path(self) -> str:
+    def location(self) -> str:
         pass
 
     @property
@@ -47,27 +52,35 @@ class GithubCodeLoader(CodeLoader):
     def __init__(
         self,
         competition_name: str,
+        file_name: typing.Literal["scoring", "submission"],
         repository=constants.COMPETITIONS_REPOSITORY,
         branch=constants.COMPETITIONS_BRANCH,
         user_agent="curl/7.88.1"
     ):
-        self._path = f"https://raw.githubusercontent.com/{repository}/refs/heads/{branch}/competitions/{competition_name}/scoring/scoring.py"
+        self._url = f"https://raw.githubusercontent.com/{repository}/refs/heads/{branch}/competitions/{competition_name}/scoring/{file_name}.py"
         self._user_agent = user_agent
 
     @property
-    def path(self):
-        return self._path
+    def location(self):
+        return self._url
 
     @property
     def source(self):
         response = requests.get(
-            self._path,
+            self._url,
             headers={
                 "User-Agent": self._user_agent
             }
         )
 
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as error:
+            if error.response is not None and error.response.status_code == 404:
+                raise NoCodeFoundError(f"no code found at url: {self._url}") from error
+
+            raise
+
         return response.text
 
 
@@ -77,10 +90,13 @@ class LocalCodeLoader(CodeLoader):
         self._path = path
 
     @property
-    def path(self):
+    def location(self):
         return self._path
 
     @property
     def source(self):
-        with open(self._path, "r") as fd:
-            return fd.read()
+        try:
+            with open(self._path, "r") as fd:
+                return fd.read()
+        except FileNotFoundError as error:
+            raise NoCodeFoundError(f"no code found at path: {self._path}") from error

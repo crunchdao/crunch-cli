@@ -1,5 +1,8 @@
+import contextlib
 import dataclasses
+import datetime
 import functools
+import gc
 import inspect
 import json
 import logging
@@ -210,14 +213,9 @@ def get_process_memory() -> int:
 
 
 def format_bytes(bytes: int):
-    suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-    suffix_index = 0
+    from .external import humanfriendly
 
-    while bytes >= 1024 and suffix_index < 8:
-        bytes /= 1024
-        suffix_index += 1
-
-    return f"{bytes:,.2f} {suffixes[suffix_index]}"
+    return humanfriendly.format_size(bytes)
 
 
 class _undefined:
@@ -485,3 +483,58 @@ def split_at_nans(
             parts.append(dataframe.iloc[start:end])
 
     return parts
+
+
+class Tracer:
+
+    def __init__(self, printer=print):
+        self._depth = 0
+        self._printer = printer
+
+    @property
+    def padding(self):
+        return "  " * self._depth
+
+    def loop(
+        self,
+        iterator: iter,
+        action: typing.Union[str, callable],
+        value_placeholder="{value}",
+    ):
+        has_value_placeholder = False
+        is_callable = callable(action)
+        if not is_callable:
+            action = str(action)
+            has_value_placeholder = value_placeholder in action
+
+        for value in iterator:
+            if is_callable:
+                action_message = str(action(value))
+            else:
+                action_message = action
+
+                if has_value_placeholder:
+                    action_message = action_message.replace(value_placeholder, str(value))
+
+            with self.log(action_message):
+                yield value
+
+    @contextlib.contextmanager
+    def log(
+        self,
+        action: str,
+    ):
+        start = datetime.datetime.now()
+        self._printer(f"{start} {self.padding} {action}")
+
+        try:
+            self._depth += 1
+
+            yield True
+        finally:
+            self._depth -= 1
+
+            gc.collect()
+
+            end = datetime.datetime.now()
+            self._printer(f"{start} {self.padding} {action} took {end - start}")
