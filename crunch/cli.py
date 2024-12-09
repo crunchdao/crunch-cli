@@ -714,7 +714,14 @@ def cloud_executor(
         write_index,
     )
 
-    executor.start()
+    try:
+        executor.start()
+    except SystemExit as error:
+        if error.code is None or error.code == 0:
+            print("[debug] exit was called without a code, forcing `2`")
+
+        error.code = 2
+        raise
 
 
 @cli.group(name="organizer")
