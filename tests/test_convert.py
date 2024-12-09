@@ -171,3 +171,34 @@ class EmbedFilesTest(unittest.TestCase):
             ])
 
         self.assertEqual("file `readme.md` specified multiple time", str(context.exception))
+
+    def test_separator(self):
+        (
+            source_code,
+            embed_files,
+            _,
+        ) = extract_cells([
+            _cell("a", "markdown", [
+                "---",
+                "<!-- content -->",
+            ])
+        ])
+
+        self.assertEqual(0, len(embed_files))
+        self.assertEqual("", source_code)
+
+        (
+            source_code,
+            embed_files,
+            _,
+        ) = extract_cells([
+            _cell("a", "markdown", [
+                "---",
+                "",  # empty line
+                "unrelated",
+                "---",
+            ])
+        ])
+
+        self.assertEqual(0, len(embed_files))
+        self.assertEqual("", source_code)
