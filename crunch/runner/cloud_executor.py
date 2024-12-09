@@ -99,7 +99,7 @@ def ping(urls: typing.List[str]):
             requests.get(url)
 
             print(f"managed to have access to the internet: {url}", file=sys.stderr)
-            # exit(1)
+            exit(1)
         except requests.exceptions.RequestException:
             pass
 
