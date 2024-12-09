@@ -1,6 +1,7 @@
 from .code_loader import (
-    CodeLoader,
+    NoCodeFoundError,
     CodeLoadError,
+    CodeLoader,
     GithubCodeLoader,
     LocalCodeLoader,
 )
