@@ -30,6 +30,9 @@ _DOT = "."
 _KV_DIVIDER = "---"
 
 
+JUPYTER_MAGIC_COMMAND_PATTERN = r"^\s*?(!|%)"
+
+
 @dataclasses.dataclass()
 class EmbedFile:
     path: str
@@ -194,7 +197,7 @@ def _extract_code_cell(
     packages: typing.Dict[str, typing.Tuple[typing.List[str], typing.List[str]]],
 ):
     source = "\n".join(
-        re.sub(r"^\s*?(!|%)", r"#\1", line)
+        re.sub(JUPYTER_MAGIC_COMMAND_PATTERN, r"#\1", line)
         for line in cell_source
     )
 
