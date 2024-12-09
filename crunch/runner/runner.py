@@ -151,6 +151,8 @@ class Runner(abc.ABC):
             self.spatial_train()
 
         target_column_namess = self.column_names.targets
+        require_target_column = len(target_column_namess) > 1
+
         for index, target_column_names in enumerate(target_column_namess):
             self.log(f"looping target=`{target_column_names.name}` ({index + 1}/{len(target_column_namess)})")
 
@@ -161,7 +163,9 @@ class Runner(abc.ABC):
                 self.deterministic = prediction.equals(prediction2)
                 self.log(f"deterministic: {str(self.deterministic).lower()}")
 
-            prediction["sample"] = target_column_names.name
+            if require_target_column:
+                prediction["sample"] = target_column_names.name
+
             self.prediction_collector.append(prediction)
 
     @abc.abstractmethod
