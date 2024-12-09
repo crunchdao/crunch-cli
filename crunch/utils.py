@@ -485,7 +485,7 @@ def split_at_nans(
     return parts
 
 
-class NestedLog:
+class Tracer:
 
     def __init__(self, printer=print):
         self._depth = 0
@@ -495,8 +495,35 @@ class NestedLog:
     def padding(self):
         return "  " * self._depth
 
+    def loop(
+        self,
+        iterator: iter,
+        action: typing.Union[str, callable],
+        value_placeholder="{value}",
+    ):
+        has_value_placeholder = False
+        is_callable = callable(action)
+        if not is_callable:
+            action = str(action)
+            has_value_placeholder = value_placeholder in action
+
+        for value in iterator:
+            if is_callable:
+                action_message = str(action(value))
+            else:
+                action_message = action
+
+                if has_value_placeholder:
+                    action_message = action_message.replace(value_placeholder, str(value))
+
+            with self.log(action_message):
+                yield value
+
     @contextlib.contextmanager
-    def __call__(self, action: str):
+    def log(
+        self,
+        action: str,
+    ):
         start = datetime.datetime.now()
         self._printer(f"{start} {self.padding} {action}")
 
