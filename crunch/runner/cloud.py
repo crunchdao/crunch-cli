@@ -66,7 +66,10 @@ class CloudRunner(Runner):
         super().__init__(
             MemoryPredictionCollector(
                 # TODO Very ugly... A plugin-like runner for unstructured competition is needed.
-                write_index=competition.name in ["broad-2"]
+                write_index=competition.name in [
+                    "broad-2",
+                    "broad-3",
+                ]
             ),
             competition.format,
             determinism_check_enabled
