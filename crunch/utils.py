@@ -210,14 +210,9 @@ def get_process_memory() -> int:
 
 
 def format_bytes(bytes: int):
-    suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-    suffix_index = 0
+    from .external import humanfriendly
 
-    while bytes >= 1024 and suffix_index < 8:
-        bytes /= 1024
-        suffix_index += 1
-
-    return f"{bytes:,.2f} {suffixes[suffix_index]}"
+    return humanfriendly.format_size(bytes)
 
 
 class _undefined:

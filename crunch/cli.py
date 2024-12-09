@@ -95,7 +95,7 @@ def ping():
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
-@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
@@ -140,7 +140,7 @@ def init(
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
-@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--no-quickstarter", is_flag=True, help="Disable quickstarter selection.")
 @click.option("--quickstarter-name", type=str, help="Pre-select a quickstarter.")
 @click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
@@ -253,7 +253,7 @@ def quickstarter(
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
-@click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored.")
+@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
 @click.option("--dry", is_flag=True, help="Prepare file but do not really create the submission.")
@@ -319,7 +319,7 @@ def push_prediction(
 def local_options(f):
     options = [
         click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code."),
-        click.option("--model-directory", "model_directory_path", default="resources", show_default=True, help="Directory where your model is stored."),
+        click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored."),
         click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop."),
         click.option("--train-frequency", default=1, show_default=True, help="Train interval."),
         click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check."),
@@ -768,6 +768,7 @@ def scoring_group(
     if script_file_path is None:
         loader = custom.GithubCodeLoader(
             competition.name,
+            "scoring",
             repository=github_repository,
             branch=github_branch,
         )
@@ -809,7 +810,7 @@ def scoring_check(
     phase_type = api.PhaseType[phase_type_string]
 
     try:
-        custom.check(
+        custom.scoring_check(
             custom.ScoringModule.load(loader),
             phase_type,
             competition.metrics.list(),
@@ -853,7 +854,7 @@ def scoring_score(
 
     try:
         metrics = competition.metrics.list()
-        results = custom.score(
+        results = custom.scoring_score(
             custom.ScoringModule.load(loader),
             phase_type,
             metrics,
@@ -903,6 +904,94 @@ def scoring_score(
         utils.exit_via(error)
     except BaseException as error:
         print(f"\n\nPrediction score function failed: {error}")
+
+        traceback.print_exc()
+
+
+@organize_test_group.group(name="submission")
+@click.option("--script-file", "script_file_path", type=click.Path(dir_okay=False, readable=True), required=False)
+@click.option("--github-repository", default=constants.COMPETITIONS_REPOSITORY, required=False)
+@click.option("--github-branch", default=constants.COMPETITIONS_BRANCH, required=False)
+@click.pass_context
+def submission_group(
+    context: click.Context,
+    script_file_path: str,
+    github_repository: str,
+    github_branch: str,
+):
+    from . import custom
+
+    competition: api.Competition = context.obj
+
+    if script_file_path is None:
+        loader = custom.GithubCodeLoader(
+            competition.name,
+            "submission",
+            repository=github_repository,
+            branch=github_branch,
+        )
+    else:
+        loader = custom.LocalCodeLoader(
+            script_file_path,
+        )
+
+    context.obj = (competition, loader)
+
+
+@submission_group.command(name="check")
+@click.option("--root-directory", "root_directory_path", type=click.Path(exists=True, file_okay=False), required=True)
+@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY)
+@click.pass_context
+def scoring_check(
+    context: click.Context,
+    root_directory_path: str,
+    model_directory_path: str,
+):
+    from . import custom
+    from .command.push import list_code_files, list_model_files
+
+    _, loader = typing.cast(
+        typing.Tuple[
+            api.Competition,
+            custom.CodeLoader,
+        ],
+        context.obj
+    )
+
+    def from_local(path: str, name: str):
+        _, extension = os.path.splitext(path)
+        can_load = extension in constants.TEXT_FILE_EXTENSIONS
+
+        return custom.File(
+            name,
+            uri=path if can_load else None,
+            size=os.path.getsize(path),
+        )
+
+    submission_files = [
+        from_local(path, name)
+        for path, name in list_code_files(root_directory_path, model_directory_path)
+    ]
+
+    model_files = [
+        from_local(path, name)
+        for path, name in list_model_files(root_directory_path, model_directory_path)
+    ]
+
+    try:
+        custom.submission_check(
+            custom.SubmissionModule.load(loader),
+            submission_files,
+            model_files,
+        )
+
+        print(f"\n\nSubmission is valid!")
+    except custom.ParticipantVisibleError as error:
+        print(f"\n\nSubmission is not valid: {error}")
+    except api.ApiException as error:
+        utils.exit_via(error)
+    except BaseException as error:
+        print(f"\n\nSubmission check function failed: {error}")
 
         traceback.print_exc()
 
