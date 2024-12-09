@@ -95,6 +95,7 @@ class CompetitionNameNotFoundException(ApiException):
 
     def print_helper(self, **kwargs):
         print(f"Competition `{self.competition_name}` not found.")
+
         _print_contact()
 
 
@@ -309,6 +310,25 @@ class RoundNotFoundException(ApiException):
         print("Round not found.")
         print("")
         print("The competition may be over or the server is not correctly configured.")
+
+        _print_contact()
+
+
+class SubmissionCustomCheckFailedException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        check_message: str,
+    ):
+        super().__init__(message)
+
+        self.check_message = check_message
+
+    def print_helper(self, **kwargs):
+        print("Competition specific checks did not pass.")
+        print("")
+        print(f"Reason: {self.check_message}")
 
         _print_contact()
 
