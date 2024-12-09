@@ -261,11 +261,22 @@ def _extract_markdown_cell(
 
     try:
         source = []
+        valid = True
+
         for line in iterator:
+            if not line.strip():
+                valid = False
+                break
+
             if line == _KV_DIVIDER:
                 break
 
             source.append(line)
+        else:
+            valid = False
+
+        if not valid:
+            return
 
         source = "\n".join(source)
 
