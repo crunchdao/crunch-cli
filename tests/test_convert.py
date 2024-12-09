@@ -129,6 +129,7 @@ class EmbedFilesTest(unittest.TestCase):
                 "---",
                 "file: ./a.txt",
                 "---",
+                "",
                 "# Hello World",
                 "from a embed markdown file",
             ])

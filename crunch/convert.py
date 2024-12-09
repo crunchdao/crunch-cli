@@ -297,7 +297,7 @@ def _extract_markdown_cell(
             get_full_source(),
         )
 
-    content = "\n".join(iterator)
+    content = "\n".join(iterator).strip()
 
     embed_files[lower_file_path] = EmbedFile(
         file_path,
