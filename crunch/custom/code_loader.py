@@ -31,6 +31,8 @@ class CodeLoader(abc.ABC):
 
             code = compile(self.source, location, 'exec')
             exec(code, module.__dict__)
+        except NoCodeFoundError:
+            raise
         except BaseException as exception:
             raise CodeLoadError(f"could not load {location}") from exception
 
