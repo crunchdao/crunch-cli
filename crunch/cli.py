@@ -965,6 +965,11 @@ def scoring_check(
         context.obj
     )
 
+    module = custom.SubmissionModule.load(loader)
+    if module is None:
+        print(f"no custom submission check found")
+        raise click.Abort()
+
     def from_local(path: str, name: str):
         _, extension = os.path.splitext(path)
         can_load = extension in constants.TEXT_FILE_EXTENSIONS
