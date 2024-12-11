@@ -59,7 +59,7 @@ class GithubCodeLoader(CodeLoader):
         branch=constants.COMPETITIONS_BRANCH,
         user_agent="curl/7.88.1"
     ):
-        self._url = f"https://raw.githubusercontent.com/{repository}/refs/heads/{branch}/competitions/{competition_name}/scoring/{file_name}.py"
+        self._url = f"https://github.com/{repository}/raw/refs/heads/{branch}/competitions/{competition_name}/scoring/{file_name}.py"
         self._user_agent = user_agent
 
     @property
