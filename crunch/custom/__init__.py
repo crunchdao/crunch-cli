@@ -1,3 +1,5 @@
+from . import utils
+
 from .code_loader import (
     NoCodeFoundError,
     CodeLoadError,
