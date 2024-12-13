@@ -33,6 +33,10 @@ class _Inline:
 
         print(f"loaded inline runner with module: {module}")
 
+        from . import is_inside_runner
+        if is_inside_runner:
+            print(f"[warning] loading the inliner in the cloud runner is not supported, this will raise an error soon", file=sys.stderr)
+
     @functools.cached_property
     def _competition(self):
         _, project = api.Client.from_project()
