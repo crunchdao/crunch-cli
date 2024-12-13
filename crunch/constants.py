@@ -17,6 +17,7 @@ IGNORED_FILES = [
     f"{DOT_CRUNCHDAO_DIRECTORY}/",
     f"{DOT_DATA_DIRECTORY}/",
     "__pycache__/",
+    ".ipynb_checkpoints/",
     ".env",
     *MACOS_HIDDEN_FILES,
 ]
