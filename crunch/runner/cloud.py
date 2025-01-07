@@ -476,16 +476,11 @@ class CloudRunner(Runner):
 
                 assert self.x_path is not None
 
-                x_path = self.x_path
-                y_path = self.y_path if train else None
-                y_raw_path = self.y_raw_path
-                orthogonalization_data_path = self.orthogonalization_data_path
-
                 path_options = {
-                    "x": x_path,
-                    "y": y_path,
-                    "y-raw": y_raw_path,
-                    "orthogonalization-data": orthogonalization_data_path,
+                    "x": self.x_path,
+                    "y": self.y_path if train else None,
+                    "y-raw": self.y_raw_path,
+                    "orthogonalization-data": self.orthogonalization_data_path,
                 }
 
                 self._install_permission_fuse(path_options.values())
