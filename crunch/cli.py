@@ -1,6 +1,5 @@
 import contextlib
 import functools
-import logging
 import os
 import sys
 import traceback
@@ -761,14 +760,6 @@ def organize_group(
         utils.exit_via(error)
 
     context.obj = competition
-
-
-@organize_group.command()
-@click.pass_context
-def x(
-    context: click.Context,
-):
-    print(context.obj)
 
 
 @organize_group.group(name="test")
