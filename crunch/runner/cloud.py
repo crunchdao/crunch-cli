@@ -29,7 +29,7 @@ CHMOD_RESET = "go=,u=r"
 SIGCONT is the only allowed signal.
 SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
 """
-FUSE_SIGNAL_NUMBER = signal.SIGCONT
+FUSE_SIGNAL = signal.SIGCONT
 
 
 def link(tmp_directory: str, path: str, fake: bool = False):
@@ -536,7 +536,7 @@ class CloudRunner(Runner):
                 "write-index": self.prediction_collector.write_index,
                 # ---
                 "fuse-pid": os.getpid(),
-                "fuse-signal-number": FUSE_SIGNAL_NUMBER,
+                "fuse-signal-number": FUSE_SIGNAL.value,
             }
 
             # TODO move to a dedicated function
@@ -602,7 +602,7 @@ class CloudRunner(Runner):
         ])
 
         def on_signal(signum, stack):
-            signal.signal(FUSE_SIGNAL_NUMBER, signal.SIG_DFL)
+            signal.signal(FUSE_SIGNAL, signal.SIG_DFL)
 
             self.bash2([
                 "chmod",
@@ -612,7 +612,7 @@ class CloudRunner(Runner):
 
             self.log("[debug] fuse triggered")
 
-        signal.signal(FUSE_SIGNAL_NUMBER, on_signal)
+        signal.signal(FUSE_SIGNAL, on_signal)
 
     @property
     def venv_env(self):
