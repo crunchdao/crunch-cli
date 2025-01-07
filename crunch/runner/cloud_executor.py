@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import sys
+import time
 import traceback
 import typing
 
@@ -55,33 +56,21 @@ def ensure_dataframe(input, name: str):
 
 
 @utils.timeit(["path"])
-def read(path: str, then_delete: bool) -> pandas.DataFrame:
+def read(path: str) -> pandas.DataFrame:
     if path is None:
         return None
 
-    try:
-        if path.endswith(".parquet"):
-            return pandas.read_parquet(path)
+    if path.endswith(".parquet"):
+        return pandas.read_parquet(path)
 
-        if path.endswith(".pickle"):
-            return pandas.read_pickle(path)
+    if path.endswith(".pickle"):
+        return pandas.read_pickle(path)
 
-        if path.endswith(".json"):
-            with open(path, "r") as fd:
-                return json.load(fd)
+    if path.endswith(".json"):
+        with open(path, "r") as fd:
+            return json.load(fd)
 
-        return pandas.read_csv(path)
-    finally:
-        if then_delete:
-            delete(path)
-
-
-def delete(path: str):
-    if path is None:
-        return None
-
-    if os.path.exists(path):
-        os.remove(path)
+    return pandas.read_csv(path)
 
 
 @utils.timeit(["path"])
@@ -134,6 +123,9 @@ class SandboxExecutor:
         column_names: api.ColumnNames,
         # ---
         write_index: bool,
+        # ---
+        fuse_pid: int,
+        fuse_signal_number: int,
     ):
         self.competition_name = competition_name
         self.competition_format = competition_format
@@ -162,14 +154,17 @@ class SandboxExecutor:
 
         self.write_index = write_index
 
+        self.fuse_pid = fuse_pid
+        self.fuse_signal_number = fuse_signal_number
+
     def load_data(self, trained: Reference):
         if self.competition_format == api.CompetitionFormat.SPATIAL:
             return None, None, None
 
-        full_x = read(self.x_path, True)
+        full_x = read(self.x_path)
 
         if self.train:
-            full_y = read(self.y_path, True)
+            full_y = read(self.y_path)
 
             x_train = self.filter_train(full_x, NamedFile.X)
             y_train = self.filter_train(full_y, NamedFile.Y)
@@ -179,18 +174,13 @@ class SandboxExecutor:
             if self.orthogonalization_data_path:
                 full_y_raw = None
                 if self.y_raw_path:
-                    full_y_raw = read(self.y_raw_path, True)
+                    full_y_raw = read(self.y_raw_path)
                     y_raw = self.filter_train(full_y_raw, NamedFile.Y)
 
                 self.setup_orthogonalization(y_train, y_raw, trained)
         else:
             x_train = None
             y_train = None
-
-        delete(self.y_path)
-        delete(self.y_raw_path)
-        delete(self.y_raw_path)
-        delete(self.orthogonalization_data_path)
 
         x_test = self.filter_test(full_x, NamedFile.X)
         del full_x
@@ -199,10 +189,27 @@ class SandboxExecutor:
 
         return x_train, y_train, x_test
 
+    def _signal_permission_fuse(self):
+        os.kill(self.fuse_pid, self.fuse_signal_number)
+
+        if self.competition_format == api.CompetitionFormat.SPATIAL:
+            return
+
+        time.sleep(0.1)
+        for _ in range(10):
+            if not os.access(self.x_path, os.R_OK):
+                break
+
+            time.sleep(1)
+            print("[debug] fuse not yet triggered", file=sys.stderr)
+        else:
+            print("fuse never triggered", file=sys.stderr)
+            exit(1)
+
     def start(self):
         ping(self.ping_urls)
 
-        self.state = read(self.state_file, False)
+        self.state = read(self.state_file)
         self.splits = api.DataReleaseSplit.from_dict_array(self.state["splits"])
         self.metrics = api.Metric.from_dict_array(self.state["metrics"], None)
         self.checks = api.Check.from_dict_array(self.state["checks"], None)
@@ -214,6 +221,8 @@ class SandboxExecutor:
         # keep local
         trained = Reference(False)
         x_train, y_train, x_test = self.load_data(trained)
+
+        self._signal_permission_fuse()
 
         try:
             spec = importlib.util.spec_from_file_location(
@@ -536,7 +545,7 @@ class SandboxExecutor:
             api.CheckFunction.MOONS,
         ]
 
-        full_orthogonalization_data = read(self.orthogonalization_data_path, True) if self.train else None
+        full_orthogonalization_data = read(self.orthogonalization_data_path) if self.train else None
 
         split_keys = y_train[self.column_names.moon].unique()
         orthogonalization_data = {

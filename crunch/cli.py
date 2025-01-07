@@ -617,6 +617,9 @@ def cloud(
 @click.option("--target", "targets", required=True, multiple=True, nargs=5)
 # ---
 @click.option("--write-index", required=True, type=bool)
+# ---
+@click.option("--fuse-pid", required=True, type=int)
+@click.option("--fuse-signal-number", required=True, type=int)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
@@ -650,6 +653,9 @@ def cloud_executor(
     targets: typing.List[typing.Tuple[str, str, str, str, str]],
     # ---
     write_index: bool,
+    # ---
+    fuse_pid: int,
+    fuse_signal_number: int,
 ):
     from .runner import is_inside
     if not is_inside:
@@ -712,6 +718,9 @@ def cloud_executor(
         ),
         # ---
         write_index,
+        # ---
+        fuse_pid,
+        fuse_signal_number,
     )
 
     try:
