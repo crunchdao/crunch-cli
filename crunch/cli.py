@@ -1,5 +1,5 @@
+import contextlib
 import functools
-import logging
 import os
 import sys
 import traceback
@@ -250,6 +250,31 @@ def quickstarter(
     print(f"quickstarter deployed")
 
 
+@contextlib.contextmanager
+def convert_if_necessary(
+    main_file_path: str
+):
+    converted = False
+    if not os.path.exists(main_file_path):
+        print(f"missing {main_file_path}")
+
+        file_name, _ = os.path.splitext(os.path.basename(main_file_path))
+        dirpath = os.path.dirname(main_file_path)
+        path_without_extension = os.path.join(dirpath, file_name)
+
+        notebook_file_path = f"{path_without_extension}.ipynb"
+        if not os.path.exists(notebook_file_path):
+            raise click.Abort()
+
+        command.convert(notebook_file_path, main_file_path)
+        converted = True
+    try:
+        yield
+    finally:
+        if converted:
+            os.unlink(main_file_path)
+
+
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
 @click.option("--main-file", "main_file_path", default="main.py", show_default=True, help="Entrypoint of your code.")
@@ -267,35 +292,18 @@ def push(
 ):
     utils.change_root()
 
-    converted = False
-    if not os.path.exists(main_file_path):
-        print(f"missing {main_file_path}")
-
-        file_name, _ = os.path.splitext(os.path.basename(main_file_path))
-        dirpath = os.path.dirname(main_file_path)
-        path_without_extension = os.path.join(dirpath, file_name)
-
-        notebook_file_path = f"{path_without_extension}.ipynb"
-        if not os.path.exists(notebook_file_path):
-            raise click.Abort()
-
-        command.convert(notebook_file_path, main_file_path)
-        converted = True
-
-    try:
-        command.push(
-            message,
-            main_file_path,
-            model_directory_path,
-            not no_pip_freeze,
-            dry,
-            export_path,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
-    finally:
-        if converted:
-            os.unlink(main_file_path)
+    with convert_if_necessary(main_file_path):
+        try:
+            command.push(
+                message,
+                main_file_path,
+                model_directory_path,
+                not no_pip_freeze,
+                dry,
+                export_path,
+            )
+        except api.ApiException as error:
+            utils.exit_via(error)
 
 
 @cli.command(help="[DEPRECATED] Send a prediction as your submission.")
@@ -464,19 +472,20 @@ def local(
     if no_determinism_check == False:
         no_determinism_check = None
 
-    try:
-        command.test(
-            main_file_path,
-            model_directory_path,
-            not no_force_first_train,
-            train_frequency,
-            round_number,
-            has_gpu,
-            not no_checks,
-            no_determinism_check,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    with convert_if_necessary(main_file_path):
+        try:
+            command.test(
+                main_file_path,
+                model_directory_path,
+                not no_force_first_train,
+                train_frequency,
+                round_number,
+                has_gpu,
+                not no_checks,
+                no_determinism_check,
+            )
+        except api.ApiException as error:
+            utils.exit_via(error)
 
 
 @runner_group.command(help="Cloud runner, do not directly run!")
@@ -751,14 +760,6 @@ def organize_group(
         utils.exit_via(error)
 
     context.obj = competition
-
-
-@organize_group.command()
-@click.pass_context
-def x(
-    context: click.Context,
-):
-    print(context.obj)
 
 
 @organize_group.group(name="test")
