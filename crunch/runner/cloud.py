@@ -1,8 +1,8 @@
 import json
 import os
+import signal
 import subprocess
 import sys
-import tempfile
 import time
 import typing
 import urllib.parse
@@ -17,6 +17,19 @@ from .runner import Runner
 CONFLICTING_GPU_PACKAGES = [
     "nvidia_cublas_cu11"
 ]
+
+
+"""
+group + other  = (null)
+user (runner)  = read
+"""
+CHMOD_RESET = "go=,u=r"
+
+"""
+SIGCONT is the only allowed signal.
+SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
+"""
+FUSE_SIGNAL_NUMBER = signal.SIGCONT
 
 
 def link(tmp_directory: str, path: str, fake: bool = False):
@@ -456,39 +469,26 @@ class CloudRunner(Runner):
     ):
         is_regular = self.competition_format != api.CompetitionFormat.SPATIAL
 
-        temporary_directory: tempfile.TemporaryDirectory = None
-
         try:
             if is_regular:
+                self.bash2(["chmod", "-R", CHMOD_RESET, self.data_directory])
+                self.bash2(["chmod", "o=x", self.data_directory])
+
                 assert self.x_path is not None
 
-                temporary_directory = tempfile.TemporaryDirectory()
-                temporary_directory_name = temporary_directory.name
-
-                self.bash2(["chmod", "a+rxw", temporary_directory_name])
-
-                x_tmp_path = link(temporary_directory_name, self.x_path)
-                y_tmp_path = link(temporary_directory_name, self.y_path, fake=not train)
-                y_raw_tmp_path = link(temporary_directory_name, self.y_raw_path)
-                orthogonalization_data_tmp_path = link(temporary_directory_name, self.orthogonalization_data_path)
-
-                self.bash2([
-                    "chmod",
-                    "a+r",
-                    x_tmp_path,
-                    *filter(bool, [
-                        y_tmp_path,
-                        y_raw_tmp_path,
-                        orthogonalization_data_tmp_path,
-                    ])
-                ])
+                x_path = self.x_path
+                y_path = self.y_path if train else None
+                y_raw_path = self.y_raw_path
+                orthogonalization_data_path = self.orthogonalization_data_path
 
                 path_options = {
-                    "x": x_tmp_path,
-                    "y": y_tmp_path,
-                    "y-raw": y_raw_tmp_path,
-                    "orthogonalization-data": orthogonalization_data_tmp_path,
+                    "x": x_path,
+                    "y": y_path,
+                    "y-raw": y_raw_path,
+                    "orthogonalization-data": orthogonalization_data_path,
                 }
+
+                self._install_permission_fuse(path_options.values())
             else:
                 self.bash2(["chmod", "-R", "a+r", self.data_directory])
 
@@ -539,6 +539,9 @@ class CloudRunner(Runner):
                 ],
                 # ---
                 "write-index": self.prediction_collector.write_index,
+                # ---
+                "fuse-pid": os.getpid(),
+                "fuse-signal-number": FUSE_SIGNAL_NUMBER,
             }
 
             # TODO move to a dedicated function
@@ -587,12 +590,34 @@ class CloudRunner(Runner):
         except SystemExit:
             self.report_trace(loop_key)
             raise
-        finally:
-            if temporary_directory is not None:
-                temporary_directory.cleanup()
 
         if return_result:
             return utils.read(self.prediction_path)
+
+    def _install_permission_fuse(
+        self,
+        paths: typing.List[typing.Optional[str]],
+    ):
+        paths = list(filter(bool, paths))
+
+        self.bash2([
+            "chmod",
+            "o+r",
+            *paths,
+        ])
+
+        def on_signal(signum, stack):
+            signal.signal(FUSE_SIGNAL_NUMBER, signal.SIG_DFL)
+
+            self.bash2([
+                "chmod",
+                CHMOD_RESET,
+                *paths,
+            ])
+
+            self.log("[debug] fuse triggered")
+
+        signal.signal(FUSE_SIGNAL_NUMBER, on_signal)
 
     @property
     def venv_env(self):
