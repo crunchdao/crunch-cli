@@ -9,7 +9,7 @@ from .. import api, constants, store, utils
 def _list_files(
     directory_path: str,
 ):
-    directory_path = utils.to_unix_path(directory_path)
+    directory_path = utils.to_unix_path(directory_path + os.path.sep)
 
     for root, _, files in os.walk(directory_path, topdown=False):
         root = utils.to_unix_path(root)
