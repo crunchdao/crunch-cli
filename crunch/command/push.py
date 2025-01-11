@@ -31,23 +31,23 @@ def list_code_files(
 ):
     from ..external import gitignorefile
 
-    ignore_files = [
-        *constants.IGNORED_FILES,
-        utils.to_unix_path(f"{model_directory_relative_path}/")
-    ]
+    ignored_files = gitignorefile._IgnoreRules(
+        rules=[
+            gitignorefile._rule_from_pattern(line)
+            for line in [
+                *constants.IGNORED_FILES,
+                utils.to_unix_path(f"/{model_directory_relative_path}/")
+            ]
+        ],
+        base_path=submission_directory_path,
+    )
 
-    matches = gitignorefile.Cache()
+    git_ignores = gitignorefile.Cache()
     parts = tuple(gitignorefile._path_split(submission_directory_path))[:-1]
-    matches._Cache__gitignores[parts] = []
+    git_ignores._Cache__gitignores[parts] = []
 
     for name in _list_files(submission_directory_path):
-        ignored = False
-        for ignore in ignore_files:
-            if ignore in name:
-                ignored = True
-                break
-
-        if ignored or matches(name):
+        if ignored_files.match(name) or git_ignores(name):
             continue
 
         path = utils.to_unix_path(os.path.join(submission_directory_path, name))

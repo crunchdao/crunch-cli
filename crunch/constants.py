@@ -15,7 +15,7 @@ MACOS_HIDDEN_FILES = [
 IGNORED_FILES = [
     ".git/",
     f"{DOT_CRUNCHDAO_DIRECTORY}/",
-    f"{DOT_DATA_DIRECTORY}/",
+    f"/{DOT_DATA_DIRECTORY}/",
     "__pycache__/",
     ".ipynb_checkpoints/",
     ".env",
