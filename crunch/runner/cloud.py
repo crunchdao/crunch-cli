@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -13,6 +14,10 @@ import requests
 from .. import api, downloader, store, utils
 from .collector import MemoryPredictionCollector
 from .runner import Runner
+
+PACKAGES_WITH_PRIORITY = [
+    "torch"
+]
 
 CONFLICTING_GPU_PACKAGES = [
     "nvidia_cublas_cu11"
@@ -132,8 +137,25 @@ class CloudRunner(Runner):
             if os.path.exists(self.requirements_txt_path):
                 self.report_current("install requirements")
 
+                priority_packages = []
+                with open(self.requirements_txt_path) as fd:
+                    for line in fd:
+                        line = line.strip()
+
+                        package = re.search(r"^([\w-]+)", line, re.MULTILINE)
+                        if package is None:
+                            continue
+
+                        package = package.group(1)
+                        if package in PACKAGES_WITH_PRIORITY:
+                            priority_packages.append(line)
+
+                if priority_packages:
+                    self.pip(priority_packages)
+
                 self.pip([
-                    "-r", self.requirements_txt_path
+                    "-r",
+                    self.requirements_txt_path
                 ])
             else:
                 self.log("no requirements.txt found")
