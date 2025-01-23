@@ -154,6 +154,7 @@ class CloudRunner(Runner):
                     self.pip(priority_packages)
 
                 self.pip([
+                    *(["--no-build-isolation"] if priority_packages else []),
                     "-r",
                     self.requirements_txt_path
                 ])
