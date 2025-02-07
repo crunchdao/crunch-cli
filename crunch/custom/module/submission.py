@@ -1,9 +1,12 @@
 import typing
 
-from . import code_loader, execute, file
+from .. import code_loader, execute, file
 
 
 class SubmissionModule:
+    """
+    Duck typing class that represent a `submission.py` usable for a custom checker.
+    """
 
     check: typing.Callable
 
@@ -25,25 +28,11 @@ def check(
     model_files: typing.List[file.File],
     logger=print,
 ):
-    _call(
-        module.check,
-        submission_files,
-        model_files,
-        logger,
-    )
-
-
-def _call(
-    function: typing.Callable,
-    submission_files: typing.List[file.File],
-    model_files: typing.List[file.File],
-    print=print,
-):
     return execute.call_function(
-        function,
+        module.check,
         {
             "submission_files": submission_files,
             "model_files": model_files,
         },
-        print,
+        logger,
     )
