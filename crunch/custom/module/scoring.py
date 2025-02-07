@@ -1,13 +1,15 @@
-import itertools
 import typing
 
 import pandas
 
-from .. import api, scoring
-from . import code_loader, execute
+from ... import api, scoring
+from .. import code_loader, execute, utils
 
 
 class ScoringModule:
+    """
+    Duck typing class that represent a `scoring.py` usable for a custom checker and scorer.
+    """
 
     check: typing.Callable
     score: typing.Callable
@@ -87,16 +89,7 @@ def _call(
     data_directory_path: str,
     print=print,
 ):
-    target_and_metrics = [
-        (target, list(metrics))
-        for target, metrics in itertools.groupby(
-            sorted(
-                metrics,
-                key=lambda x: x.target.id
-            ),
-            lambda x: x.target
-        )
-    ]
+    target_and_metrics = utils.group_metrics_by_target(metrics)
 
     target_names = list({
         target.name

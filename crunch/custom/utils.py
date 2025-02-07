@@ -1,3 +1,9 @@
+import itertools
+import typing
+
+from .. import api
+
+
 def truncate(
     values: set,
     max_size=10
@@ -34,3 +40,15 @@ def delta_message(
         message += f"extras [{truncate(extras)}]"
 
     return message
+
+def group_metrics_by_target(metrics: typing.List[api.Target]):
+    return [
+        (target, list(metrics))
+        for target, metrics in itertools.groupby(
+            sorted(
+                metrics,
+                key=lambda x: x.target.id
+            ),
+            lambda x: x.target
+        )
+    ]

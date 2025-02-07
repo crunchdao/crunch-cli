@@ -1,6 +1,8 @@
 import contextlib
 import functools
+import json
 import os
+import random
 import sys
 import traceback
 import typing
@@ -767,6 +769,134 @@ def organize_test_group():
     pass
 
 
+@organize_test_group.group(name="leaderboard")
+@click.option("--script-file", "script_file_path", type=click.Path(dir_okay=False, readable=True), required=False)
+@click.option("--github-repository", default=constants.COMPETITIONS_REPOSITORY, required=False)
+@click.option("--github-branch", default=constants.COMPETITIONS_BRANCH, required=False)
+@click.pass_context
+def leaderboard_group(
+    context: click.Context,
+    script_file_path: str,
+    github_repository: str,
+    github_branch: str,
+):
+    from . import custom
+
+    competition: api.Competition = context.obj
+
+    if script_file_path is None:
+        loader = custom.GithubCodeLoader(
+            competition.name,
+            "leaderboard",
+            repository=github_repository,
+            branch=github_branch,
+        )
+    else:
+        loader = custom.LocalCodeLoader(
+            script_file_path,
+        )
+
+    context.obj = (competition, loader)
+
+
+@leaderboard_group.command(name="rank")
+@click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--shuffle", is_flag=True)
+@click.pass_context
+def leaderboard_rank(
+    context: click.Context,
+    score_file_path: str,
+    shuffle,
+):
+    from . import custom
+
+    competition, loader = typing.cast(
+        typing.Tuple[
+            api.Competition,
+            custom.CodeLoader,
+        ],
+        context.obj
+    )
+
+    module = custom.LeaderboardModule.load(loader)
+    if module is None:
+        print(f"no custom leaderboard rank found")
+        raise click.Abort()
+
+    with open(score_file_path, "r") as fd:
+        root = json.load(fd)
+        if not isinstance(root, list):
+            raise ValueError("root must be a list")
+
+        projects = [
+            custom.RankableProject.from_dict(item)
+            for item in root
+        ]
+
+        if shuffle:
+            random.shuffle(projects)
+
+    try:
+        metrics = competition.metrics.list()
+
+        ordered_project_ids = custom.leaderboard_rank(
+            module,
+            metrics,
+            projects,
+        )
+
+        print(f"\n\nLeaderboard is ranked")
+
+        used_metric_ids = list({
+            metric.id
+            for project in projects
+            for metric in project.metrics
+        })
+
+        metric_name_by_id = {
+            metric.id: metric.name
+            for metric in metrics
+            if metric.id in used_metric_ids
+        }
+
+        score_by_metric_id_by_project_id = {
+            project.id: {
+                metric.id: metric.score
+                for metric in project.metrics
+            }
+            for project in projects
+        }
+
+        print(f"\nResults:")
+        utils.ascii_table(
+            (
+                "Rank",
+                "Project IDs",
+                *[
+                    f"Metric: {metric_name_by_id[id]}"
+                    for id in used_metric_ids
+                ]
+            ),
+            [
+                (
+                    rank,
+                    project_id,
+                    *(
+                        score_by_metric_id_by_project_id[project_id].get(metric_id)
+                        for metric_id in used_metric_ids
+                    )
+                )
+                for rank, project_id in enumerate(ordered_project_ids, 1)
+            ]
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
+    except BaseException as error:
+        print(f"\n\nLeaderboard rank function failed: {error}")
+
+        traceback.print_exc()
+
+
 @organize_test_group.group(name="scoring")
 @click.option("--script-file", "script_file_path", type=click.Path(dir_okay=False, readable=True), required=False)
 @click.option("--github-repository", default=constants.COMPETITIONS_REPOSITORY, required=False)
@@ -886,35 +1016,22 @@ def scoring_score(
 
         print(f"\n\nPrediction is scorable!")
 
-        rows = [
-            (
-                metric_by_id[metric_id].target.name,
-                metric_by_id[metric_id].name,
-                str(scored_metric.value),
-                " ".join((
-                    f"{detail.key}={detail.value}"
-                    for detail in scored_metric.details
-                ))
-            )
-            for metric_id, scored_metric in results.items()
-        ]
-
-        rows.insert(0, ("Target", "Metric", "Score", "Details"))
-
-        max_length_per_columns = [
-            max((len(row[index]) for row in rows))
-            for index in range(len(rows[0]))
-        ]
-
         print(f"\nResults:")
-        for row in rows:
-            print("  ", end="")
-
-            for column_index, value in enumerate(row):
-                width = max_length_per_columns[column_index] + 3
-                print(value.ljust(width), end="")
-
-            print()
+        utils.ascii_table(
+            ("Target", "Metric", "Score", "Details"),
+            [
+                (
+                    metric_by_id[metric_id].target.name,
+                    metric_by_id[metric_id].name,
+                    str(scored_metric.value),
+                    " ".join((
+                        f"{detail.key}={detail.value}"
+                        for detail in scored_metric.details
+                    ))
+                )
+                for metric_id, scored_metric in results.items()
+            ]
+        )
     except custom.ParticipantVisibleError as error:
         print(f"\n\nPrediction is not scorable: {error}")
     except api.ApiException as error:
@@ -959,7 +1076,7 @@ def submission_group(
 @click.option("--root-directory", "root_directory_path", type=click.Path(exists=True, file_okay=False), required=True)
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY)
 @click.pass_context
-def scoring_check(
+def submission_check(
     context: click.Context,
     root_directory_path: str,
     model_directory_path: str,
