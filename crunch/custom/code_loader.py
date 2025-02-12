@@ -16,6 +16,27 @@ class CodeLoadError(ImportError):
     pass
 
 
+class MissingFunctionError(RuntimeError):
+    pass
+
+
+class ModuleWrapper:
+
+    def __init__(
+        self,
+        module: types.ModuleType,
+    ):
+        self._module = module
+
+    def _get_function(self, name: str):
+        function = getattr(self._module, name, None)
+
+        if function is None:
+            raise MissingFunctionError(f"no `{name}` function from module {self._module}")
+
+        return function
+
+
 class CodeLoader(abc.ABC):
 
     def load(self):

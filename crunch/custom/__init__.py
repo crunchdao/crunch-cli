@@ -19,8 +19,8 @@ from .file import (
 from .module.leaderboard import (
     RankableProject,
     RankableProjectMetric,
+    ComparedSimilarity,
     LeaderboardModule,
-    rank as leaderboard_rank,
 )
 
 from .module.scoring import (
