@@ -28,10 +28,10 @@ class ModuleWrapper:
     ):
         self._module = module
 
-    def _get_function(self, name: str):
+    def _get_function(self, name: str, ensure: bool):
         function = getattr(self._module, name, None)
 
-        if function is None:
+        if ensure and function is None:
             raise MissingFunctionError(f"no `{name}` function from module {self._module}")
 
         return function

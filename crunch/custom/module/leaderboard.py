@@ -38,9 +38,8 @@ class ComparedSimilarity(dataclasses_json.DataClassJsonMixin):
 
 class LeaderboardModule(code_loader.ModuleWrapper):
 
-    @property
-    def compare_function(self):
-        return self._get_function("compare")
+    def compare_function(self, ensure=True):
+        return self._get_function("compare", ensure)
 
     def compare(
         self,
@@ -57,7 +56,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
         combinations = list(itertools.combinations(sorted(predictions.keys()), 2))
 
         similarities = execute.call_function(
-            self.compare_function,
+            self.compare_function(ensure=True),
             {
                 "targets": targets,
                 "predictions": predictions,
@@ -68,9 +67,8 @@ class LeaderboardModule(code_loader.ModuleWrapper):
 
         return similarities
 
-    @property
-    def rank_function(self):
-        return self._get_function("rank")
+    def rank_function(self, ensure=True):
+        return self._get_function("rank", ensure)
 
     def rank(
         self,
@@ -87,7 +85,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
         target_and_metrics = utils.group_metrics_by_target(metrics)
 
         ordered_project_ids = execute.call_function(
-            self.rank_function,
+            self.rank_function(ensure=True),
             {
                 "target_and_metrics": target_and_metrics,
                 "projects": projects,
