@@ -8,6 +8,7 @@ import traceback
 import typing
 
 import click
+import pandas
 
 from . import __version__, api, benchmark, command, constants, store, utils
 
@@ -820,7 +821,7 @@ def leaderboard_rank(
 
     module = custom.LeaderboardModule.load(loader)
     if module is None:
-        print(f"no custom leaderboard rank found")
+        print(f"no custom leaderboard script found")
         raise click.Abort()
 
     with open(score_file_path, "r") as fd:
@@ -839,8 +840,7 @@ def leaderboard_rank(
     try:
         metrics = competition.metrics.list()
 
-        ordered_project_ids = custom.leaderboard_rank(
-            module,
+        ordered_project_ids = module.rank(
             metrics,
             projects,
         )
@@ -887,6 +887,82 @@ def leaderboard_rank(
                     )
                 )
                 for rank, project_id in enumerate(ordered_project_ids, 1)
+            ]
+        )
+    except api.ApiException as error:
+        utils.exit_via(error)
+    except BaseException as error:
+        print(f"\n\nLeaderboard rank function failed: {error}")
+
+        traceback.print_exc()
+
+
+@leaderboard_group.command(name="compare")
+@click.option("--prediction-file", "prediction_file_paths", type=(int, click.Path(exists=True, dir_okay=False)), multiple=True)
+@click.pass_context
+def leaderboard_compare(
+    context: click.Context,
+    prediction_file_paths: typing.List[typing.Tuple[int, str]],
+):
+    from . import custom
+
+    competition, loader = typing.cast(
+        typing.Tuple[
+            api.Competition,
+            custom.CodeLoader,
+        ],
+        context.obj
+    )
+
+    module = custom.LeaderboardModule.load(loader)
+    if module is None:
+        print(f"no custom leaderboard script found")
+        raise click.Abort()
+
+    predictions = {}
+    for prediction_id, prediction_file_path in prediction_file_paths:
+        if prediction_id in predictions:
+            print(f"prediction id {prediction_id} specified multiple time")
+            raise click.Abort()
+
+        predictions[prediction_id] = pandas.read_parquet(prediction_file_path)
+
+    try:
+        targets = competition.targets.list()
+
+        similarities = module.compare(
+            targets,
+            predictions,
+        )
+
+        print(f"\n\nSimilarities have been compared")
+
+        target_per_id = {
+            target.id: target
+            for target in targets
+        }
+
+        prediction_name_per_id = {
+            id: os.path.splitext(path)[0]
+            for id, path in prediction_file_paths
+        }
+
+        print(f"\nResults:")
+        utils.ascii_table(
+            (
+                "Target Name",
+                "Left",
+                "Right",
+                "Similarity"
+            ),
+            [
+                (
+                    target_per_id[similarity.target_id].name,
+                    prediction_name_per_id[similarity.left_id],
+                    prediction_name_per_id[similarity.right_id],
+                    similarity.value,
+                )
+                for similarity in similarities
             ]
         )
     except api.ApiException as error:

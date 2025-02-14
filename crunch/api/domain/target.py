@@ -74,11 +74,15 @@ class TargetCollection(Collection):
         )
 
     def list(
-        self
+        self,
+        name: typing.Optional[str] = None,
+        virtual: typing.Optional[bool] = None,
     ) -> Target:
         return self.prepare_models(
             self._client.api.list_targets(
-                self.competition.id
+                self.competition.id,
+                name,
+                virtual,
             )
         )
 
@@ -105,11 +109,17 @@ class TargetEndpointMixin:
 
     def list_targets(
         self,
-        competition_identifier
+        competition_identifier,
+        name,
+        virtual,
     ):
         return self._result(
             self.get(
-                f"/v1/competitions/{competition_identifier}/targets"
+                f"/v1/competitions/{competition_identifier}/targets",
+                params={
+                    "name": name,
+                    "virtual": virtual,
+                }
             ),
             json=True
         )
