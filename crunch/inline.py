@@ -75,7 +75,7 @@ class _Inline:
             x_train_path = data_paths.get(api.KnownData.X_TRAIN)
             y_train_path = data_paths.get(api.KnownData.Y_TRAIN)
             x_test_path = data_paths.get(api.KnownData.X_TEST)
-        except api.CrunchNotFoundException:
+        except (api.CrunchNotFoundException, api.MissingPhaseDataException):
             command.download_no_data_available()
             raise click.Abort()
 
@@ -115,7 +115,7 @@ class _Inline:
 
             x_train_path = data_paths.get(api.KnownData.X_TRAIN)
             x_test_path = data_paths.get(api.KnownData.X_TEST)
-        except api.CrunchNotFoundException:
+        except (api.CrunchNotFoundException, api.MissingPhaseDataException):
             command.download_no_data_available()
             raise click.Abort()
 

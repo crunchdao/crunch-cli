@@ -125,7 +125,7 @@ def init(
 
         if not no_data:
             command.download(force=True)
-    except api.CrunchNotFoundException:
+    except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
         utils.exit_via(
@@ -212,7 +212,7 @@ def setup(
 
         if not no_data:
             command.download(force=True)
-    except api.CrunchNotFoundException:
+    except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
         utils.exit_via(
@@ -376,7 +376,7 @@ def download(
             force,
             size_variant,
         )
-    except api.CrunchNotFoundException:
+    except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
         utils.exit_via(error)
