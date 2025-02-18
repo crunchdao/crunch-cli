@@ -111,7 +111,7 @@ class LocalRunner(Runner):
                 self.x_test_path = self.data_paths.get(api.KnownData.X_TEST)
                 self.y_test_path = self.data_paths.get(api.KnownData.Y_TEST)
                 self.example_prediction_path = self.data_paths.get(api.KnownData.EXAMPLE_PREDICTION)
-        except api.CrunchNotFoundException:
+        except (api.CrunchNotFoundException, api.MissingPhaseDataException):
             command.download_no_data_available()
             raise click.Abort()
 

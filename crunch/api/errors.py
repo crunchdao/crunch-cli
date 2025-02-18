@@ -212,6 +212,23 @@ class InvalidProjectTokenException(ApiException):
         _print_contact()
 
 
+class MissingPhaseDataException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        phase_id: int,
+        phase_type: str,
+    ):
+        super().__init__(message)
+
+        self.phase_id = phase_id
+        self.phase_type = phase_type
+
+    def print_helper(self, **kwargs):
+        print("No data is available for local download.")
+
+
 class NeverSubmittedException(ApiException):
 
     def __init__(self, message: str):
