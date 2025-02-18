@@ -104,7 +104,7 @@ class CrunchNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        phase_type: typing.Optional[typing.Union[str, ProjectTokenType]],
+        phase_type: typing.Optional[typing.Union[str, PhaseType]],
         round_number: int,
         competition_name: str
     ):
@@ -218,9 +218,12 @@ class MissingPhaseDataException(ApiException):
         self,
         message: str,
         phase_id: int,
-        phase_type: str,
+        phase_type: typing.Union[str, PhaseType],
     ):
         super().__init__(message)
+
+        if isinstance(phase_type, str):
+            phase_type = PhaseType[phase_type]
 
         self.phase_id = phase_id
         self.phase_type = phase_type
