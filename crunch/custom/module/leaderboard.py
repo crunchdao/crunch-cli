@@ -101,6 +101,12 @@ class LeaderboardModule(code_loader.ModuleWrapper):
             print,
         )
 
+        if isinstance(ranked_projects, list) and all(isinstance(x, int) for x in ranked_projects):
+            ranked_projects = [
+                RankedProject(id, rank, float(rank))
+                for rank, id in enumerate(ranked_projects, 1)
+            ]
+
         if not isinstance(ranked_projects, list) or any(not isinstance(x, RankedProject) for x in ranked_projects):
             raise ValueError(f"rank(...) must return a list[RankedProject]: {ranked_projects}")
 
