@@ -18,6 +18,7 @@ class RankableProjectMetric(dataclasses_json.DataClassJsonMixin):
 @dataclasses.dataclass
 class RankableProject(dataclasses_json.DataClassJsonMixin):
     id: typing.Optional[float]
+    rewardable: bool
     metrics: typing.List[RankableProjectMetric] = dataclasses.field(default_factory=list)
 
     def get_metric(self, id: int):
@@ -26,6 +27,13 @@ class RankableProject(dataclasses_json.DataClassJsonMixin):
                 return metric
 
         return None
+
+
+@dataclasses.dataclass
+class RankedProject(dataclasses_json.DataClassJsonMixin):
+    id: int
+    rank: int
+    reward_rank: typing.Optional[typing.Union[int]]
 
 
 @dataclasses.dataclass
@@ -75,7 +83,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
         metrics: typing.List[api.Metric],
         projects: typing.List[RankableProject],
         print=print,
-    ) -> typing.List[int]:
+    ) -> typing.List[RankedProject]:
         """
         Call the rank function of a leaderboard module.
 
@@ -84,7 +92,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
 
         target_and_metrics = utils.group_metrics_by_target(metrics)
 
-        ordered_project_ids = execute.call_function(
+        ranked_projects = execute.call_function(
             self.rank_function(ensure=True),
             {
                 "target_and_metrics": target_and_metrics,
@@ -93,18 +101,23 @@ class LeaderboardModule(code_loader.ModuleWrapper):
             print,
         )
 
-        if not isinstance(ordered_project_ids, list) or any(not isinstance(x, int) for x in ordered_project_ids):
-            raise ValueError(f"rank(...) must return a list[int]: {ordered_project_ids}")
+        if not isinstance(ranked_projects, list) or any(not isinstance(x, RankedProject) for x in ranked_projects):
+            raise ValueError(f"rank(...) must return a list[RankedProject]: {ranked_projects}")
 
-        unique_ordered_project_ids = set(ordered_project_ids)
-        if len(unique_ordered_project_ids) != len(ordered_project_ids):
+        ranked_project_ids = [x.id for x in ranked_projects]
+        unique_ranked_project_ids = set(ranked_project_ids)
+        if len(unique_ranked_project_ids) != len(ranked_project_ids):
             raise ValueError(f"rank(...) contains duplicates project ids")
 
         original_project_ids = {project.id for project in projects}
-        if unique_ordered_project_ids != original_project_ids:
+        if unique_ranked_project_ids != original_project_ids:
             raise ValueError(f"rank(...) missing or extra project ids")
 
-        return ordered_project_ids
+        ranks = [x.rank for x in ranked_projects]
+        if len(ranks) != len(set(ranks)):
+            raise ValueError(f"rank(...) contains duplicate rank")
+
+        return ranked_projects
 
     @staticmethod
     def load(loader: code_loader.CodeLoader):

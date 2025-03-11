@@ -840,7 +840,7 @@ def leaderboard_rank(
     try:
         metrics = competition.metrics.list()
 
-        ordered_project_ids = module.rank(
+        ranked_projects = module.rank(
             metrics,
             projects,
         )
@@ -871,7 +871,8 @@ def leaderboard_rank(
         utils.ascii_table(
             (
                 "Rank",
-                "Project IDs",
+                "Reward Rank",
+                "Project ID",
                 *[
                     f"Metric: {metric_name_by_id[id]}"
                     for id in used_metric_ids
@@ -879,14 +880,15 @@ def leaderboard_rank(
             ),
             [
                 (
-                    rank,
-                    project_id,
+                    ranked_project.rank,
+                    ranked_project.reward_rank,
+                    ranked_project.id,
                     *(
-                        score_by_metric_id_by_project_id[project_id].get(metric_id)
+                        score_by_metric_id_by_project_id[ranked_project.id].get(metric_id)
                         for metric_id in used_metric_ids
                     )
                 )
-                for rank, project_id in enumerate(ordered_project_ids, 1)
+                for ranked_project in ranked_projects
             ]
         )
     except api.ApiException as error:
