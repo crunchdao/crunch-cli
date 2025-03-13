@@ -158,7 +158,7 @@ class SandboxExecutor:
         self.fuse_signal_number = fuse_signal_number
 
     def load_data(self, trained: Reference):
-        if self.competition_format == api.CompetitionFormat.SPATIAL:
+        if self.competition_format.unstructured:
             return None, None, None
 
         full_x = read(self.x_path)
@@ -192,7 +192,7 @@ class SandboxExecutor:
     def _signal_permission_fuse(self):
         os.kill(self.fuse_pid, self.fuse_signal_number)
 
-        if self.competition_format == api.CompetitionFormat.SPATIAL:
+        if self.competition_format.unstructured:
             return
 
         time.sleep(0.1)
@@ -259,7 +259,7 @@ class SandboxExecutor:
                     x_test,
                 )
 
-            elif self.competition_format == api.CompetitionFormat.SPATIAL:
+            elif self.competition_format.unstructured:
                 prediction = self.process_unstructured(
                     train_function,
                     infer_function,

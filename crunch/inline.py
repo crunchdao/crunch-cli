@@ -50,7 +50,7 @@ class _Inline:
         force=False,
         **kwargs,
     ) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
-        if self._competition.format == api.CompetitionFormat.SPATIAL:
+        if self._competition.format.unstructured:
             self.logger.error(f"Please follow the competition instructions to load the data.")
             return None, None, None
 
@@ -91,7 +91,7 @@ class _Inline:
         force=False,
         **kwargs,
     ) -> typing.Tuple[Streams, Streams]:
-        if self._competition.format == api.CompetitionFormat.SPATIAL:
+        if self._competition.format.unstructured:
             self.logger.error(f"Please follow the competition instructions to load the data.")
             return None, None
 

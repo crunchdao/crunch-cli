@@ -490,7 +490,7 @@ class CloudRunner(Runner):
         loop_key: typing.Union[int, str],
         return_result=True,
     ):
-        is_regular = self.competition_format != api.CompetitionFormat.SPATIAL
+        is_regular = not self.competition_format.unstructured
 
         try:
             if is_regular:
