@@ -32,7 +32,7 @@ class LocalRunner(Runner):
     ):
         collector = (
             MemoryPredictionCollector()
-            if competition.format != api.CompetitionFormat.SPATIAL
+            if not competition.format.unstructured
             else FilePredictionCollector()
         )
 
@@ -105,7 +105,7 @@ class LocalRunner(Runner):
                 round_number=self.round_number
             )
 
-            if self.competition_format != api.CompetitionFormat.SPATIAL:
+            if not self.competition_format.unstructured:
                 self.x_train_path = self.data_paths.get(api.KnownData.X_TRAIN)
                 self.y_train_path = self.data_paths.get(api.KnownData.Y_TRAIN)
                 self.x_test_path = self.data_paths.get(api.KnownData.X_TEST)
@@ -428,7 +428,7 @@ class LocalRunner(Runner):
         self.log('save prediction - path=%s' % prediction_path, important=True)
         self.prediction_collector.persist(prediction_path)
 
-        if self.checks and self.competition_format != api.CompetitionFormat.SPATIAL:
+        if self.checks and not self.competition_format.unstructured:
             prediction = utils.read(prediction_path)
             example_prediction = utils.read(self.example_prediction_path)
 

@@ -12,9 +12,14 @@ class CompetitionFormat(enum.Enum):
     DAG = "DAG"
     STREAM = "STREAM"
     SPATIAL = "SPATIAL"
+    UNSTRUCTURED = "UNSTRUCTURED"
 
     def __repr__(self):
         return self.name
+
+    @property
+    def unstructured(self):
+        return self in [CompetitionFormat.SPATIAL, CompetitionFormat.UNSTRUCTURED]
 
 
 class Competition(Model):
