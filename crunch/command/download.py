@@ -96,5 +96,5 @@ def download(
 
 def download_no_data_available():
     print("\n---")
-    print("No data is available yet.")
-    print("Please make sure that the competition has started and that you are trying to use the crunch-cli correctly.")
+    print("No data is available yet via the crunch-cli.")
+    print("Read the documentation for more information.")
