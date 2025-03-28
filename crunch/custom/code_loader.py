@@ -75,7 +75,7 @@ class GithubCodeLoader(CodeLoader):
     def __init__(
         self,
         competition_name: str,
-        file_name: typing.Literal["scoring", "submission"],
+        file_name: typing.Literal["submission", "scoring", "leaderboard"],
         repository=constants.COMPETITIONS_REPOSITORY,
         branch=constants.COMPETITIONS_BRANCH,
         user_agent="curl/7.88.1"
