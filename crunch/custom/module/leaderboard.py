@@ -53,6 +53,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
         self,
         targets: typing.List[api.Target],
         predictions: typing.Dict[int, pandas.DataFrame],
+        data_directory_path: str,
         print=print,
     ) -> typing.List[ComparedSimilarity]:
         """
@@ -69,6 +70,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
                 "targets": targets,
                 "predictions": predictions,
                 "combinations": combinations,
+                "data_directory_path": data_directory_path,
             },
             print,
         )

@@ -901,10 +901,12 @@ def leaderboard_rank(
 
 @leaderboard_group.command(name="compare")
 @click.option("--prediction-file", "prediction_file_paths", type=(int, click.Path(exists=True, dir_okay=False)), multiple=True)
+@click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.pass_context
 def leaderboard_compare(
     context: click.Context,
     prediction_file_paths: typing.List[typing.Tuple[int, str]],
+    data_directory_path: str,
 ):
     from . import custom
 
@@ -935,6 +937,7 @@ def leaderboard_compare(
         similarities = module.compare(
             targets,
             predictions,
+            data_directory_path,
         )
 
         print(f"\n\nSimilarities have been compared")
