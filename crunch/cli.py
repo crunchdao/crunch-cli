@@ -802,12 +802,14 @@ def leaderboard_group(
 
 @leaderboard_group.command(name="rank")
 @click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--rank-pass", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
 @click.option("--shuffle", is_flag=True)
 @click.pass_context
 def leaderboard_rank(
     context: click.Context,
     score_file_path: str,
-    shuffle,
+    rank_pass: str,
+    shuffle: bool,
 ):
     from . import custom
 
@@ -818,6 +820,8 @@ def leaderboard_rank(
         ],
         context.obj
     )
+
+    rank_pass = custom.RankPass[rank_pass]
 
     module = custom.LeaderboardModule.load(loader)
     if module is None:
@@ -843,9 +847,10 @@ def leaderboard_rank(
         ranked_projects = module.rank(
             metrics,
             projects,
+            rank_pass,
         )
 
-        print(f"\n\nLeaderboard is ranked")
+        print(f"\n\nLeaderboard is ranked (pass: {rank_pass.name})")
 
         used_metric_ids = list({
             metric.id
