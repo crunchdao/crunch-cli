@@ -19,6 +19,7 @@ from .file import (
 from .module.leaderboard import (
     RankableProject,
     RankableProjectMetric,
+    RankPass,
     RankedProject,
     ComparedSimilarity,
     LeaderboardModule,

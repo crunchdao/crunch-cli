@@ -1,4 +1,5 @@
 import dataclasses
+import enum
 import itertools
 import typing
 
@@ -28,6 +29,11 @@ class RankableProject(dataclasses_json.DataClassJsonMixin):
                 return metric
 
         return None
+
+
+class RankPass(enum.Enum):
+    PRE_DUPLICATE = "PRE_DUPLICATE"
+    FINAL = "FINAL"
 
 
 @dataclasses.dataclass
@@ -85,6 +91,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
         self,
         metrics: typing.List[api.Metric],
         projects: typing.List[RankableProject],
+        rank_pass: RankPass,
         print=print,
     ) -> typing.List[RankedProject]:
         """
@@ -100,6 +107,7 @@ class LeaderboardModule(code_loader.ModuleWrapper):
             {
                 "target_and_metrics": target_and_metrics,
                 "projects": projects,
+                "rank_pass": rank_pass,
             },
             print,
         )
