@@ -18,6 +18,7 @@ class RankableProjectMetric(dataclasses_json.DataClassJsonMixin):
 @dataclasses.dataclass
 class RankableProject(dataclasses_json.DataClassJsonMixin):
     id: typing.Optional[float]
+    group: str
     rewardable: bool
     metrics: typing.List[RankableProjectMetric] = dataclasses.field(default_factory=list)
 
