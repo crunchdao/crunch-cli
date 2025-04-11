@@ -6,6 +6,7 @@ from .code_loader import (
     CodeLoader,
     GithubCodeLoader,
     LocalCodeLoader,
+    deduce as deduce_code_loader,
 )
 
 from .execute import (
@@ -23,6 +24,10 @@ from .module.leaderboard import (
     RankedProject,
     ComparedSimilarity,
     LeaderboardModule,
+)
+
+from .module.runner import (
+    RunnerModule,
 )
 
 from .module.scoring import (
