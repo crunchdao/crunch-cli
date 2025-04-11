@@ -115,19 +115,19 @@ class GithubCodeLoader(CodeLoader):
 class LocalCodeLoader(CodeLoader):
 
     def __init__(self, path: str):
-        self._path = path
+        self.path = path
 
     @property
     def location(self):
-        return self._path
+        return self.path
 
     @property
     def source(self):
         try:
-            with open(self._path, "r") as fd:
+            with open(self.path, "r") as fd:
                 return fd.read()
         except FileNotFoundError as error:
-            raise NoCodeFoundError(f"no code found at path: {self._path}") from error
+            raise NoCodeFoundError(f"no code found at path: {self.path}") from error
 
 
 def _format_relative_module_path(

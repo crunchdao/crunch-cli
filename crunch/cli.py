@@ -495,6 +495,7 @@ def local(
 @click.option("--competition-name", envvar="COMPETITION_NAME", required=True)
 # ---
 @click.option("--context-directory", envvar="CONTEXT_DIRECTORY", default="/context")
+@click.option("--scoring-directory", envvar="SCORING_DIRECTORY", default="{context}/scoring")
 @click.option("--state-file", envvar="STATE_FILE", default="{context}/state.json")
 @click.option("--venv-directory", envvar="VENV_DIRECTORY", default="{context}/venv")
 @click.option("--data-directory", envvar="DATA_DIRECTORY", default="{context}/data")
@@ -517,6 +518,7 @@ def cloud(
     competition_name: str,
     # ---
     context_directory: str,
+    scoring_directory: str,
     state_file: str,
     venv_directory: str,
     data_directory: str,
@@ -546,6 +548,7 @@ def cloud(
     os.unsetenv("LOG_SECRET")
 
     code_directory = code_directory.replace("{context}", context_directory)
+    scoring_directory = scoring_directory.replace("{context}", context_directory)
     data_directory = data_directory.replace("{context}", context_directory)
     venv_directory = venv_directory.replace("{context}", context_directory)
     state_file = state_file.replace("{context}", context_directory)
@@ -571,6 +574,7 @@ def cloud(
         run,
         # ---
         context_directory,
+        scoring_directory,
         state_file,
         venv_directory,
         data_directory,
@@ -632,6 +636,9 @@ def cloud(
 # ---
 @click.option("--fuse-pid", required=True, type=int)
 @click.option("--fuse-signal-number", required=True, type=int)
+# ---
+@click.option("--runner-py-file", "runner_dot_py_file_path", type=str, default=None)
+@click.option("--parameters", "parameters_json_string", type=str, default=None)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
@@ -668,6 +675,9 @@ def cloud_executor(
     # ---
     fuse_pid: int,
     fuse_signal_number: int,
+    # ---
+    runner_dot_py_file_path: typing.Optional[str],
+    parameters_json_string: typing.Optional[str],
 ):
     from .runner import is_inside
     if not is_inside:
@@ -733,6 +743,9 @@ def cloud_executor(
         # ---
         fuse_pid,
         fuse_signal_number,
+        # ---
+        runner_dot_py_file_path,
+        json.loads(parameters_json_string) if parameters_json_string else {},
     )
 
     try:
