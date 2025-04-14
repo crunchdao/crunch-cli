@@ -5,9 +5,10 @@ import typing
 
 import click
 import pandas
+import psutil
 
-from . import (api, command, constants, container, custom, orthogonalization,
-               runner, tester, utils)
+from . import (__version__, api, command, constants, container, custom,
+               orthogonalization, runner, tester, utils)
 
 LoadedData = typing.Union[
     pandas.DataFrame,
@@ -36,6 +37,19 @@ class _Inline:
         from . import is_inside_runner
         if is_inside_runner:
             print(f"[warning] loading the inliner in the cloud runner is not supported, this will raise an error soon", file=sys.stderr)
+
+        print()
+
+        version = __version__.__version__
+        print(f"cli version: {version}")
+
+        available_ram = psutil.virtual_memory().total / (1024 ** 3)
+        print(f"available ram: {available_ram:.2f} gb")
+
+        cpu_count = psutil.cpu_count()
+        print(f"available cpu: {cpu_count} core")
+
+        print(f"----")
 
     @functools.cached_property
     def _competition(self):
