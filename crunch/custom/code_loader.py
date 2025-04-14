@@ -144,9 +144,14 @@ def _format_relative_module_path(
 
 def deduce(
     competition_name: str,
-    file_name: ModuleFileName
+    file_name: ModuleFileName,
+    github_repository: typing.Optional[str] = None,
+    github_branch: typing.Optional[str] = None,
+    directory_path: typing.Optional[str] = None,
 ):
-    directory_path = os.environ.get(constants.COMPETITIONS_DIRECTORY_PATH_ENV_VAR, None)
+    if not directory_path:
+        directory_path = os.environ.get(constants.COMPETITIONS_DIRECTORY_PATH_ENV_VAR, None)
+
     if directory_path:
         path = os.path.join(
             directory_path,
@@ -155,4 +160,4 @@ def deduce(
 
         return LocalCodeLoader(path)
 
-    return GithubCodeLoader(competition_name, file_name)
+    return GithubCodeLoader(competition_name, file_name, github_repository, github_branch)

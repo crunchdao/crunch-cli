@@ -7,6 +7,7 @@ from .code_loader import (
     GithubCodeLoader,
     LocalCodeLoader,
     deduce as deduce_code_loader,
+    ModuleFileName,
 )
 
 from .execute import (
