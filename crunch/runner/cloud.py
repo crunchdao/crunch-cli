@@ -319,6 +319,8 @@ class CloudRunner(Runner):
         )
 
     def start_unstructured(self):
+        self.create_trace_file()
+
         if self.runner_module is None:
             raise RuntimeError("no runner is available for this competition")
 
