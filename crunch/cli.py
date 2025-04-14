@@ -8,7 +8,7 @@ import typing
 import click
 
 from . import __version__, api, benchmark, command, constants, store, utils
-from .custom.cli import organize_test_group
+from .unstructured.cli import organize_test_group
 
 store.load_from_env()
 
