@@ -16,7 +16,7 @@ import pandas
 import requests
 
 from .. import api, checker, meta, orthogonalization, scoring, utils, custom
-from ..container import Columns, Features, GeneratorWrapper
+from ..container import Columns, Features, GeneratorWrapper, StreamMessage
 from ..orthogonalization import _runner as orthogonalization_runner
 from .custom import RunnerExecutorContext, UserModule
 from .shared import split_streams
@@ -412,7 +412,8 @@ class SandboxExecutor:
                         default_values, {
                             "stream": stream,
                         }
-                    )
+                    ),
+                    StreamMessage,
                 )
 
                 collected_values, collected_durations = wrapper.collect(len(stream_data))
