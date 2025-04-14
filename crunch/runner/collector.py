@@ -32,6 +32,14 @@ class PredictionCollector(abc.ABC):
         This is a terminal operation, do not call `append' again afterwards.
         """
 
+    @property
+    @abc.abstractmethod
+    def is_write_index(self) -> bool:
+        ...
+
+    def __del__(self):
+        self.discard()
+
 
 class MemoryPredictionCollector(PredictionCollector):
 
@@ -60,6 +68,10 @@ class MemoryPredictionCollector(PredictionCollector):
 
     def discard(self):
         self._clear()
+
+    @property
+    def is_write_index(self) -> bool:
+        return self.write_index
 
     def _clear(self):
         self.dataframes.clear()
@@ -95,6 +107,9 @@ class FilePredictionCollector(PredictionCollector):
     def persist(self, file_path: str):
         self._reset()
 
+        if self.writer is None:
+            raise RuntimeError("no data collected")
+
         shutil.move(self.temporary_file_path, file_path)
 
         self._close()
@@ -102,6 +117,10 @@ class FilePredictionCollector(PredictionCollector):
     def discard(self):
         self._reset()
         self._close()
+
+    @property
+    def is_write_index(self) -> bool:
+        return True
 
     def _reset(self):
         if self.writer is not None:

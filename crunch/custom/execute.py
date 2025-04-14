@@ -11,10 +11,11 @@ class ParticipantVisibleError(Exception):
 def call_function(
     function: typing.Callable,
     kwargs: dict,
-    print=print,
+    print: typing.Optional[typing.Callable[[typing.Any], None]] = None,
 ):
     try:
-        print(f"\n\ncalling {function}\n")
+        if print:
+            print(f"\n\ncalling {function}\n")
 
         return utils.smart_call(
             function,

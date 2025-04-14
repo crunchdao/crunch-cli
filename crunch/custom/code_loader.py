@@ -5,7 +5,9 @@ import typing
 
 import requests
 
-from .. import constants
+from .. import constants, store
+
+ModuleFileName = typing.Literal["leaderboard", "runner", "scoring", "submission"]
 
 
 class NoCodeFoundError(RuntimeError):
@@ -75,12 +77,15 @@ class GithubCodeLoader(CodeLoader):
     def __init__(
         self,
         competition_name: str,
-        file_name: typing.Literal["submission", "scoring", "leaderboard"],
-        repository=constants.COMPETITIONS_REPOSITORY,
-        branch=constants.COMPETITIONS_BRANCH,
+        file_name: ModuleFileName,
+        repository: str = None,
+        branch: str = None,
         user_agent="curl/7.88.1"
     ):
-        self._url = f"https://github.com/{repository}/raw/refs/heads/{branch}/competitions/{competition_name}/scoring/{file_name}.py"
+        repository = repository or store.competitions_repository
+        branch = branch or store.competitions_branch
+
+        self._url = f"https://github.com/{repository}/blob/{branch}/{_format_relative_module_path(competition_name, file_name)}?raw=true"
         self._user_agent = user_agent
 
     @property
@@ -110,16 +115,44 @@ class GithubCodeLoader(CodeLoader):
 class LocalCodeLoader(CodeLoader):
 
     def __init__(self, path: str):
-        self._path = path
+        self.path = path
 
     @property
     def location(self):
-        return self._path
+        return self.path
 
     @property
     def source(self):
         try:
-            with open(self._path, "r") as fd:
+            with open(self.path, "r") as fd:
                 return fd.read()
         except FileNotFoundError as error:
-            raise NoCodeFoundError(f"no code found at path: {self._path}") from error
+            raise NoCodeFoundError(f"no code found at path: {self.path}") from error
+
+
+def _format_relative_module_path(
+    competition_name: str,
+    file_name: ModuleFileName
+):
+    return os.path.join(
+        "competitions",
+        competition_name,
+        "scoring",
+        f"{file_name}.py"
+    ).replace("\\", "/")
+
+
+def deduce(
+    competition_name: str,
+    file_name: ModuleFileName
+):
+    directory_path = os.environ.get(constants.COMPETITIONS_DIRECTORY_PATH_ENV_VAR, None)
+    if directory_path:
+        path = os.path.join(
+            directory_path,
+            _format_relative_module_path(competition_name, file_name)
+        )
+
+        return LocalCodeLoader(path)
+
+    return GithubCodeLoader(competition_name, file_name)

@@ -6,9 +6,10 @@ import typing
 import click
 import pandas
 
-from .. import (api, checker, command, constants, container, ensure, meta,
-                monkey_patches, tester, utils)
-from .collector import FilePredictionCollector, MemoryPredictionCollector
+from .. import (api, checker, command, constants, container, custom, ensure,
+                meta, monkey_patches, tester, utils)
+from .collector import FilePredictionCollector, MemoryPredictionCollector, PredictionCollector
+from .custom import RunnerContext, RunnerExecutorContext, UserModule
 from .runner import Runner
 from .shared import split_streams
 
@@ -17,7 +18,8 @@ class LocalRunner(Runner):
 
     def __init__(
         self,
-        module: typing.Any,
+        user_module: typing.Any,
+        runner_module: custom.RunnerModule,
         model_directory_path: str,
         force_first_train: bool,
         train_frequency: int,
@@ -42,7 +44,8 @@ class LocalRunner(Runner):
             determinism_check_enabled
         )
 
-        self.module = module
+        self.user_module = user_module
+        self.runner_module = runner_module
         self.model_directory_path = model_directory_path
         self.force_first_train = force_first_train
         self.train_frequency = train_frequency
@@ -89,8 +92,8 @@ class LocalRunner(Runner):
         self.log("internet access isn't restricted, no check will be done", important=True)
         self.log("")
 
-        self.train_function = ensure.is_function(self.module, "train", logger=self.logger)
-        self.infer_function = ensure.is_function(self.module, "infer", logger=self.logger)
+        self.train_function = ensure.is_function(self.user_module, "train", logger=self.logger)
+        self.infer_function = ensure.is_function(self.user_module, "infer", logger=self.logger)
 
         try:
             (
@@ -419,6 +422,21 @@ class LocalRunner(Runner):
 
         return prediction
 
+    def start_unstructured(self):
+        if self.runner_module is None:
+            self.log("no runner is available for this competition", error=True)
+            raise click.Abort()
+
+        context = LocalRunnerContext(self)
+
+        prediction = self.runner_module.run(
+            context,
+            self.data_directory_path,
+            self.model_directory_path,
+        )
+
+        return prediction
+
     def finalize(self):
         prediction_path = os.path.join(
             constants.DOT_DATA_DIRECTORY,
@@ -426,7 +444,13 @@ class LocalRunner(Runner):
         )
 
         self.log('save prediction - path=%s' % prediction_path, important=True)
-        self.prediction_collector.persist(prediction_path)
+        if self.prediction is not None:
+            self.prediction.to_parquet(
+                prediction_path,
+                index=self.prediction_collector.is_write_index
+            )
+        else:
+            self.prediction_collector.persist(prediction_path)
 
         if self.checks and not self.competition_format.unstructured:
             prediction = utils.read(prediction_path)
@@ -477,3 +501,77 @@ class LocalRunner(Runner):
         moon: int
     ):
         return dataframe[dataframe.index == moon].reset_index()
+
+
+class LocalRunnerContext(RunnerContext):
+
+    def __init__(self, runner: LocalRunner):
+        self.runner = runner
+
+    @property
+    def is_local(self):
+        return True
+
+    def log(
+        self,
+        message: str,
+        important=False,
+        error=False
+    ):
+        self.runner.log(message, important=important, error=error)
+
+    def execute(
+        self,
+        command,
+        parameters=None,
+        return_prediction=False
+    ):
+        user_module = LocalUserModule(self.runner)
+        executor_context = LocalRunnerExecutorContext(self.runner)
+
+        handlers = self.runner.runner_module.execute(
+            executor_context,
+            user_module,
+            self.runner.data_directory_path,
+            self.runner.model_directory_path,
+        )
+
+        handler = handlers.get(command)
+        if handler is None:
+            self.log(f"command not found: {command}", error=True)
+            return None
+
+        result = utils.smart_call(
+            handler,
+            parameters or {}
+        )
+
+        if isinstance(return_prediction, PredictionCollector):
+            ensure.is_dataframe(result, "result", logger=self.runner.logger)
+            return_prediction.append(result)
+        elif return_prediction == True:
+            ensure.is_dataframe(result, "result", logger=self.runner.logger)
+            return result
+
+
+class LocalRunnerExecutorContext(RunnerExecutorContext):
+
+    def __init__(self, runner: LocalRunner):
+        self.runner = runner
+
+    @property
+    def is_local(self):
+        return True
+
+    def trip_data_fuse(self):
+        pass  # no fuse locally
+
+
+class LocalUserModule(UserModule):
+
+    def __init__(self, runner: LocalRunner):
+        self.runner = runner
+
+    @property
+    def module(self):
+        return self.runner.user_module

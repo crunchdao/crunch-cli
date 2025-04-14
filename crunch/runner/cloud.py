@@ -11,8 +11,9 @@ import urllib.parse
 import pandas
 import requests
 
-from .. import api, downloader, store, utils
-from .collector import MemoryPredictionCollector
+from .. import api, custom, downloader, store, utils
+from .collector import MemoryPredictionCollector, PredictionCollector
+from .custom import RunnerContext
 from .runner import Runner
 
 PACKAGES_WITH_PRIORITY = [
@@ -60,6 +61,7 @@ class CloudRunner(Runner):
         run: api.RunnerRun,
         # ---
         context_directory: str,
+        scoring_directory: str,
         state_file: str,
         venv_directory: str,
         data_directory: str,
@@ -84,10 +86,13 @@ class CloudRunner(Runner):
         super().__init__(
             MemoryPredictionCollector(
                 # TODO Very ugly... A plugin-like runner for unstructured competition is needed.
-                write_index=competition.name in [
-                    "broad-2",
-                    "broad-3",
-                ]
+                write_index=(
+                    competition.name in [
+                        "broad-2",
+                        "broad-3",
+                    ]
+                    or competition.format == api.CompetitionFormat.UNSTRUCTURED
+                )
             ),
             competition.format,
             determinism_check_enabled
@@ -97,11 +102,13 @@ class CloudRunner(Runner):
         self.run = run
 
         self.context_directory = context_directory
+        self.scoring_directory = scoring_directory
         self.state_file = state_file
         self.venv_directory = venv_directory
         self.data_directory = data_directory
         self.code_directory = code_directory
         self.main_file = main_file
+        self.runner_dot_py_file_path = None
 
         self.requirements_txt_path = requirements_txt_path
         self.model_directory_path = model_directory_path
@@ -127,6 +134,31 @@ class CloudRunner(Runner):
         self.report_current("ending")
 
     def initialize(self):
+        if self.competition_format == api.CompetitionFormat.UNSTRUCTURED and self.log("downloading runner..."):
+            self.report_current("download runner")
+
+            loader = custom.deduce_code_loader(
+                self.competition.name,
+                "runner",
+            )
+
+            if isinstance(loader, custom.GithubCodeLoader):
+                source = loader.source
+
+                self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
+                with open(self.runner_dot_py_file_path, "w") as fd:
+                    fd.write(source)
+
+                self.bash2(["chmod", "a+r", self.runner_dot_py_file_path])
+
+                loader = custom.LocalCodeLoader(self.runner_dot_py_file_path)
+            elif isinstance(loader, custom.LocalCodeLoader):
+                self.runner_dot_py_file_path = loader.path
+
+            self.runner_module = custom.RunnerModule.load(loader)
+            if self.runner_module is None:
+                raise RuntimeError("no runner is available for this competition")
+
         if self.log("downloading code..."):
             self.report_current("download code")
 
@@ -286,12 +318,29 @@ class CloudRunner(Runner):
             target_column_names.name
         )
 
+    def start_unstructured(self):
+        if self.runner_module is None:
+            raise RuntimeError("no runner is available for this competition")
+
+        context = CloudRunnerContext(self)
+
+        return self.runner_module.run(
+            context,
+            self.data_directory,
+            self.model_directory_path,
+        )
+
     def finalize(self):
         self.report_current("upload result")
         self.log("uploading result...")
 
-        prediction_file_name = os.path.basename(self.prediction_path)
-        self.prediction_collector.persist(self.prediction_path)
+        if self.prediction is not None:
+            self.prediction.to_parquet(
+                self.prediction_path,
+                index=self.prediction_collector.is_write_index
+            )
+        else:
+            self.prediction_collector.persist(self.prediction_path)
 
         fds = []
         try:
@@ -313,6 +362,7 @@ class CloudRunner(Runner):
                 post_model_files_modification[file_name] = stat.st_mtime_ns
                 model_files_size += file_size
 
+            prediction_file_name = os.path.basename(self.prediction_path)
             files = [
                 ("predictionFile", (prediction_file_name, prediction_fd))
             ]
@@ -469,18 +519,18 @@ class CloudRunner(Runner):
     @typing.overload
     def sandbox(
         self,
-        train: bool,
-        loop_key: typing.Union[int, str],
         return_result: typing.Literal[True] = True,
+        *args,
+        **kwargs,
     ) -> pandas.DataFrame:
         ...
 
     @typing.overload
     def sandbox(
         self,
-        train: bool,
-        loop_key: typing.Union[int, str],
         return_result: typing.Literal[False],
+        *args,
+        **kwargs,
     ) -> None:
         ...
 
@@ -489,6 +539,7 @@ class CloudRunner(Runner):
         train: bool,
         loop_key: typing.Union[int, str],
         return_result=True,
+        parameters: dict = None,
     ):
         is_regular = not self.competition_format.unstructured
 
@@ -560,6 +611,9 @@ class CloudRunner(Runner):
                 # ---
                 "fuse-pid": os.getpid(),
                 "fuse-signal-number": FUSE_SIGNAL.value,
+                # ---
+                "runner-py-file": self.runner_dot_py_file_path,
+                "parameters": json.dumps(parameters) if parameters is not None else None,
             }
 
             # TODO move to a dedicated function
@@ -748,3 +802,39 @@ class CloudRunner(Runner):
                 file_name = os.path.join(relative, filename)
 
                 yield file_path, file_name
+
+
+class CloudRunnerContext(RunnerContext):
+
+    def __init__(self, runner: CloudRunner):
+        self.runner = runner
+
+    @property
+    def is_local(self):
+        return False
+
+    def log(
+        self,
+        message: str,
+        important=False,
+        error=False
+    ):
+        self.runner.log(message, important=important, error=error)
+
+    def execute(
+        self,
+        command,
+        parameters=None,
+        return_prediction=False
+    ):
+        result = self.runner.sandbox(
+            self.runner.force_first_train,
+            command,
+            return_result=return_prediction != False,
+            parameters=parameters or {},
+        )
+
+        if isinstance(return_prediction, PredictionCollector):
+            return_prediction.append(result)
+        elif return_prediction == True:
+            return result

@@ -1,5 +1,6 @@
 import datetime
 import enum
+import functools
 import gc
 import importlib
 import importlib.util
@@ -14,9 +15,10 @@ import typing
 import pandas
 import requests
 
-from .. import api, checker, meta, orthogonalization, scoring, utils
+from .. import api, checker, meta, orthogonalization, scoring, utils, custom
 from ..container import Columns, Features, GeneratorWrapper
 from ..orthogonalization import _runner as orthogonalization_runner
+from .custom import RunnerExecutorContext, UserModule
 from .shared import split_streams
 
 
@@ -126,6 +128,9 @@ class SandboxExecutor:
         # ---
         fuse_pid: int,
         fuse_signal_number: int,
+        # ---
+        runner_dot_py_file_path: str,
+        parameters: dict,
     ):
         self.competition_name = competition_name
         self.competition_format = competition_format
@@ -156,6 +161,9 @@ class SandboxExecutor:
 
         self.fuse_pid = fuse_pid
         self.fuse_signal_number = fuse_signal_number
+
+        self.runner_dot_py_file_path = runner_dot_py_file_path
+        self.parameters = parameters
 
     def load_data(self, trained: Reference):
         if self.competition_format.unstructured:
@@ -225,48 +233,43 @@ class SandboxExecutor:
         self._signal_permission_fuse()
 
         try:
-            spec = importlib.util.spec_from_file_location(
-                "user_code",
-                os.path.join(self.code_directory, self.main_file)
-            )
-
-            module = importlib.util.module_from_spec(spec)
-
-            sys.path.insert(0, self.code_directory)
-            spec.loader.exec_module(module)
-
-            print("[debug] user code loaded")
-
-            train_function = ensure_function(module, "train")
-            infer_function = ensure_function(module, "infer")
-
-            if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.DAG]:
-                prediction = self.process_linear(
-                    train_function,
-                    infer_function,
-                    x_train,
-                    y_train,
-                    x_test,
-                    trained,
-                )
-
-            elif self.competition_format == api.CompetitionFormat.STREAM:
-                prediction = self.process_async(
-                    train_function,
-                    infer_function,
-                    x_train,
-                    y_train,
-                    x_test,
-                )
-
-            elif self.competition_format.unstructured:
-                prediction = self.process_unstructured(
-                    train_function,
-                    infer_function,
-                )
-
+            if self.competition_format == api.CompetitionFormat.UNSTRUCTURED:
+                prediction = self.process_unstructured()
             else:
-                raise ValueError(f"unsupported competition format: {self.competition_format}")
+                module = self.load_module()
+
+                print("[debug] user code loaded")
+
+                train_function = ensure_function(module, "train")
+                infer_function = ensure_function(module, "infer")
+
+                if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.DAG]:
+                    prediction = self.process_linear(
+                        train_function,
+                        infer_function,
+                        x_train,
+                        y_train,
+                        x_test,
+                        trained,
+                    )
+
+                elif self.competition_format == api.CompetitionFormat.STREAM:
+                    prediction = self.process_async(
+                        train_function,
+                        infer_function,
+                        x_train,
+                        y_train,
+                        x_test,
+                    )
+
+                elif self.competition_format == api.CompetitionFormat.SPATIAL:
+                    prediction = self.process_spatial(
+                        train_function,
+                        infer_function,
+                    )
+
+                else:
+                    raise ValueError(f"unsupported competition format: {self.competition_format}")
         except BaseException:
             self.write_trace(sys.exc_info())
             raise
@@ -280,6 +283,19 @@ class SandboxExecutor:
                 self.prediction_path,
                 index=self.write_index
             )
+
+    def load_module(self):
+        spec = importlib.util.spec_from_file_location(
+            "user_code",
+            os.path.join(self.code_directory, self.main_file)
+        )
+
+        module = importlib.util.module_from_spec(spec)
+        sys.path.insert(0, self.code_directory)
+
+        spec.loader.exec_module(module)
+
+        return module
 
     def process_linear(
         self,
@@ -417,7 +433,7 @@ class SandboxExecutor:
                 }
             })
 
-    def process_unstructured(
+    def process_spatial(
         self,
         train_function: callable,
         infer_function: callable,
@@ -458,6 +474,33 @@ class SandboxExecutor:
 
             ensure_dataframe(prediction, "prediction")
             return prediction
+
+    def process_unstructured(self):
+        loader = custom.LocalCodeLoader(self.runner_dot_py_file_path)
+        runner_module = custom.RunnerModule.load(loader)
+        assert runner_module is not None
+
+        user_module = CloudExecutorUserModule(self)
+        executor_context = CloudExecutorRunnerExecutorContext(self)
+
+        handlers = runner_module.execute(
+            executor_context,
+            user_module,
+            self.data_directory_path,
+            self.model_directory_path,
+        )
+
+        command = self.loop_key  # TODO Don't repurpose loop-key and use a dedicated property
+
+        handler = handlers.get(command)
+        if handler is None:
+            self.log(f"command not found: {command}", error=True)
+            return None
+
+        return utils.smart_call(
+            handler,
+            self.parameters,
+        )
 
     def filter_train(self, dataframe: pandas.DataFrame, named_file: NamedFile):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
@@ -652,3 +695,26 @@ class SandboxExecutor:
                 traceback.print_exception(*exc_info, file=fd)
         except BaseException as ignored:
             print(f"ignored exception when reporting trace: {type(ignored)}({ignored})", file=sys.stderr)
+
+
+class CloudExecutorRunnerExecutorContext(RunnerExecutorContext):
+
+    def __init__(self, executor: SandboxExecutor):
+        self.executor = executor
+
+    @property
+    def is_local(self):
+        return False
+
+    def trip_data_fuse(self):
+        self.executor._signal_permission_fuse()
+
+
+class CloudExecutorUserModule(UserModule):
+
+    def __init__(self, executor: SandboxExecutor):
+        self.executor = executor
+
+    @functools.cached_property
+    def module(self):
+        return self.executor.load_module()

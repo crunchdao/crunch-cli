@@ -19,6 +19,7 @@ class Runner(abc.ABC):
         determinism_check_enabled=False,
     ):
         self.prediction_collector = prediction_collector
+        self.prediction: pandas.DataFrame = None  # TODO remove this, use the collector directly
         self.competition_format = competition_format
 
         self.determinism_check_enabled = determinism_check_enabled
@@ -36,22 +37,32 @@ class Runner(abc.ABC):
         try:
             if self.competition_format == api.CompetitionFormat.TIMESERIES:
                 self.log("starting timeseries loop...")
-                self.start_timeseries()
+                result = self.start_timeseries()
 
             elif self.competition_format == api.CompetitionFormat.DAG:
                 self.log("starting dag process...")
-                self.start_dag()
+                result = self.start_dag()
 
             elif self.competition_format == api.CompetitionFormat.STREAM:
                 self.log("starting stream loop...")
-                self.start_stream()
+                result = self.start_stream()
 
             elif self.competition_format == api.CompetitionFormat.SPATIAL:
                 self.log("starting spatial loop...")
-                self.start_spatial()
+                result = self.start_spatial()
+
+            elif self.competition_format == api.CompetitionFormat.UNSTRUCTURED:
+                self.log("starting unstructured loop...")
+                result = self.start_unstructured()
 
             else:
                 raise ValueError(f"unsupported: {self.competition_format}")
+
+            if isinstance(result, pandas.DataFrame):
+                self.prediction = result
+            elif isinstance(result, PredictionCollector):
+                self.prediction_collector.discard()  # TODO use a factory to avoid useless instanciation
+                self.prediction_collector = result
         except:
             self.prediction_collector.discard()
             raise
@@ -179,6 +190,10 @@ class Runner(abc.ABC):
         self,
         target_column_names: api.TargetColumnNames
     ) -> pandas.DataFrame:
+        ...
+
+    @abc.abstractmethod
+    def start_unstructured(self):
         ...
 
     def setup(self):
