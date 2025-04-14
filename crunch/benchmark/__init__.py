@@ -1,1 +1,0 @@
-from .orthogonalization import benchmark as orthogonalization

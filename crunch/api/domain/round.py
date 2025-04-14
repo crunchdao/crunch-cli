@@ -41,28 +41,6 @@ class Round(Model):
             client=self._client
         )
 
-    def orthogonalize(
-        self,
-        dataframe: "pandas.DataFrame",
-        timeout=60
-    ):
-        from .score import Score
-
-        with tempfile.NamedTemporaryFile(suffix=".parquet") as tmp:
-            dataframe.to_parquet(tmp, index=False)
-            tmp.seek(0)
-
-            result = self._client.api.orthogonalize(
-                self.competition.resource_identifier,
-                self.resource_identifier,
-                [
-                    ("predictionFile", ('prediction.parquet', tmp, "application/x-tar"))
-                ],
-                timeout=timeout
-            )
-
-        return Score.from_dict_array(result, None)
-
 
 class RoundCollection(Collection):
 
@@ -142,23 +120,6 @@ class RoundEndpointMixin:
         return self._result(
             self.get(
                 f"/v1/competitions/{competition_identifier}/rounds/{round_identifier}"
-            ),
-            json=True
-        )
-
-    def orthogonalize(
-        self,
-        competition_identifier,
-        round_identifier,
-        files,
-        timeout=60
-    ):
-        return self._result(
-            self.post(
-                f"/v1/competitions/{competition_identifier}/rounds/{round_identifier}/orthogonalize",
-                data={},  # push token will be added
-                files=tuple(files),
-                timeout=timeout
             ),
             json=True
         )

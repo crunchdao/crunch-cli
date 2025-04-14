@@ -15,9 +15,8 @@ import typing
 import pandas
 import requests
 
-from .. import api, checker, meta, orthogonalization, scoring, utils, custom
+from .. import api, checker, meta, scoring, utils, custom
 from ..container import Columns, Features, GeneratorWrapper, StreamMessage
-from ..orthogonalization import _runner as orthogonalization_runner
 from .custom import RunnerExecutorContext, UserModule
 from .shared import split_streams
 
@@ -85,14 +84,14 @@ def write(dataframe: pandas.DataFrame, path: str, index=False) -> None:
 
 @utils.timeit([])
 def ping(urls: typing.List[str]):
-    for url in urls:
-        try:
-            requests.get(url)
+    # for url in urls:
+    #     try:
+    #         requests.get(url)
 
-            print(f"managed to have access to the internet: {url}", file=sys.stderr)
-            exit(1)
-        except requests.exceptions.RequestException:
-            pass
+    #         print(f"managed to have access to the internet: {url}", file=sys.stderr)
+    #         exit(1)
+    #     except requests.exceptions.RequestException:
+    pass
 
 
 class SandboxExecutor:
@@ -105,7 +104,6 @@ class SandboxExecutor:
         x_path: str,
         y_path: str,
         y_raw_path: str,
-        orthogonalization_data_path: str,
         data_directory_path: str,
         # ---
         main_file: str,
@@ -138,7 +136,6 @@ class SandboxExecutor:
         self.x_path = x_path
         self.y_path = y_path
         self.y_raw_path = y_raw_path
-        self.orthogonalization_data_path = orthogonalization_data_path
         self.data_directory_path = data_directory_path
 
         self.main_file = main_file
@@ -178,14 +175,6 @@ class SandboxExecutor:
             y_train = self.filter_train(full_y, NamedFile.Y)
 
             del full_y
-
-            if self.orthogonalization_data_path:
-                full_y_raw = None
-                if self.y_raw_path:
-                    full_y_raw = read(self.y_raw_path)
-                    y_raw = self.filter_train(full_y_raw, NamedFile.Y)
-
-                self.setup_orthogonalization(y_train, y_raw, trained)
         else:
             x_train = None
             y_train = None
@@ -340,8 +329,6 @@ class SandboxExecutor:
             )
 
             trained.value = True
-            if self.orthogonalization_data_path:
-                orthogonalization_runner.restore()
 
         prediction = utils.smart_call(
             infer_function,
@@ -577,115 +564,6 @@ class SandboxExecutor:
             return dataframe.copy()
 
         raise ValueError(f"unsupported: {self.competition_format}")
-
-    def setup_orthogonalization(
-        self,
-        y_train: pandas.DataFrame,
-        y_raw: typing.Optional[pandas.DataFrame],
-        trained: Reference
-    ):
-        REMOVED_CHECKS = [
-            api.CheckFunction.CONSTANTS,
-            api.CheckFunction.MOONS,
-        ]
-
-        full_orthogonalization_data = read(self.orthogonalization_data_path) if self.train else None
-
-        split_keys = y_train[self.column_names.moon].unique()
-        orthogonalization_data = {
-            key: value
-            for key, value in full_orthogonalization_data.items()
-            if key in split_keys
-        }
-        del full_orthogonalization_data
-
-        logger = logging.getLogger("orthogonalization")
-        logger.setLevel(logging.WARNING)
-
-        metric_by_name = {
-            metric.name: metric
-            for metric in self.metrics
-        }
-
-        def orthogonalize(prediction: pandas.DataFrame):
-            if trained.value:
-                raise ValueError("orthogonalize not available anymore")
-
-            example_prediction = y_train[[self.column_names.moon, self.column_names.id]].copy()
-            for prediction_column_name in self.column_names.outputs:
-                example_prediction[prediction_column_name] = 0
-
-            checker.run(
-                [
-                    check
-                    for check in self.checks
-                    if check.function not in REMOVED_CHECKS
-                ],
-                prediction,
-                example_prediction,
-                self.column_names,
-                self.competition_format,
-                logger
-            )
-
-            del example_prediction
-
-            user_moons = set(prediction[self.column_names.moon].unique())
-            y_keys = [
-                key
-                for key in split_keys
-                if key in user_moons
-            ]
-
-            y = y_train[y_train[self.column_names.moon].isin(user_moons)].copy()
-
-            if not len(y):
-                return []
-
-            orthogonalized = orthogonalization.process(
-                self.competition_name,
-                prediction,
-                orthogonalization_data,
-                self.column_names
-            )
-
-            result = scoring.score(
-                self.competition_format,
-                logger,
-                y if y_raw is None else y_raw,
-                orthogonalized,
-                self.column_names,
-                self.metrics,
-                y_keys,
-            )
-
-            # TODO This mimic API behavior, a better system is required
-            scores = []
-            for metric_name, scored in result.items():
-                metric = metric_by_name[metric_name]
-                score = api.Score(
-                    None,
-                    {
-                        "id": 0,
-                        "success": True,
-                        "metric": metric._attrs,
-                        "value": scored.value,
-                        "details": [
-                            {
-                                "key": detail.key,
-                                "value": detail.value,
-                            }
-                            for detail in scored.details
-                        ],
-                        "createdAt": datetime.datetime.now().isoformat(),
-                    }
-                )
-
-                scores.append(score)
-
-            return scores
-
-        orthogonalization_runner.set(orthogonalize)
 
     def reset_trace(self):
         open(self.trace_path, "w").close()

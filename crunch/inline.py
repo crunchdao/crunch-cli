@@ -7,8 +7,8 @@ import click
 import pandas
 import psutil
 
-from . import (__version__, api, command, constants, container, custom,
-               orthogonalization, runner, tester, utils)
+from . import (__version__, api, command, constants, container, custom, runner,
+               tester, utils)
 
 LoadedData = typing.Union[
     pandas.DataFrame,
@@ -199,20 +199,6 @@ class _Inline:
                 raise abort
 
         return None
-
-    def alpha_score(
-        self,
-        prediction: pandas.DataFrame,
-        as_dataframe=True,
-        max_retry=orthogonalization.DEFAULT_MAX_RETRY,
-        timeout=orthogonalization.DEFAULT_TIMEOUT,
-    ):
-        return orthogonalization.run(
-            prediction,
-            as_dataframe,
-            max_retry,
-            timeout,
-        )
 
     @property
     def is_inside_runner(self):
