@@ -417,28 +417,6 @@ def update_token(
         utils.exit_via(error)
 
 
-@cli.group(name="benchmark")
-def benchmark_group():
-    pass
-
-
-@benchmark_group.command(help="Benchmark the orthogonalization feature.")
-@click.argument("prediction-path", type=click.Path(exists=True, dir_okay=False), required=True)
-def orthogonalization(
-    prediction_path: str,
-):
-    utils.change_root()
-
-    try:
-        prediction = utils.read(prediction_path)
-
-        benchmark.orthogonalization(
-            prediction=prediction
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
-
-
 @cli.group(name="runner")
 def runner_group():
     pass
@@ -606,7 +584,6 @@ def cloud(
 @click.option("--x", "x_path", default=None)
 @click.option("--y", "y_path", default=None)
 @click.option("--y-raw", "y_raw_path", default=None)
-@click.option("--orthogonalization-data", "orthogonalization_data_path", default=None)
 @click.option("--data-directory", "data_directory_path", default=None)
 # ---
 @click.option("--main-file", required=True)
@@ -645,7 +622,6 @@ def cloud_executor(
     x_path: str,
     y_path: str,
     y_raw_path: str,
-    orthogonalization_data_path: str,
     data_directory_path: str,
     # ---
     main_file: str,
@@ -701,7 +677,6 @@ def cloud_executor(
         x_path,
         y_path,
         y_raw_path,
-        orthogonalization_data_path,
         data_directory_path,
         # ---
         main_file,

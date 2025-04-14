@@ -504,19 +504,20 @@ class CloudRunner(Runner):
         self,
         arguments: list
     ):
-        self.bash(
-            "pip",
-            [
-                "pip3", "install",
-                "--root-user-action", "ignore",
-                "--disable-pip-version-check",
-                "--no-input",
-                "--no-color",
-                "--progress-bar", "off",
-                *arguments
-            ],
-            self.venv_env
-        )
+        pass
+        # self.bash(
+        #     "pip",
+        #     [
+        #         "pip3", "install",
+        #         "--root-user-action", "ignore",
+        #         "--disable-pip-version-check",
+        #         "--no-input",
+        #         "--no-color",
+        #         "--progress-bar", "off",
+        #         *arguments
+        #     ],
+        #     self.venv_env
+        # )
 
     @typing.overload
     def sandbox(
@@ -556,7 +557,6 @@ class CloudRunner(Runner):
                     "x": self.x_path,
                     "y": self.y_path if train else None,
                     "y-raw": self.y_raw_path,
-                    "orthogonalization-data": self.orthogonalization_data_path,
                 }
 
                 self._install_permission_fuse(path_options.values())
@@ -648,7 +648,7 @@ class CloudRunner(Runner):
                     "sandbox",
                     "--verbose",
                     "--chown-directory", self.model_directory_path,
-                    self.sandbox_restriction_flag,
+                    # self.sandbox_restriction_flag,
                     "--",
                     "prefix", "user-code",
                     "--",
@@ -734,7 +734,6 @@ class CloudRunner(Runner):
         self.x_path = file_paths.get(api.KnownData.X)
         self.y_path = file_paths.get(api.KnownData.Y)
         self.y_raw_path = file_paths.get(api.KnownData.Y_RAW)
-        self.orthogonalization_data_path = file_paths.get(api.KnownData.ORTHOGONALIZATION_DATA)
 
     def download(
         self,
