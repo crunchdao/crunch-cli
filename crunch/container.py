@@ -135,8 +135,11 @@ class GeneratorWrapper:
     def __init__(
         self,
         iterator: typing.Iterator,
-        consumer_factory: typing.Callable[[typing.Iterator], typing.Generator]
+        consumer_factory: typing.Callable[[typing.Iterator], typing.Generator],
+        element_wrapper_factory: typing.Optional[typing.Callable[[typing.Any], typing.Any]] = None,
     ):
+        self.element_wrapper_factory = element_wrapper_factory or (lambda x: x)
+
         self.ready = None
         self.consumed = True
 
@@ -151,7 +154,7 @@ class GeneratorWrapper:
                 self.ready = False
                 self.consumed = False
 
-                yield StreamMessage(value)
+                yield self.element_wrapper_factory(value)
 
         stream = inner()
         consumer = consumer_factory(stream)
@@ -230,9 +233,9 @@ class CallableIterable(typing.Iterable):
         mapper: typing.Optional[typing.Callable[[float], typing.Any]] = None
     ):
         if mapper:
-            getter = lambda: iter(map(mapper, dataframe[column_name].copy()))
+            def getter(): return iter(map(mapper, dataframe[column_name].copy()))
         else:
-            getter = lambda: iter(dataframe[column_name].copy())
+            def getter(): return iter(dataframe[column_name].copy())
 
         return CallableIterable(
             getter,
