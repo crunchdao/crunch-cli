@@ -11,10 +11,10 @@ import urllib.parse
 import pandas
 import requests
 
-from .. import api, unstructured, downloader, store, utils
+from .. import api, downloader, store, unstructured, utils
 from .collector import MemoryPredictionCollector, PredictionCollector
-from .unstructured import RunnerContext
 from .runner import Runner
+from .unstructured import RunnerContext
 
 PACKAGES_WITH_PRIORITY = [
     "torch"
@@ -504,20 +504,19 @@ class CloudRunner(Runner):
         self,
         arguments: list
     ):
-        pass
-        # self.bash(
-        #     "pip",
-        #     [
-        #         "pip3", "install",
-        #         "--root-user-action", "ignore",
-        #         "--disable-pip-version-check",
-        #         "--no-input",
-        #         "--no-color",
-        #         "--progress-bar", "off",
-        #         *arguments
-        #     ],
-        #     self.venv_env
-        # )
+        self.bash(
+            "pip",
+            [
+                "pip3", "install",
+                "--root-user-action", "ignore",
+                "--disable-pip-version-check",
+                "--no-input",
+                "--no-color",
+                "--progress-bar", "off",
+                *arguments
+            ],
+            self.venv_env
+        )
 
     @typing.overload
     def sandbox(
@@ -648,7 +647,7 @@ class CloudRunner(Runner):
                     "sandbox",
                     "--verbose",
                     "--chown-directory", self.model_directory_path,
-                    # self.sandbox_restriction_flag,
+                    self.sandbox_restriction_flag,
                     "--",
                     "prefix", "user-code",
                     "--",
