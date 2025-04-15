@@ -1,7 +1,7 @@
 import logging
 import typing
 
-from . import api
+from . import api, unstructured
 
 _logged_installed = False
 
@@ -27,7 +27,8 @@ def install_logger():
 
 
 def run(
-    module: typing.Any,
+    user_module: typing.Any,
+    runner_module: unstructured.RunnerModule,
     model_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
@@ -50,7 +51,8 @@ def run(
 
     from .runner.local import LocalRunner
     runner = LocalRunner(
-        module,
+        user_module,
+        runner_module,
         model_directory_path,
         force_first_train,
         train_frequency,

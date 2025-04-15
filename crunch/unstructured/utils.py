@@ -23,11 +23,14 @@ def truncate(
 
 
 def delta_message(
-    expected: set,
-    predicted: set,
+    expected: typing.Iterable[typing.Any],
+    predicted: typing.Iterable[typing.Any],
 ):
-    missing = set(expected) - set(predicted)
-    extras = set(predicted) - set(expected)
+    expected = set(expected)
+    predicted = set(predicted)
+
+    missing = expected - predicted
+    extras = predicted - expected
 
     message = ""
     if len(missing):

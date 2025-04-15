@@ -1,10 +1,9 @@
-import datetime
 import enum
+import functools
 import gc
 import importlib
 import importlib.util
 import json
-import logging
 import os
 import sys
 import time
@@ -14,10 +13,10 @@ import typing
 import pandas
 import requests
 
-from .. import api, checker, meta, orthogonalization, scoring, utils
-from ..container import Columns, Features, GeneratorWrapper
-from ..orthogonalization import _runner as orthogonalization_runner
+from .. import api, meta, unstructured, utils
+from ..container import Columns, Features, GeneratorWrapper, StreamMessage
 from .shared import split_streams
+from .unstructured import RunnerExecutorContext, UserModule
 
 
 class Reference:
@@ -92,7 +91,6 @@ def ping(urls: typing.List[str]):
         except requests.exceptions.RequestException:
             pass
 
-
 class SandboxExecutor:
 
     def __init__(
@@ -103,7 +101,6 @@ class SandboxExecutor:
         x_path: str,
         y_path: str,
         y_raw_path: str,
-        orthogonalization_data_path: str,
         data_directory_path: str,
         # ---
         main_file: str,
@@ -126,6 +123,9 @@ class SandboxExecutor:
         # ---
         fuse_pid: int,
         fuse_signal_number: int,
+        # ---
+        runner_dot_py_file_path: str,
+        parameters: dict,
     ):
         self.competition_name = competition_name
         self.competition_format = competition_format
@@ -133,7 +133,6 @@ class SandboxExecutor:
         self.x_path = x_path
         self.y_path = y_path
         self.y_raw_path = y_raw_path
-        self.orthogonalization_data_path = orthogonalization_data_path
         self.data_directory_path = data_directory_path
 
         self.main_file = main_file
@@ -157,6 +156,9 @@ class SandboxExecutor:
         self.fuse_pid = fuse_pid
         self.fuse_signal_number = fuse_signal_number
 
+        self.runner_dot_py_file_path = runner_dot_py_file_path
+        self.parameters = parameters
+
     def load_data(self, trained: Reference):
         if self.competition_format.unstructured:
             return None, None, None
@@ -170,14 +172,6 @@ class SandboxExecutor:
             y_train = self.filter_train(full_y, NamedFile.Y)
 
             del full_y
-
-            if self.orthogonalization_data_path:
-                full_y_raw = None
-                if self.y_raw_path:
-                    full_y_raw = read(self.y_raw_path)
-                    y_raw = self.filter_train(full_y_raw, NamedFile.Y)
-
-                self.setup_orthogonalization(y_train, y_raw, trained)
         else:
             x_train = None
             y_train = None
@@ -225,48 +219,43 @@ class SandboxExecutor:
         self._signal_permission_fuse()
 
         try:
-            spec = importlib.util.spec_from_file_location(
-                "user_code",
-                os.path.join(self.code_directory, self.main_file)
-            )
-
-            module = importlib.util.module_from_spec(spec)
-
-            sys.path.insert(0, self.code_directory)
-            spec.loader.exec_module(module)
-
-            print("[debug] user code loaded")
-
-            train_function = ensure_function(module, "train")
-            infer_function = ensure_function(module, "infer")
-
-            if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.DAG]:
-                prediction = self.process_linear(
-                    train_function,
-                    infer_function,
-                    x_train,
-                    y_train,
-                    x_test,
-                    trained,
-                )
-
-            elif self.competition_format == api.CompetitionFormat.STREAM:
-                prediction = self.process_async(
-                    train_function,
-                    infer_function,
-                    x_train,
-                    y_train,
-                    x_test,
-                )
-
-            elif self.competition_format.unstructured:
-                prediction = self.process_unstructured(
-                    train_function,
-                    infer_function,
-                )
-
+            if self.competition_format == api.CompetitionFormat.UNSTRUCTURED:
+                prediction = self.process_unstructured()
             else:
-                raise ValueError(f"unsupported competition format: {self.competition_format}")
+                module = self.load_module()
+
+                print("[debug] user code loaded")
+
+                train_function = ensure_function(module, "train")
+                infer_function = ensure_function(module, "infer")
+
+                if self.competition_format in [api.CompetitionFormat.TIMESERIES, api.CompetitionFormat.DAG]:
+                    prediction = self.process_linear(
+                        train_function,
+                        infer_function,
+                        x_train,
+                        y_train,
+                        x_test,
+                        trained,
+                    )
+
+                elif self.competition_format == api.CompetitionFormat.STREAM:
+                    prediction = self.process_async(
+                        train_function,
+                        infer_function,
+                        x_train,
+                        y_train,
+                        x_test,
+                    )
+
+                elif self.competition_format == api.CompetitionFormat.SPATIAL:
+                    prediction = self.process_spatial(
+                        train_function,
+                        infer_function,
+                    )
+
+                else:
+                    raise ValueError(f"unsupported competition format: {self.competition_format}")
         except BaseException:
             self.write_trace(sys.exc_info())
             raise
@@ -280,6 +269,19 @@ class SandboxExecutor:
                 self.prediction_path,
                 index=self.write_index
             )
+
+    def load_module(self):
+        spec = importlib.util.spec_from_file_location(
+            "user_code",
+            os.path.join(self.code_directory, self.main_file)
+        )
+
+        module = importlib.util.module_from_spec(spec)
+        sys.path.insert(0, self.code_directory)
+
+        spec.loader.exec_module(module)
+
+        return module
 
     def process_linear(
         self,
@@ -324,8 +326,6 @@ class SandboxExecutor:
             )
 
             trained.value = True
-            if self.orthogonalization_data_path:
-                orthogonalization_runner.restore()
 
         prediction = utils.smart_call(
             infer_function,
@@ -396,7 +396,8 @@ class SandboxExecutor:
                         default_values, {
                             "stream": stream,
                         }
-                    )
+                    ),
+                    StreamMessage,
                 )
 
                 collected_values, collected_durations = wrapper.collect(len(stream_data))
@@ -417,7 +418,7 @@ class SandboxExecutor:
                 }
             })
 
-    def process_unstructured(
+    def process_spatial(
         self,
         train_function: callable,
         infer_function: callable,
@@ -458,6 +459,33 @@ class SandboxExecutor:
 
             ensure_dataframe(prediction, "prediction")
             return prediction
+
+    def process_unstructured(self):
+        loader = unstructured.LocalCodeLoader(self.runner_dot_py_file_path)
+        runner_module = unstructured.RunnerModule.load(loader)
+        assert runner_module is not None
+
+        user_module = CloudExecutorUserModule(self)
+        executor_context = CloudExecutorRunnerExecutorContext(self)
+
+        handlers = runner_module.execute(
+            executor_context,
+            user_module,
+            self.data_directory_path,
+            self.model_directory_path,
+        )
+
+        command = self.loop_key  # TODO Don't repurpose loop-key and use a dedicated property
+
+        handler = handlers.get(command)
+        if handler is None:
+            self.log(f"command not found: {command}", error=True)
+            return None
+
+        return utils.smart_call(
+            handler,
+            self.parameters,
+        )
 
     def filter_train(self, dataframe: pandas.DataFrame, named_file: NamedFile):
         if self.competition_format == api.CompetitionFormat.TIMESERIES:
@@ -534,115 +562,6 @@ class SandboxExecutor:
 
         raise ValueError(f"unsupported: {self.competition_format}")
 
-    def setup_orthogonalization(
-        self,
-        y_train: pandas.DataFrame,
-        y_raw: typing.Optional[pandas.DataFrame],
-        trained: Reference
-    ):
-        REMOVED_CHECKS = [
-            api.CheckFunction.CONSTANTS,
-            api.CheckFunction.MOONS,
-        ]
-
-        full_orthogonalization_data = read(self.orthogonalization_data_path) if self.train else None
-
-        split_keys = y_train[self.column_names.moon].unique()
-        orthogonalization_data = {
-            key: value
-            for key, value in full_orthogonalization_data.items()
-            if key in split_keys
-        }
-        del full_orthogonalization_data
-
-        logger = logging.getLogger("orthogonalization")
-        logger.setLevel(logging.WARNING)
-
-        metric_by_name = {
-            metric.name: metric
-            for metric in self.metrics
-        }
-
-        def orthogonalize(prediction: pandas.DataFrame):
-            if trained.value:
-                raise ValueError("orthogonalize not available anymore")
-
-            example_prediction = y_train[[self.column_names.moon, self.column_names.id]].copy()
-            for prediction_column_name in self.column_names.outputs:
-                example_prediction[prediction_column_name] = 0
-
-            checker.run(
-                [
-                    check
-                    for check in self.checks
-                    if check.function not in REMOVED_CHECKS
-                ],
-                prediction,
-                example_prediction,
-                self.column_names,
-                self.competition_format,
-                logger
-            )
-
-            del example_prediction
-
-            user_moons = set(prediction[self.column_names.moon].unique())
-            y_keys = [
-                key
-                for key in split_keys
-                if key in user_moons
-            ]
-
-            y = y_train[y_train[self.column_names.moon].isin(user_moons)].copy()
-
-            if not len(y):
-                return []
-
-            orthogonalized = orthogonalization.process(
-                self.competition_name,
-                prediction,
-                orthogonalization_data,
-                self.column_names
-            )
-
-            result = scoring.score(
-                self.competition_format,
-                logger,
-                y if y_raw is None else y_raw,
-                orthogonalized,
-                self.column_names,
-                self.metrics,
-                y_keys,
-            )
-
-            # TODO This mimic API behavior, a better system is required
-            scores = []
-            for metric_name, scored in result.items():
-                metric = metric_by_name[metric_name]
-                score = api.Score(
-                    None,
-                    {
-                        "id": 0,
-                        "success": True,
-                        "metric": metric._attrs,
-                        "value": scored.value,
-                        "details": [
-                            {
-                                "key": detail.key,
-                                "value": detail.value,
-                            }
-                            for detail in scored.details
-                        ],
-                        "createdAt": datetime.datetime.now().isoformat(),
-                    }
-                )
-
-                scores.append(score)
-
-            return scores
-
-        orthogonalization_runner.set(orthogonalize)
-
     def reset_trace(self):
         open(self.trace_path, "w").close()
 
@@ -652,3 +571,26 @@ class SandboxExecutor:
                 traceback.print_exception(*exc_info, file=fd)
         except BaseException as ignored:
             print(f"ignored exception when reporting trace: {type(ignored)}({ignored})", file=sys.stderr)
+
+
+class CloudExecutorRunnerExecutorContext(RunnerExecutorContext):
+
+    def __init__(self, executor: SandboxExecutor):
+        self.executor = executor
+
+    @property
+    def is_local(self):
+        return False
+
+    def trip_data_fuse(self):
+        self.executor._signal_permission_fuse()
+
+
+class CloudExecutorUserModule(UserModule):
+
+    def __init__(self, executor: SandboxExecutor):
+        self.executor = executor
+
+    @functools.cached_property
+    def module(self):
+        return self.executor.load_module()

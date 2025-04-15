@@ -44,7 +44,6 @@ class KnownData:
     Y = "y"
     Y_RAW = "y_raw"
     EXAMPLE_PREDICTION = "example_prediction"
-    ORTHOGONALIZATION_DATA = "orthogonalization_data"
 
 
 @dataclasses_json.dataclass_json(
@@ -75,7 +74,6 @@ class OriginalFiles:
     y: DataFile
     y_raw: typing.Optional[DataFile]
     example_prediction: DataFile
-    orthogonalization_data: typing.Optional[DataFile]
 
     def items(self):
         return vars(self).items()

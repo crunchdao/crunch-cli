@@ -5,8 +5,9 @@ import typing
 
 import click
 import pandas
+import psutil
 
-from . import (api, command, constants, container, orthogonalization, runner,
+from . import (__version__, api, command, constants, container, unstructured, runner,
                tester, utils)
 
 LoadedData = typing.Union[
@@ -21,21 +22,34 @@ class _Inline:
 
     def __init__(
         self,
-        module: typing.Any,
+        user_module: typing.Any,
         model_directory: str,
         logger: logging.Logger,
         has_gpu=False,
     ):
-        self.module = module
+        self.user_module = user_module
         self.model_directory = model_directory
         self.logger = logger
         self.has_gpu = has_gpu
 
-        print(f"loaded inline runner with module: {module}")
+        print(f"loaded inline runner with module: {user_module}")
 
         from . import is_inside_runner
         if is_inside_runner:
             print(f"[warning] loading the inliner in the cloud runner is not supported, this will raise an error soon", file=sys.stderr)
+
+        print()
+
+        version = __version__.__version__
+        print(f"cli version: {version}")
+
+        available_ram = psutil.virtual_memory().total / (1024 ** 3)
+        print(f"available ram: {available_ram:.2f} gb")
+
+        cpu_count = psutil.cpu_count()
+        print(f"available cpu: {cpu_count} core")
+
+        print(f"----")
 
     @functools.cached_property
     def _competition(self):
@@ -50,10 +64,6 @@ class _Inline:
         force=False,
         **kwargs,
     ) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
-        if self._competition.format.unstructured:
-            self.logger.error(f"Please follow the competition instructions to load the data.")
-            return None, None, None
-
         if self._competition.format == api.CompetitionFormat.STREAM:
             self.logger.error(f"Please call `.load_streams()` instead.")
             return None, None, None
@@ -65,19 +75,30 @@ class _Inline:
                 _,  # split keys
                 _,  # features
                 _,  # column_names
-                _,  # data_directory_path,
+                data_directory_path,
                 data_paths,
             ) = command.download(
                 round_number=round_number,
                 force=force,
             )
-
-            x_train_path = data_paths.get(api.KnownData.X_TRAIN)
-            y_train_path = data_paths.get(api.KnownData.Y_TRAIN)
-            x_test_path = data_paths.get(api.KnownData.X_TEST)
         except (api.CrunchNotFoundException, api.MissingPhaseDataException):
             command.download_no_data_available()
             raise click.Abort()
+
+        if self._competition.format.unstructured:
+            module = self._runner_module
+            if module is None or module.get_load_data_function(ensure=False) is None:
+                self.logger.info("Please follow the competition instructions to load the data.")
+                return None, None, None
+
+            return module.load_data(
+                data_directory_path=data_directory_path,
+                logger=self.logger,
+            )
+
+        x_train_path = data_paths.get(api.KnownData.X_TRAIN)
+        y_train_path = data_paths.get(api.KnownData.Y_TRAIN)
+        x_test_path = data_paths.get(api.KnownData.X_TEST)
 
         x_train = utils.read(x_train_path, kwargs=kwargs)
         y_train = utils.read(y_train_path, kwargs=kwargs)
@@ -152,11 +173,12 @@ class _Inline:
         competition = self._competition
 
         try:
-            library.scan(module=self.module, logger=self.logger)
+            library.scan(module=self.user_module, logger=self.logger)
             self.logger.warning('')
 
             return tester.run(
-                self.module,
+                self.user_module,
+                self._runner_module,
                 self.model_directory,
                 force_first_train,
                 train_frequency,
@@ -178,23 +200,18 @@ class _Inline:
 
         return None
 
-    def alpha_score(
-        self,
-        prediction: pandas.DataFrame,
-        as_dataframe=True,
-        max_retry=orthogonalization.DEFAULT_MAX_RETRY,
-        timeout=orthogonalization.DEFAULT_TIMEOUT,
-    ):
-        return orthogonalization.run(
-            prediction,
-            as_dataframe,
-            max_retry,
-            timeout,
-        )
-
     @property
     def is_inside_runner(self):
         return runner.is_inside
+
+    @functools.cached_property
+    def _runner_module(self):
+        loader = unstructured.deduce_code_loader(
+            self._competition.name,
+            "runner",
+        )
+
+        return unstructured.RunnerModule.load(loader)
 
     def __getattr__(self, key):
         import crunch

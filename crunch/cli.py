@@ -2,15 +2,13 @@ import contextlib
 import functools
 import json
 import os
-import random
 import sys
-import traceback
 import typing
 
 import click
-import pandas
 
-from . import __version__, api, benchmark, command, constants, store, utils
+from . import __version__, api, command, constants, store, utils
+from .unstructured.cli import organize_test_group
 
 store.load_from_env()
 
@@ -419,28 +417,6 @@ def update_token(
         utils.exit_via(error)
 
 
-@cli.group(name="benchmark")
-def benchmark_group():
-    pass
-
-
-@benchmark_group.command(help="Benchmark the orthogonalization feature.")
-@click.argument("prediction-path", type=click.Path(exists=True, dir_okay=False), required=True)
-def orthogonalization(
-    prediction_path: str,
-):
-    utils.change_root()
-
-    try:
-        prediction = utils.read(prediction_path)
-
-        benchmark.orthogonalization(
-            prediction=prediction
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
-
-
 @cli.group(name="runner")
 def runner_group():
     pass
@@ -495,6 +471,7 @@ def local(
 @click.option("--competition-name", envvar="COMPETITION_NAME", required=True)
 # ---
 @click.option("--context-directory", envvar="CONTEXT_DIRECTORY", default="/context")
+@click.option("--scoring-directory", envvar="SCORING_DIRECTORY", default="{context}/scoring")
 @click.option("--state-file", envvar="STATE_FILE", default="{context}/state.json")
 @click.option("--venv-directory", envvar="VENV_DIRECTORY", default="{context}/venv")
 @click.option("--data-directory", envvar="DATA_DIRECTORY", default="{context}/data")
@@ -517,6 +494,7 @@ def cloud(
     competition_name: str,
     # ---
     context_directory: str,
+    scoring_directory: str,
     state_file: str,
     venv_directory: str,
     data_directory: str,
@@ -546,6 +524,7 @@ def cloud(
     os.unsetenv("LOG_SECRET")
 
     code_directory = code_directory.replace("{context}", context_directory)
+    scoring_directory = scoring_directory.replace("{context}", context_directory)
     data_directory = data_directory.replace("{context}", context_directory)
     venv_directory = venv_directory.replace("{context}", context_directory)
     state_file = state_file.replace("{context}", context_directory)
@@ -571,6 +550,7 @@ def cloud(
         run,
         # ---
         context_directory,
+        scoring_directory,
         state_file,
         venv_directory,
         data_directory,
@@ -604,7 +584,6 @@ def cloud(
 @click.option("--x", "x_path", default=None)
 @click.option("--y", "y_path", default=None)
 @click.option("--y-raw", "y_raw_path", default=None)
-@click.option("--orthogonalization-data", "orthogonalization_data_path", default=None)
 @click.option("--data-directory", "data_directory_path", default=None)
 # ---
 @click.option("--main-file", required=True)
@@ -632,6 +611,9 @@ def cloud(
 # ---
 @click.option("--fuse-pid", required=True, type=int)
 @click.option("--fuse-signal-number", required=True, type=int)
+# ---
+@click.option("--runner-py-file", "runner_dot_py_file_path", type=str, default=None)
+@click.option("--parameters", "parameters_json_string", type=str, default=None)
 def cloud_executor(
     competition_name: str,
     competition_format: str,
@@ -640,7 +622,6 @@ def cloud_executor(
     x_path: str,
     y_path: str,
     y_raw_path: str,
-    orthogonalization_data_path: str,
     data_directory_path: str,
     # ---
     main_file: str,
@@ -668,6 +649,9 @@ def cloud_executor(
     # ---
     fuse_pid: int,
     fuse_signal_number: int,
+    # ---
+    runner_dot_py_file_path: typing.Optional[str],
+    parameters_json_string: typing.Optional[str],
 ):
     from .runner import is_inside
     if not is_inside:
@@ -693,7 +677,6 @@ def cloud_executor(
         x_path,
         y_path,
         y_raw_path,
-        orthogonalization_data_path,
         data_directory_path,
         # ---
         main_file,
@@ -733,6 +716,9 @@ def cloud_executor(
         # ---
         fuse_pid,
         fuse_signal_number,
+        # ---
+        runner_dot_py_file_path,
+        json.loads(parameters_json_string) if parameters_json_string else {},
     )
 
     try:
@@ -765,461 +751,7 @@ def organize_group(
     context.obj = competition
 
 
-@organize_group.group(name="test")
-def organize_test_group():
-    pass
-
-
-@organize_test_group.group(name="leaderboard")
-@click.option("--script-file", "script_file_path", type=click.Path(dir_okay=False, readable=True), required=False)
-@click.option("--github-repository", default=constants.COMPETITIONS_REPOSITORY, required=False)
-@click.option("--github-branch", default=constants.COMPETITIONS_BRANCH, required=False)
-@click.pass_context
-def leaderboard_group(
-    context: click.Context,
-    script_file_path: str,
-    github_repository: str,
-    github_branch: str,
-):
-    from . import custom
-
-    competition: api.Competition = context.obj
-
-    if script_file_path is None:
-        loader = custom.GithubCodeLoader(
-            competition.name,
-            "leaderboard",
-            repository=github_repository,
-            branch=github_branch,
-        )
-    else:
-        loader = custom.LocalCodeLoader(
-            script_file_path,
-        )
-
-    context.obj = (competition, loader)
-
-
-@leaderboard_group.command(name="rank")
-@click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
-@click.option("--rank-pass", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
-@click.option("--shuffle", is_flag=True)
-@click.pass_context
-def leaderboard_rank(
-    context: click.Context,
-    score_file_path: str,
-    rank_pass: str,
-    shuffle: bool,
-):
-    from . import custom
-
-    competition, loader = typing.cast(
-        typing.Tuple[
-            api.Competition,
-            custom.CodeLoader,
-        ],
-        context.obj
-    )
-
-    rank_pass = custom.RankPass[rank_pass]
-
-    module = custom.LeaderboardModule.load(loader)
-    if module is None:
-        print(f"no custom leaderboard script found")
-        raise click.Abort()
-
-    with open(score_file_path, "r") as fd:
-        root = json.load(fd)
-        if not isinstance(root, list):
-            raise ValueError("root must be a list")
-
-        projects = [
-            custom.RankableProject.from_dict(item)
-            for item in root
-        ]
-
-        if shuffle:
-            random.shuffle(projects)
-
-    try:
-        metrics = competition.metrics.list()
-
-        ranked_projects = module.rank(
-            metrics,
-            projects,
-            rank_pass,
-        )
-
-        print(f"\n\nLeaderboard is ranked (pass: {rank_pass.name})")
-
-        used_metric_ids = list({
-            metric.id
-            for project in projects
-            for metric in project.metrics
-        })
-
-        metric_name_by_id = {
-            metric.id: metric.name
-            for metric in metrics
-            if metric.id in used_metric_ids
-        }
-
-        score_by_metric_id_by_project_id = {
-            project.id: {
-                metric.id: metric.score
-                for metric in project.metrics
-            }
-            for project in projects
-        }
-
-        print(f"\nResults:")
-        utils.ascii_table(
-            (
-                "Rank",
-                "Reward Rank",
-                "Project ID",
-                *[
-                    f"Metric: {metric_name_by_id[id]}"
-                    for id in used_metric_ids
-                ]
-            ),
-            [
-                (
-                    ranked_project.rank,
-                    ranked_project.reward_rank,
-                    ranked_project.id,
-                    *(
-                        score_by_metric_id_by_project_id[ranked_project.id].get(metric_id)
-                        for metric_id in used_metric_ids
-                    )
-                )
-                for ranked_project in ranked_projects
-            ]
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
-    except BaseException as error:
-        print(f"\n\nLeaderboard rank function failed: {error}")
-
-        traceback.print_exc()
-
-
-@leaderboard_group.command(name="compare")
-@click.option("--prediction-file", "prediction_file_paths", type=(int, click.Path(exists=True, dir_okay=False)), multiple=True)
-@click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
-@click.pass_context
-def leaderboard_compare(
-    context: click.Context,
-    prediction_file_paths: typing.List[typing.Tuple[int, str]],
-    data_directory_path: str,
-):
-    from . import custom
-
-    competition, loader = typing.cast(
-        typing.Tuple[
-            api.Competition,
-            custom.CodeLoader,
-        ],
-        context.obj
-    )
-
-    module = custom.LeaderboardModule.load(loader)
-    if module is None:
-        print(f"no custom leaderboard script found")
-        raise click.Abort()
-
-    predictions = {}
-    for prediction_id, prediction_file_path in prediction_file_paths:
-        if prediction_id in predictions:
-            print(f"prediction id {prediction_id} specified multiple time")
-            raise click.Abort()
-
-        predictions[prediction_id] = pandas.read_parquet(prediction_file_path)
-
-    try:
-        targets = competition.targets.list()
-
-        similarities = module.compare(
-            targets,
-            predictions,
-            data_directory_path,
-        )
-
-        print(f"\n\nSimilarities have been compared")
-
-        target_per_id = {
-            target.id: target
-            for target in targets
-        }
-
-        prediction_name_per_id = {
-            id: os.path.splitext(path)[0]
-            for id, path in prediction_file_paths
-        }
-
-        print(f"\nResults:")
-        utils.ascii_table(
-            (
-                "Target Name",
-                "Left",
-                "Right",
-                "Similarity"
-            ),
-            [
-                (
-                    target_per_id[similarity.target_id].name,
-                    prediction_name_per_id[similarity.left_id],
-                    prediction_name_per_id[similarity.right_id],
-                    similarity.value,
-                )
-                for similarity in similarities
-            ]
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
-    except BaseException as error:
-        print(f"\n\nLeaderboard rank function failed: {error}")
-
-        traceback.print_exc()
-
-
-@organize_test_group.group(name="scoring")
-@click.option("--script-file", "script_file_path", type=click.Path(dir_okay=False, readable=True), required=False)
-@click.option("--github-repository", default=constants.COMPETITIONS_REPOSITORY, required=False)
-@click.option("--github-branch", default=constants.COMPETITIONS_BRANCH, required=False)
-@click.pass_context
-def scoring_group(
-    context: click.Context,
-    script_file_path: str,
-    github_repository: str,
-    github_branch: str,
-):
-    from . import custom
-
-    competition: api.Competition = context.obj
-
-    if script_file_path is None:
-        loader = custom.GithubCodeLoader(
-            competition.name,
-            "scoring",
-            repository=github_repository,
-            branch=github_branch,
-        )
-    else:
-        loader = custom.LocalCodeLoader(
-            script_file_path,
-        )
-
-    context.obj = (competition, loader)
-
-
-LOWER_PHASE_TYPES = list(map(lambda x: x.name, [
-    api.PhaseType.SUBMISSION,
-    api.PhaseType.OUT_OF_SAMPLE,
-]))
-
-
-@scoring_group.command(name="check")
-@click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
-@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
-@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
-@click.pass_context
-def scoring_check(
-    context: click.Context,
-    data_directory_path: str,
-    prediction_file_path: str,
-    phase_type_string: str,
-):
-    from . import custom
-
-    competition, loader = typing.cast(
-        typing.Tuple[
-            api.Competition,
-            custom.CodeLoader,
-        ],
-        context.obj
-    )
-
-    phase_type = api.PhaseType[phase_type_string]
-
-    try:
-        custom.scoring_check(
-            custom.ScoringModule.load(loader),
-            phase_type,
-            competition.metrics.list(),
-            utils.read(prediction_file_path),
-            data_directory_path
-        )
-
-        print(f"\n\nPrediction is valid!")
-    except custom.ParticipantVisibleError as error:
-        print(f"\n\nPrediction is not valid: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
-    except BaseException as error:
-        print(f"\n\nPrediction check function failed: {error}")
-
-        traceback.print_exc()
-
-
-@scoring_group.command(name="score")
-@click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
-@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
-@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
-@click.pass_context
-def scoring_score(
-    context: click.Context,
-    data_directory_path: str,
-    prediction_file_path: str,
-    phase_type_string: str,
-):
-    from . import custom
-
-    competition, loader = typing.cast(
-        typing.Tuple[
-            api.Competition,
-            custom.CodeLoader,
-        ],
-        context.obj
-    )
-
-    phase_type = api.PhaseType[phase_type_string]
-
-    try:
-        metrics = competition.metrics.list()
-        results = custom.scoring_score(
-            custom.ScoringModule.load(loader),
-            phase_type,
-            metrics,
-            utils.read(prediction_file_path),
-            data_directory_path,
-        )
-
-        metric_by_id = {
-            metric.id: metric
-            for metric in metrics
-        }
-
-        print(f"\n\nPrediction is scorable!")
-
-        print(f"\nResults:")
-        utils.ascii_table(
-            ("Target", "Metric", "Score", "Details"),
-            [
-                (
-                    metric_by_id[metric_id].target.name,
-                    metric_by_id[metric_id].name,
-                    str(scored_metric.value),
-                    " ".join((
-                        f"{detail.key}={detail.value}"
-                        for detail in scored_metric.details
-                    ))
-                )
-                for metric_id, scored_metric in results.items()
-            ]
-        )
-    except custom.ParticipantVisibleError as error:
-        print(f"\n\nPrediction is not scorable: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
-    except BaseException as error:
-        print(f"\n\nPrediction score function failed: {error}")
-
-        traceback.print_exc()
-
-
-@organize_test_group.group(name="submission")
-@click.option("--script-file", "script_file_path", type=click.Path(dir_okay=False, readable=True), required=False)
-@click.option("--github-repository", default=constants.COMPETITIONS_REPOSITORY, required=False)
-@click.option("--github-branch", default=constants.COMPETITIONS_BRANCH, required=False)
-@click.pass_context
-def submission_group(
-    context: click.Context,
-    script_file_path: str,
-    github_repository: str,
-    github_branch: str,
-):
-    from . import custom
-
-    competition: api.Competition = context.obj
-
-    if script_file_path is None:
-        loader = custom.GithubCodeLoader(
-            competition.name,
-            "submission",
-            repository=github_repository,
-            branch=github_branch,
-        )
-    else:
-        loader = custom.LocalCodeLoader(
-            script_file_path,
-        )
-
-    context.obj = (competition, loader)
-
-
-@submission_group.command(name="check")
-@click.option("--root-directory", "root_directory_path", type=click.Path(exists=True, file_okay=False), required=True)
-@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY)
-@click.pass_context
-def submission_check(
-    context: click.Context,
-    root_directory_path: str,
-    model_directory_path: str,
-):
-    from . import custom
-    from .command.push import list_code_files, list_model_files
-
-    _, loader = typing.cast(
-        typing.Tuple[
-            api.Competition,
-            custom.CodeLoader,
-        ],
-        context.obj
-    )
-
-    module = custom.SubmissionModule.load(loader)
-    if module is None:
-        print(f"no custom submission check found")
-        raise click.Abort()
-
-    def from_local(path: str, name: str):
-        _, extension = os.path.splitext(path)
-        can_load = extension in constants.TEXT_FILE_EXTENSIONS
-
-        return custom.File(
-            name,
-            uri=path if can_load else None,
-            size=os.path.getsize(path),
-        )
-
-    submission_files = [
-        from_local(path, name)
-        for path, name in list_code_files(root_directory_path, model_directory_path)
-    ]
-
-    model_files = [
-        from_local(path, name)
-        for path, name in list_model_files(root_directory_path, model_directory_path)
-    ]
-
-    try:
-        custom.submission_check(
-            custom.SubmissionModule.load(loader),
-            submission_files,
-            model_files,
-        )
-
-        print(f"\n\nSubmission is valid!")
-    except custom.ParticipantVisibleError as error:
-        print(f"\n\nSubmission is not valid: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
-    except BaseException as error:
-        print(f"\n\nSubmission check function failed: {error}")
-
-        traceback.print_exc()
-
+organize_group.add_command(organize_test_group)
 
 if __name__ == '__main__':
     cli()

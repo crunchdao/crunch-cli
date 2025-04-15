@@ -8,10 +8,14 @@ from .external import humanfriendly
 debug: bool = None
 web_base_url: str = None
 api_base_url: str = None
+competitions_repository: str = None
+competitions_branch: str = None
 
 
 def load_from_env():
-    global debug, web_base_url, api_base_url
+    global debug
+    global web_base_url, api_base_url
+    global competitions_repository, competitions_branch
 
     dotenv.load_dotenv(".env", verbose=False)
 
@@ -21,3 +25,7 @@ def load_from_env():
     if web_base_url is None:
         web_base_url = os.getenv(constants.WEB_BASE_URL_ENV_VAR, constants.WEB_BASE_URL_PRODUCTION)
         api_base_url = os.getenv(constants.API_BASE_URL_ENV_VAR, constants.API_BASE_URL_PRODUCTION)
+
+    if competitions_repository is None:
+        competitions_repository = os.getenv(constants.COMPETITIONS_REPOSITORY_ENV_VAR, constants.COMPETITIONS_REPOSITORY)
+        competitions_branch = os.getenv(constants.COMPETITIONS_BRANCH_ENV_VAR, constants.COMPETITIONS_BRANCH)
