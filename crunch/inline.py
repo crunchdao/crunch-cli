@@ -7,7 +7,7 @@ import click
 import pandas
 import psutil
 
-from . import (__version__, api, command, constants, container, custom, runner,
+from . import (__version__, api, command, constants, container, unstructured, runner,
                tester, utils)
 
 LoadedData = typing.Union[
@@ -206,12 +206,12 @@ class _Inline:
 
     @functools.cached_property
     def _runner_module(self):
-        loader = custom.deduce_code_loader(
+        loader = unstructured.deduce_code_loader(
             self._competition.name,
             "runner",
         )
 
-        return custom.RunnerModule.load(loader)
+        return unstructured.RunnerModule.load(loader)
 
     def __getattr__(self, key):
         import crunch

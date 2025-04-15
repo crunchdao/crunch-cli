@@ -6,10 +6,10 @@ import typing
 import click
 import pandas
 
-from .. import (api, checker, command, constants, container, custom, ensure,
+from .. import (api, checker, command, constants, container, unstructured, ensure,
                 meta, monkey_patches, tester, utils)
 from .collector import FilePredictionCollector, MemoryPredictionCollector, PredictionCollector
-from .custom import RunnerContext, RunnerExecutorContext, UserModule
+from .unstructured import RunnerContext, RunnerExecutorContext, UserModule
 from .runner import Runner
 from .shared import split_streams
 
@@ -19,7 +19,7 @@ class LocalRunner(Runner):
     def __init__(
         self,
         user_module: typing.Any,
-        runner_module: custom.RunnerModule,
+        runner_module: unstructured.RunnerModule,
         model_directory_path: str,
         force_first_train: bool,
         train_frequency: int,

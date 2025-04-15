@@ -1,11 +1,9 @@
-import datetime
 import enum
 import functools
 import gc
 import importlib
 import importlib.util
 import json
-import logging
 import os
 import sys
 import time
@@ -13,12 +11,11 @@ import traceback
 import typing
 
 import pandas
-import requests
 
-from .. import api, checker, meta, scoring, utils, custom
+from .. import api, meta, unstructured, utils
 from ..container import Columns, Features, GeneratorWrapper, StreamMessage
-from .custom import RunnerExecutorContext, UserModule
 from .shared import split_streams
+from .unstructured import RunnerExecutorContext, UserModule
 
 
 class Reference:
@@ -464,8 +461,8 @@ class SandboxExecutor:
             return prediction
 
     def process_unstructured(self):
-        loader = custom.LocalCodeLoader(self.runner_dot_py_file_path)
-        runner_module = custom.RunnerModule.load(loader)
+        loader = unstructured.LocalCodeLoader(self.runner_dot_py_file_path)
+        runner_module = unstructured.RunnerModule.load(loader)
         assert runner_module is not None
 
         user_module = CloudExecutorUserModule(self)

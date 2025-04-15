@@ -11,9 +11,9 @@ import urllib.parse
 import pandas
 import requests
 
-from .. import api, custom, downloader, store, utils
+from .. import api, unstructured, downloader, store, utils
 from .collector import MemoryPredictionCollector, PredictionCollector
-from .custom import RunnerContext
+from .unstructured import RunnerContext
 from .runner import Runner
 
 PACKAGES_WITH_PRIORITY = [
@@ -137,12 +137,12 @@ class CloudRunner(Runner):
         if self.competition_format == api.CompetitionFormat.UNSTRUCTURED and self.log("downloading runner..."):
             self.report_current("download runner")
 
-            loader = custom.deduce_code_loader(
+            loader = unstructured.deduce_code_loader(
                 self.competition.name,
                 "runner",
             )
 
-            if isinstance(loader, custom.GithubCodeLoader):
+            if isinstance(loader, unstructured.GithubCodeLoader):
                 source = loader.source
 
                 self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
@@ -151,11 +151,11 @@ class CloudRunner(Runner):
 
                 self.bash2(["chmod", "a+r", self.runner_dot_py_file_path])
 
-                loader = custom.LocalCodeLoader(self.runner_dot_py_file_path)
-            elif isinstance(loader, custom.LocalCodeLoader):
+                loader = unstructured.LocalCodeLoader(self.runner_dot_py_file_path)
+            elif isinstance(loader, unstructured.LocalCodeLoader):
                 self.runner_dot_py_file_path = loader.path
 
-            self.runner_module = custom.RunnerModule.load(loader)
+            self.runner_module = unstructured.RunnerModule.load(loader)
             if self.runner_module is None:
                 raise RuntimeError("no runner is available for this competition")
 
