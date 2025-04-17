@@ -513,6 +513,13 @@ class LocalRunnerContext(RunnerContext):
     def is_local(self):
         return True
 
+    @property
+    def is_determinism_check_enabled(self):
+        return self.runner.determinism_check_enabled
+
+    def report_determinism(self, deterministic: bool):
+        self.runner.deterministic = deterministic
+
     def log(
         self,
         message: str,
@@ -527,6 +534,8 @@ class LocalRunnerContext(RunnerContext):
         parameters=None,
         return_prediction=False
     ):
+        self.log(f"executing - command={command}")
+
         user_module = LocalUserModule(self.runner)
         executor_context = LocalRunnerExecutorContext(self.runner)
 

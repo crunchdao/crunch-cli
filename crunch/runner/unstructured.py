@@ -12,6 +12,15 @@ class RunnerContext(abc.ABC):
     def is_local(self):
         ...
 
+    @property
+    @abc.abstractmethod
+    def is_determinism_check_enabled(self):
+        ...
+
+    @abc.abstractmethod
+    def report_determinism(self, deterministic: bool):
+        ...
+
     @abc.abstractmethod
     def log(self, message: str, important=False, error=False):
         ...

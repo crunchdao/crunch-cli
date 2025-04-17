@@ -813,6 +813,13 @@ class CloudRunnerContext(RunnerContext):
     def is_local(self):
         return False
 
+    @property
+    def is_determinism_check_enabled(self):
+        return self.runner.determinism_check_enabled
+
+    def report_determinism(self, deterministic: bool):
+        self.runner.deterministic = deterministic
+
     def log(
         self,
         message: str,
@@ -827,6 +834,8 @@ class CloudRunnerContext(RunnerContext):
         parameters=None,
         return_prediction=False
     ):
+        self.log(f"executing - command={command}")
+
         result = self.runner.sandbox(
             self.runner.force_first_train,
             command,
