@@ -397,7 +397,7 @@ class SandboxExecutor:
                             "stream": stream,
                         }
                     ),
-                    StreamMessage,
+                    element_wrapper_factory=StreamMessage,
                 )
 
                 collected_values, collected_durations = wrapper.collect(len(stream_data))

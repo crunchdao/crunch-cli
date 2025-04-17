@@ -356,7 +356,7 @@ class LocalRunner(Runner):
                     },
                     logger=self.logger,
                 ),
-                container.StreamMessage,
+                element_wrapper_factory=container.StreamMessage,
             )
 
             collected_values, collected_durations = wrapper.collect(len(stream_data))
