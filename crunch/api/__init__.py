@@ -11,6 +11,7 @@ from .errors import (
     RetryableException,
     AnnotatedConnectException,
     NullPointerException,
+    AuthorizationDeniedException,
     ValidationFailedException,
     CheckException,
     CompetitionNameNotFoundException,

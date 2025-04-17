@@ -50,6 +50,14 @@ AnnotatedConnectException = InternalServerException
 NullPointerException = InternalServerException
 
 
+class AuthorizationDeniedException(ApiException):
+
+    def print_helper(self, **kwargs):
+        print(f"You do not have permission to access this resource: {self.message}")
+
+        _print_contact()
+
+
 class ValidationFailedException(ApiException):
 
     def __init__(
