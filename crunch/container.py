@@ -136,9 +136,12 @@ class GeneratorWrapper:
         self,
         iterator: typing.Iterator,
         consumer_factory: typing.Callable[[typing.Iterator], typing.Generator],
+        *,
         element_wrapper_factory: typing.Optional[typing.Callable[[typing.Any], typing.Any]] = None,
+        post_processor: typing.Optional[typing.Callable[[typing.Any], typing.Any]] = None,
     ):
         self.element_wrapper_factory = element_wrapper_factory or (lambda x: x)
+        self.post_processor = post_processor or (lambda x: x)
 
         self.ready = None
         self.consumed = True
@@ -186,6 +189,8 @@ class GeneratorWrapper:
                 break
 
             took = datetime.datetime.now() - start
+
+            y = self.post_processor(y)
 
             values.append(y)
             durations.append(took)

@@ -158,7 +158,6 @@ class GeneratorWrapperTest(unittest.TestCase):
             GeneratorWrapper(
                 iter([1, 2, 3]),
                 consumer,
-                StreamMessage,
             )
 
         self.assertEqual(GeneratorWrapper.ERROR_YIELD_MUST_BE_CALLED_BEFORE, str(context.exception))
@@ -174,7 +173,6 @@ class GeneratorWrapperTest(unittest.TestCase):
             GeneratorWrapper(
                 iter([1, 2, 3]),
                 consumer,
-                StreamMessage,
             ).collect(3)
 
         self.assertEqual(GeneratorWrapper.ERROR_PREVIOUS_VALUE_NOT_YIELD, str(context.exception))
@@ -187,7 +185,6 @@ class GeneratorWrapperTest(unittest.TestCase):
             GeneratorWrapper(
                 iter([1, 2, 3]),
                 consumer,
-                StreamMessage,
             )
 
         self.assertEqual(GeneratorWrapper.ERROR_YIELD_NOT_CALLED, str(context.exception))
@@ -200,7 +197,6 @@ class GeneratorWrapperTest(unittest.TestCase):
             GeneratorWrapper(
                 iter([1, 2, 3]),
                 consumer,
-                StreamMessage,
             )
 
         self.assertEqual(GeneratorWrapper.ERROR_FIRST_YIELD_MUST_BE_NONE, str(context.exception))
@@ -217,7 +213,6 @@ class GeneratorWrapperTest(unittest.TestCase):
             GeneratorWrapper(
                 iter([1, 2, 3]),
                 consumer,
-                StreamMessage,
             ).collect(3)
 
         self.assertEqual(GeneratorWrapper.ERROR_MULTIPLE_YIELD, str(context.exception))
@@ -237,7 +232,6 @@ class GeneratorWrapperTest(unittest.TestCase):
                 GeneratorWrapper(
                     iter([1, 2, 3]),
                     consumer,
-                    StreamMessage,
                 ).collect(3)
 
         self.assertTrue(f"{GeneratorWrapper.ERROR_MULTIPLE_YIELD} (2 / 3)", str(context.exception))
@@ -258,7 +252,6 @@ class GeneratorWrapperTest(unittest.TestCase):
                 GeneratorWrapper(
                     iter([1, 2, 3]),
                     consumer,
-                    StreamMessage,
                 ).collect(3)
 
             self.assertTrue(f"{GeneratorWrapper.ERROR_MULTIPLE_YIELD} (2 / 3)", str(context.exception))
@@ -267,13 +260,12 @@ class GeneratorWrapperTest(unittest.TestCase):
         def consumer(stream: iter):
             yield
 
-            for message in stream:
-                yield message.x * 2
+            for x in stream:
+                yield x * 2
 
         values, durations = GeneratorWrapper(
             iter([1, 2, 3]),
             consumer,
-            StreamMessage,
         ).collect(3)
 
         self.assertListEqual([2, 4, 6], values)
