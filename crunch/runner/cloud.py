@@ -678,7 +678,6 @@ class CloudRunner(Runner):
                 self.data_directory,
                 "-mindepth", "1",
                 "-maxdepth", "1",
-                "-print",
                 "-exec", "chmod", mode, "-R", "{}", ";"
             ])
 
