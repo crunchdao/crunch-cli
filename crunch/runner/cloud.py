@@ -558,13 +558,13 @@ class CloudRunner(Runner):
                     "y-raw": self.y_raw_path,
                 }
 
-                self._install_permission_fuse(path_options.values())
+                self._install_permission_fuse()
             else:
                 self.bash2(["chmod", "-R", "a+r", self.data_directory])
 
                 path_options = {}
 
-                self._install_permission_fuse(None)
+                self._install_permission_fuse()
 
             options = {
                 "competition-name": self.competition.name,
@@ -671,27 +671,16 @@ class CloudRunner(Runner):
 
     def _install_permission_fuse(
         self,
-        paths: typing.Optional[typing.List[typing.Optional[str]]] = None,
     ):
-        if paths is None:
-            def call_chmod(mode):
-                self.bash2([
-                    "find",
-                    self.data_directory,
-                    "-mindepth", "1",
-                    "-maxdepth", "1",
-                    "-print",
-                    "-exec", "chmod", mode, "-R", "{}", ";"
-                ])
-        else:
-            paths = list(filter(bool, paths))
-
-            def call_chmod(mode):
-                self.bash2([
-                    "chmod",
-                    mode,
-                    *paths,
-                ])
+        def call_chmod(mode):
+            self.bash2([
+                "find",
+                self.data_directory,
+                "-mindepth", "1",
+                "-maxdepth", "1",
+                "-print",
+                "-exec", "chmod", mode, "-R", "{}", ";"
+            ])
 
         call_chmod("o+r")
 
