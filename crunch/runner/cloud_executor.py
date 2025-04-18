@@ -91,6 +91,7 @@ def ping(urls: typing.List[str]):
         except requests.exceptions.RequestException:
             pass
 
+
 class SandboxExecutor:
 
     def __init__(
@@ -184,18 +185,20 @@ class SandboxExecutor:
         return x_train, y_train, x_test
 
     def _signal_permission_fuse(self):
-        os.kill(self.fuse_pid, self.fuse_signal_number)
+        test_path = next(iter(os.listdir(self.data_directory_path)), None)
+        if not test_path:
+            return  # no data?
+        test_path = os.path.join(self.data_directory_path, test_path)
 
-        if self.competition_format.unstructured:
-            return
+        os.kill(self.fuse_pid, self.fuse_signal_number)
 
         time.sleep(0.1)
         for _ in range(10):
-            if not os.access(self.x_path, os.R_OK):
+            if not os.access(test_path, os.R_OK):
                 break
 
             time.sleep(1)
-            print("[debug] fuse not yet triggered", file=sys.stderr)
+            print(f"[debug] fuse not yet triggered - test_path=`{test_path}`", file=sys.stderr)
         else:
             print("fuse never triggered", file=sys.stderr)
             exit(1)
@@ -216,7 +219,8 @@ class SandboxExecutor:
         trained = Reference(False)
         x_train, y_train, x_test = self.load_data(trained)
 
-        self._signal_permission_fuse()
+        if not self.competition_format.unstructured:
+            self._signal_permission_fuse()
 
         try:
             if self.competition_format == api.CompetitionFormat.UNSTRUCTURED:
