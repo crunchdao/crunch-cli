@@ -674,24 +674,31 @@ class CloudRunner(Runner):
         paths: typing.Optional[typing.List[typing.Optional[str]]] = None,
     ):
         if paths is None:
-            paths = ["-R", self.data_directory]
+            def call_chmod(mode):
+                self.bash2([
+                    "find",
+                    self.data_directory,
+                    "-mindepth", "1",
+                    "-maxdepth", "1",
+                    "-print",
+                    "-exec", "chmod", mode, "-R", "{}", ";"
+                ])
         else:
             paths = list(filter(bool, paths))
 
-        self.bash2([
-            "chmod",
-            "o+r",
-            *paths,
-        ])
+            def call_chmod(mode):
+                self.bash2([
+                    "chmod",
+                    mode,
+                    *paths,
+                ])
+
+        call_chmod("o+r")
 
         def on_signal(signum, stack):
             signal.signal(FUSE_SIGNAL, signal.SIG_DFL)
 
-            self.bash2([
-                "chmod",
-                CHMOD_RESET,
-                *paths,
-            ])
+            call_chmod(CHMOD_RESET)
 
             self.log("[debug] fuse triggered")
 
