@@ -684,14 +684,14 @@ class CloudRunner(Runner):
 
         call_chmod("o+r")
 
-        # def on_signal(signum, stack):
-        #     signal.signal(FUSE_SIGNAL, signal.SIG_DFL)
+        def on_signal(signum, stack):
+            signal.signal(FUSE_SIGNAL, signal.SIG_DFL)
 
-        #     call_chmod(CHMOD_RESET)
+            call_chmod(CHMOD_RESET)
 
-        #     self.log("[debug] fuse triggered")
+            self.log("[debug] fuse triggered")
 
-        # signal.signal(FUSE_SIGNAL, on_signal)
+        signal.signal(FUSE_SIGNAL, on_signal)
 
     @property
     def venv_env(self):

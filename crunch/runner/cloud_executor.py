@@ -190,18 +190,18 @@ class SandboxExecutor:
             return  # no data?
         test_path = os.path.join(self.data_directory_path, test_path)
 
-        os.kill(self.fuse_pid, self.fuse_signal_number)
+        # os.kill(self.fuse_pid, self.fuse_signal_number)
 
-        time.sleep(0.1)
-        for _ in range(10):
-            if not os.access(test_path, os.R_OK):
-                break
+        # time.sleep(0.1)
+        # for _ in range(10):
+        #     if not os.access(test_path, os.R_OK):
+        #         break
 
-            time.sleep(1)
-            print(f"[debug] fuse not yet triggered - test_path=`{test_path}`", file=sys.stderr)
-        else:
-            print("fuse never triggered", file=sys.stderr)
-            exit(1)
+        #     time.sleep(1)
+        #     print(f"[debug] fuse not yet triggered - test_path=`{test_path}`", file=sys.stderr)
+        # else:
+        #     print("fuse never triggered", file=sys.stderr)
+        #     exit(1)
 
     def start(self):
         ping(self.ping_urls)
