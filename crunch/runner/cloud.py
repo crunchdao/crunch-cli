@@ -564,6 +564,8 @@ class CloudRunner(Runner):
 
                 path_options = {}
 
+                self._install_permission_fuse(None)
+
             options = {
                 "competition-name": self.competition.name,
                 "competition-format": self.competition.format.name,
@@ -669,9 +671,12 @@ class CloudRunner(Runner):
 
     def _install_permission_fuse(
         self,
-        paths: typing.List[typing.Optional[str]],
+        paths: typing.Optional[typing.List[typing.Optional[str]]] = None,
     ):
-        paths = list(filter(bool, paths))
+        if paths is None:
+            paths = ["-R", self.data_directory]
+        else:
+            paths = list(filter(bool, paths))
 
         self.bash2([
             "chmod",
