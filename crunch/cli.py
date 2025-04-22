@@ -135,7 +135,7 @@ def init(
     print(f"Success! Your environment has been correctly initialized.")
 
 
-@cli.command(help="Setup a workspace directory with the latest submission of you code.")
+@cli.command(help="Setup a workspace directory.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
 @click.option("--submission", "submission_number", required=False, type=int, help="Submission number to clone. (latest if not specified)")
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
@@ -196,8 +196,6 @@ def setup(
         command.setup(
             clone_token,
             submission_number,
-            competition_name,
-            project_name,
             directory,
             model_directory_path,
             force,
@@ -226,6 +224,56 @@ def setup(
         print(f" - To get inside your workspace directory, run: cd {directory}")
 
     print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
+
+
+@cli.command(help="Setup a notebook workspace.")
+@click.option("--submission", "submission_number", required=False, type=int, help="Submission number to clone. (latest if not specified)")
+@click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
+@click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
+@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
+@click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
+@click.argument("competition-name", required=True)
+@click.argument("clone-token")
+def setup_notebook(
+    submission_number: str,
+    no_data: bool,
+    no_model: bool,
+    model_directory_path: str,
+    data_size_variant_raw: str,
+    competition_name: str,
+    clone_token: str,
+):
+    directory = os.getcwd()
+
+    data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
+
+    try:
+        command.setup_notebook(
+            clone_token,
+            submission_number,
+            directory,
+            model_directory_path,
+            no_model,
+            data_size_variant,
+        )
+
+        if not no_data:
+            command.download(force=True)
+    except (api.CrunchNotFoundException, api.MissingPhaseDataException):
+        command.download_no_data_available()
+    except api.ApiException as error:
+        utils.exit_via(
+            error,
+            competition_name=competition_name
+        )
+
+    print("\n---")
+    print(f"Success! Your environment has been correctly setup.")
+    print(f"Next recommended actions:")
+    print(f"1. Load the Crunch Toolings: `crunch = crunch.load_notebook()`")
+    print(f"2. Execute the cells with your code")
+    print(f"3. Run a test: `crunch.test()`")
+    print(f"4. Download and submit your code to the platform!")
 
 
 @cli.command(help="Setup a workspace directory with the latest submission of you code.")
