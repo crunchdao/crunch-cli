@@ -28,12 +28,12 @@ def change_root():
         current = os.getcwd()
 
         if os.path.exists(constants.DOT_CRUNCHDAO_DIRECTORY):
-            print(f"found project: {current}")
+            print(f"project: found {current}")
             return
 
         os.chdir("../")
         if current == os.getcwd():
-            print("no project found")
+            print("project: not found")
             raise click.Abort()
 
 
