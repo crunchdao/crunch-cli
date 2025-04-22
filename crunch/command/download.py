@@ -47,6 +47,7 @@ def _get_data_urls(
 def download(
     round_number: api.RoundIdentifierType = "@current",
     force=False,
+    try_last_if_not_found=True,
     size_variant: typing.Optional[api.SizeVariant] = None,
 ):
     client, project = api.Client.from_project()
@@ -60,7 +61,17 @@ def download(
         print(f"repository set default size variant: {size_variant.name.lower()}")
 
     competition = project.competition
-    round = competition.rounds.get(round_number)
+
+    try:
+        round = competition.rounds.get(round_number)
+    except api.RoundNotFoundException as original:
+        if try_last_if_not_found:
+            try:
+                round = competition.rounds.last
+            except api.RoundNotFoundException:
+                raise original
+        else:
+            raise
 
     data_directory_path = constants.DOT_DATA_DIRECTORY
     os.makedirs(data_directory_path, exist_ok=True)
