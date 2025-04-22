@@ -1,9 +1,12 @@
-from .convert import convert, convert_cells_to_file
-from .download import download, download_no_data_available
-from .init import init
-from .push import push
-from .push_prediction import push_prediction
-from .quickstarter import quickstarter
-from .setup import setup
-from .test import test
-from .update_token import update_token
+from .convert import convert as convert
+from .convert import convert_cells_to_file as convert_cells_to_file
+from .download import download as download
+from .download import download_no_data_available as download_no_data_available
+from .init import init as init
+from .push import push as push
+from .push_prediction import push_prediction as push_prediction
+from .quickstarter import quickstarter as quickstarter
+from .setup import setup as setup
+from .setup import setup_notebook as setup_notebook
+from .test import test as test
+from .update_token import update_token as update_token

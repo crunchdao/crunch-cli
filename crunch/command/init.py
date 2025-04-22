@@ -25,8 +25,6 @@ def _check_if_already_exists(directory: str, force: bool):
 
 def init(
     clone_token: str,
-    competition_name: str,
-    project_name: str,
     directory: str,
     model_directory: str,
     force: bool,
@@ -44,11 +42,12 @@ def init(
     os.makedirs(dot_crunchdao_path, exist_ok=True)
 
     plain = project_token.plain
-    user_id = project_token.project.user_id
+    project = project_token.project
+
     project_info = utils.ProjectInfo(
-        competition_name,
-        project_name,
-        user_id,
+        project.competition.name,
+        project.name,
+        project.user_id,
         data_size_variant,
     )
 

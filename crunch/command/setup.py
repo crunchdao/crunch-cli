@@ -6,8 +6,6 @@ from .. import api, command, utils
 def setup(
     clone_token: str,
     submission_number: str,
-    competition_name: str,
-    project_name: str,
     directory: str,
     model_directory: str,
     force: bool,
@@ -19,8 +17,6 @@ def setup(
 ):
     command.init(
         clone_token,
-        competition_name,
-        project_name,
         directory,
         model_directory,
         force,
@@ -46,3 +42,25 @@ def setup(
             )
         else:
             print(f"you appear to have never submitted code before")
+
+
+def setup_notebook(
+    clone_token: str,
+    submission_number: str,
+    directory: str,
+    model_directory: str,
+    no_model: bool,
+    data_size_variant: api.SizeVariant,
+):
+    setup(
+        clone_token,
+        submission_number,
+        directory,
+        model_directory,
+        True,
+        no_model,
+        False,
+        None,
+        False,
+        data_size_variant,
+    )
