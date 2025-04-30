@@ -1,10 +1,9 @@
 import importlib.util
-import logging
 import os
 import sys
 import typing
 
-from .. import api, tester
+from .. import api, tester, unstructured
 
 
 def test(
@@ -20,6 +19,11 @@ def test(
     _, project = api.Client.from_project()
     competition = project.competition.reload()
 
+    runner_module = None
+    if competition.format == api.CompetitionFormat.UNSTRUCTURED:
+        loader = unstructured.deduce_code_loader(competition.name, "runner")
+        runner_module = unstructured.RunnerModule.load(loader)
+
     spec = importlib.util.spec_from_file_location("user_code", main_file_path)
     module = importlib.util.module_from_spec(spec)
 
@@ -28,6 +32,7 @@ def test(
 
     prediction = tester.run(
         module,
+        runner_module,
         model_directory_path,
         force_first_train,
         train_frequency,
