@@ -15,7 +15,7 @@ pyyaml
 redbaron
 requests
 requests-toolbelt
-requirements-parser
+requirements-parser>=0.11.0
 scikit-learn
 scipy
 tqdm
