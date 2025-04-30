@@ -150,7 +150,7 @@ def deduce(
     directory_path: typing.Optional[str] = None,
 ):
     if not directory_path:
-        directory_path = os.environ.get(constants.COMPETITIONS_DIRECTORY_PATH_ENV_VAR, None)
+        directory_path = store.competitions_directory_path
 
     if directory_path:
         path = os.path.join(

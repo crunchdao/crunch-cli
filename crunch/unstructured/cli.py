@@ -32,15 +32,9 @@ def _load_code(context: click.Context, file_name: "ModuleFileName") -> typing.Tu
 
 
 @click.group(name="test")
-@click.option("--github-repository", default=None, required=False)
-@click.option("--github-branch", default=None, required=False)
-@click.option("--directory-path", default=None, required=False)
 @click.pass_context
 def organize_test_group(
     context: click.Context,
-    github_repository: str,
-    github_branch: str,
-    directory_path: str,
 ):
     from . import deduce_code_loader
 
@@ -49,9 +43,6 @@ def organize_test_group(
     load_code = functools.partial(
         deduce_code_loader,
         competition_name=context.obj.name,
-        github_repository=github_repository,
-        github_branch=github_branch,
-        directory_path=directory_path,
     )
 
     context.obj = (competition, load_code)
