@@ -52,18 +52,27 @@ def _format_directory(directory: str, competition_name: str, project_name: str):
 @click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_PRODUCTION, help="Set the API base url.")
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_PRODUCTION, help="Set the Web base url.")
+@click.option("--competitions-repository", envvar=constants.COMPETITIONS_REPOSITORY_ENV_VAR, default=constants.COMPETITIONS_REPOSITORY, help="Set the Competitions GitHub repository name.")
+@click.option("--competitions-branch", envvar=constants.COMPETITIONS_BRANCH_ENV_VAR, default=constants.COMPETITIONS_REPOSITORY, help="Set the Competitions GitHub branch name (only for testing).")
+@click.option("--competitions-directory-path", envvar=constants.COMPETITIONS_DIRECTORY_PATH_ENV_VAR, default=None, required=False, help="Set the Competitions repository to a local directory (only for testing).")
 @click.option("--staging", is_flag=True, help="[DEPRECATED] Connect to the staging environment.")
 @click.option("--environment", "--env", "environment_name", help="Connect to another environment.")
 def cli(
     debug: bool,
     api_base_url: str,
     web_base_url: str,
+    competitions_repository: str,
+    competitions_branch: str,
+    competitions_directory_path: typing.Optional[str],
     staging: bool,
     environment_name: str,
 ):
     store.debug = debug
     store.api_base_url = api_base_url
     store.web_base_url = web_base_url
+    store.competitions_repository = competitions_repository
+    store.competitions_branch = competitions_branch
+    store.competitions_directory_path = competitions_directory_path
 
     if staging:
         if environment_name:
