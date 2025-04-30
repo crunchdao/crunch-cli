@@ -85,7 +85,7 @@ class GithubCodeLoader(CodeLoader):
         repository = repository or store.competitions_repository
         branch = branch or store.competitions_branch
 
-        self._url = f"https://github.com/{repository}/blob/{branch}/{_format_relative_module_path(competition_name, file_name)}?raw=true"
+        self._url = f"https://github.com/{repository}/raw/refs/heads/{branch}/{_format_relative_module_path(competition_name, file_name)}"
         self._user_agent = user_agent
 
     @property
