@@ -55,7 +55,6 @@ def _format_directory(directory: str, competition_name: str, project_name: str):
 @click.option("--competitions-repository", envvar=constants.COMPETITIONS_REPOSITORY_ENV_VAR, default=constants.COMPETITIONS_REPOSITORY, help="Set the Competitions GitHub repository name.")
 @click.option("--competitions-branch", envvar=constants.COMPETITIONS_BRANCH_ENV_VAR, default=constants.COMPETITIONS_REPOSITORY, help="Set the Competitions GitHub branch name (only for testing).")
 @click.option("--competitions-directory-path", envvar=constants.COMPETITIONS_DIRECTORY_PATH_ENV_VAR, default=None, required=False, help="Set the Competitions repository to a local directory (only for testing).")
-@click.option("--staging", is_flag=True, help="[DEPRECATED] Connect to the staging environment.")
 @click.option("--environment", "--env", "environment_name", help="Connect to another environment.")
 def cli(
     debug: bool,
@@ -64,7 +63,6 @@ def cli(
     competitions_repository: str,
     competitions_branch: str,
     competitions_directory_path: typing.Optional[str],
-    staging: bool,
     environment_name: str,
 ):
     store.debug = debug
@@ -73,13 +71,6 @@ def cli(
     store.competitions_repository = competitions_repository
     store.competitions_branch = competitions_branch
     store.competitions_directory_path = competitions_directory_path
-
-    if staging:
-        if environment_name:
-            print("option `--staging` is deprecated, ignoring it", file=sys.stderr)
-        else:
-            print("option `--staging` is deprecated, prefer `--environment staging`", file=sys.stderr)
-            environment_name = ENVIRONMENT_STAGING
 
     environment_name = ENVIRONMENT_ALIASES.get(environment_name) or environment_name
     if environment_name in ENVIRONMENTS:
