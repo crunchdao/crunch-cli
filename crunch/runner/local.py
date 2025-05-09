@@ -510,6 +510,10 @@ class LocalRunnerContext(RunnerContext):
         self.runner = runner
 
     @property
+    def force_first_train(self):
+        return self.runner.force_first_train
+
+    @property
     def is_local(self):
         return True
 
