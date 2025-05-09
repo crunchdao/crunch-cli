@@ -19,6 +19,3 @@ requirements-parser>=0.11.0
 scikit-learn
 scipy
 tqdm
-
-# TODO Remove me once competition is over
-spatialdata-plot
