@@ -562,6 +562,7 @@ def cloud(
     max_retry: int,
     retry_seconds: int
 ):
+    print(f"gpu={gpu} getenv=", os.getenv('GPU', 'not set'))
     from .runner import is_inside
     if not is_inside:
         print("not in a runner")
