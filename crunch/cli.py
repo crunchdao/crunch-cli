@@ -531,9 +531,9 @@ def local(
 @click.option("--run-token", envvar="RUN_TOKEN", required=True)
 @click.option("--log-secret", envvar="LOG_SECRET", default=None, type=str)
 @click.option("--train-frequency", envvar="TRAIN_FREQUENCY", type=int, default=0)
-@click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", is_flag=True)
-@click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", is_flag=True)
-@click.option("--gpu", envvar="GPU", is_flag=True)
+@click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", type=bool, default=False)
+@click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", type=bool, default=False)
+@click.option("--gpu", envvar="GPU", type=bool, default=False)
 @click.option("--crunch-cli-commit-hash", default="main", envvar="CRUNCH_CLI_COMMIT_HASH")
 # ---
 @click.option("--max-retry", envvar="MAX_RETRY", default=3, type=int)
