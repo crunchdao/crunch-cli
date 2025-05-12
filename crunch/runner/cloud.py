@@ -125,6 +125,7 @@ class CloudRunner(Runner):
         self.retry_seconds = retry_seconds
 
         self.sandbox_restriction_flag = "--change-network-namespace" if gpu else "--filter-socket-syscalls"
+        print(f"gpu={gpu} sandbox_restriction_flag={self.sandbox_restriction_flag}")
 
     def start(self):
         self.report_current("starting")
