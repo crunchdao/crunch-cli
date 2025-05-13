@@ -185,10 +185,13 @@ class SandboxExecutor:
         return x_train, y_train, x_test
 
     def _signal_permission_fuse(self):
-        test_path = next(iter(os.listdir(self.data_directory_path)), None)
-        if not test_path:
-            return  # no data?
-        test_path = os.path.join(self.data_directory_path, test_path)
+        if self.competition_format.unstructured:
+            test_path = next(iter(os.listdir(self.data_directory_path)), None)
+            if not test_path:
+                return  # no data?
+            test_path = os.path.join(self.data_directory_path, test_path)
+        else:
+            test_path = self.x_path
 
         os.kill(self.fuse_pid, self.fuse_signal_number)
 
