@@ -1,9 +1,25 @@
 import importlib.util
 import os
 import sys
+import types
 import typing
 
 from .. import api, tester, unstructured
+
+
+def load_user_code(
+    main_file_path: str,
+    module_name="user_code"
+) -> types.ModuleType:
+    spec = importlib.util.spec_from_file_location(module_name, main_file_path)
+    module = importlib.util.module_from_spec(spec)
+
+    sys.path.insert(0, os.getcwd())
+    spec.loader.exec_module(module)
+
+    sys.modules[module_name] = module
+
+    return module
 
 
 def test(
@@ -24,11 +40,7 @@ def test(
         loader = unstructured.deduce_code_loader(competition.name, "runner")
         runner_module = unstructured.RunnerModule.load(loader)
 
-    spec = importlib.util.spec_from_file_location("user_code", main_file_path)
-    module = importlib.util.module_from_spec(spec)
-
-    sys.path.insert(0, os.getcwd())
-    spec.loader.exec_module(module)
+    module = load_user_code(main_file_path)
 
     prediction = tester.run(
         module,

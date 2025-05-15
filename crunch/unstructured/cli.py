@@ -339,7 +339,7 @@ def submission_group():
 
 @submission_group.command(name="check")
 @click.option("--root-directory", "root_directory_path", type=click.Path(exists=True, file_okay=False), required=True)
-@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY)
+@click.option("--model-directory", "model_directory_path", type=click.Path(file_okay=False), default=constants.DEFAULT_MODEL_DIRECTORY, help="Resources directory relative to root directory.")
 @click.pass_context
 def submission_check(
     context: click.Context,
