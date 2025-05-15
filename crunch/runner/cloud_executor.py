@@ -278,17 +278,11 @@ class SandboxExecutor:
             )
 
     def load_module(self):
-        spec = importlib.util.spec_from_file_location(
-            "user_code",
-            os.path.join(self.code_directory, self.main_file)
-        )
+        from ..command.test import load_user_code
 
-        module = importlib.util.module_from_spec(spec)
-        sys.path.insert(0, self.code_directory)
+        main_file_path = os.path.join(self.code_directory, self.main_file)
 
-        spec.loader.exec_module(module)
-
-        return module
+        return load_user_code(main_file_path)
 
     def process_linear(
         self,
