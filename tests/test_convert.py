@@ -60,14 +60,10 @@ class SourceCodeTest(unittest.TestCase):
                 return x + 1
             
             
-            
             #a += 1
-            
             
             class Model:
                 pass
-            
-            
         """).lstrip()
 
         self.assertEqual(content, source_code)
@@ -105,7 +101,6 @@ class SourceCodeTest(unittest.TestCase):
             
             
             #d = 42
-            
         """).lstrip()
 
         self.assertEqual(content, source_code)

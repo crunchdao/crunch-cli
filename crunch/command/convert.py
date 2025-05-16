@@ -1,5 +1,6 @@
 import json
 import os
+import textwrap
 import typing
 
 import click
@@ -39,7 +40,8 @@ def convert(
     python_file_path: str,
     override: bool = False,
 ):
-    from ..convert import ConverterError
+    from ..convert import (ConverterError, InconsistantLibraryVersionError,
+                           NotebookCellParseError)
 
     try:
         with open(notebook_file_path) as fd:
@@ -52,4 +54,26 @@ def convert(
         )
     except ConverterError as error:
         print(f"convert failed: {error}")
+
+        if isinstance(error, NotebookCellParseError):
+            print(f"  cell: {error.cell_id} ({error.cell_index})")
+            print(f"  source:")
+            _print_indented(error.cell_source)
+            print(f"  parser error:")
+            _print_indented(error.parser_error)
+
+        elif isinstance(error, InconsistantLibraryVersionError):
+            print(f"  package name: {error.package_name}")
+            print(f"  first version: {error.old}")
+            print(f"  other version: {error.new}")
+
         raise click.Abort()
+
+
+def _print_indented(text):
+    indented = textwrap.indent(text, "   | ", lambda x: True)
+
+    if indented.endswith("\n"):
+        indented = indented[:-1]
+
+    print(indented)

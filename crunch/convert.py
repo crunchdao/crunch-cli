@@ -1,5 +1,7 @@
+import ast
 import dataclasses
 import os
+import py_compile
 import re
 import string
 import typing
@@ -17,13 +19,14 @@ _IMPORT = (
 )
 
 _COMMENT = redbaron.CommentNode
+_EMPTY_LINE = redbaron.EndlNode
 
 _KEEP = (
     # inert code
     _COMMENT,
+    _EMPTY_LINE,
     redbaron.StringNode,
-    redbaron.EndlNode,
-    
+
     # code blocks
     redbaron.DefNode,
     redbaron.ClassNode
@@ -254,13 +257,18 @@ def _extract_code_cell(
                 for line in node_str.split("\n")
             ))
 
-        parts.append(node.dumps())
+        if isinstance(node, _EMPTY_LINE):
+            parts.append("")
+        else:
+            parts.append(node.dumps().rstrip())
 
     if len(tree):
         log(f"used {len(tree)} node(s)")
 
+        if len(module):
+            module.append(f"\n")
+
         module.append("\n".join(parts))
-        module.append("\n")
     else:
         log(f"skip since empty")
 
@@ -345,9 +353,29 @@ def _extract_markdown_cell(
     log(f"embed {lower_file_path}: {len(content)} characters")
 
 
+def _validate(source_code: str):
+    try:
+        ast.parse(source_code)
+    except SyntaxError as error:
+        parser_error = py_compile.PyCompileError(
+            error.__class__,
+            error,
+            "<converted_output>",
+        )
+
+        raise NotebookCellParseError(
+            f"converted notebook code cell cannot be compiled",
+            str(parser_error),
+            source_code,
+            -1,
+            parser_error.file
+        )
+
+
 def extract_cells(
     cells: typing.List[typing.Any],
     print: typing.Callable[[str], None] = print,
+    validate=True,
 ) -> typing.Tuple[
     str,
     typing.List[EmbedFile],
@@ -386,7 +414,9 @@ def extract_cells(
             error.cell_id = cell_id
             raise
 
+    module.append("")
     source_code = "\n".join(module)
+
     requirements = [
         Requirement(
             name,
@@ -395,6 +425,9 @@ def extract_cells(
         )
         for name, requirement in packages.items()
     ]
+
+    if validate:
+        _validate(source_code)
 
     return (
         source_code,
