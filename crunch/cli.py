@@ -113,12 +113,10 @@ def init(
 
     try:
         command.init(
-            clone_token,
-            competition_name,
-            project_name,
-            directory,
-            model_directory_path,
-            force,
+            clone_token=clone_token,
+            directory=directory,
+            model_directory=model_directory_path,
+            force=force,
         )
 
         if not no_data:
