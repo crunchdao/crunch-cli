@@ -51,7 +51,7 @@ setup(
     install_requires=requirements,
     extras_require={
         'test': test_requirements,
-    }
+    },
     zip_safe=False,
     entry_points={
         'console_scripts': ['crunch=crunch.cli:cli'],
