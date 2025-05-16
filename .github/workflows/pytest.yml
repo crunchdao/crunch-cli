@@ -32,3 +32,14 @@ jobs:
         env:
           CRUNCH_API_KEY: ${{ secrets.CRUNCH_API_KEY }}
         run: make test
+      
+      - name: Check out quickstarters repository
+        uses: actions/checkout@v2
+        with:
+          name: crunchdao/competitions
+          path: /competitions
+
+      - name: Run convert tests
+        env:
+          CLONED_COMPETITIONS_REPOSITORY_PATH: /competitions
+        run: python -m pytest -v tests/test_convert.py::FullNotebookTest

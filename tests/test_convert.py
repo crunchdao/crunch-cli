@@ -1,7 +1,13 @@
+import json
+import os
+import tempfile
 import textwrap
 import typing
 import unittest
 
+from parameterized import parameterized
+
+from crunch.command.convert import convert
 from crunch.convert import (EmbedFile, InconsistantLibraryVersionError,
                             NotebookCellParseError, Requirement,
                             RequirementVersionParseError, extract_cells)
@@ -240,3 +246,57 @@ class EmbedFilesTest(unittest.TestCase):
 
         self.assertEqual(0, len(embed_files))
         self.assertEqual("", source_code)
+
+
+def get_notebook_paths():
+    cloned_directory = os.getenv("CLONED_COMPETITIONS_REPOSITORY_PATH")
+    if not cloned_directory:
+        return []
+
+    competitions_directory = os.path.join(cloned_directory, "competitions")
+    for competition_name in os.listdir(competitions_directory):
+        quickstarters_directory = os.path.join(competitions_directory, competition_name, "quickstarters")
+
+        if not os.path.isdir(quickstarters_directory):
+            continue
+
+        for quickstarter_name in os.listdir(quickstarters_directory):
+            quickstarter_directory = os.path.join(quickstarters_directory, quickstarter_name)
+
+            manifest_file = os.path.join(quickstarter_directory, "quickstarter.json")
+            if not os.path.exists(manifest_file):
+                continue
+
+            with open(manifest_file, "r") as file:
+                manifest = json.loads(file.read())
+
+            if not manifest.get("notebook") or manifest.get("language") != "PYTHON":
+                continue
+
+            entrypoint_file = os.path.join(quickstarter_directory, manifest["entrypoint"])
+            if not os.path.exists(entrypoint_file):
+                continue
+
+            yield entrypoint_file
+
+
+class FullNotebookTest(unittest.TestCase):
+
+    @parameterized.expand(
+        [
+            (notebook_path,)
+            for notebook_path in get_notebook_paths()
+        ],
+        skip_on_empty=True
+    )
+    def test_convert(self, notebook_path: str):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            main_file = os.path.join(temp_dir, "main.py")
+
+            convert(
+                notebook_path,
+                main_file,
+                override=True,
+            )
+
+            self.assertNotEquals(0, os.path.getsize(main_file), "main file is empty")
