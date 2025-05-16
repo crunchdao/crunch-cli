@@ -47,6 +47,15 @@ def _format_directory(directory: str, competition_name: str, project_name: str):
     return os.path.normpath(directory)
 
 
+def echo_version(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        click.echo(f"{__version__.__title__}, version {__version__.__version__}")
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
 @click.group()
 @click.version_option(__version__.__version__, package_name="__version__.__title__")
 @click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
@@ -148,6 +157,7 @@ def init(
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
+@echo_version
 def setup(
     clone_token: str,
     submission_number: str,
@@ -232,6 +242,7 @@ def setup(
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
 @click.argument("clone-token")
+@echo_version
 def setup_notebook(
     submission_number: str,
     no_data: bool,
