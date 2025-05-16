@@ -1,6 +1,7 @@
 import dataclasses
 import os
 import re
+import string
 import typing
 
 import redbaron
@@ -15,19 +16,24 @@ _IMPORT = (
     redbaron.FromImportNode,
 )
 
-_CODE = (
+_COMMENT = redbaron.CommentNode
+
+_KEEP = (
+    # inert code
+    _COMMENT,
+    redbaron.StringNode,
+    redbaron.EndlNode,
+    
+    # code blocks
     redbaron.DefNode,
     redbaron.ClassNode
 )
 
-_COMMENT = (
-    redbaron.CommentNode,
-    redbaron.StringNode,
-    redbaron.EndlNode,
-)
-
 _DOT = "."
 _KV_DIVIDER = "---"
+
+_AUTO_COMMENT_ON = "@crunch/keep:on"
+_AUTO_COMMENT_OFF = "@crunch/keep:off"
 
 
 JUPYTER_MAGIC_COMMAND_PATTERN = r"^\s*?(!|%)"
@@ -107,6 +113,10 @@ def _cut_crlf(input: str):
         input = input[:-1]
 
     return input
+
+
+def _strip_hashes(input: str):
+    return input.lstrip(string.whitespace + "#")
 
 
 def _extract_import_version(log: typing.Callable[[str], None], node: redbaron.Node):
@@ -215,6 +225,8 @@ def _extract_code_cell(
             source,
         ) from error
 
+    auto_comment = True
+
     parts = []
     for node in tree:
         node: redbaron.Node
@@ -225,7 +237,18 @@ def _extract_code_cell(
 
         if isinstance(node, _IMPORT):
             _add_to_packages(log, packages, node)
-        elif not isinstance(node, _CODE) and not isinstance(node, _COMMENT):
+
+        elif isinstance(node, _COMMENT):
+            node_str = _strip_hashes(node_str)
+
+            if node_str == _AUTO_COMMENT_ON:
+                log("disabled auto comment")
+                auto_comment = False
+            elif node_str == _AUTO_COMMENT_OFF:
+                auto_comment = True
+                log("enabled auto comment")
+
+        elif auto_comment and not isinstance(node, _KEEP):
             node = redbaron.RedBaron("\n".join(
                 f"#{line}"
                 for line in node_str.split("\n")

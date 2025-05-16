@@ -9,7 +9,6 @@ packaging>=24.2
 pandas
 psutil
 pyarrow
-pytest
 python-dotenv
 pyyaml
 redbaron
