@@ -26,7 +26,7 @@ jobs:
         run: make build
 
       - name: Install wheel
-        run: pip install dist/*.whl
+        run: pip install $(echo dist/*.whl)"[test]"
 
       - name: Run tests
         env:
