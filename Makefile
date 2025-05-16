@@ -2,7 +2,7 @@ PYTHON=python
 PIP=$(PYTHON) -m pip
 
 install:
-	$(PIP) install -e .
+	$(PIP) install -e .[test]
 
 install-runner:
 	$(PIP) install -r requirements/runner.txt
