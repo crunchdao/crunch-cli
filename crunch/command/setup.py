@@ -16,11 +16,11 @@ def setup(
     data_size_variant: api.SizeVariant,
 ):
     command.init(
-        clone_token,
-        directory,
-        model_directory,
-        force,
-        data_size_variant,
+        clone_token=clone_token,
+        directory=directory,
+        model_directory=model_directory,
+        force=force,
+        data_size_variant=data_size_variant,
     )
 
     _, project = api.Client.from_project()

@@ -24,6 +24,7 @@ def _check_if_already_exists(directory: str, force: bool):
 
 
 def init(
+    *,
     clone_token: str,
     directory: str,
     model_directory: str,
