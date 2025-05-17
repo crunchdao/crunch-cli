@@ -6,6 +6,7 @@ import re
 import string
 import typing
 
+import libcst
 import redbaron
 import yaml
 
@@ -13,30 +14,11 @@ import requirements
 
 _FAKE_PACKAGE_NAME = "version"
 
-_IMPORT = (
-    redbaron.ImportNode,
-    redbaron.FromImportNode,
-)
-
-_COMMENT = redbaron.CommentNode
-_EMPTY_LINE = redbaron.EndlNode
-
-_KEEP = (
-    # inert code
-    _COMMENT,
-    _EMPTY_LINE,
-    redbaron.StringNode,
-
-    # code blocks
-    redbaron.DefNode,
-    redbaron.ClassNode
-)
-
 _DOT = "."
 _KV_DIVIDER = "---"
 
-_AUTO_COMMENT_ON = "@crunch/keep:on"
-_AUTO_COMMENT_OFF = "@crunch/keep:off"
+_CRUNCH_KEEP_ON = "@crunch/keep:on"
+_CRUNCH_KEEP_OFF = "@crunch/keep:off"
 
 
 JUPYTER_MAGIC_COMMAND_PATTERN = r"^\s*?(!|%)"
@@ -122,9 +104,9 @@ def _strip_hashes(input: str):
     return input.lstrip(string.whitespace + "#")
 
 
-def _extract_import_version(log: typing.Callable[[str], None], node: redbaron.Node):
+def _extract_import_version(log: typing.Callable[[str], None], node: libcst.CSTNode):
     next_node = node.next
-    if not isinstance(next_node, redbaron.CommentNode):
+    if not isinstance(next_node, libcst.Comment):
         log(f"skip version: next node not comment")
         return None
 
@@ -160,11 +142,13 @@ def _extract_import_version(log: typing.Callable[[str], None], node: redbaron.No
     )
 
 
-def _convert_import(log: typing.Callable[[str], None], node: redbaron.Node):
+def _convert_import(log: typing.Callable[[str], None], node: libcst.CSTNode):
     paths = None
-    if isinstance(node, redbaron.ImportNode):
+    if isinstance(node, libcst.Import):
+        breakpoint()
         paths = node.modules()
-    elif isinstance(node, redbaron.FromImportNode):
+    elif isinstance(node, libcst.ImportFrom):
+        breakpoint()
         paths = node.full_path_modules()
 
     if paths is None:
@@ -181,7 +165,7 @@ def _convert_import(log: typing.Callable[[str], None], node: redbaron.Node):
     return names, version
 
 
-def _add_to_packages(log: typing.Callable[[str], None], packages: dict, node: redbaron.Node):
+def _add_to_packages(log: typing.Callable[[str], None], packages: dict, node: libcst.CSTNode):
     package_names, new = _convert_import(log, node)
 
     for package_name in package_names:
@@ -203,6 +187,57 @@ def _add_to_packages(log: typing.Callable[[str], None], packages: dict, node: re
             log(f"found version: {package_name}: {new}")
 
 
+_IMPORT = (
+    libcst.Import,
+    libcst.ImportFrom,
+)
+
+_KEEP = (
+    libcst.Module,
+
+    libcst.FunctionDef,
+    libcst.ClassDef,
+
+    libcst.Comment,
+    libcst.EmptyLine,
+    libcst.TrailingWhitespace,
+)
+
+
+class CommentTransformer(libcst.CSTTransformer):
+
+    def __init__(self, tree: libcst.Module):
+        self.tree = tree
+
+    def on_visit(self, node):
+        return isinstance(node, libcst.Module)
+
+    def on_leave(self, original_node, updated_node):
+        if isinstance(original_node, _KEEP):
+            return updated_node
+
+        if isinstance(original_node, libcst.SimpleStatementLine):
+            nodes = []
+
+            for index, child in enumerate(original_node.children):
+                if isinstance(child, _IMPORT) or isinstance(child, _KEEP):
+                    nodes.append(child)
+                    continue
+
+                for line in self._to_lines(child):
+                    nodes.append(libcst.Comment(f"#{line}"))
+
+            return libcst.FlattenSentinel(nodes)
+
+        return libcst.FlattenSentinel([
+            libcst.EmptyLine(comment=libcst.Comment(f"#{line}") if line else None)
+            for line in self._to_lines(original_node)
+        ])
+
+    def _to_lines(self, node: libcst.CSTNode) -> str:
+        return self.tree.code_for_node(node).splitlines()
+
+
 def _extract_code_cell(
     cell_source: typing.List[str],
     log: typing.Callable[[str], None],
@@ -219,56 +254,27 @@ def _extract_code_cell(
         return
 
     try:
-        tree = redbaron.RedBaron(source)
-    except Exception as error:
-        log(f"failed to parse: {error}")
+        tree = libcst.parse_module(source)
+    except libcst.ParserSyntaxError as error:
+        log(f"failed to parse: {error.message}")
+
         raise NotebookCellParseError(
             f"notebook code cell cannot be parsed",
             str(error),
             source,
         ) from error
 
-    auto_comment = True
+    transformer = CommentTransformer(tree)
+    tree = tree.visit(transformer)
 
-    parts = []
-    for node in tree:
-        node: redbaron.Node
-
-        node_str = node.dumps()
-        if node_str.endswith("\n"):
-            node_str = node_str[:-1]
-
-        if isinstance(node, _IMPORT):
-            _add_to_packages(log, packages, node)
-
-        elif isinstance(node, _COMMENT):
-            node_str = _strip_hashes(node_str)
-
-            if node_str == _AUTO_COMMENT_ON:
-                log("disabled auto comment")
-                auto_comment = False
-            elif node_str == _AUTO_COMMENT_OFF:
-                auto_comment = True
-                log("enabled auto comment")
-
-        elif auto_comment and not isinstance(node, _KEEP):
-            node = redbaron.RedBaron("\n".join(
-                f"#{line}"
-                for line in node_str.split("\n")
-            ))
-
-        if isinstance(node, _EMPTY_LINE):
-            parts.append("")
-        else:
-            parts.append(node.dumps().rstrip())
-
-    if len(tree):
-        log(f"used {len(tree)} node(s)")
+    lines = tree.code.strip("\r\n").splitlines()
+    if len(lines):
+        log(f"used {len(lines)} line(s)")
 
         if len(module):
             module.append(f"\n")
 
-        module.append("\n".join(parts))
+        module.append("\n".join(lines))
     else:
         log(f"skip since empty")
 
