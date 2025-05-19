@@ -104,13 +104,16 @@ def _strip_hashes(input: str):
     return input.lstrip(string.whitespace + "#")
 
 
-def _extract_import_version(log: typing.Callable[[str], None], node: libcst.CSTNode):
-    next_node = node.next
-    if not isinstance(next_node, libcst.Comment):
-        log(f"skip version: next node not comment")
+def _extract_import_version(log: typing.Callable[[str], None], comment_node: typing.Optional[libcst.Comment]):
+    if comment_node is None:
+        log(f"skip version: no comment")
         return None
 
-    line = re.sub(r"\s*#", "", next_node.dumps()).strip()
+    line = _strip_hashes(comment_node.value)
+    if not line:
+        log(f"skip version: comment empty")
+        return None
+
     if not re.match(r"^[\[><=~]", line):
         log(f"skip version: line not matching: `{line}`")
         return None
@@ -142,19 +145,30 @@ def _extract_import_version(log: typing.Callable[[str], None], node: libcst.CSTN
     )
 
 
-def _convert_import(log: typing.Callable[[str], None], node: libcst.CSTNode):
-    paths = None
-    if isinstance(node, libcst.Import):
-        breakpoint()
-        paths = node.modules()
-    elif isinstance(node, libcst.ImportFrom):
-        breakpoint()
-        paths = node.full_path_modules()
+ImportNodeType = typing.Union[libcst.Import, libcst.ImportFrom]
 
-    if paths is None:
+
+def _evaluate_name(node: libcst.CSTNode) -> str:
+    if isinstance(node, libcst.Name):
+        return node.value
+    elif isinstance(node, libcst.Attribute):
+        return f"{_evaluate_name(node.value)}.{node.attr.value}"
+    else:
+        raise Exception("Logic error!")
+
+
+def _convert_import(log: typing.Callable[[str], None], import_node: ImportNodeType, comment_node: typing.Optional[libcst.Comment]):
+    if isinstance(import_node, libcst.Import):
+        paths = [
+            _evaluate_name(alias.name)
+            for alias in import_node.names
+        ]
+    elif isinstance(import_node, libcst.ImportFrom) and import_node.module is not None:
+        paths = [_evaluate_name(import_node.module)]
+    else:
         return [], None
 
-    version = _extract_import_version(log, node)
+    version = _extract_import_version(log, comment_node)
 
     names = set()
     for path in paths:
@@ -165,8 +179,8 @@ def _convert_import(log: typing.Callable[[str], None], node: libcst.CSTNode):
     return names, version
 
 
-def _add_to_packages(log: typing.Callable[[str], None], packages: dict, node: libcst.CSTNode):
-    package_names, new = _convert_import(log, node)
+def _add_to_packages(log: typing.Callable[[str], None], packages: dict, import_node: ImportNodeType, comment_node: typing.Optional[libcst.Comment]):
+    package_names, new = _convert_import(log, import_node, comment_node)
 
     for package_name in package_names:
         if new is not None:
@@ -230,33 +244,50 @@ class CommentTransformer(libcst.CSTTransformer):
     def __init__(self, tree: libcst.Module):
         self.tree = tree
 
-        self.method_stack = []
+        self.import_and_comment_nodes: typing.List[typing.Tuple[ImportNodeType, typing.Optional[libcst.Comment]]] = []
+
+        self._method_stack = []
+        self._previous_import_node = None
 
     def on_visit(self, node):
         print("visit", type(node), "\\n".join(self._to_lines(node)))
 
         if isinstance(node, (libcst.Module, libcst.SimpleStatementLine)):
-            self.method_stack.append(self.METHOD_GROUP)
+            self._method_stack.append(self.METHOD_GROUP)
             return True
         elif isinstance(node, libcst.BaseCompoundStatement):
-            self.method_stack.append(self.METHOD_GROUP)
+            self._method_stack.append(self.METHOD_GROUP)
             return False
         else:
-            self.method_stack.append(self.METHOD_LINE)
+            self._method_stack.append(self.METHOD_LINE)
             return False
 
     def on_leave(self, original_node, updated_node):
-        method = self.method_stack.pop()
+        method = self._method_stack.pop()
         print("leave", type(original_node), method)
 
         if isinstance(original_node, _IMPORT):
+            self._previous_import_node = original_node
             return updated_node
+
+        if self._previous_import_node is not None:
+            import_node, self._previous_import_node = self._previous_import_node, None
+
+            if isinstance(original_node, libcst.TrailingWhitespace) and original_node.comment:
+                self.import_and_comment_nodes.append(
+                    (import_node, original_node.comment)
+                )
+            else:
+                self.import_and_comment_nodes.append(
+                    (import_node, None)
+                )
 
         if isinstance(original_node, _KEEP):
             return updated_node
 
         nodes = []
 
+        # control flow blocks have their comment attached to them
         if isinstance(original_node, libcst.BaseCompoundStatement) and original_node.leading_lines:
             nodes.extend(original_node.leading_lines)
 
@@ -286,7 +317,7 @@ class CommentTransformer(libcst.CSTTransformer):
                     Comment(f"#{line}")
                     for line in self._to_lines(original_node)
                 )
-        
+
         else:
             raise NotImplementedError(f"method: {method}")
 
@@ -324,6 +355,9 @@ def _extract_code_cell(
 
     transformer = CommentTransformer(tree)
     tree = tree.visit(transformer)
+
+    for import_node, comment_node in transformer.import_and_comment_nodes:
+        _add_to_packages(log, packages, import_node, comment_node)
 
     lines = tree.code.strip("\r\n").splitlines()
     if len(lines):
