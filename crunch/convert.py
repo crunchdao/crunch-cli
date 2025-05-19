@@ -201,38 +201,96 @@ _KEEP = (
     libcst.Comment,
     libcst.EmptyLine,
     libcst.TrailingWhitespace,
+
+    libcst.SimpleStatementLine,
 )
+
+
+class Comment(libcst.Comment):
+
+    semicolon = False
+
+    def _codegen_impl(self, state, default_semicolon=None) -> None:
+        super()._codegen_impl(state)
+
+
+class EmptyLine(libcst.EmptyLine):
+
+    semicolon = False
+
+    def _codegen_impl(self, state, default_semicolon=None) -> None:
+        super()._codegen_impl(state)
 
 
 class CommentTransformer(libcst.CSTTransformer):
 
+    METHOD_GROUP = "group"
+    METHOD_LINE = "line"
+
     def __init__(self, tree: libcst.Module):
         self.tree = tree
 
+        self.method_stack = []
+
     def on_visit(self, node):
-        return isinstance(node, libcst.Module)
+        print("visit", type(node), "\\n".join(self._to_lines(node)))
+
+        if isinstance(node, (libcst.Module, libcst.SimpleStatementLine)):
+            self.method_stack.append(self.METHOD_GROUP)
+            return True
+        elif isinstance(node, libcst.BaseCompoundStatement):
+            self.method_stack.append(self.METHOD_GROUP)
+            return False
+        else:
+            self.method_stack.append(self.METHOD_LINE)
+            return False
 
     def on_leave(self, original_node, updated_node):
+        method = self.method_stack.pop()
+        print("leave", type(original_node), method)
+
+        if isinstance(original_node, _IMPORT):
+            return updated_node
+
         if isinstance(original_node, _KEEP):
             return updated_node
 
-        if isinstance(original_node, libcst.SimpleStatementLine):
-            nodes = []
+        nodes = []
 
-            for index, child in enumerate(original_node.children):
-                if isinstance(child, _IMPORT) or isinstance(child, _KEEP):
-                    nodes.append(child)
-                    continue
+        if isinstance(original_node, libcst.BaseCompoundStatement) and original_node.leading_lines:
+            nodes.extend(original_node.leading_lines)
 
-                for line in self._to_lines(child):
-                    nodes.append(libcst.Comment(f"#{line}"))
+            original_node = original_node.with_changes(
+                leading_lines=libcst.FlattenSentinel([])
+            )
 
-            return libcst.FlattenSentinel(nodes)
+        if method == self.METHOD_GROUP:
+            nodes.extend(
+                EmptyLine(comment=Comment(f"#{line}"))
+                for line in self._to_lines(original_node)
+            )
 
-        return libcst.FlattenSentinel([
-            libcst.EmptyLine(comment=libcst.Comment(f"#{line}") if line else None)
-            for line in self._to_lines(original_node)
-        ])
+        elif method == self.METHOD_LINE:
+            if isinstance(original_node, libcst.BaseSmallStatement):
+                lines = self._to_lines(original_node)
+
+                if len(lines) == 1:
+                    nodes.append(Comment(f"#{lines[0]}"))
+                else:
+                    nodes.extend(
+                        EmptyLine(comment=Comment(f"#{line}"))
+                        for line in lines
+                    )
+            else:
+                nodes.extend(
+                    Comment(f"#{line}")
+                    for line in self._to_lines(original_node)
+                )
+        
+        else:
+            raise NotImplementedError(f"method: {method}")
+
+        return libcst.FlattenSentinel(nodes)
 
     def _to_lines(self, node: libcst.CSTNode) -> str:
         return self.tree.code_for_node(node).splitlines()
