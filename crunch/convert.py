@@ -7,7 +7,6 @@ import string
 import typing
 
 import libcst
-import redbaron
 import yaml
 
 import requirements
