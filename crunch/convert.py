@@ -248,6 +248,7 @@ class CommentTransformer(libcst.CSTTransformer):
 
         self._method_stack = []
         self._previous_import_node = None
+        self._auto_comment = True
 
     def on_visit(self, node):
         print("visit", type(node), "\\n".join(self._to_lines(node)))
@@ -282,7 +283,16 @@ class CommentTransformer(libcst.CSTTransformer):
                     (import_node, None)
                 )
 
-        if isinstance(original_node, _KEEP):
+        if isinstance(original_node, libcst.EmptyLine) and original_node.comment:
+            comment = _strip_hashes(original_node.comment.value)
+            if comment == _CRUNCH_KEEP_ON:
+                self._auto_comment = False
+            elif comment == _CRUNCH_KEEP_OFF:
+                self._auto_comment = True
+
+            return updated_node
+
+        if not self._auto_comment or isinstance(original_node, _KEEP):
             return updated_node
 
         nodes = []

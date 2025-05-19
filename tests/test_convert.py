@@ -68,40 +68,42 @@ class SourceCodeTest(unittest.TestCase):
 
         self.assertEqual(content, source_code)
 
-    # def test_keep_commands(self):
-    #     (
-    #         source_code,
-    #         _,
-    #         _,
-    #     ) = extract_cells([
-    #         _cell("a", "code", [
-    #             "# @crunch/keep:on",
-    #             "a = 42",
-    #             "# @crunch/keep:off",
-    #             "b = 42",
-    #         ]),
-    #         _cell("b", "code", [
-    #             "# @crunch/keep:on",
-    #             "c = 42",
-    #         ]),
-    #         _cell("b", "code", [
-    #             "d = 42",
-    #         ]),
-    #     ])
+    def test_keep_commands(self):
+        (
+            source_code,
+            _,
+            _,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "# @crunch/keep:on",
+                "a = 42",
+                "# @crunch/keep:off",
+                "b = 42",
+            ]),
+            _cell("b", "code", [
+                "# @crunch/keep:on",
+                "c = 42",
+            ]),
+            _cell("b", "code", [
+                "d = 42",
+            ]),
+        ])
 
-    #     content = textwrap.dedent("""
-    #         # @crunch/keep:on
-    #         a = 42
-    #         # @crunch/keep:off
-    #         #b = 42
+        content = textwrap.dedent("""
+            # @crunch/keep:on
+            a = 42
+            # @crunch/keep:off
+            #b = 42
 
-    #         # @crunch/keep:on
-    #         c = 42
 
-    #         #d = 42
-    #     """).lstrip()
+            # @crunch/keep:on
+            c = 42
 
-    #     self.assertEqual(content, source_code)
+
+            #d = 42
+        """).lstrip()
+
+        self.assertEqual(content, source_code)
 
     def test_invalid_syntax(self):
         with self.assertRaises(NotebookCellParseError) as context:
