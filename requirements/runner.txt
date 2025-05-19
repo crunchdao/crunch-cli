@@ -6,16 +6,15 @@ dataclasses_json
 joblib
 
 
+
 pandas
 psutil
 pyarrow
 
 python-dotenv
 
-
 requests
 requests-toolbelt
-
 
 
 tqdm
