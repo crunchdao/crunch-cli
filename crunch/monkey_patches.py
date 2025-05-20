@@ -78,6 +78,15 @@ def tqdm_display():
 
 
 @_patcher
+def tqdm_notebook():
+    from tqdm.notebook import tqdm as tqdm_notebook
+
+    for key, value in dict(vars(tqdm_notebook)).items():
+        if callable(value) or isinstance(value, property):
+            delattr(tqdm_notebook, key)
+
+
+@_patcher
 def pathlib_str_functions():
     import pathlib
 
