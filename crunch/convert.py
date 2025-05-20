@@ -250,7 +250,7 @@ class CommentTransformer(libcst.CSTTransformer):
         self._auto_comment = True
 
     def on_visit(self, node):
-        print("visit", type(node), "\\n".join(self._to_lines(node)))
+        # print("visit", type(node), "\\n".join(self._to_lines(node)))
 
         if isinstance(node, (libcst.Module, libcst.SimpleStatementLine)):
             self._method_stack.append(self.METHOD_GROUP)
@@ -264,7 +264,7 @@ class CommentTransformer(libcst.CSTTransformer):
 
     def on_leave(self, original_node, updated_node):
         method = self._method_stack.pop()
-        print("leave", type(original_node), method)
+        # print("leave", type(original_node), method)
 
         if isinstance(original_node, _IMPORT):
             self._previous_import_node = original_node
