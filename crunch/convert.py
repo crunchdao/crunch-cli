@@ -6,37 +6,18 @@ import re
 import string
 import typing
 
-import redbaron
+import libcst
 import yaml
 
 import requirements
 
 _FAKE_PACKAGE_NAME = "version"
 
-_IMPORT = (
-    redbaron.ImportNode,
-    redbaron.FromImportNode,
-)
-
-_COMMENT = redbaron.CommentNode
-_EMPTY_LINE = redbaron.EndlNode
-
-_KEEP = (
-    # inert code
-    _COMMENT,
-    _EMPTY_LINE,
-    redbaron.StringNode,
-
-    # code blocks
-    redbaron.DefNode,
-    redbaron.ClassNode
-)
-
 _DOT = "."
 _KV_DIVIDER = "---"
 
-_AUTO_COMMENT_ON = "@crunch/keep:on"
-_AUTO_COMMENT_OFF = "@crunch/keep:off"
+_CRUNCH_KEEP_ON = "@crunch/keep:on"
+_CRUNCH_KEEP_OFF = "@crunch/keep:off"
 
 
 JUPYTER_MAGIC_COMMAND_PATTERN = r"^\s*?(!|%)"
@@ -122,13 +103,16 @@ def _strip_hashes(input: str):
     return input.lstrip(string.whitespace + "#")
 
 
-def _extract_import_version(log: typing.Callable[[str], None], node: redbaron.Node):
-    next_node = node.next
-    if not isinstance(next_node, redbaron.CommentNode):
-        log(f"skip version: next node not comment")
+def _extract_import_version(log: typing.Callable[[str], None], comment_node: typing.Optional[libcst.Comment]):
+    if comment_node is None:
+        log(f"skip version: no comment")
         return None
 
-    line = re.sub(r"\s*#", "", next_node.dumps()).strip()
+    line = _strip_hashes(comment_node.value)
+    if not line:
+        log(f"skip version: comment empty")
+        return None
+
     if not re.match(r"^[\[><=~]", line):
         log(f"skip version: line not matching: `{line}`")
         return None
@@ -160,17 +144,30 @@ def _extract_import_version(log: typing.Callable[[str], None], node: redbaron.No
     )
 
 
-def _convert_import(log: typing.Callable[[str], None], node: redbaron.Node):
-    paths = None
-    if isinstance(node, redbaron.ImportNode):
-        paths = node.modules()
-    elif isinstance(node, redbaron.FromImportNode):
-        paths = node.full_path_modules()
+ImportNodeType = typing.Union[libcst.Import, libcst.ImportFrom]
 
-    if paths is None:
+
+def _evaluate_name(node: libcst.CSTNode) -> str:
+    if isinstance(node, libcst.Name):
+        return node.value
+    elif isinstance(node, libcst.Attribute):
+        return f"{_evaluate_name(node.value)}.{node.attr.value}"
+    else:
+        raise Exception("Logic error!")
+
+
+def _convert_import(log: typing.Callable[[str], None], import_node: ImportNodeType, comment_node: typing.Optional[libcst.Comment]):
+    if isinstance(import_node, libcst.Import):
+        paths = [
+            _evaluate_name(alias.name)
+            for alias in import_node.names
+        ]
+    elif isinstance(import_node, libcst.ImportFrom) and import_node.module is not None:
+        paths = [_evaluate_name(import_node.module)]
+    else:
         return [], None
 
-    version = _extract_import_version(log, node)
+    version = _extract_import_version(log, comment_node)
 
     names = set()
     for path in paths:
@@ -181,8 +178,8 @@ def _convert_import(log: typing.Callable[[str], None], node: redbaron.Node):
     return names, version
 
 
-def _add_to_packages(log: typing.Callable[[str], None], packages: dict, node: redbaron.Node):
-    package_names, new = _convert_import(log, node)
+def _add_to_packages(log: typing.Callable[[str], None], packages: dict, import_node: ImportNodeType, comment_node: typing.Optional[libcst.Comment]):
+    package_names, new = _convert_import(log, import_node, comment_node)
 
     for package_name in package_names:
         if new is not None:
@@ -203,6 +200,143 @@ def _add_to_packages(log: typing.Callable[[str], None], packages: dict, node: re
             log(f"found version: {package_name}: {new}")
 
 
+_IMPORT = (
+    libcst.Import,
+    libcst.ImportFrom,
+)
+
+_KEEP = (
+    libcst.Module,
+
+    libcst.FunctionDef,
+    libcst.ClassDef,
+
+    libcst.Comment,
+    libcst.EmptyLine,
+    libcst.TrailingWhitespace,
+
+    libcst.SimpleStatementLine,
+)
+
+
+class Comment(libcst.Comment):
+
+    semicolon = False
+
+    def _codegen_impl(self, state, default_semicolon=None) -> None:
+        super()._codegen_impl(state)
+
+
+class EmptyLine(libcst.EmptyLine):
+
+    semicolon = False
+
+    def _codegen_impl(self, state, default_semicolon=None) -> None:
+        super()._codegen_impl(state)
+
+
+class CommentTransformer(libcst.CSTTransformer):
+
+    METHOD_GROUP = "group"
+    METHOD_LINE = "line"
+
+    def __init__(self, tree: libcst.Module):
+        self.tree = tree
+
+        self.import_and_comment_nodes: typing.List[typing.Tuple[ImportNodeType, typing.Optional[libcst.Comment]]] = []
+
+        self._method_stack = []
+        self._previous_import_node = None
+        self._auto_comment = True
+
+    def on_visit(self, node):
+        print("visit", type(node), "\\n".join(self._to_lines(node)))
+
+        if isinstance(node, (libcst.Module, libcst.SimpleStatementLine)):
+            self._method_stack.append(self.METHOD_GROUP)
+            return True
+        elif isinstance(node, libcst.BaseCompoundStatement):
+            self._method_stack.append(self.METHOD_GROUP)
+            return False
+        else:
+            self._method_stack.append(self.METHOD_LINE)
+            return False
+
+    def on_leave(self, original_node, updated_node):
+        method = self._method_stack.pop()
+        print("leave", type(original_node), method)
+
+        if isinstance(original_node, _IMPORT):
+            self._previous_import_node = original_node
+            return updated_node
+
+        if self._previous_import_node is not None:
+            import_node, self._previous_import_node = self._previous_import_node, None
+
+            if isinstance(original_node, libcst.TrailingWhitespace) and original_node.comment:
+                self.import_and_comment_nodes.append(
+                    (import_node, original_node.comment)
+                )
+            else:
+                self.import_and_comment_nodes.append(
+                    (import_node, None)
+                )
+
+        if isinstance(original_node, libcst.EmptyLine) and original_node.comment:
+            comment = _strip_hashes(original_node.comment.value)
+            if comment == _CRUNCH_KEEP_ON:
+                self._auto_comment = False
+            elif comment == _CRUNCH_KEEP_OFF:
+                self._auto_comment = True
+
+            return updated_node
+
+        if not self._auto_comment or isinstance(original_node, _KEEP):
+            return updated_node
+
+        nodes = []
+
+        # control flow blocks have their comment attached to them
+        if isinstance(original_node, libcst.BaseCompoundStatement) and original_node.leading_lines:
+            nodes.extend(original_node.leading_lines)
+
+            original_node = original_node.with_changes(
+                leading_lines=libcst.FlattenSentinel([])
+            )
+
+        if method == self.METHOD_GROUP:
+            nodes.extend(
+                EmptyLine(comment=Comment(f"#{line}"))
+                for line in self._to_lines(original_node)
+            )
+
+        elif method == self.METHOD_LINE:
+            if isinstance(original_node, libcst.BaseSmallStatement):
+                lines = self._to_lines(original_node)
+
+                if len(lines) == 1:
+                    nodes.append(Comment(f"#{lines[0]}"))
+                else:
+                    nodes.extend(
+                        EmptyLine(comment=Comment(f"#{line}"))
+                        for line in lines[:-1]
+                    )
+                    nodes.append(Comment(f"#{lines[-1]}"))
+            else:
+                nodes.extend(
+                    Comment(f"#{line}")
+                    for line in self._to_lines(original_node)
+                )
+
+        else:
+            raise NotImplementedError(f"method: {method}")
+
+        return libcst.FlattenSentinel(nodes)
+
+    def _to_lines(self, node: libcst.CSTNode) -> str:
+        return self.tree.code_for_node(node).splitlines()
+
+
 def _extract_code_cell(
     cell_source: typing.List[str],
     log: typing.Callable[[str], None],
@@ -219,56 +353,30 @@ def _extract_code_cell(
         return
 
     try:
-        tree = redbaron.RedBaron(source)
-    except Exception as error:
-        log(f"failed to parse: {error}")
+        tree = libcst.parse_module(source)
+    except libcst.ParserSyntaxError as error:
+        log(f"failed to parse: {error.message}")
+
         raise NotebookCellParseError(
             f"notebook code cell cannot be parsed",
             str(error),
             source,
         ) from error
 
-    auto_comment = True
+    transformer = CommentTransformer(tree)
+    tree = tree.visit(transformer)
 
-    parts = []
-    for node in tree:
-        node: redbaron.Node
+    for import_node, comment_node in transformer.import_and_comment_nodes:
+        _add_to_packages(log, packages, import_node, comment_node)
 
-        node_str = node.dumps()
-        if node_str.endswith("\n"):
-            node_str = node_str[:-1]
-
-        if isinstance(node, _IMPORT):
-            _add_to_packages(log, packages, node)
-
-        elif isinstance(node, _COMMENT):
-            node_str = _strip_hashes(node_str)
-
-            if node_str == _AUTO_COMMENT_ON:
-                log("disabled auto comment")
-                auto_comment = False
-            elif node_str == _AUTO_COMMENT_OFF:
-                auto_comment = True
-                log("enabled auto comment")
-
-        elif auto_comment and not isinstance(node, _KEEP):
-            node = redbaron.RedBaron("\n".join(
-                f"#{line}"
-                for line in node_str.split("\n")
-            ))
-
-        if isinstance(node, _EMPTY_LINE):
-            parts.append("")
-        else:
-            parts.append(node.dumps().rstrip())
-
-    if len(tree):
-        log(f"used {len(tree)} node(s)")
+    lines = tree.code.strip("\r\n").splitlines()
+    if len(lines):
+        log(f"used {len(lines)} line(s)")
 
         if len(module):
             module.append(f"\n")
 
-        module.append("\n".join(parts))
+        module.append("\n".join(lines))
     else:
         log(f"skip since empty")
 

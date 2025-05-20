@@ -4,6 +4,7 @@ dataclasses_json
 importlib_metadata
 inquirer
 joblib
+libcst
 networkx
 packaging>=24.2
 pandas
@@ -11,7 +12,6 @@ psutil
 pyarrow
 python-dotenv
 pyyaml
-redbaron
 requests
 requests-toolbelt
 requirements-parser>=0.11.0
