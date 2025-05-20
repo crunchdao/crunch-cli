@@ -47,3 +47,7 @@ TEXT_FILE_EXTENSIONS = [
     ".txt",
     ".md",
 ]
+
+USER_CODE_MODULE_NAME = "user_code"
+
+RUN_VIA_CLI = False
