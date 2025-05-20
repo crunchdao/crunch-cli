@@ -403,6 +403,19 @@ class SourceCodeTest(unittest.TestCase):
         ("x not in y", "#x not in y\n",),
 
         ("import a as b", "import a as b\n",),
+
+        (
+            """
+            print(x(1
+                    + y))
+            print()
+            """,
+            """
+            #print(x(1
+            #        + y))
+            #print()
+            """,
+        ),
     ])
     def test_syntax(self, cell_content, expected):
         cell_content = textwrap.dedent(cell_content).lstrip()

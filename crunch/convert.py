@@ -319,8 +319,9 @@ class CommentTransformer(libcst.CSTTransformer):
                 else:
                     nodes.extend(
                         EmptyLine(comment=Comment(f"#{line}"))
-                        for line in lines
+                        for line in lines[:-1]
                     )
+                    nodes.append(Comment(f"#{lines[-1]}"))
             else:
                 nodes.extend(
                     Comment(f"#{line}")
