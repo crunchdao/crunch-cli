@@ -74,6 +74,8 @@ def cli(
     competitions_directory_path: typing.Optional[str],
     environment_name: str,
 ):
+    constants.RUN_VIA_CLI = True
+
     store.debug = debug
     store.api_base_url = api_base_url
     store.web_base_url = web_base_url
@@ -809,6 +811,3 @@ def organize_group(
 
 
 organize_group.add_command(organize_test_group)
-
-if __name__ == '__main__':
-    cli()

@@ -4,12 +4,12 @@ import sys
 import types
 import typing
 
-from .. import api, tester, unstructured
+from .. import api, tester, unstructured, constants
 
 
 def load_user_code(
     main_file_path: str,
-    module_name="user_code"
+    module_name=constants.USER_CODE_MODULE_NAME,
 ) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location(module_name, main_file_path)
     module = importlib.util.module_from_spec(spec)

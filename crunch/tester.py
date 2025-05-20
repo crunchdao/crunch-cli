@@ -1,7 +1,7 @@
 import logging
 import typing
 
-from . import api, unstructured
+from . import api, unstructured, monkey_patches
 
 _logged_installed = False
 
@@ -40,6 +40,8 @@ def run(
     read_kwargs={},
     write_kwargs={},
 ):
+    monkey_patches.pickle_unpickler_find_class()
+
     if competition.format == api.CompetitionFormat.STREAM:
         if no_determinism_check == False:
             logger.warning("determinism check not available for stream competitions")
