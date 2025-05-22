@@ -1,7 +1,10 @@
 import json
 import os
+import random
 import re
 import signal
+import stat
+import string
 import subprocess
 import sys
 import time
@@ -24,6 +27,10 @@ CONFLICTING_GPU_PACKAGES = [
     "nvidia_cublas_cu11"
 ]
 
+"""
+Write permissions for current user, current group and others.
+"""
+S_IWALL = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
 
 """
 group + other  = (null)
@@ -72,6 +79,7 @@ class CloudRunner(Runner):
         model_directory_path: str,
         prediction_path: str,
         trace_path: str,
+        exit_file_path: str,
         # ---
         log_secret: str,
         train_frequency: str,
@@ -114,6 +122,9 @@ class CloudRunner(Runner):
         self.model_directory_path = model_directory_path
         self.prediction_path = prediction_path
         self.trace_path = trace_path
+
+        self.exit_file_path = exit_file_path
+        self.exit_content = None
 
         self.log_secret = log_secret
         self.train_frequency = train_frequency
@@ -546,6 +557,8 @@ class CloudRunner(Runner):
         is_regular = not self.competition_format.unstructured
 
         try:
+            self._prepare_exit()
+
             if is_regular:
                 self.bash2(["chmod", "-R", CHMOD_RESET, self.data_directory])
                 self.bash2(["chmod", "o=x", self.data_directory])
@@ -614,6 +627,8 @@ class CloudRunner(Runner):
                 # ---
                 "fuse-pid": os.getpid(),
                 "fuse-signal-number": FUSE_SIGNAL.value,
+                "exit-file": self.exit_file_path,
+                "exit-content": self.exit_content,
                 # ---
                 "runner-py-file": self.runner_dot_py_file_path,
                 "parameters": json.dumps(parameters) if parameters is not None else None,
@@ -662,12 +677,36 @@ class CloudRunner(Runner):
                     "CRUNCH_AUTO_MONKEY_PATCH": "true",
                 }
             )
+
+            self._validate_exit()
         except SystemExit:
             self.report_trace(loop_key)
             raise
 
         if return_result:
             return utils.read(self.prediction_path)
+
+    def _prepare_exit(self):
+        if not os.path.exists(self.exit_file_path):
+            self.bash2(["touch", self.exit_file_path])
+
+        if (os.stat(self.exit_file_path).st_mode & S_IWALL) != S_IWALL:
+            self.bash2(["chmod", "a+w", self.exit_file_path])
+
+        # truncate
+        open(self.exit_file_path, "w").close()
+
+        self.exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+
+    def _validate_exit(self):
+        self.exit_content, expected_content = None, self.exit_content
+
+        with open(self.exit_file_path) as fd:
+            got_content = fd.read()
+
+        if got_content != expected_content:
+            self.log(f"[debug] failed exit check - expected=`{expected_content}` got=`{got_content[:len(expected_content)*2]}`", error=True)
+            raise RuntimeError("user code exited prematurely")
 
     def _install_permission_fuse(
         self,
