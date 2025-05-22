@@ -4,7 +4,7 @@ import sys
 import types
 import typing
 
-from .. import api, tester, unstructured, constants
+from .. import api, constants, tester, unstructured, utils
 
 
 def load_user_code(
@@ -15,7 +15,9 @@ def load_user_code(
     module = importlib.util.module_from_spec(spec)
 
     sys.path.insert(0, os.getcwd())
-    spec.loader.exec_module(module)
+    
+    with utils.limit_traceback():
+        spec.loader.exec_module(module)
 
     sys.modules[module_name] = module
 
