@@ -597,6 +597,9 @@ def cloud(
     trace_file_name = "trace.txt"
     trace_path = os.path.join(context_directory, trace_file_name)
 
+    exit_file_name = "exit.txt"
+    exit_file_path = os.path.join(context_directory, exit_file_name)
+
     auth = api.auth.RunTokenAuth(run_token)
     client = api.Client.from_env(auth, show_progress=False)
 
@@ -620,6 +623,7 @@ def cloud(
         model_directory_path,
         prediction_path,
         trace_path,
+        exit_file_path,
         # ---
         log_secret,
         train_frequency,
@@ -670,6 +674,8 @@ def cloud(
 # ---
 @click.option("--fuse-pid", required=True, type=int)
 @click.option("--fuse-signal-number", required=True, type=int)
+@click.option("--exit-file", "exit_file_path", required=True, type=str)
+@click.option("--exit-content", required=True, type=str)
 # ---
 @click.option("--runner-py-file", "runner_dot_py_file_path", type=str, default=None)
 @click.option("--parameters", "parameters_json_string", type=str, default=None)
@@ -708,6 +714,8 @@ def cloud_executor(
     # ---
     fuse_pid: int,
     fuse_signal_number: int,
+    exit_file_path: str,
+    exit_content: str,
     # ---
     runner_dot_py_file_path: typing.Optional[str],
     parameters_json_string: typing.Optional[str],
@@ -780,14 +788,10 @@ def cloud_executor(
         json.loads(parameters_json_string) if parameters_json_string else {},
     )
 
-    try:
-        executor.start()
-    except SystemExit as error:
-        if error.code is None or error.code == 0:
-            print("[debug] exit was called without a code, forcing `2`")
+    executor.start()
 
-        error.code = 2
-        raise
+    with open(exit_file_path, "w") as fd:
+        fd.write(exit_content)
 
 
 @cli.group(name="organizer")
