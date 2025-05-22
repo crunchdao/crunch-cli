@@ -430,11 +430,12 @@ class LocalRunner(Runner):
 
         context = LocalRunnerContext(self)
 
-        prediction = self.runner_module.run(
-            context,
-            self.data_directory_path,
-            self.model_directory_path,
-        )
+        with utils.limit_traceback():
+            prediction = self.runner_module.run(
+                context,
+                self.data_directory_path,
+                self.model_directory_path,
+            )
 
         return prediction
 
@@ -557,7 +558,7 @@ class LocalRunnerContext(RunnerContext):
 
         result = utils.smart_call(
             handler,
-            parameters or {}
+            parameters or {},
         )
 
         if isinstance(return_prediction, PredictionCollector):
