@@ -113,12 +113,31 @@ def scan(
     if module:
         packages = extract_from_notebook_modules(module)
         forbidden = find_forbidden(packages, True)
+        _log_forbidden(forbidden, logger, True)
     elif requirements_file:
         packages = extract_from_requirements(requirements_file)
         forbidden = find_forbidden(packages, False)
+        _log_forbidden(forbidden, logger, False)
 
-    for package in forbidden:
-        logger.error('forbidden library: %s', package)
 
+def _log_forbidden(
+    forbidden: typing.Set[str],
+    logger: logging.Logger,
+    is_alias: bool
+):
     if not len(forbidden):
         logger.warning('no forbidden library found')
+        return
+
+    competition_name = utils.try_get_competition_name()
+    client = api.Client.from_env()
+    query_param = 'requestAlias' if is_alias else 'requestName'
+
+    for package in forbidden:
+        line = f'forbidden library: {package}'
+
+        if competition_name:
+            url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?{query_param}={package}')
+            line += f'  (request to whitelist: {url})'
+
+        logger.error(line)

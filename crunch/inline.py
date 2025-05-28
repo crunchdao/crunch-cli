@@ -173,7 +173,10 @@ class _Inline:
         competition = self._competition
 
         try:
-            library.scan(module=self.user_module, logger=self.logger)
+            library.scan(
+                module=self.user_module,
+                logger=self.logger,
+            )
             self.logger.warning('')
 
             return tester.run(
