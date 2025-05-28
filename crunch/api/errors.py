@@ -179,12 +179,23 @@ class ForbiddenLibraryException(ApiException):
 
         self.packages = packages
 
-    def print_helper(self, **kwargs):
+    def print_helper(self, competition_name: str = None, **kwargs):
+        from .client import Client
+
         print("Forbidden packages has been found and the server is unable to accept your work.")
+
+        if competition_name is None:
+            competition_name = utils.try_get_competition_name()
+
+        client = Client.from_env()
 
         print("\nProblematic packages:")
         for package in self.packages:
             print(f"- {package}")
+
+            if competition_name is not None:
+                url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?requestName={package}')
+                print(f"  >> Request to whitelist: {url}")
 
         _print_contact("the package should be allowed")
 
