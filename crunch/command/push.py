@@ -155,19 +155,6 @@ def _print_success(
 ):
     print("\n---")
     print(f"submission #{submission.number} succesfully uploaded!")
-
-    files = [
-        file
-        for file in submission.files.list()
-        if file.found_hardcoded_string
-    ]
-
-    if len(files):
-        print("\nwarning: some of your files have hardcoded strings")
-
-        for file in files:
-            print(f"- {file.name}")
-
     print()
 
     project = submission.project

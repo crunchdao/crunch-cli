@@ -39,10 +39,6 @@ class SubmissionFile(Model):
     def mime_type(self) -> str:
         return self._attrs["mimeType"]
 
-    @property
-    def found_hardcoded_string(self) -> bool:
-        return self._attrs["foundHardcodedString"]
-
 
 class SubmissionFileCollection(Collection):
 
