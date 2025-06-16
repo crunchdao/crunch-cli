@@ -12,6 +12,8 @@ import yaml
 import requirements
 
 _FAKE_PACKAGE_NAME = "x__fake_package_name__"
+_PACKAGE_NAME_PATTERN = r"[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z0-9]"
+_LAST_VERSION = "@latest"
 
 _DOT = "."
 _KV_DIVIDER = "---"
@@ -105,10 +107,7 @@ def _cut_crlf(input: str):
 
 
 def _strip_hashes(input: str):
-    return input.lstrip(string.whitespace + "#")
-
-
-_PACKAGE_NAME_PATTERN = r"[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z0-9]"
+    return input.strip(string.whitespace + "#")
 
 
 def _extract_import_version(log: typing.Callable[[str], None], comment_node: typing.Optional[libcst.Comment]):
@@ -121,14 +120,19 @@ def _extract_import_version(log: typing.Callable[[str], None], comment_node: typ
         log(f"skip version: comment empty")
         return None
 
-    match = re.match(r"^(" + _PACKAGE_NAME_PATTERN + r")?\s*[\[><=~]", line)
+    match = re.match(r"^(" + _PACKAGE_NAME_PATTERN + r")?\s*([@\[><=~])", line)
     if not match:
         log(f"skip version: line not matching: `{line}`")
         return None
 
-    user_package_name = match.group(1) or ""
+    user_package_name = match.group(1)
     test_package_name = user_package_name or _FAKE_PACKAGE_NAME
-    line = f"{test_package_name} {line[len(user_package_name):]}"
+
+    version_part = line[match.start(2):]
+    if version_part == _LAST_VERSION:
+        return (user_package_name or None, [], [])
+
+    line = f"{test_package_name} {version_part}"
 
     try:
         requirement = next(requirements.parse(line), None)

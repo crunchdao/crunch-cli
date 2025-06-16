@@ -456,6 +456,23 @@ class ImportTest(unittest.TestCase):
             ImportedRequirement("extras", None, ["big"], [">4.2"]),
         ], requirements)
 
+    def test_latest_version(self):
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "import hello # @latest",
+                "import world # pandas @latest",
+            ])
+        ])
+
+        self.assertEqual([
+            ImportedRequirement("hello", None, [], []),
+            ImportedRequirement("world", "pandas", [], []),
+        ], requirements)
+
     def test_inconsistant_version(self):
         with self.assertRaises(InconsistantLibraryVersionError):
             extract_cells([
