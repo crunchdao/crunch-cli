@@ -8,8 +8,9 @@ import unittest
 from parameterized import parameterized
 
 from crunch.command.convert import convert
-from crunch.convert import (EmbedFile, InconsistantLibraryVersionError,
-                            NotebookCellParseError, Requirement,
+from crunch.convert import (EmbedFile, ImportedRequirement,
+                            InconsistantLibraryVersionError,
+                            NotebookCellParseError,
                             RequirementVersionParseError, extract_cells)
 
 
@@ -443,14 +444,16 @@ class ImportTest(unittest.TestCase):
             _cell("a", "code", [
                 "import hello",
                 "import world # == 42",
+                "import named # named-python == 42",
                 "import extras # [big] >4.2",
             ])
         ])
 
         self.assertEqual([
-            Requirement("hello", None, None),
-            Requirement("world", [], ["==42"]),
-            Requirement("extras", ["big"], [">4.2"]),
+            ImportedRequirement("hello", None, [], []),
+            ImportedRequirement("world", None, [], ["==42"]),
+            ImportedRequirement("named", "named-python", [], ["==42"]),
+            ImportedRequirement("extras", None, ["big"], [">4.2"]),
         ], requirements)
 
     def test_inconsistant_version(self):
