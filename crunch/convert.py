@@ -11,7 +11,9 @@ import yaml
 
 import requirements
 
-_FAKE_PACKAGE_NAME = "version"
+_FAKE_PACKAGE_NAME = "x__fake_package_name__"
+_PACKAGE_NAME_PATTERN = r"[a-zA-Z_][a-zA-Z0-9_-]*[a-zA-Z0-9]"
+_LAST_VERSION = "@latest"
 
 _DOT = "."
 _KV_DIVIDER = "---"
@@ -31,10 +33,15 @@ class EmbedFile:
 
 
 @dataclasses.dataclass()
-class Requirement:
-    name: str
+class ImportedRequirement:
+    alias: str
+    name: typing.Optional[str]
     extras: typing.Optional[typing.List[str]]
     specs: typing.Optional[typing.List[str]]
+
+    @property
+    def extras_and_specs(self) -> typing.List[str]:
+        return (self.extras, self.specs)
 
 
 def strip_packages(name: str):
@@ -100,7 +107,7 @@ def _cut_crlf(input: str):
 
 
 def _strip_hashes(input: str):
-    return input.lstrip(string.whitespace + "#")
+    return input.strip(string.whitespace + "#")
 
 
 def _extract_import_version(log: typing.Callable[[str], None], comment_node: typing.Optional[libcst.Comment]):
@@ -113,11 +120,19 @@ def _extract_import_version(log: typing.Callable[[str], None], comment_node: typ
         log(f"skip version: comment empty")
         return None
 
-    if not re.match(r"^[\[><=~]", line):
+    match = re.match(r"^(" + _PACKAGE_NAME_PATTERN + r")?\s*([@\[><=~])", line)
+    if not match:
         log(f"skip version: line not matching: `{line}`")
         return None
 
-    line = f"{_FAKE_PACKAGE_NAME} {line}"
+    user_package_name = match.group(1)
+    test_package_name = user_package_name or _FAKE_PACKAGE_NAME
+
+    version_part = line[match.start(2):]
+    if version_part == _LAST_VERSION:
+        return (user_package_name or None, [], [])
+
+    line = f"{test_package_name} {version_part}"
 
     try:
         requirement = next(requirements.parse(line), None)
@@ -129,13 +144,14 @@ def _extract_import_version(log: typing.Callable[[str], None], comment_node: typ
             f"version cannot be parsed: {error}"
         ) from error
 
-    if requirement.name != _FAKE_PACKAGE_NAME:
+    if requirement.name != test_package_name:
         # package has been modified somehow
         raise RequirementVersionParseError(
-            f"name must be {_FAKE_PACKAGE_NAME} and not {requirement.name}"
+            f"name must be `{test_package_name}` and not `{requirement.name}`"
         )
 
     return (
+        user_package_name or None,
         list(requirement.extras),
         [
             f"{operator}{semver}"
@@ -156,7 +172,11 @@ def _evaluate_name(node: libcst.CSTNode) -> str:
         raise Exception("Logic error!")
 
 
-def _convert_import(log: typing.Callable[[str], None], import_node: ImportNodeType, comment_node: typing.Optional[libcst.Comment]):
+def _convert_import(
+    log: typing.Callable[[str], None],
+    import_node: ImportNodeType,
+    comment_node: typing.Optional[libcst.Comment]
+) -> typing.List[ImportedRequirement]:
     if isinstance(import_node, libcst.Import):
         paths = [
             _evaluate_name(alias.name)
@@ -165,9 +185,9 @@ def _convert_import(log: typing.Callable[[str], None], import_node: ImportNodeTy
     elif isinstance(import_node, libcst.ImportFrom) and import_node.module is not None:
         paths = [_evaluate_name(import_node.module)]
     else:
-        return [], None
+        return []
 
-    version = _extract_import_version(log, comment_node)
+    package_name, extras, specs = _extract_import_version(log, comment_node) or (None, [], [])
 
     names = set()
     for path in paths:
@@ -175,28 +195,48 @@ def _convert_import(log: typing.Callable[[str], None], import_node: ImportNodeTy
         if name:
             names.add(name)
 
-    return names, version
+    return [
+        ImportedRequirement(
+            alias=name,
+            name=package_name,
+            extras=extras,
+            specs=specs,
+        )
+        for name in names
+    ]
 
 
-def _add_to_packages(log: typing.Callable[[str], None], packages: dict, import_node: ImportNodeType, comment_node: typing.Optional[libcst.Comment]):
-    package_names, new = _convert_import(log, import_node, comment_node)
+_EMPTY_EXTRAS_AND_SPECS = ([], [])
 
-    for package_name in package_names:
-        if new is not None:
-            old = packages.get(package_name)
 
-            if old is not None and old != new:
+def _add_to_packages(
+    log: typing.Callable[[str], None],
+    imported_requirements: typing.Dict[str, ImportedRequirement],
+    import_node: ImportNodeType,
+    comment_node: typing.Optional[libcst.Comment]
+):
+    new_requirements = _convert_import(log, import_node, comment_node)
+
+    for new in new_requirements:
+        package_name = new.alias
+        new_extras_and_specs = new.extras_and_specs
+
+        if len(new.extras) or len(new.specs):
+            old = imported_requirements.get(package_name)
+
+            old_extras_and_specs = old.extras_and_specs if old else new_extras_and_specs
+            if old_extras_and_specs != new_extras_and_specs:
                 raise InconsistantLibraryVersionError(
                     f"inconsistant requirements for the same package",
                     package_name,
-                    old,
-                    new
+                    old.extras_and_specs,
+                    new.extras_and_specs,
                 )
 
-        if package_name not in packages or new is not None:
-            packages[package_name] = new
+        if package_name not in imported_requirements or new is not None:
+            imported_requirements[package_name] = new
 
-        if new is not None:
+        if new_extras_and_specs != _EMPTY_EXTRAS_AND_SPECS:
             log(f"found version: {package_name}: {new}")
 
 
@@ -341,7 +381,7 @@ def _extract_code_cell(
     cell_source: typing.List[str],
     log: typing.Callable[[str], None],
     module: typing.List[str],
-    packages: typing.Dict[str, typing.Tuple[typing.List[str], typing.List[str]]],
+    imported_requirements: typing.Dict[str, ImportedRequirement],
 ):
     source = "\n".join(
         re.sub(JUPYTER_MAGIC_COMMAND_PATTERN, r"#\1", line)
@@ -367,7 +407,7 @@ def _extract_code_cell(
     tree = tree.visit(transformer)
 
     for import_node, comment_node in transformer.import_and_comment_nodes:
-        _add_to_packages(log, packages, import_node, comment_node)
+        _add_to_packages(log, imported_requirements, import_node, comment_node)
 
     lines = tree.code.strip("\r\n").splitlines()
     if len(lines):
@@ -487,9 +527,9 @@ def extract_cells(
 ) -> typing.Tuple[
     str,
     typing.List[EmbedFile],
-    typing.List[Requirement],
+    typing.List[ImportedRequirement],
 ]:
-    packages: typing.Dict[str, typing.Tuple[typing.List[str], typing.List[str]]] = {}
+    imported_requirements: typing.Dict[str, ImportedRequirement] = {}
     module: typing.List[str] = []
     embed_files: typing.Dict[str, EmbedFile] = {}
 
@@ -511,7 +551,7 @@ def extract_cells(
         try:
             cell_type = cell["cell_type"]
             if cell_type == "code":
-                _extract_code_cell(cell_source, log, module, packages)
+                _extract_code_cell(cell_source, log, module, imported_requirements)
             elif cell_type == "markdown":
                 _extract_markdown_cell(cell_source, log, embed_files)
             else:
@@ -525,20 +565,11 @@ def extract_cells(
     module.append("")
     source_code = "\n".join(module)
 
-    requirements = [
-        Requirement(
-            name,
-            requirement[0] if requirement is not None else None,
-            requirement[1] if requirement is not None else None,
-        )
-        for name, requirement in packages.items()
-    ]
-
     if validate:
         _validate(source_code)
 
     return (
         source_code,
         list(embed_files.values()),
-        requirements,
+        list(imported_requirements.values()),
     )
