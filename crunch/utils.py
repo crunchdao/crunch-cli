@@ -597,9 +597,15 @@ def ascii_table(
 
 class LimitedSizeIO:
 
-    def __init__(self, underlying_io: io.IOBase, limit: int):
+    def __init__(
+        self,
+        underlying_io: io.IOBase,
+        limit: int,
+        callback: typing.Optional[typing.Callable[[int], None]] = None
+    ):
         self.underlying_io = underlying_io
         self.limit = limit
+        self.callback = callback
         self.read_so_far = 0
 
     def read(self, size=-1):
@@ -612,7 +618,12 @@ class LimitedSizeIO:
             size = min(size, self.limit - self.read_so_far)
 
         data = self.underlying_io.read(size)
-        self.read_so_far += len(data)
+        data_length = len(data)
+
+        self.read_so_far += data_length
+
+        if self.callback is not None:
+            self.callback(data_length)
 
         return data
 

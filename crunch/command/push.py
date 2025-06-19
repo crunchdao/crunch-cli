@@ -1,9 +1,6 @@
 import os
-import shutil
-import tarfile
-import tempfile
 
-from .. import api, constants, store, utils
+from .. import api, constants, utils
 
 
 def _list_files(
@@ -65,17 +62,6 @@ def list_model_files(
         yield path, name
 
 
-def _print_sse_handler(event):
-    data = event.data
-    if isinstance(data, dict):
-        data = " ".join(
-            f"{key}={value}"
-            for key, value in data.items()
-        )
-
-    print(f"server: {event.event}: {data}")
-
-
 def push(
     message: str,
     main_file_path: str,
@@ -90,13 +76,13 @@ def push(
 
     installed_packages_version = utils.pip_freeze() if include_installed_packages_version else {}
 
-    preferred_chunk_size = 6000000
+    preferred_chunk_size = 50_000_000
 
     def do_upload(path, name, size):
         if dry:
             return None
 
-        return client.uploads.send_from_file(path, name, size, preferred_chunk_size)
+        return client.uploads.send_from_file(path, name, size, preferred_chunk_size, progress_bar=True)
 
     code_uploads = {}
     model_uploads = {}
@@ -108,11 +94,8 @@ def push(
             size = os.path.getsize(path)
             total_size += size
 
-            print(f"found code file:  {name} ({utils.format_bytes(size)})")
+            print(f"found code file: {name} ({utils.format_bytes(size)})")
             code_uploads[name] = do_upload(path, name, size)
-            if name == "zero":
-                for x in range(10):
-                    code_uploads[f"{name}{x}"] = code_uploads[name]
 
         for path, name in list_model_files(submission_directory_path, model_directory_relative_path):
             size = os.path.getsize(path)
@@ -120,7 +103,7 @@ def push(
 
             print(f"found model file: {name} ({utils.format_bytes(size)})")
             model_uploads[name] = do_upload(path, name, size)
-        
+
         print(f"total size: {utils.format_bytes(total_size)}")
 
         print(f"export {competition.name}:project/{project.user_id}/{project.name}")
@@ -138,21 +121,18 @@ def push(
                 path: upload.id
                 for path, upload in model_uploads.items()
             },
-            sse_handler=_print_sse_handler if store.debug else None
         )
 
         _print_success(client, submission)
 
         return submission
-    except Exception as error:
+    finally:
         if not dry:
             for upload in code_uploads.values():
                 upload.abort()
 
             for upload in model_uploads.values():
                 upload.abort()
-
-        raise error
 
 
 def _print_success(

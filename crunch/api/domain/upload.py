@@ -1,9 +1,12 @@
+import contextlib
 import dataclasses
 import enum
 import typing
 
 import dataclasses_json
 import requests
+import tqdm
+import time
 
 from ..resource import Collection, Model
 
@@ -132,20 +135,41 @@ class UploadChunk(Model):
             )
         )
 
-    def send(self, fd: typing.IO[bytes]):
+    def send(
+        self,
+        fd: typing.IO[bytes],
+        max_retry=10,
+        byte_callback: typing.Optional[typing.Callable[[int], None]] = None,
+        retry_callback: typing.Optional[typing.Callable[[], None]] = None,
+    ):
         from ...utils import LimitedSizeIO
 
-        fd.seek(self.offset)
+        for retry in range(max_retry + 1):
+            last = retry == max_retry
 
-        request = self.request
-        response = requests.request(
-            request.method,
-            request.url,
-            headers=request.headers,
-            data=LimitedSizeIO(fd, self.size),
-        )
+            try:
+                fd.seek(self.offset)
 
-        response.raise_for_status()
+                request = self.request
+                response = requests.request(
+                    request.method,
+                    request.url,
+                    headers=request.headers,
+                    data=LimitedSizeIO(fd, self.size, callback=byte_callback),
+                )
+
+                response.raise_for_status()
+
+                break
+            except (requests.exceptions.ConnectionError, KeyboardInterrupt) as error:
+                if last:
+                    raise
+
+                print(f"retrying {retry + 1}/{max_retry} because of {error.__class__.__name__}: {str(error) or '(no message)'}")
+                time.sleep(1)
+
+                if retry_callback is not None:
+                    retry_callback()
 
         provider = self.upload.provider
         if provider == UploadProvider.AWS_S3:
@@ -182,17 +206,44 @@ class UploadCollection(Collection):
         path: str,
         name: str,
         size: int,
-        preferred_chunk_size: typing.Optional[int] = None
+        preferred_chunk_size: typing.Optional[int] = None,
+        progress_bar: bool = False,
+        max_retry=10,
     ) -> Upload:
         upload = self.create(name, size, preferred_chunk_size)
 
         try:
-            # print(upload._attrs)
-            with open(path, "rb") as fd:
+            with contextlib.ExitStack() as stack:
+                fd = stack.enter_context(open(path, "rb"))
+                progress = stack.enter_context(tqdm.tqdm(
+                    total=size,
+                    desc=f"uploading {name}",
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    miniters=1,
+                    disable=not progress_bar,
+                    leave=False,
+                ))
+
                 for chunk in upload.chunks:
-                    # print(chunk)
-                    chunk.send(fd)
-        except Exception as error:
+                    def retry_callback():
+                        progress.last_print_n = progress.n = chunk.offset
+                        progress.refresh()
+
+                    if progress_bar:
+                        if upload.chunked:
+                            progress.desc = f"uploading `{name}` (chunk {chunk.number}/{len(upload.chunks)})"
+                        else:
+                            progress.desc = f"uploading `{name}` (direct)"
+
+                    chunk.send(
+                        fd,
+                        max_retry=max_retry,
+                        byte_callback=progress.update,
+                        retry_callback=retry_callback,
+                    )
+        except (Exception, KeyboardInterrupt) as error:
             try:
                 upload.abort()
             except Exception as error2:
