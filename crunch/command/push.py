@@ -82,7 +82,6 @@ def push(
     model_directory_relative_path: str,
     include_installed_packages_version: bool,
     dry: bool,
-    export_path: str = None,
 ):
     submission_directory_path = os.path.abspath(".")
 
@@ -91,62 +90,69 @@ def push(
 
     installed_packages_version = utils.pip_freeze() if include_installed_packages_version else {}
 
-    fds = []
+    preferred_chunk_size = 6000000
+
+    def do_upload(path, name, size):
+        if dry:
+            return None
+
+        return client.uploads.send_from_file(path, name, size, preferred_chunk_size)
+
+    code_uploads = {}
+    model_uploads = {}
 
     try:
-        with tempfile.NamedTemporaryFile(prefix="submission-", suffix=".tar", dir=constants.DOT_CRUNCHDAO_DIRECTORY) as tmp:
-            with tarfile.open(fileobj=tmp, mode="w") as tar:
-                for path, name in list_code_files(submission_directory_path, model_directory_relative_path):
-                    size = os.path.getsize(path)
-                    print(f"compress {name} ({utils.format_bytes(size)})")
+        total_size = 0
 
-                    tar.add(path, name)
+        for path, name in list_code_files(submission_directory_path, model_directory_relative_path):
+            size = os.path.getsize(path)
+            total_size += size
 
-            total_size = tmp.tell()
-            tmp.seek(0)
+            print(f"found code file:  {name} ({utils.format_bytes(size)})")
+            code_uploads[name] = do_upload(path, name, size)
+            if name == "zero":
+                for x in range(10):
+                    code_uploads[f"{name}{x}"] = code_uploads[name]
 
-            if export_path:
-                print(f"export {export_path}")
+        for path, name in list_model_files(submission_directory_path, model_directory_relative_path):
+            size = os.path.getsize(path)
+            total_size += size
 
-                with open(export_path, "wb") as fd:
-                    shutil.copyfileobj(tmp, fd)
-            else:
-                files = [
-                    ("codeFile", ('code.tar', tmp, "application/x-tar"))
-                ]
+            print(f"found model file: {name} ({utils.format_bytes(size)})")
+            model_uploads[name] = do_upload(path, name, size)
+        
+        print(f"total size: {utils.format_bytes(total_size)}")
 
-                for path, name in list_model_files(submission_directory_path, model_directory_relative_path):
-                    size = os.path.getsize(path)
-                    print(f"model {name} ({utils.format_bytes(size)})")
+        print(f"export {competition.name}:project/{project.user_id}/{project.name}")
+        submission = project.submissions.create(
+            message=message,
+            main_file_path=main_file_path,
+            model_directory_path=model_directory_relative_path,
+            type=api.SubmissionType.CODE,
+            preferred_packages_version=installed_packages_version,
+            code_files={
+                path: upload.id
+                for path, upload in code_uploads.items()
+            },
+            model_files={
+                path: upload.id
+                for path, upload in model_uploads.items()
+            },
+            sse_handler=_print_sse_handler if store.debug else None
+        )
 
-                    fd = open(path, "rb")
-                    fds.append(fd)
+        _print_success(client, submission)
 
-                    files.append(("modelFiles", (name, fd)))
-                    total_size += size
+        return submission
+    except Exception as error:
+        if not dry:
+            for upload in code_uploads.values():
+                upload.abort()
 
-                print(f"export {competition.name}:project/{project.user_id}/{project.name}")
-                if dry:
-                    print("create dry (no upload)")
-                else:
-                    print(f"create on server ({utils.format_bytes(total_size)})")
+            for upload in model_uploads.values():
+                upload.abort()
 
-                    submission = project.submissions.create(
-                        message=message,
-                        main_file_path=main_file_path,
-                        model_directory_path=model_directory_relative_path,
-                        type=api.SubmissionType.CODE,
-                        preferred_packages_version=installed_packages_version,
-                        files=files,
-                        sse_handler=_print_sse_handler if store.debug else None
-                    )
-
-                    _print_success(client, submission)
-
-                    return submission
-    finally:
-        for fd in fds:
-            fd.close()
+        raise error
 
 
 def _print_success(
