@@ -129,10 +129,10 @@ def push(
     finally:
         if not dry:
             for upload in code_uploads.values():
-                upload.abort()
+                upload.delete()
 
             for upload in model_uploads.values():
-                upload.abort()
+                upload.delete()
 
 
 def _print_success(

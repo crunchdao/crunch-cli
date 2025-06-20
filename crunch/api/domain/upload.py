@@ -76,6 +76,13 @@ class Upload(Model):
             )
         )
 
+    def delete(self):
+        self._attrs.update(
+            self._client.api.delete_upload(
+                self.id,
+            )
+        )
+
 
 class UploadChunk(Model):
 
@@ -347,4 +354,15 @@ class UploadEndpointMixin:
                 json={},
             ),
             json=True
+        )
+
+    def delete_upload(
+        self,
+        id
+    ):
+        return self._result(
+            self.delete(
+                f"/v1/uploads/{id}",
+                json={},
+            )
         )

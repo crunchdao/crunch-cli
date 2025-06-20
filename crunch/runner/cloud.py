@@ -402,11 +402,8 @@ class CloudRunner(Runner):
                 self.log("max retry reached", error=True)
                 exit(1)
         finally:
-            for upload in prediction_uploads.values():
-                upload.abort()
-
-            for upload in model_uploads.values():
-                upload.abort()
+            self._delete_uploads(prediction_uploads.values())
+            self._delete_uploads(model_uploads.values())
 
     def _upload_prediction_files(self, uploads: typing.Dict[str, str]):
         prediction_file_name = os.path.basename(self.prediction_path)
@@ -457,6 +454,13 @@ class CloudRunner(Runner):
             )
 
         return True
+
+    def _delete_uploads(self, uploads: typing.Iterable[api.Upload]):
+        for upload in uploads:
+            try:
+                upload.delete()
+            except Exception as exception:
+                self.log(f"[debug] failed to delete upload {upload.id}: {exception}", error=True)
 
     def teardown(self):
         self.report_current(f"shutting down")
