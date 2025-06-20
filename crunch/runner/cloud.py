@@ -66,6 +66,7 @@ class CloudRunner(Runner):
         self,
         competition: api.Competition,
         run: api.RunnerRun,
+        client: api.Client,
         # ---
         context_directory: str,
         scoring_directory: str,
@@ -108,6 +109,7 @@ class CloudRunner(Runner):
 
         self.competition = competition
         self.run = run
+        self.client = client
 
         self.context_directory = context_directory
         self.scoring_directory = scoring_directory
@@ -355,41 +357,14 @@ class CloudRunner(Runner):
         else:
             self.prediction_collector.persist(self.prediction_path)
 
-        fds = []
+        self.upload_results()
+
+    def upload_results(self):
+        prediction_uploads = {}
+        model_uploads = {}
+
+        # TODO Use decorator instead
         try:
-            prediction_fd = open(self.prediction_path, "rb")
-            fds.append(prediction_fd)
-
-            model_files, model_files_size = [], 0
-            post_model_files_modification = {}
-            for file_path, file_name in self.find_model_files():
-                stat = os.stat(file_path)
-                file_size = stat.st_size
-
-                self.log(f"found model file: {file_name} ({file_size})")
-
-                fd = open(file_path, "rb")
-                fds.append(fd)
-
-                model_files.append((file_name, fd))
-                post_model_files_modification[file_name] = stat.st_mtime_ns
-                model_files_size += file_size
-
-            prediction_file_name = os.path.basename(self.prediction_path)
-            files = [
-                ("predictionFile", (prediction_file_name, prediction_fd))
-            ]
-
-            has_model_changed = self.pre_model_files_modification != post_model_files_modification
-            self.log(f"model file_count={len(model_files)} files_size={model_files_size} has_changed={has_model_changed}")
-
-            if has_model_changed:
-                files.extend((
-                    ("modelFiles", model_file)
-                    for model_file in model_files
-                ))
-
-            # TODO Use decorator instead
             for retry in range(0, self.max_retry + 1):
                 if retry != 0:
                     retry_in = self.retry_seconds * retry
@@ -400,10 +375,20 @@ class CloudRunner(Runner):
                     self.report_current(f"upload result try #{retry}")
 
                 try:
+                    self._upload_prediction_files(prediction_uploads)
+                    has_model_changed = self._upload_model_files(model_uploads)
+
                     self.run.submit_result(
                         use_initial_model=not has_model_changed,
                         deterministic=self.deterministic,
-                        files=files
+                        prediction_files={
+                            name: upload.id
+                            for name, upload in prediction_uploads.items()
+                        },
+                        model_files={
+                            name: upload.id
+                            for name, upload in model_uploads.items()
+                        },
                     )
 
                     self.log("result submitted")
@@ -413,15 +398,65 @@ class CloudRunner(Runner):
 
                     if isinstance(exception, requests.HTTPError):
                         self.log(exception.response.text, error=True)
-
-                    for fd in fds:
-                        fd.seek(0)
             else:
                 self.log("max retry reached", error=True)
                 exit(1)
         finally:
-            for fd in fds:
-                fd.close()
+            for upload in prediction_uploads.values():
+                upload.abort()
+
+            for upload in model_uploads.values():
+                upload.abort()
+
+    def _upload_prediction_files(self, uploads: typing.Dict[str, str]):
+        prediction_file_name = os.path.basename(self.prediction_path)
+        if prediction_file_name in uploads:
+            self.log(f"reusing upload for prediction")
+            return
+
+        self.log(f"uploading prediction")
+        uploads[prediction_file_name] = self.client.uploads.send_from_file(
+            self.prediction_path,
+            prediction_file_name,
+            os.path.getsize(self.prediction_path),
+            progress_bar=True,
+            max_retry=3
+        )
+
+    def _upload_model_files(self, uploads: typing.Dict[str, str]):
+        model_files, model_files_size = [], 0
+        post_model_files_modification = {}
+        for file_path, file_name in self.find_model_files():
+            stat = os.stat(file_path)
+            file_size = stat.st_size
+
+            self.log(f"found model file: {file_name} ({file_size})")
+
+            model_files.append((file_path, file_name))
+            post_model_files_modification[file_name] = stat.st_mtime_ns
+            model_files_size += file_size
+
+        has_model_changed = self.pre_model_files_modification != post_model_files_modification
+        self.log(f"model file_count={len(model_files)} files_size={model_files_size} has_changed={has_model_changed}")
+
+        if not has_model_changed:
+            return False
+
+        for file_path, file_name in model_files:
+            if file_name in uploads:
+                self.log(f"reusing upload for {file_name}")
+                continue
+
+            self.log(f"uploading {file_name}")
+            uploads[file_name] = self.client.uploads.send_from_file(
+                file_path,
+                file_name,
+                os.path.getsize(file_path),
+                progress_bar=True,
+                max_retry=3
+            )
+
+        return True
 
     def teardown(self):
         self.report_current(f"shutting down")

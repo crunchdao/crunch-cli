@@ -616,6 +616,7 @@ def cloud(
     runner = CloudRunner(
         competition,
         run,
+        client,
         # ---
         context_directory,
         scoring_directory,
