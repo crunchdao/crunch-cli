@@ -4,6 +4,7 @@ import datetime
 import functools
 import gc
 import inspect
+import io
 import json
 import logging
 import os
@@ -592,3 +593,42 @@ def ascii_table(
             print(value.ljust(width), end="")
 
         print()
+
+
+class LimitedSizeIO:
+
+    def __init__(
+        self,
+        underlying_io: io.IOBase,
+        limit: int,
+        callback: typing.Optional[typing.Callable[[int], None]] = None
+    ):
+        self.underlying_io = underlying_io
+        self.limit = limit
+        self.callback = callback
+        self.read_so_far = 0
+
+    def read(self, size=-1):
+        if self.read_so_far >= self.limit:
+            return b''
+
+        if size == -1:
+            size = self.limit - self.read_so_far
+        else:
+            size = min(size, self.limit - self.read_so_far)
+
+        data = self.underlying_io.read(size)
+        data_length = len(data)
+
+        self.read_so_far += data_length
+
+        if self.callback is not None:
+            self.callback(data_length)
+
+        return data
+
+    def readable(self):
+        return True
+
+    def __len__(self):
+        return self.limit

@@ -32,6 +32,7 @@ from .domain.score import ScoreEndpointMixin
 from .domain.submission import SubmissionEndpointMixin
 from .domain.submission_file import SubmissionFileEndpointMixin
 from .domain.target import TargetEndpointMixin
+from .domain.upload import UploadCollection, UploadEndpointMixin
 from .domain.user import UserCollection, UserEndpointMixin
 from .errors import convert_error
 from .pagination import PageRequest
@@ -56,6 +57,7 @@ class EndpointClient(
     SubmissionEndpointMixin,
     SubmissionFileEndpointMixin,
     TargetEndpointMixin,
+    UploadEndpointMixin,
     UserEndpointMixin,
 ):
 
@@ -290,6 +292,10 @@ class Client:
     @property
     def libraries(self):
         return LibraryCollection(client=self)
+
+    @property
+    def uploads(self):
+        return UploadCollection(client=self)
 
     @property
     def users(self):

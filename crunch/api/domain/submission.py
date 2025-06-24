@@ -3,6 +3,7 @@ import typing
 
 from ..resource import Collection, Model
 from .project import Project
+from ..auth import PushTokenAuth
 
 if typing.TYPE_CHECKING:
     from ...external import sseclient
@@ -99,7 +100,8 @@ class SubmissionCollection(Collection):
         model_directory_path: str,
         type: SubmissionType,
         preferred_packages_version: typing.Dict[str, str],
-        files: typing.List[typing.Tuple],
+        code_files: typing.Dict[str, str],
+        model_files: typing.Dict[str, str],
         sse_handler: typing.Optional[typing.Callable[["sseclient.Event"], None]] = None
     ):
         return self.prepare_model(
@@ -112,7 +114,8 @@ class SubmissionCollection(Collection):
                 model_directory_path,
                 type.name,
                 preferred_packages_version,
-                files,
+                code_files,
+                model_files,
                 sse_handler,
             )
         )
@@ -163,28 +166,29 @@ class SubmissionEndpointMixin:
         model_directory_path,
         type,
         preferred_packages_version,
-        files,
+        code_files,
+        model_files,
         sse_handler=None,
     ):
         sse = sse_handler is not None
 
         return self._result(
             self.post(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
+                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
                 params={
                     "sse": sse,
                 },
-                data={
+                json={
                     "message": message,
                     "mainFilePath": main_file_path,
                     "modelDirectoryPath": model_directory_path,
                     "type": type,
-                    **{
-                        f"preferredPackagesVersion[{key}]": value
-                        for key, value in preferred_packages_version.items()
-                    }
+                    "preferredPackagesVersion": preferred_packages_version,
+                    "codeFiles": code_files,
+                    "modelFiles": model_files,
+                    # TODO Use a better way to pass the push token
+                    "pushToken": self.auth_._token if isinstance(self.auth_, PushTokenAuth) else None,
                 },
-                files=tuple(files),
                 stream=sse
             ),
             json=True,

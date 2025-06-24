@@ -63,4 +63,5 @@ from .submission import (
 )
 from .submission_file import SubmissionFile
 from .target import Target
+from .upload import Upload
 from .user import User

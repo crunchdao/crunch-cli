@@ -352,6 +352,10 @@ def push(
 ):
     utils.change_root()
 
+    if export_path is not None:
+        print("--export is not supported anymore", file=sys.stderr)
+        raise click.Abort()
+
     with convert_if_necessary(main_file_path):
         try:
             command.push(
@@ -360,7 +364,6 @@ def push(
                 model_directory_path,
                 not no_pip_freeze,
                 dry,
-                export_path,
             )
         except api.ApiException as error:
             utils.exit_via(error)
@@ -613,6 +616,7 @@ def cloud(
     runner = CloudRunner(
         competition,
         run,
+        client,
         # ---
         context_directory,
         scoring_directory,
