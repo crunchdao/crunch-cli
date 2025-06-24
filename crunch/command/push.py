@@ -129,7 +129,6 @@ def push(
     finally:
         if not dry:
             _cleanup(code_uploads, model_uploads)
-            _cleanup(code_uploads, model_uploads)
 
 
 def _cleanup(
