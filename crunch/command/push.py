@@ -128,11 +128,25 @@ def push(
         return submission
     finally:
         if not dry:
-            for upload in code_uploads.values():
-                upload.delete()
+            _cleanup(code_uploads, model_uploads)
+            _cleanup(code_uploads, model_uploads)
 
-            for upload in model_uploads.values():
-                upload.delete()
+
+def _cleanup(
+    code_uploads: dict[str, api.Upload],
+    model_uploads: dict[str, api.Upload]
+):
+    for upload in code_uploads.values():
+        try:
+            upload.delete()
+        except api.ApiException as exception:
+            print(f"cleanup error {exception}")
+
+    for upload in model_uploads.values():
+        try:
+            upload.delete()
+        except api.ApiException as exception:
+            print(f"cleanup error {exception}")
 
 
 def _print_success(
