@@ -416,7 +416,6 @@ class CloudRunner(Runner):
             self.prediction_path,
             prediction_file_name,
             os.path.getsize(self.prediction_path),
-            progress_bar=True,
             max_retry=3
         )
 
@@ -449,7 +448,6 @@ class CloudRunner(Runner):
                 file_path,
                 file_name,
                 os.path.getsize(file_path),
-                progress_bar=True,
                 max_retry=3
             )
 
