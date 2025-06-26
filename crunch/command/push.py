@@ -106,6 +106,10 @@ def push(
 
         print(f"total size: {utils.format_bytes(total_size)}")
 
+        if dry:
+            print("dry run, not uploading files")
+            return None
+
         print(f"export {competition.name}:project/{project.user_id}/{project.name}")
         submission = project.submissions.create(
             message=message,
