@@ -169,12 +169,6 @@ def strip_python_special_lines(lines: typing.List[str]):
     )
 
 
-def to_unix_path(input: str):
-    return input\
-        .replace("\\", "/")\
-        .replace("//", "/")
-
-
 def pip_freeze():
     import importlib_metadata
 

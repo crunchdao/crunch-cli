@@ -12,14 +12,19 @@ MACOS_HIDDEN_FILES = [
     ".DS_Store",
 ]
 
-IGNORED_FILES = [
+IGNORED_MODEL_FILES = [
     ".git/",
     f"{DOT_CRUNCHDAO_DIRECTORY}/",
-    f"/{DOT_DATA_DIRECTORY}/",
     "__pycache__/",
     ".ipynb_checkpoints/",
     ".env",
+    "*.pyc",
     *MACOS_HIDDEN_FILES,
+]
+
+IGNORED_CODE_FILES = [
+    *IGNORED_MODEL_FILES,
+    f"{DOT_DATA_DIRECTORY}/",
 ]
 
 DEBUG_ENV_VAR = "CRUNCH_DEBUG"
