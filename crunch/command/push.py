@@ -1,4 +1,5 @@
 import os
+import typing
 
 from .. import api, constants, utils
 
@@ -17,14 +18,16 @@ def _list_files(
             root = ""
 
         for file in files:
-            file = utils.to_unix_path(os.path.join(root, file))
+            relative_path = utils.to_unix_path(os.path.join(root, file))
+            absolute_path = utils.to_unix_path(os.path.join(directory_path, relative_path))
 
-            yield file
+            yield absolute_path, relative_path
 
 
-def list_code_files(
-    submission_directory_path: str,
-    model_directory_relative_path: str,
+def _build_gitignore(
+    base_directory_path: str,
+    ignored_paths: typing.List[str],
+    extra_ignored_path: typing.Optional[str] = None,
 ):
     from ..external import gitignorefile
 
@@ -32,34 +35,56 @@ def list_code_files(
         rules=[
             gitignorefile._rule_from_pattern(line)
             for line in [
-                *constants.IGNORED_FILES,
-                utils.to_unix_path(f"/{model_directory_relative_path}/")
+                *ignored_paths,
+                *([utils.to_unix_path(f"/{extra_ignored_path}/")] if extra_ignored_path else [])
             ]
         ],
-        base_path=submission_directory_path,
+        base_path=base_directory_path,
     )
 
     git_ignores = gitignorefile.Cache()
-    parts = tuple(gitignorefile._path_split(submission_directory_path))[:-1]
+    parts = tuple(gitignorefile._path_split(base_directory_path))[:-1]
     git_ignores._Cache__gitignores[parts] = []
 
-    for name in _list_files(submission_directory_path):
-        if ignored_files.match(name) or git_ignores(name):
+    return lambda name: (ignored_files.match(name), git_ignores(name))
+
+
+def list_code_files(
+    submission_directory_path: str,
+    model_directory_relative_path: str,
+):
+    is_ignored = _build_gitignore(
+        submission_directory_path,
+        constants.IGNORED_CODE_FILES,
+        model_directory_relative_path,
+    )
+
+    for absolute_path, relative_path in _list_files(submission_directory_path):
+        if any(is_ignored(absolute_path)):
             continue
 
-        path = utils.to_unix_path(os.path.join(submission_directory_path, name))
-        yield path, name
+        yield absolute_path, relative_path
 
 
 def list_model_files(
     submission_directory_path: str,
     model_directory_relative_path: str,
 ):
-    model_directory_path = os.path.join(submission_directory_path, model_directory_relative_path)
+    model_directory_path = os.path.join(
+        submission_directory_path,
+        model_directory_relative_path,
+    )
 
-    for name in _list_files(model_directory_path):
-        path = utils.to_unix_path(os.path.join(model_directory_path, name))
-        yield path, name
+    is_ignored = _build_gitignore(
+        model_directory_path,
+        constants.IGNORED_MODEL_FILES,
+    )
+
+    for absolute_path, relative_path in _list_files(model_directory_path):
+        if any(is_ignored(absolute_path)):
+            continue
+
+        yield absolute_path, relative_path
 
 
 def push(
