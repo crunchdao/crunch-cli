@@ -43,6 +43,53 @@ class ImportedRequirement:
     def extras_and_specs(self) -> typing.List[str]:
         return (self.extras, self.specs)
 
+    def merge(self, other: "ImportedRequirement") -> bool:
+        """
+        Merge requirements:
+        - if name is missing or the same, then use other's name
+        - if (extras and specs) are empty or the same, then use other's (extras and specs)
+
+        Alias is ignored.
+        If a condition is False, the object is still modified.
+        """
+
+        errors = []
+
+        different_name = self.name is not None and other.name is not None and self.name != other.name
+        if different_name:
+            errors.append("name")
+
+        different_extras = len(self.extras) and len(other.extras) and self.extras != other.extras
+        if different_extras:
+            errors.append("extras")
+
+        different_specs = len(self.specs) and len(other.specs) and self.specs != other.specs
+        if different_specs:
+            errors.append("specs")
+
+        if not different_name and other.name is not None:
+            self.name = other.name
+
+        if not different_extras and not different_specs and (len(other.extras) or len(other.specs)):
+            self.extras = other.extras
+            self.specs = other.specs
+
+        if len(errors):
+            error_count = len(errors)
+
+            if error_count == 1:
+                field = errors[0]
+                be = "is" if field == "name" else "are"
+                message = f"{field} {be} different"
+            elif error_count == 2:
+                message = f"both {errors[0]} and {errors[1]} are different"
+            elif error_count == 3:
+                message = f"{errors[0]}, {errors[1]} and {errors[2]} are all different"
+
+            return False, message
+
+        return True, None
+
 
 def strip_packages(name: str):
     if name.startswith(_DOT):
@@ -219,24 +266,22 @@ def _add_to_packages(
 
     for new in new_requirements:
         package_name = new.alias
-        new_extras_and_specs = new.extras_and_specs
 
-        if len(new.extras) or len(new.specs):
-            old = imported_requirements.get(package_name)
+        if package_name in imported_requirements:
+            current = imported_requirements[package_name]
 
-            old_extras_and_specs = old.extras_and_specs if old else new_extras_and_specs
-            if old_extras_and_specs != new_extras_and_specs:
+            success, message = current.merge(new)
+            if not success:
                 raise InconsistantLibraryVersionError(
-                    f"inconsistant requirements for the same package",
+                    f"inconsistant requirements for the same package: {message}",
                     package_name,
-                    old.extras_and_specs,
+                    current.extras_and_specs,
                     new.extras_and_specs,
                 )
-
-        if package_name not in imported_requirements or new is not None:
+        else:
             imported_requirements[package_name] = new
 
-        if new_extras_and_specs != _EMPTY_EXTRAS_AND_SPECS:
+        if new.extras_and_specs != _EMPTY_EXTRAS_AND_SPECS:
             log(f"found version: {package_name}: {new}")
 
 
