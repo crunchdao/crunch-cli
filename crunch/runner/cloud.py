@@ -561,6 +561,7 @@ class CloudRunner(Runner):
                 "--no-input",
                 "--no-color",
                 "--progress-bar", "off",
+                "--resume-retries", "5",  # https://ichard26.github.io/blog/2025/04/whats-new-in-pip-25.1/#resumable-downloads
                 *arguments
             ],
             self.venv_env
