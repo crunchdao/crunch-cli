@@ -666,6 +666,33 @@ class ImportTest(unittest.TestCase):
             ImportedRequirement("hello", None, [], ["==1"]),
         ], requirements)
 
+    def test_import_in_try_except(self):
+        (
+            source_code,
+            _,
+            _,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "try:",
+                "    import hello",
+                "except ImportError:",
+                "    !pip install hello",
+                "",
+                "import hello",
+            ])
+        ])
+
+        content = textwrap.dedent("""
+            #try:
+            #    import hello
+            #except ImportError:
+            #    pass  #!pip install hello
+
+            import hello
+        """).lstrip()
+
+        self.assertEqual(content, source_code)
+
 
 class EmbedFilesTest(unittest.TestCase):
 

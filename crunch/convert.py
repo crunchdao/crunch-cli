@@ -22,7 +22,7 @@ _CRUNCH_KEEP_ON = "@crunch/keep:on"
 _CRUNCH_KEEP_OFF = "@crunch/keep:off"
 
 
-JUPYTER_MAGIC_COMMAND_PATTERN = r"^\s*?(!|%)"
+JUPYTER_MAGIC_COMMAND_PATTERN = r"^(\s*?)(!|%)"
 
 
 @dataclasses.dataclass()
@@ -421,6 +421,16 @@ class CommentTransformer(libcst.CSTTransformer):
         return self.tree.code_for_node(node).splitlines()
 
 
+def _jupyter_replacer(match: typing.Match[str]) -> str:
+    spaces = match.group(1)
+    command = match.group(2)
+
+    if len(spaces):
+        return f"{spaces}pass  #{command}"
+
+    return f"#{command}"
+
+
 def _extract_code_cell(
     cell_source: typing.List[str],
     log: typing.Callable[[str], None],
@@ -428,7 +438,7 @@ def _extract_code_cell(
     imported_requirements: typing.Dict[str, ImportedRequirement],
 ):
     source = "\n".join(
-        re.sub(JUPYTER_MAGIC_COMMAND_PATTERN, r"#\1", line)
+        re.sub(JUPYTER_MAGIC_COMMAND_PATTERN, _jupyter_replacer, line)
         for line in cell_source
     )
 
