@@ -50,7 +50,6 @@ class ImportedRequirement:
         - if (extras and specs) are empty or the same, then use other's (extras and specs)
 
         Alias is ignored.
-        If a condition is False, the object is still modified.
         """
 
         errors = []
@@ -67,13 +66,6 @@ class ImportedRequirement:
         if different_specs:
             errors.append("specs")
 
-        if not different_name and other.name is not None:
-            self.name = other.name
-
-        if not different_extras and not different_specs and (len(other.extras) or len(other.specs)):
-            self.extras = other.extras
-            self.specs = other.specs
-
         if len(errors):
             error_count = len(errors)
 
@@ -87,6 +79,13 @@ class ImportedRequirement:
                 message = f"{errors[0]}, {errors[1]} and {errors[2]} are all different"
 
             return False, message
+
+        if not different_name and other.name is not None:
+            self.name = other.name
+
+        if not different_extras and not different_specs and (len(other.extras) or len(other.specs)):
+            self.extras = other.extras
+            self.specs = other.specs
 
         return True, None
 
@@ -135,8 +134,8 @@ class InconsistantLibraryVersionError(ConverterError):
         self,
         message: str,
         package_name: str,
-        old: typing.List[str],
-        new: typing.List[str]
+        old: typing.Tuple[typing.Optional[str], typing.List[str], typing.List[str]],
+        new: typing.Tuple[typing.Optional[str], typing.List[str], typing.List[str]],
     ) -> None:
         super().__init__(message)
         self.package_name = package_name
@@ -275,8 +274,8 @@ def _add_to_packages(
                 raise InconsistantLibraryVersionError(
                     f"inconsistant requirements for the same package: {message}",
                     package_name,
-                    current.extras_and_specs,
-                    new.extras_and_specs,
+                    (current.name, current.extras, current.specs),
+                    (new.name, new.extras, new.specs),
                 )
         else:
             imported_requirements[package_name] = new
