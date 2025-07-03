@@ -106,6 +106,25 @@ class SourceCodeTest(unittest.TestCase):
 
         self.assertEqual(content, source_code)
 
+    def test_pip_escape(self):
+        (
+            source_code,
+            _,
+            _,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "pip install pandas",
+                "pip3 install pandas",
+            ]),
+        ])
+
+        content = textwrap.dedent("""
+            #pip install pandas
+            #pip3 install pandas
+        """).lstrip()
+
+        self.assertEqual(content, source_code)
+
     def test_invalid_syntax(self):
         with self.assertRaises(NotebookCellParseError) as context:
             extract_cells([
@@ -689,6 +708,25 @@ class ImportTest(unittest.TestCase):
             #    pass  #!pip install hello
 
             import hello
+        """).lstrip()
+
+        self.assertEqual(content, source_code)
+
+    def test_import_with_commented(self):
+        (
+            source_code,
+            _,
+            _,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "from pandas import DataFrame #, Series",
+                "import pandas # Import important tools"
+            ])
+        ])
+
+        content = textwrap.dedent("""
+            from pandas import DataFrame #, Series
+            import pandas # Import important tools
         """).lstrip()
 
         self.assertEqual(content, source_code)

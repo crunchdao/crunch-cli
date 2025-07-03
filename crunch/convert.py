@@ -22,7 +22,7 @@ _CRUNCH_KEEP_ON = "@crunch/keep:on"
 _CRUNCH_KEEP_OFF = "@crunch/keep:off"
 
 
-JUPYTER_MAGIC_COMMAND_PATTERN = r"^(\s*?)(!|%)"
+JUPYTER_MAGIC_COMMAND_PATTERN = r"^(\s*?)(!|%|pip3? )"
 
 
 @dataclasses.dataclass()
