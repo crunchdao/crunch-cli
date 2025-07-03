@@ -433,6 +433,135 @@ class SourceCodeTest(unittest.TestCase):
         self.assertEqual(expected, source_code)
 
 
+class ImportedRequirementTest(unittest.TestCase):
+
+    def test_merge_nothing(self):
+        a = ImportedRequirement("a", None, [], [])
+        b = ImportedRequirement("b", None, [], [])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", None, [], []), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_ignore_if_set_name(self):
+        a = ImportedRequirement("a", "xyz", [], [])
+        b = ImportedRequirement("b", None, [], [])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", "xyz", [], []), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_ignore_if_set_extras(self):
+        a = ImportedRequirement("a", None, ["tiny"], [])
+        b = ImportedRequirement("b", None, [], [])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", None, ["tiny"], []), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_ignore_if_set_full(self):
+        a = ImportedRequirement("a", "xyz", ["tiny"], ["==1"])
+        b = ImportedRequirement("b", None, [], [])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", "xyz", ["tiny"], ["==1"]), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_ignore_if_set_full(self):
+        a = ImportedRequirement("a", None, [], ["==1"])
+        b = ImportedRequirement("b", None, [], [])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", None, [], ["==1"]), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_name(self):
+        a = ImportedRequirement("a", None, [], [])
+        b = ImportedRequirement("b", "xyz", [], [])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", "xyz", [], []), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_extras(self):
+        a = ImportedRequirement("a", None, [], [])
+        b = ImportedRequirement("b", None, ["full"], [])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", None, ["full"], []), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_specs(self):
+        a = ImportedRequirement("a", None, [], [])
+        b = ImportedRequirement("b", None, [], ["==1"])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", None, [], ["==1"]), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_specs_and_extras(self):
+        a = ImportedRequirement("a", None, [], [])
+        b = ImportedRequirement("b", None, ["full"], ["==1"])
+
+        success, _ = a.merge(b)
+
+        self.assertTrue(success)
+        self.assertEqual(("a", None, ["full"], ["==1"]), (a.alias, a.name, a.extras, a.specs))
+
+    def test_merge_different_name(self):
+        a = ImportedRequirement("a", "abc", [], [])
+        b = ImportedRequirement("b", "def", ["full"], ["==1"])
+
+        success, message = a.merge(b)
+
+        self.assertFalse(success)
+        self.assertEqual(message, "name is different")
+
+    def test_merge_different_extras(self):
+        a = ImportedRequirement("a", None, ["tiny"], [])
+        b = ImportedRequirement("b", None, ["full"], [])
+
+        success, message = a.merge(b)
+
+        self.assertFalse(success)
+        self.assertEqual(message, "extras are different")
+
+    def test_merge_different_specs(self):
+        a = ImportedRequirement("a", None, [], ["==1"])
+        b = ImportedRequirement("b", None, [], ["==2"])
+
+        success, message = a.merge(b)
+
+        self.assertFalse(success)
+        self.assertEqual(message, "specs are different")
+
+    def test_merge_different_extras_and_specs(self):
+        a = ImportedRequirement("a", None, ["tiny"], ["==1"])
+        b = ImportedRequirement("b", None, ["full"], ["==2"])
+
+        success, message = a.merge(b)
+
+        self.assertFalse(success)
+        self.assertEqual(message, "both extras and specs are different")
+
+    def test_merge_different_full(self):
+        a = ImportedRequirement("a", "abc", ["tiny"], ["==1"])
+        b = ImportedRequirement("b", "def", ["full"], ["==2"])
+
+        success, message = a.merge(b)
+
+        self.assertFalse(success)
+        self.assertEqual(message, "name, extras and specs are all different")
+
+
 class ImportTest(unittest.TestCase):
 
     def test_normal(self):
@@ -489,6 +618,53 @@ class ImportTest(unittest.TestCase):
                     "import hello # == aaa",
                 ])
             ])
+
+    def test_one_specific_and_one_generic(self):
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "import hello # == 1",
+                "import hello",
+            ])
+        ])
+
+        self.assertEqual([
+            ImportedRequirement("hello", None, [], ["==1"]),
+        ], requirements)
+
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "import hello",
+                "import hello # == 1",
+            ])
+        ])
+
+        self.assertEqual([
+            ImportedRequirement("hello", None, [], ["==1"]),
+        ], requirements)
+
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "import hello",
+                "import hello # == 1",
+                "import hello",
+            ])
+        ])
+
+        self.assertEqual([
+            ImportedRequirement("hello", None, [], ["==1"]),
+        ], requirements)
 
 
 class EmbedFilesTest(unittest.TestCase):
