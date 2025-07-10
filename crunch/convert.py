@@ -35,9 +35,9 @@ class EmbedFile:
 @dataclasses.dataclass()
 class ImportedRequirement:
     alias: str
-    name: typing.Optional[str]
-    extras: typing.Optional[typing.List[str]]
-    specs: typing.Optional[typing.List[str]]
+    name: typing.Optional[str] = None
+    extras: typing.Optional[typing.List[str]] = None
+    specs: typing.Optional[typing.List[str]] = None
 
     @property
     def extras_and_specs(self) -> typing.List[str]:

@@ -5,6 +5,10 @@ import warnings
 from ..resource import Collection, Model
 from .common import GpuRequirement
 
+if typing.TYPE_CHECKING:
+    from ...convert import ImportedRequirement
+
+
 class LibraryListInclude(enum.Enum):
 
     ALL = "ALL"
@@ -66,6 +70,15 @@ class LibraryCollection(Collection):
             )
         )
 
+    def freeze_imported_requirements(
+        self,
+        /,
+        requirements: typing.List["ImportedRequirement"],
+    ) -> str:
+        return self._client.api.freeze_imported_requirements(
+            requirements=requirements,
+        )
+
 
 class LibraryEndpointMixin:
 
@@ -101,7 +114,7 @@ class LibraryEndpointMixin:
 
         if standard is not None:
             params["standard"] = str(standard).lower()
-        
+
         return self._paginated(
             lambda page_request: self.get(
                 "/v2/libraries",
@@ -112,4 +125,26 @@ class LibraryEndpointMixin:
                 }
             ),
             page_size=1000
+        )
+
+    def freeze_imported_requirements(
+        self,
+        requirements,
+    ):
+        body = {
+            "requirements": [
+                {
+                    "alias": requirement.alias,
+                    "name": requirement.name,
+                    "extras": requirement.extras,
+                    "specs": requirement.specs,
+                } for requirement in requirements
+            ],
+        }
+
+        return self._result(
+            self.post(
+                "/v1/libraries/requirements/freeze/imported",
+                json=body,
+            )
         )
