@@ -2,6 +2,8 @@ import functools
 import os
 import sys
 
+from . import constants
+
 _patchers = []
 
 
@@ -193,6 +195,7 @@ def pickle_unpickler_find_class():
     Both `pandas` and `joblib` use the Python version of the `pickle` module.
     """
 
+    import multiprocessing.reduction
     import pickle
 
     original = pickle._Unpickler.find_class
@@ -200,9 +203,71 @@ def pickle_unpickler_find_class():
     def patched(self: pickle.Unpickler, module_name: str, global_name: str, /):
         from . import constants
 
+        # TODO test if RUN_VIA_CLI is set or if run via loky
+        # print(constants.RUN_VIA_CLI)
         if constants.RUN_VIA_CLI and module_name == "__main__":
             module_name = constants.USER_CODE_MODULE_NAME
 
         return original(self, module_name, global_name)
 
     pickle._Unpickler.find_class = patched
+    multiprocessing.reduction.ForkingPickler.loads = pickle._loads
+
+
+@_patcher
+def joblib_parallel_initializer():
+    try:
+        import joblib
+        import joblib.externals.loky.initializers
+    except ModuleNotFoundError:
+        return
+
+    original = joblib.Parallel.__init__
+
+    def patched(self, *args, **kwargs):
+        original(self, *args, **kwargs)
+
+        prepare_for_process_initializer()
+
+        # Pretty unstable as it relies on private variables
+        args = getattr(self, "_backend_args", None) or getattr(self, "_backend_kwargs", None) or {}
+
+        initializer = args.pop("initializer", None)
+        if initializer is None:
+            args["initializer"] = process_initializer
+        else:
+            initializer, initargs = joblib.externals.loky.initializers._chain_initializers([
+                (process_initializer, ()),
+                (initializer, args.pop("initargs", None) or ())
+            ])
+
+            args["initargs"] = initargs
+            args["initializer"] = initializer
+
+    joblib.Parallel.__init__ = patched
+
+
+def prepare_for_process_initializer(
+    module_name=constants.USER_CODE_MODULE_NAME
+):
+    user_code_module = sys.modules.get(module_name)
+
+    user_code_path = user_code_module.__file__ if user_code_module is not None else None
+    user_code_path = user_code_path or os.environ.get(constants.MAIN_FILE_PATH_ENV_VAR)
+    user_code_path = user_code_path or os.path.join(os.getcwd(), constants.MAIN_FILE_PATH)
+
+    os.environ[constants.USER_CODE_MODULE_NAME_ENV_VAR] = module_name
+    os.environ[constants.MAIN_FILE_PATH_ENV_VAR] = user_code_path
+
+
+def process_initializer(*args, **kwargs):
+    apply_all()
+
+    user_code_module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR, constants.USER_CODE_MODULE_NAME)
+    main_file_path = os.environ.get(constants.MAIN_FILE_PATH_ENV_VAR, constants.MAIN_FILE_PATH)
+
+    if not user_code_module_name in sys.modules:
+        from .command.test import load_user_code
+        module = load_user_code(main_file_path, user_code_module_name)
+
+        sys.modules[user_code_module_name] = module
