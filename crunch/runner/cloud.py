@@ -211,6 +211,8 @@ class CloudRunner(Runner):
 
             self.pip([
                 "--upgrade",
+                "--force-reinstall",
+                "--no-deps",
                 f"git+https://github.com/crunchdao/crunch-cli@{self.crunch_cli_commit_hash}"
             ])
 
