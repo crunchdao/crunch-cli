@@ -41,6 +41,7 @@ def run(
     write_kwargs={},
 ):
     monkey_patches.pickle_unpickler_find_class()
+    monkey_patches.joblib_parallel_initializer()
 
     if competition.format == api.CompetitionFormat.STREAM:
         if no_determinism_check == False:

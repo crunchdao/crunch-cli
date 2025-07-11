@@ -171,7 +171,7 @@ def logging_file_handler():
     def patched(self: logging.FileHandler, filename: str, *args, **kwargs):
         if not filename.startswith("/") and not os.access(filename, os.W_OK):
             filename = os.path.join("/tmp", filename)
-            print(f"[debug] redirect logging file to: {filename}", file=sys.stderr)
+            # print(f"[debug] redirect logging file to: {filename}", file=sys.stderr)
 
         original(self, filename, *args, **kwargs)
 
