@@ -1,6 +1,8 @@
 import functools
 import os
+import re
 import sys
+import traceback
 
 from . import constants
 
@@ -186,6 +188,24 @@ def pycaret_internal_logging():
     pycaret.internal.logging.LOGGER = pycaret.internal.logging.create_logger("/dev/stdout")
 
 
+def _should_redirect_main_to_user_code():
+    """
+    Determine if the __main__ module should be redirected to user_code:
+    - If the code is run via the CLI
+    - If the code is run in a loky child process
+    """
+
+    if constants.RUN_VIA_CLI:
+        return True
+
+    for frame, _ in traceback.walk_stack(sys._getframe()):
+        file_name = frame.f_code.co_filename
+        if re.search(r"loky(?:\\|/)backend(?:\\|/)popen_", file_name):
+            return True
+
+    return False
+
+
 @_patcher
 def pickle_unpickler_find_class():
     """
@@ -199,13 +219,12 @@ def pickle_unpickler_find_class():
     import pickle
 
     original = pickle._Unpickler.find_class
+    should_redirect = _should_redirect_main_to_user_code()
 
     def patched(self: pickle.Unpickler, module_name: str, global_name: str, /):
         from . import constants
 
-        # TODO test if RUN_VIA_CLI is set or if run via loky
-        # print(constants.RUN_VIA_CLI)
-        if constants.RUN_VIA_CLI and module_name == "__main__":
+        if should_redirect and module_name == "__main__":
             module_name = constants.USER_CODE_MODULE_NAME
 
         return original(self, module_name, global_name)
