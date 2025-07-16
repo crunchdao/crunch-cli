@@ -219,10 +219,12 @@ def pickle_unpickler_find_class():
     import pickle
 
     original = pickle._Unpickler.find_class
-    should_redirect = _should_redirect_main_to_user_code()
+    should_redirect = None
 
-    def patched(self: pickle.Unpickler, module_name: str, global_name: str, /):
-        from . import constants
+    def patched(self: pickle.Unpickler, module_name: str, global_name: str):
+        nonlocal should_redirect
+        if should_redirect is None:
+            should_redirect = _should_redirect_main_to_user_code()
 
         if should_redirect and module_name == "__main__":
             module_name = constants.USER_CODE_MODULE_NAME
