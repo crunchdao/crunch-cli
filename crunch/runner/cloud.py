@@ -522,7 +522,11 @@ class CloudRunner(Runner):
                     del env[key]
 
         self.log(f"executing command: {' '.join(arguments)}")
-        process = subprocess.Popen(arguments, env=env)
+        process = subprocess.Popen(
+            arguments,
+            env=env,
+            cwd=self.code_directory,
+        )
 
         code = process.wait()
         if code != 0:
