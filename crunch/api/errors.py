@@ -250,6 +250,20 @@ class InvalidProjectTokenException(ApiException):
         _print_contact()
 
 
+class LeaderboardNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        leaderboard_name: str,
+        competition_name: str,
+    ):
+        super().__init__(message)
+
+        self.leaderboard_name = leaderboard_name
+        self.competition_name = competition_name
+
+
 class MissingPhaseDataException(ApiException):
 
     def __init__(
