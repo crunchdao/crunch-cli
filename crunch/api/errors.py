@@ -133,6 +133,25 @@ class CrunchNotFoundException(ApiException):
         _print_contact()
 
 
+class CrunchNotPublishedException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        crunch_number: int,
+    ):
+        super().__init__(message)
+
+        self.crunch_number = crunch_number
+
+    def print_helper(self, **kwargs):
+        print("Crunch not published.")
+        print("")
+        print("The leaderboard should be published soon.")
+
+        _print_contact()
+
+
 class CurrentPhaseNotFoundException(ApiException):
 
     def __init__(
