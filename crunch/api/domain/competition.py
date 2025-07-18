@@ -103,6 +103,15 @@ class Competition(Model):
             client=self._client
         )
 
+    @property
+    def leaderboards(self):
+        from .leaderboard import LeaderboardCollection
+
+        return LeaderboardCollection(
+            competition=self,
+            client=self._client
+        )
+
 
 class CompetitionCollection(Collection):
 

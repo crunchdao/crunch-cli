@@ -37,7 +37,7 @@ def _build_gitignore(
 def _list_files(
     directory_path: str,
     ignored_paths: typing.List[str],
-    /,
+    *,
     use_parent_gitignore: bool = False,
 ):
     directory_path = _to_unix_path(directory_path)

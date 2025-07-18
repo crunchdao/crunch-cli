@@ -1,12 +1,8 @@
 import typing
-import tempfile
 
 from ..identifiers import RoundIdentifierType
 from ..resource import Collection, Model
 from .competition import Competition
-
-if typing.TYPE_CHECKING:
-    import pandas
 
 
 class Round(Model):

@@ -28,6 +28,10 @@ class Crunch(Model):
     def number(self) -> int:
         return self._attrs["number"]
 
+    @property
+    def published(self) -> bool:
+        return self._attrs["published"]
+
 
 class CrunchCollection(Collection):
 
