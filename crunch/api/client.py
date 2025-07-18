@@ -17,6 +17,7 @@ from .domain.competition import (CompetitionCollection,
                                  CompetitionEndpointMixin, CompetitionFormat)
 from .domain.crunch import CrunchEndpointMixin
 from .domain.data_release import DataReleaseEndpointMixin
+from .domain.leaderboard import LeaderboardEndpointMixin
 from .domain.library import LibraryCollection, LibraryEndpointMixin
 from .domain.metric import MetricEndpointMixin
 from .domain.phase import PhaseEndpointMixin
@@ -44,6 +45,7 @@ class EndpointClient(
     CompetitionEndpointMixin,
     CrunchEndpointMixin,
     DataReleaseEndpointMixin,
+    LeaderboardEndpointMixin,
     LibraryEndpointMixin,
     MetricEndpointMixin,
     PhaseEndpointMixin,

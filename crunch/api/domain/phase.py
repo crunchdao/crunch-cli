@@ -124,11 +124,23 @@ class PhaseCollection(Collection):
     def get_current(self):
         return self.get("@current")
 
+    @property
+    def current(self):
+        return self.get_current()
+
     def get_submission(self):
         return self.get(PhaseType.SUBMISSION)
 
+    @property
+    def submission(self):
+        return self.get_submission()
+
     def get_out_of_sample(self):
         return self.get(PhaseType.OUT_OF_SAMPLE)
+
+    @property
+    def out_of_sample(self):
+        return self.get_out_of_sample()
 
     def list(
         self
