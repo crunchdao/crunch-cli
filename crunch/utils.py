@@ -432,7 +432,7 @@ def limit_traceback(forward=0):
 
     try:
         yield
-    except SystemExit:
+    except (SystemExit, click.Abort):
         raise
     except BaseException:
         exc_type, exc_value, exc_traceback = sys.exc_info()
