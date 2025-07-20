@@ -9,7 +9,7 @@ from .. import api, constants, tester, unstructured, utils
 
 def load_user_code(
     main_file_path: str,
-    module_name=constants.USER_CODE_MODULE_NAME,
+    module_name=constants.DEFAULT_USER_CODE_MODULE_NAME,
 ) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location(module_name, main_file_path)
     module = importlib.util.module_from_spec(spec)

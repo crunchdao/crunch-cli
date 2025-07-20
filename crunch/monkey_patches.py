@@ -227,7 +227,7 @@ def pickle_unpickler_find_class():
             should_redirect = _should_redirect_main_to_user_code()
 
         if should_redirect and module_name == "__main__":
-            module_name = constants.USER_CODE_MODULE_NAME
+            module_name = constants.DEFAULT_USER_CODE_MODULE_NAME
 
         return original(self, module_name, global_name)
 
@@ -269,13 +269,13 @@ def joblib_parallel_initializer():
 
 
 def prepare_for_process_initializer(
-    module_name=constants.USER_CODE_MODULE_NAME
+    module_name=constants.DEFAULT_USER_CODE_MODULE_NAME
 ):
     user_code_module = sys.modules.get(module_name)
 
     user_code_path = user_code_module.__file__ if user_code_module is not None else None
     user_code_path = user_code_path or os.environ.get(constants.MAIN_FILE_PATH_ENV_VAR)
-    user_code_path = user_code_path or os.path.join(os.getcwd(), constants.MAIN_FILE_PATH)
+    user_code_path = user_code_path or os.path.join(os.getcwd(), constants.DEFAULT_MAIN_FILE_PATH)
 
     os.environ[constants.USER_CODE_MODULE_NAME_ENV_VAR] = module_name
     os.environ[constants.MAIN_FILE_PATH_ENV_VAR] = user_code_path
@@ -284,8 +284,8 @@ def prepare_for_process_initializer(
 def process_initializer(*args, **kwargs):
     apply_all()
 
-    user_code_module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR, constants.USER_CODE_MODULE_NAME)
-    main_file_path = os.environ.get(constants.MAIN_FILE_PATH_ENV_VAR, constants.MAIN_FILE_PATH)
+    user_code_module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR, constants.DEFAULT_USER_CODE_MODULE_NAME)
+    main_file_path = os.environ.get(constants.MAIN_FILE_PATH_ENV_VAR, constants.DEFAULT_MAIN_FILE_PATH)
 
     if not user_code_module_name in sys.modules:
         from .command.test import load_user_code

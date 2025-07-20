@@ -337,7 +337,7 @@ def convert_if_necessary(
 
 @cli.command(help="Send the new submission of your code.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
-@click.option("--main-file", "main_file_path", default=constants.USER_CODE_MODULE_NAME, show_default=True, help="Entrypoint of your code.")
+@click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
@@ -389,7 +389,7 @@ def push_prediction(
 
 def local_options(f):
     options = [
-        click.option("--main-file", "main_file_path", default=constants.MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
+        click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
         click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored."),
         click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop."),
         click.option("--train-frequency", default=1, show_default=True, help="Train interval."),
@@ -540,7 +540,7 @@ def local(
 @click.option("--data-directory", envvar="DATA_DIRECTORY", default="{context}/data")
 @click.option("--code-directory", envvar="CODE_DIRECTORY", default="{context}/code")
 @click.option("--model-directory", envvar="MODEL_DIRECTORY", default="model")
-@click.option("--main-file", envvar=constants.MAIN_FILE_PATH_ENV_VAR, default=constants.MAIN_FILE_PATH)
+@click.option("--main-file", envvar=constants.MAIN_FILE_PATH_ENV_VAR, default=constants.DEFAULT_MAIN_FILE_PATH)
 # ---
 @click.option("--run-id", envvar="RUN_ID", required=True)
 @click.option("--run-token", envvar="RUN_TOKEN", required=True)
