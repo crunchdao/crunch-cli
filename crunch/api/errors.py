@@ -133,6 +133,25 @@ class CrunchNotFoundException(ApiException):
         _print_contact()
 
 
+class CrunchNotPublishedException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        crunch_number: int,
+    ):
+        super().__init__(message)
+
+        self.crunch_number = crunch_number
+
+    def print_helper(self, **kwargs):
+        print("Crunch not published.")
+        print("")
+        print("The leaderboard should be published soon.")
+
+        _print_contact()
+
+
 class CurrentPhaseNotFoundException(ApiException):
 
     def __init__(
@@ -229,6 +248,20 @@ class InvalidProjectTokenException(ApiException):
             print(client.format_web_url(f''))
 
         _print_contact()
+
+
+class LeaderboardNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        leaderboard_name: str,
+        competition_name: str,
+    ):
+        super().__init__(message)
+
+        self.leaderboard_name = leaderboard_name
+        self.competition_name = competition_name
 
 
 class MissingPhaseDataException(ApiException):

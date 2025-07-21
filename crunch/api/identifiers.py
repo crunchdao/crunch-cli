@@ -34,3 +34,11 @@ CrunchIdentifierType = typing.Union[
         "@published",
     ]
 ]
+
+LeaderboardIdentifierType = typing.Union[
+    str,
+    typing_extensions.Literal[
+        "@default",
+        "@mine",
+    ]
+]
