@@ -395,6 +395,9 @@ class CloudRunner(Runner):
 
                     self.log("result submitted")
                     break
+                except (api.errors.ModelTooBigException, api.errors.PredictionTooBigException) as exception:
+                    self.log(f"failed to submit result: {exception}: {exception.size}/{exception.maximum_size} bytes", error=True)
+                    exit(1)
                 except Exception as exception:
                     self.log(f"failed to submit result: {exception}", error=True)
 
@@ -749,7 +752,7 @@ class CloudRunner(Runner):
             got_content = fd.read()
 
         if got_content != expected_content:
-            self.log(f"[debug] failed exit check - expected=`{expected_content}` got=`{got_content[:len(expected_content)*2]}`", error=True)
+            self.log(f"[debug] failed exit check - expected=`{expected_content}` got=`{got_content[:len(expected_content) * 2]}`", error=True)
             raise RuntimeError("user code exited prematurely")
 
     def _install_permission_fuse(

@@ -262,7 +262,7 @@ def smart_call(
 
         debug(f"set {name}={value.__class__.__name__}")
         arguments[name] = value
-    
+
     if limit_traceback:
         with _limit_traceback(1):
             return function(**arguments)
@@ -443,6 +443,7 @@ def limit_traceback(forward=0):
         traceback.print_exception(exc_type, exc_value, exc_traceback)
 
         sys.exit(1)
+
 
 _limit_traceback = limit_traceback
 
