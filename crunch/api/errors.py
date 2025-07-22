@@ -251,6 +251,27 @@ class MissingPhaseDataException(ApiException):
         print("No data is available for local download.")
 
 
+class ModelTooBigException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        size: typing.Optional[int],
+        maximum_size: int,
+    ):
+        super().__init__(message)
+
+        self.size = size
+        self.maximum_size = maximum_size
+
+    def print_helper(self, **kwargs):
+        size = utils.format_bytes(self.size) if self.size is not None else None
+        maximum_size = utils.format_bytes(self.maximum_size)
+
+        sizes = f"{size}/{maximum_size}" if size is not None else f"max. {maximum_size}"
+        print(f"The resources directory is too big. ({sizes})")
+
+
 class NeverSubmittedException(ApiException):
 
     def __init__(self, message: str):
@@ -270,6 +291,23 @@ class PredictionSubmissionNotAllowedException(ApiException):
 
     def print_helper(self, **kwargs):
         print("Prediction submission are not allowed for this competition.")
+
+
+class PredictionTooBigException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        size: int,
+        maximum_size: int,
+    ):
+        super().__init__(message)
+
+        self.size = size
+        self.maximum_size = maximum_size
+
+    def print_helper(self, **kwargs):
+        print(f"Prediction is too big. ({utils.format_bytes(self.size)}/{utils.format_bytes(self.maximum_size)})")
 
 
 class ProjectNotFoundException(ApiException):
@@ -370,6 +408,23 @@ class SubmissionCustomCheckFailedException(ApiException):
         print(f"Reason: {self.check_message}")
 
         _print_contact()
+
+
+class SubmissionTooBigException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        size: int,
+        maximum_size: int,
+    ):
+        super().__init__(message)
+
+        self.size = size
+        self.maximum_size = maximum_size
+
+    def print_helper(self, **kwargs):
+        print(f"Submission is too big. ({utils.format_bytes(self.size)}/{utils.format_bytes(self.maximum_size)})")
 
 
 # TODO Only use one class like crunch

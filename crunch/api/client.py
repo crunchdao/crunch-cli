@@ -279,7 +279,7 @@ class Client:
         auth: Auth,
         project_info: typing.Optional[utils.ProjectInfo] = None,
         *,
-        show_progress = True,
+        show_progress=True,
     ):
         self.api = EndpointClient(api_base_url, auth, show_progress)
         self.web_base_url = web_base_url
