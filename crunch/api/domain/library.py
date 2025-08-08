@@ -47,7 +47,7 @@ class LibraryCollection(Collection):
 
     def list(
         self,
-        /,
+        *,
         include: typing.Optional[LibraryListInclude] = None,
         name: typing.Optional[str] = None,
         gpu_requirement: typing.Optional[GpuRequirement] = None,
@@ -72,7 +72,7 @@ class LibraryCollection(Collection):
 
     def freeze_imported_requirements(
         self,
-        /,
+        *,
         requirements: typing.List["ImportedRequirement"],
     ) -> str:
         return self._client.api.freeze_imported_requirements(
