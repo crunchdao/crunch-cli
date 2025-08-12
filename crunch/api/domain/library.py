@@ -55,29 +55,20 @@ class LibraryCollection(Collection):
         self,
         *,
         requirements: typing.List["ImportedRequirement"],
-    ) -> str:
-        return self._client.api.freeze_imported_requirements(
+    ) -> typing.Dict["ImportedRequirementLanguage", str]:
+        from ...convert import ImportedRequirementLanguage
+
+        result = self._client.api.freeze_imported_requirements(
             requirements=requirements,
         )
 
+        return {
+            ImportedRequirementLanguage[lang]: version
+            for lang, version in result.items()
+        }
+
 
 class LibraryEndpointMixin:
-
-    def list_libraries_v1(
-        self,
-        include
-    ):
-        params = {}
-        if include is not None:
-            params["include"] = include
-
-        return self._result(
-            self.get(
-                "/v1/libraries",
-                params=params
-            ),
-            json=True
-        )
 
     def list_libraries_v2(
         self,
@@ -123,13 +114,15 @@ class LibraryEndpointMixin:
                     "name": requirement.name,
                     "extras": requirement.extras,
                     "specs": requirement.specs,
+                    "language": requirement.language.name,
                 } for requirement in requirements
             ],
         }
 
         return self._result(
             self.post(
-                "/v1/libraries/requirements/freeze/imported",
+                "/v2/libraries/requirements/freeze/imported",
                 json=body,
-            )
+            ),
+            json=True
         )
