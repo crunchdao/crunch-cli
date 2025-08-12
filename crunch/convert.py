@@ -658,13 +658,16 @@ def _validate(source_code: str):
 
 def extract_cells(
     cells: typing.List[typing.Any],
-    print: typing.Callable[[str], None] = print,
+    print: typing.Optional[typing.Callable[[str], None]] = print,
     validate=True,
 ) -> typing.Tuple[
     str,
     typing.List[EmbedFile],
     typing.List[ImportedRequirement],
 ]:
+    if print is None:
+        print = lambda _: None
+
     imported_requirements: typing.DefaultDict[ImportedRequirementLanguage, typing.Dict[str, ImportedRequirement]] = collections.defaultdict(dict)
     module: typing.List[str] = []
     embed_files: typing.Dict[str, EmbedFile] = {}

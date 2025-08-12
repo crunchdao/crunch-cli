@@ -1,130 +1,178 @@
-import ast
 import logging
-import typing
+import os
+from collections import defaultdict
+from types import ModuleType
+from typing import Dict, Optional, Set, cast, overload
 
 import requirements
 
-from . import api, utils
+from . import api, constants, utils
+from .api import Language
+from .convert import extract_cells
 
-DOT = "."
-
-
-def strip_packages(
-    name: str
-):
-    if name.startswith(DOT):
-        return None  # just in case, but should not happen
-
-    if DOT not in name:
-        return name
-
-    index = name.index(DOT)
-    return name[:index]
-
-
-def _convert_import(
-    node: ast.AST
-):
-    packages = set()
-
-    if isinstance(node, ast.Import):
-        for alias in node.names:
-            name = strip_packages(alias.name)
-            if name:
-                packages.add(name)
-    elif isinstance(node, ast.ImportFrom):
-        name = strip_packages(node.module)
-        if name:
-            packages.add(name)
-
-    return packages
+__all__ = [
+    "extract_from_requirements",
+    "extract_from_notebook_modules",
+    "find_forbidden",
+    "scan",
+]
 
 
 def extract_from_requirements(
     file_path: str
-):
+) -> Set[str]:
+    """
+    Extracts package names from a requirements file.
+    Does nothing if the file does not exist.
+    """
+
+    if not os.path.exists(file_path):
+        return set()
+
     with open(file_path, 'r') as fd:
         return {
-            requirement.name
+            cast(str, requirement.name)
             for requirement in requirements.parse(fd)
         }
 
 
-def extract_from_code_cells(
-    cells: typing.List[typing.List[str]]
+def extract_from_notebook_modules(
+    module: ModuleType
 ):
-    packages = set()
+    """
+    Extracts package names from a Jupyter notebook module.
+    """
 
-    for index, lines in enumerate(cells):
-        try:
-            source = utils.strip_python_special_lines(lines)
+    cells = getattr(module, "In", [])
+    cells = [
+        {
+            "metadata": {},
+            "cell_type": "code",
+            "source": cell if isinstance(cell, list) else cell.split("\n")
+        }
+        for cell in cells
+    ]
 
-            tree = ast.parse(source)
+    (
+        _source_code,
+        _embed_files,
+        requirements,
+    ) = extract_cells(
+        cells,
+        print=None,
+        validate=False,
+    )
 
-            for node in tree.body:
-                packages.update(_convert_import(node))
-        except Exception as exception:
-            print(f"ignoring cell #{index + 1}: {str(exception)}")
+    packages = defaultdict(set)
+    for requirement in requirements:
+        packages[requirement.language].add(requirement.alias)
 
     return packages
 
 
-def extract_from_notebook_modules(
-    module: typing.Any
-):
-    cells = getattr(module, "In", [])
-    cells_and_lines = [
-        cell if isinstance(cell, list) else cell.split("\n")
-        for cell in cells
-    ]
-
-    return extract_from_code_cells(cells_and_lines)
-
-
 def find_forbidden(
-    packages: typing.Set[str],
+    packages: Dict[Language, Set[str]],
     allow_standard: bool
 ):
+    """
+    Finds forbidden libraries by querying the API.
+    """
+
     client = api.Client.from_env()
 
-    libraries = client.libraries.list(
-        standard=(
-            None
-            if allow_standard
-            else False
+    whitelist: Dict[Language, Set[str]] = defaultdict(set)
+
+    for language in packages.keys():
+        libraries = client.libraries.list(
+            standard=(
+                None
+                if allow_standard
+                else False
+            ),
+            language=language,
         )
-    )
 
-    whitelist = set()
-    for library in libraries:
-        whitelist.add(library.name)
-        whitelist.update(library.aliases)
+        for library in libraries:
+            whitelisted = whitelist[language]
 
-    return packages - whitelist
+            whitelisted.add(library.name)
+            whitelisted.update(library.aliases)
+
+    return {
+        language: package_set - whitelist[language]
+        for language, package_set in packages.items()
+    }
+
+
+@overload
+def scan(
+    *,
+    module: ModuleType,
+    logger: logging.Logger = logging.getLogger()
+):
+    """
+    Scans a module for forbidden libraries.
+    """
+
+
+@overload
+def scan(
+    *,
+    requirements_file: Optional[str] = None,
+    requirements_r_file: Optional[str] = None,
+    logger: logging.Logger = logging.getLogger()
+):
+    """
+    Scans requirements files for forbidden libraries.
+    If no files are provided, uses the default ones from constants.
+    If the files do not exist, they are ignored.
+    """
 
 
 def scan(
-    module: typing.Any = None,
-    requirements_file: str = None,
-    logger: logging.Logger = logging.getLogger()
+    module: Optional[ModuleType] = None,
+    requirements_file: Optional[str] = None,
+    requirements_r_file: Optional[str] = None,
+    logger: Optional[logging.Logger] = None
 ):
-    forbidden = set()
-
-    if module:
+    if module is not None:
         packages = extract_from_notebook_modules(module)
         forbidden = find_forbidden(packages, True)
-        _log_forbidden(forbidden, logger, True)
-    elif requirements_file:
-        packages = extract_from_requirements(requirements_file)
+        _log_forbidden(
+            forbidden=forbidden,
+            logger=logger,
+            is_alias=True
+        )
+
+    else:
+        if requirements_file is None:
+            requirements_file = constants.REQUIREMENTS_TXT
+
+        if requirements_r_file is None:
+            requirements_r_file = constants.REQUIREMENTS_R_TXT
+
+        packages = {
+            Language.PYTHON: extract_from_requirements(requirements_file),
+            Language.R: extract_from_requirements(requirements_r_file),
+        }
+
         forbidden = find_forbidden(packages, False)
-        _log_forbidden(forbidden, logger, False)
+        _log_forbidden(
+            forbidden=forbidden,
+            logger=logger,
+            is_alias=False
+        )
 
 
 def _log_forbidden(
-    forbidden: typing.Set[str],
-    logger: logging.Logger,
-    is_alias: bool
+    *,
+    forbidden: Dict[Language, Set[str]],
+    logger: Optional[logging.Logger],
+    is_alias: bool,
 ):
+    if logger is None:
+        logger = logging.getLogger()
+
     if not len(forbidden):
         logger.warning('no forbidden library found')
         return
@@ -133,11 +181,16 @@ def _log_forbidden(
     client = api.Client.from_env()
     query_param = 'requestAlias' if is_alias else 'requestName'
 
-    for package in forbidden:
-        line = f'forbidden library: {package}'
+    show_language = len(forbidden) > 1
 
-        if competition_name:
-            url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?{query_param}={package}')
-            line += f'  (request to whitelist: {url})'
+    for language, packages in forbidden.items():
+        for package in packages:
+            line = f'forbidden library: {package}'
+            if show_language:
+                line += f' ({language.name.lower()})'
 
-        logger.error(line)
+            if competition_name:
+                url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?{query_param}={package}&requestLanguage={language.name}')
+                line += f'  (request to whitelist: {url})'
+
+            logger.error(line)
