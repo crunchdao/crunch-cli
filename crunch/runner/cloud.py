@@ -193,7 +193,7 @@ class CloudRunner(Runner):
                 "r-base",
             ])
 
-            with open(self.requirements_r_txt_path, "w") as fd:
+            with open(self.requirements_r_txt_path, "r") as fd:
                 requirements = requirements_parser.parse(fd.read())
 
             apt_names = [
