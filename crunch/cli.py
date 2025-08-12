@@ -549,7 +549,7 @@ def local(
 @click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", type=bool, default=False)
 @click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", type=bool, default=False)
 @click.option("--gpu", envvar="GPU", type=bool, default=False)
-@click.option("--crunch-cli-commit-hash", default="main", envvar="CRUNCH_CLI_COMMIT_HASH")
+@click.option("--crunch-cli-commit-hash", default="master", envvar="CRUNCH_CLI_COMMIT_HASH")
 # ---
 @click.option("--max-retry", envvar="MAX_RETRY", default=3, type=int)
 @click.option("--retry-seconds", envvar="RETRY_WAIT", default=60, type=int)
@@ -595,6 +595,7 @@ def cloud(
     state_file = state_file.replace("{context}", context_directory)
 
     requirements_txt_path = os.path.join(code_directory, "requirements.txt")
+    requirements_r_txt_path = os.path.join(code_directory, "requirements.r.txt")
     model_directory_path = os.path.join(code_directory, model_directory)
 
     prediction_file_name = "prediction.parquet"
@@ -627,6 +628,7 @@ def cloud(
         main_file,
         # ---
         requirements_txt_path,
+        requirements_r_txt_path,
         model_directory_path,
         prediction_path,
         trace_path,
