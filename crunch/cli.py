@@ -504,10 +504,7 @@ def local(
     tester.install_logger()
 
     if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
-        library.scan(
-            requirements_file=constants.REQUIREMENTS_TXT,
-            logger=tester.logger
-        )
+        library.scan(logger=tester.logger)
 
         tester.logger.warning('')
 

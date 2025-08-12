@@ -6,7 +6,8 @@ from ..resource import Collection, Model
 from .common import GpuRequirement
 
 if typing.TYPE_CHECKING:
-    from ...convert import ImportedRequirement
+    from ...convert import ImportedRequirement, ImportedRequirementLanguage
+    from .enum_ import Language
 
 
 class LibraryListInclude(enum.Enum):
@@ -52,6 +53,7 @@ class LibraryCollection(Collection):
         name: typing.Optional[str] = None,
         gpu_requirement: typing.Optional[GpuRequirement] = None,
         standard: typing.Optional[bool] = None,
+        language: typing.Optional[typing.Union["Language", "ImportedRequirementLanguage"]] = None,
     ) -> typing.List[Library]:
         if include is not None:
             warnings.warn("The 'include' parameter is deprecated", DeprecationWarning)
@@ -67,6 +69,7 @@ class LibraryCollection(Collection):
                 name=name,
                 gpu_requirement=gpu_requirement,
                 standard=standard,
+                language=language,
             )
         )
 
@@ -103,6 +106,7 @@ class LibraryEndpointMixin:
         name,
         gpu_requirement,
         standard,
+        language,
     ):
         params = {}
 
@@ -114,6 +118,9 @@ class LibraryEndpointMixin:
 
         if standard is not None:
             params["standard"] = str(standard).lower()
+
+        if language is not None:
+            params["language"] = language.name
 
         return self._paginated(
             lambda page_request: self.get(
