@@ -202,11 +202,18 @@ class CloudRunner(Runner):
             ]
 
             self.log("installing r cran packages...")
-            self.bash2([
+            self.bash("r-apt", [
                 "apt-get",
                 "-qq",
                 "install",
                 *apt_names
+            ])
+
+            # remove warning about empty directory
+            self.bash2([
+                "rm",
+                "-r",
+                "/usr/local/lib/R/site-library",
             ])
 
         if self.log("installing requirements..."):
