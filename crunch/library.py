@@ -189,8 +189,8 @@ def _log_forbidden(
             if show_language:
                 line += f' ({language.name.lower()})'
 
+            logger.error(line)
+
             if competition_name:
                 url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?{query_param}={package}&requestLanguage={language.name}')
-                line += f'  (request to whitelist: {url})'
-
-            logger.error(line)
+                logger.error(f'request to whitelist: {url}')
