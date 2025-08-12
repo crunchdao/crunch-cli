@@ -1,6 +1,4 @@
-import enum
 import typing
-import warnings
 
 from ..resource import Collection, Model
 from .common import GpuRequirement
@@ -8,16 +6,6 @@ from .common import GpuRequirement
 if typing.TYPE_CHECKING:
     from ...convert import ImportedRequirement, ImportedRequirementLanguage
     from .enum_ import Language
-
-
-class LibraryListInclude(enum.Enum):
-
-    ALL = "ALL"
-    STANDARD = "STANDARD"
-    THIRD_PARTY = "THIRD_PARTY"
-
-    def __repr__(self):
-        return self.name
 
 
 class Library(Model):
@@ -49,21 +37,11 @@ class LibraryCollection(Collection):
     def list(
         self,
         *,
-        include: typing.Optional[LibraryListInclude] = None,
         name: typing.Optional[str] = None,
         gpu_requirement: typing.Optional[GpuRequirement] = None,
         standard: typing.Optional[bool] = None,
         language: typing.Optional[typing.Union["Language", "ImportedRequirementLanguage"]] = None,
     ) -> typing.List[Library]:
-        if include is not None:
-            warnings.warn("The 'include' parameter is deprecated", DeprecationWarning)
-
-            return self.prepare_models(
-                self._client.api.list_libraries_v1(
-                    include=include.name
-                )
-            )
-
         return self.prepare_models(
             self._client.api.list_libraries_v2(
                 name=name,
@@ -77,29 +55,20 @@ class LibraryCollection(Collection):
         self,
         *,
         requirements: typing.List["ImportedRequirement"],
-    ) -> str:
-        return self._client.api.freeze_imported_requirements(
+    ) -> typing.Dict["ImportedRequirementLanguage", str]:
+        from ...convert import ImportedRequirementLanguage
+
+        result = self._client.api.freeze_imported_requirements(
             requirements=requirements,
         )
 
+        return {
+            ImportedRequirementLanguage[lang]: version
+            for lang, version in result.items()
+        }
+
 
 class LibraryEndpointMixin:
-
-    def list_libraries_v1(
-        self,
-        include
-    ):
-        params = {}
-        if include is not None:
-            params["include"] = include
-
-        return self._result(
-            self.get(
-                "/v1/libraries",
-                params=params
-            ),
-            json=True
-        )
 
     def list_libraries_v2(
         self,
@@ -145,13 +114,15 @@ class LibraryEndpointMixin:
                     "name": requirement.name,
                     "extras": requirement.extras,
                     "specs": requirement.specs,
+                    "language": requirement.language.name,
                 } for requirement in requirements
             ],
         }
 
         return self._result(
             self.post(
-                "/v1/libraries/requirements/freeze/imported",
+                "/v2/libraries/requirements/freeze/imported",
                 json=body,
-            )
+            ),
+            json=True
         )
