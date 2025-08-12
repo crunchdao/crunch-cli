@@ -595,6 +595,7 @@ def cloud(
     state_file = state_file.replace("{context}", context_directory)
 
     requirements_txt_path = os.path.join(code_directory, "requirements.txt")
+    requirements_r_txt_path = os.path.join(code_directory, "requirements.r.txt")
     model_directory_path = os.path.join(code_directory, model_directory)
 
     prediction_file_name = "prediction.parquet"
@@ -627,6 +628,7 @@ def cloud(
         main_file,
         # ---
         requirements_txt_path,
+        requirements_r_txt_path,
         model_directory_path,
         prediction_path,
         trace_path,

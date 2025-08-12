@@ -14,6 +14,8 @@ import urllib.parse
 import pandas
 import requests
 
+import requirements as requirements_parser
+
 from .. import api, downloader, store, unstructured, utils
 from .collector import MemoryPredictionCollector, PredictionCollector
 from .runner import Runner
@@ -77,6 +79,7 @@ class CloudRunner(Runner):
         main_file: str,
         # ---
         requirements_txt_path: str,
+        requirements_r_txt_path: str,
         model_directory_path: str,
         prediction_path: str,
         trace_path: str,
@@ -121,6 +124,7 @@ class CloudRunner(Runner):
         self.runner_dot_py_file_path = None
 
         self.requirements_txt_path = requirements_txt_path
+        self.requirements_r_txt_path = requirements_r_txt_path
         self.model_directory_path = model_directory_path
         self.prediction_path = prediction_path
         self.trace_path = trace_path
@@ -177,6 +181,33 @@ class CloudRunner(Runner):
 
             file_urls = self.run.code
             self.download_files(file_urls, self.code_directory)
+
+        if os.path.exists(self.requirements_txt_path):
+            self.report_current("install r requirements")
+
+            self.log("installing r...")
+            self.bash2([
+                "apt-get",
+                "-qq",
+                "install",
+                "r-base",
+            ])
+
+            with open(self.requirements_r_txt_path, "w") as fd:
+                requirements = requirements_parser.parse(fd.read())
+
+            apt_names = [
+                f"r-cran-{requirement.name}"
+                for requirement in requirements
+            ]
+
+            self.log("installing r cran packages...")
+            self.bash2([
+                "apt-get",
+                "-qq",
+                "install",
+                *apt_names
+            ])
 
         if self.log("installing requirements..."):
             if os.path.exists(self.requirements_txt_path):
