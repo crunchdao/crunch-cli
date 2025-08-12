@@ -186,12 +186,8 @@ class CloudRunner(Runner):
             self.report_current("install r requirements")
 
             self.log("installing r...")
-            self.bash2([
-                "apt-get",
-                "-qq",
-                "install",
-                "r-base",
-            ])
+            self.bash("r-apt", ["apt-get", "-qq", "update"])
+            self.bash("r-apt", ["apt-get", "-qq", "install", "r-base"])
 
             with open(self.requirements_r_txt_path, "r") as fd:
                 requirements = requirements_parser.parse(fd.read())
@@ -202,19 +198,12 @@ class CloudRunner(Runner):
             ]
 
             self.log("installing r cran packages...")
-            self.bash("r-apt", [
-                "apt-get",
-                "-qq",
-                "install",
-                *apt_names
-            ])
+            self.bash("r-apt", ["apt-get", "-qq", "install", *apt_names])
 
             # remove warning about empty directory
-            self.bash2([
-                "rm",
-                "-r",
-                "/usr/local/lib/R/site-library",
-            ])
+            user_site_library = "/usr/local/lib/R/site-library"
+            if os.path.exists(user_site_library) and len(os.listdir(user_site_library)) == 0:
+                self.bash2(["rm", "-r", user_site_library])
 
         if self.log("installing requirements..."):
             if os.path.exists(self.requirements_txt_path):
