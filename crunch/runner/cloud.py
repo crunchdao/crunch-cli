@@ -182,7 +182,7 @@ class CloudRunner(Runner):
             file_urls = self.run.code
             self.download_files(file_urls, self.code_directory)
 
-        if os.path.exists(self.requirements_txt_path):
+        if os.path.exists(self.requirements_r_txt_path):
             self.report_current("install r requirements")
 
             self.log("installing r...")
@@ -205,9 +205,9 @@ class CloudRunner(Runner):
             if os.path.exists(user_site_library) and len(os.listdir(user_site_library)) == 0:
                 self.bash2(["rm", "-r", user_site_library])
 
-        if self.log("installing requirements..."):
+        if self.log("installing python requirements..."):
             if os.path.exists(self.requirements_txt_path):
-                self.report_current("install requirements")
+                self.report_current("install python requirements")
 
                 priority_packages = []
                 with open(self.requirements_txt_path) as fd:
