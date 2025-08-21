@@ -564,7 +564,7 @@ class CloudRunner(Runner):
         self.bash(
             "pip",
             [
-                "pip3", "install",
+                "pip3", "install", "-v",
                 "--root-user-action", "ignore",
                 "--disable-pip-version-check",
                 "--no-input",
