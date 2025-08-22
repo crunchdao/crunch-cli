@@ -203,8 +203,11 @@ class CloudRunner(Runner):
                 for requirement in requirements
             ]
 
-            self.log("installing r cran packages...")
-            self.bash("r-apt", ["apt-get", "-qq", "install", *apt_names])
+            if len(apt_names):
+                self.log("installing r cran packages...")
+                self.bash("r-apt", ["apt-get", "-qq", "install", *apt_names])
+            else:
+                self.log("no r cran packages to install")
 
             # remove warning about empty directory
             user_site_library_paths = [
