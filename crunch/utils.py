@@ -227,7 +227,6 @@ def smart_call(
     specific_values={},
     log=True,
     logger=logging.getLogger(),
-    limit_traceback=False,
 ):
     values = {
         **default_values,
@@ -262,10 +261,6 @@ def smart_call(
 
         debug(f"set {name}={value.__class__.__name__}")
         arguments[name] = value
-
-    if limit_traceback:
-        with _limit_traceback(1):
-            return function(**arguments)
 
     return function(**arguments)
 
@@ -423,29 +418,6 @@ def download(
             source_file_path,
             destination_file_path
         )
-
-
-@contextlib.contextmanager
-def limit_traceback(forward=0):
-    if forward < 0:
-        raise ValueError("forward must be >= 0")
-
-    try:
-        yield
-    except (SystemExit, click.Abort):
-        raise
-    except BaseException:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-
-        for _ in range(forward + 1):  # +1 to skip "yield"
-            exc_traceback = exc_traceback.tb_next
-
-        traceback.print_exception(exc_type, exc_value, exc_traceback)
-
-        sys.exit(1)
-
-
-_limit_traceback = limit_traceback
 
 
 def exit_via(error: "api.ApiException", **kwargs):

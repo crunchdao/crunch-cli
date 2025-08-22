@@ -12,7 +12,6 @@ def call_function(
     function: typing.Callable,
     kwargs: dict,
     print: typing.Optional[typing.Callable[[typing.Any], None]] = None,
-    limit_traceback=False,
 ):
     try:
         if print:
@@ -21,7 +20,6 @@ def call_function(
         return utils.smart_call(
             function,
             kwargs,
-            limit_traceback=limit_traceback,
         )
     except Exception as exception:
         if exception.__class__.__name__ == 'ParticipantVisibleError':

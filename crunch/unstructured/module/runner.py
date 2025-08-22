@@ -30,7 +30,6 @@ class RunnerModule(code_loader.ModuleWrapper):
         context: "RunnerContext",
         data_directory_path: str,
         model_directory_path: str,
-        limit_traceback=True,
     ) -> typing.Any:
         return execute.call_function(
             self.get_run_function(ensure=True),
@@ -39,7 +38,6 @@ class RunnerModule(code_loader.ModuleWrapper):
                 "data_directory_path": data_directory_path,
                 "model_directory_path": model_directory_path,
             },
-            limit_traceback=limit_traceback,
         )
 
     def get_execute_function(self, ensure=True):
