@@ -47,6 +47,12 @@ SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
 FUSE_SIGNAL = signal.SIGCONT
 
 
+R_SITE_LIBRARY_PATHS = [
+    "/usr/lib/R/site-library",
+    "/usr/local/lib/R/site-library"
+]
+
+
 def link(tmp_directory: str, path: str, fake: bool = False):
     if path is None:
         return None
@@ -201,9 +207,14 @@ class CloudRunner(Runner):
             self.bash("r-apt", ["apt-get", "-qq", "install", *apt_names])
 
             # remove warning about empty directory
-            user_site_library = "/usr/local/lib/R/site-library"
-            if os.path.exists(user_site_library) and len(os.listdir(user_site_library)) == 0:
-                self.bash2(["rm", "-r", user_site_library])
+            user_site_library_paths = [
+                path
+                for path in R_SITE_LIBRARY_PATHS
+                if os.path.exists(path) and len(os.listdir(path)) == 0
+            ]
+
+            if len(user_site_library_paths):
+                self.bash2(["rm", "-r", *user_site_library_paths])
 
         if self.log("installing python requirements..."):
             if os.path.exists(self.requirements_txt_path):
