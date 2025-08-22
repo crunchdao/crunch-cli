@@ -430,12 +430,11 @@ class LocalRunner(Runner):
 
         context = LocalRunnerContext(self)
 
-        with utils.limit_traceback():
-            prediction = self.runner_module.run(
-                context,
-                self.data_directory_path,
-                self.model_directory_path,
-            )
+        prediction = self.runner_module.run(
+            context,
+            self.data_directory_path,
+            self.model_directory_path,
+        )
 
         return prediction
 
