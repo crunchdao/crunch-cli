@@ -6,6 +6,7 @@ from .init import init as init
 from .push import push as push
 from .push_prediction import push_prediction as push_prediction
 from .quickstarter import quickstarter as quickstarter
+from .setup import SetupSubmissionNumber as SetupSubmissionNumber
 from .setup import setup as setup
 from .setup import setup_notebook as setup_notebook
 from .test import test as test

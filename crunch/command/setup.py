@@ -2,10 +2,12 @@ import typing
 
 from .. import api, command, utils
 
+SetupSubmissionNumber = typing.Union[int, typing.Literal["latest", "scratch"]]
+
 
 def setup(
     clone_token: str,
-    submission_number: str,
+    submission_number: SetupSubmissionNumber,
     directory: str,
     model_directory: str,
     force: bool,
@@ -25,9 +27,17 @@ def setup(
 
     _, project = api.Client.from_project()
 
+    if submission_number == "scratch":
+        print(f"you decided to start from scratch, previous submission will not be downloaded")
+        return
+
     try:
         urls = project.clone(
-            submission_number=submission_number,
+            submission_number=(
+                None
+                if submission_number == "latest"
+                else submission_number
+            ),
             include_model=not no_model,
         )
 
@@ -46,7 +56,7 @@ def setup(
 
 def setup_notebook(
     clone_token: str,
-    submission_number: str,
+    submission_number: SetupSubmissionNumber,
     directory: str,
     model_directory: str,
     no_model: bool,
