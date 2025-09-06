@@ -443,6 +443,21 @@ class SubmissionCustomCheckFailedException(ApiException):
         _print_contact()
 
 
+class SubmissionNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        submission_number: int,
+    ):
+        super().__init__(message)
+
+        self.submission_number = submission_number
+
+    def print_helper(self, **kwargs):
+        print(f"The submission #{self.submission_number} does not exists.")
+
+
 class SubmissionTooBigException(ApiException):
 
     def __init__(
