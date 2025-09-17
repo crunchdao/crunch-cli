@@ -1,10 +1,12 @@
 import ast
 import dataclasses
+import enum
 import os
 import py_compile
 import re
 import string
 import typing
+import collections
 
 import libcst
 import yaml
@@ -32,18 +34,25 @@ class EmbedFile:
     content: str
 
 
+# TODO Maybe merge with global `Language` enum?
+class ImportedRequirementLanguage(enum.Enum):
+    PYTHON = "PYTHON"
+    R = "R"
+
+
 @dataclasses.dataclass()
 class ImportedRequirement:
     alias: str
     name: typing.Optional[str] = None
-    extras: typing.Optional[typing.List[str]] = None
-    specs: typing.Optional[typing.List[str]] = None
+    extras: typing.List[str] = dataclasses.field(default_factory=list)
+    specs: typing.List[str] = dataclasses.field(default_factory=list)
+    language: ImportedRequirementLanguage = ImportedRequirementLanguage.PYTHON
 
     @property
-    def extras_and_specs(self) -> typing.List[str]:
+    def extras_and_specs(self):
         return (self.extras, self.specs)
 
-    def merge(self, other: "ImportedRequirement") -> bool:
+    def merge(self, other: "ImportedRequirement") -> typing.Tuple[bool, typing.Optional[str]]:
         """
         Merge requirements:
         - if name is missing or the same, then use other's name
@@ -51,6 +60,12 @@ class ImportedRequirement:
 
         Alias is ignored.
         """
+
+        if self.language != other.language:
+            raise ValueError(
+                f"cannot merge requirements with different languages: "
+                f"{self.language} != {other.language}"
+            )
 
         errors = []
 
@@ -78,7 +93,7 @@ class ImportedRequirement:
             elif error_count == 3:
                 message = f"{errors[0]}, {errors[1]} and {errors[2]} are all different"
 
-            return False, message
+            return False, message  # type: ignore
 
         if not different_name and other.name is not None:
             self.name = other.name
@@ -112,8 +127,8 @@ class NotebookCellParseError(ConverterError):
         message: str,
         parser_error: str,
         cell_source: str,
-        cell_index: int = None,
-        cell_id: str = None,
+        cell_index: typing.Optional[int] = None,
+        cell_id: typing.Optional[str] = None,
     ) -> None:
         super().__init__(message)
         self.parser_error = parser_error
@@ -218,7 +233,7 @@ def _evaluate_name(node: libcst.CSTNode) -> str:
         raise Exception("Logic error!")
 
 
-def _convert_import(
+def _convert_python_import(
     log: typing.Callable[[str], None],
     import_node: ImportNodeType,
     comment_node: typing.Optional[libcst.Comment]
@@ -247,6 +262,7 @@ def _convert_import(
             name=package_name,
             extras=extras,
             specs=specs,
+            language=ImportedRequirementLanguage.PYTHON
         )
         for name in names
     ]
@@ -256,13 +272,10 @@ _EMPTY_EXTRAS_AND_SPECS = ([], [])
 
 
 def _add_to_packages(
-    log: typing.Callable[[str], None],
     imported_requirements: typing.Dict[str, ImportedRequirement],
-    import_node: ImportNodeType,
-    comment_node: typing.Optional[libcst.Comment]
+    new_requirements: typing.List[ImportedRequirement],
+    log: typing.Callable[[str], None],
 ):
-    new_requirements = _convert_import(log, import_node, comment_node)
-
     for new in new_requirements:
         package_name = new.alias
 
@@ -303,6 +316,47 @@ _KEEP = (
 )
 
 
+def _is_r_import(original_node: libcst.CSTNode) -> typing.Optional[str]:
+    is_assign = (
+        isinstance(original_node, libcst.Assign)
+        and len(original_node.targets) == 1
+        and isinstance(original_node.targets[0].target, libcst.Name)
+    )
+
+    is_ann_assign = (
+        isinstance(original_node, libcst.AnnAssign)
+        and isinstance(original_node.target, libcst.Name)
+    )
+
+    if not (is_assign or is_ann_assign):
+        return None
+
+    call = original_node.value  # type: ignore
+    if not isinstance(call, libcst.Call):
+        return None
+
+    func = call.func
+    if not isinstance(func, libcst.Name):
+        return None
+
+    if func.value != "importr":
+        return None
+
+    if len(call.args) == 0:
+        return None
+
+    first_arg = call.args[0].value
+    if not isinstance(first_arg, libcst.SimpleString):
+        return None
+
+    raw_string = first_arg.value
+    if len(raw_string) <= 2:
+        # only contains quotes
+        return None
+
+    return raw_string[1:-1]
+
+
 class Comment(libcst.Comment):
 
     semicolon = False
@@ -328,6 +382,7 @@ class CommentTransformer(libcst.CSTTransformer):
         self.tree = tree
 
         self.import_and_comment_nodes: typing.List[typing.Tuple[ImportNodeType, typing.Optional[libcst.Comment]]] = []
+        self.r_import_names: typing.List[str] = []
 
         self._method_stack = []
         self._previous_import_node = None
@@ -351,6 +406,12 @@ class CommentTransformer(libcst.CSTTransformer):
         # print("leave", type(original_node), method)
 
         if isinstance(original_node, _IMPORT):
+            self._previous_import_node = original_node
+            return updated_node
+
+        r_requirement = _is_r_import(original_node)
+        if r_requirement is not None:
+            self.r_import_names.append(r_requirement)
             self._previous_import_node = original_node
             return updated_node
 
@@ -417,7 +478,7 @@ class CommentTransformer(libcst.CSTTransformer):
 
         return libcst.FlattenSentinel(nodes)
 
-    def _to_lines(self, node: libcst.CSTNode) -> str:
+    def _to_lines(self, node: libcst.CSTNode) -> typing.List[str]:
         return self.tree.code_for_node(node).splitlines()
 
 
@@ -435,7 +496,7 @@ def _extract_code_cell(
     cell_source: typing.List[str],
     log: typing.Callable[[str], None],
     module: typing.List[str],
-    imported_requirements: typing.Dict[str, ImportedRequirement],
+    imported_requirements: typing.DefaultDict[ImportedRequirementLanguage, typing.Dict[str, ImportedRequirement]],
 ):
     source = "\n".join(
         re.sub(JUPYTER_MAGIC_COMMAND_PATTERN, _jupyter_replacer, line)
@@ -461,7 +522,28 @@ def _extract_code_cell(
     tree = tree.visit(transformer)
 
     for import_node, comment_node in transformer.import_and_comment_nodes:
-        _add_to_packages(log, imported_requirements, import_node, comment_node)
+        new_requirements = _convert_python_import(log, import_node, comment_node)
+
+        _add_to_packages(
+            imported_requirements[ImportedRequirementLanguage.PYTHON],
+            new_requirements,
+            log,
+        )
+
+    if True:
+        new_requirements = [
+            ImportedRequirement(
+                alias=name,
+                language=ImportedRequirementLanguage.R
+            )
+            for name in transformer.r_import_names
+        ]
+
+        _add_to_packages(
+            imported_requirements[ImportedRequirementLanguage.R],
+            new_requirements,
+            log,
+        )
 
     lines = tree.code.strip("\r\n").splitlines()
     if len(lines):
@@ -576,14 +658,17 @@ def _validate(source_code: str):
 
 def extract_cells(
     cells: typing.List[typing.Any],
-    print: typing.Callable[[str], None] = print,
+    print: typing.Optional[typing.Callable[[str], None]] = print,
     validate=True,
 ) -> typing.Tuple[
     str,
     typing.List[EmbedFile],
     typing.List[ImportedRequirement],
 ]:
-    imported_requirements: typing.Dict[str, ImportedRequirement] = {}
+    if print is None:
+        print = lambda _: None
+
+    imported_requirements: typing.DefaultDict[ImportedRequirementLanguage, typing.Dict[str, ImportedRequirement]] = collections.defaultdict(dict)
     module: typing.List[str] = []
     embed_files: typing.Dict[str, EmbedFile] = {}
 
@@ -625,5 +710,9 @@ def extract_cells(
     return (
         source_code,
         list(embed_files.values()),
-        list(imported_requirements.values()),
+        [
+            requirement
+            for requirements in imported_requirements.values()
+            for requirement in list(requirements.values())
+        ],
     )

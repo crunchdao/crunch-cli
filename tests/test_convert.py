@@ -9,6 +9,7 @@ from parameterized import parameterized
 
 from crunch.command.convert import convert
 from crunch.convert import (EmbedFile, ImportedRequirement,
+                            ImportedRequirementLanguage,
                             InconsistantLibraryVersionError,
                             NotebookCellParseError,
                             RequirementVersionParseError, extract_cells)
@@ -597,12 +598,15 @@ class ImportTest(unittest.TestCase):
             ])
         ])
 
-        self.assertEqual([
-            ImportedRequirement("hello", None, [], []),
-            ImportedRequirement("world", None, [], ["==42"]),
-            ImportedRequirement("named", "named-python", [], ["==42"]),
-            ImportedRequirement("extras", None, ["big"], [">4.2"]),
-        ], requirements)
+        self.assertEqual(
+            [
+                ImportedRequirement("hello", None, [], []),
+                ImportedRequirement("world", None, [], ["==42"]),
+                ImportedRequirement("named", "named-python", [], ["==42"]),
+                ImportedRequirement("extras", None, ["big"], [">4.2"]),
+            ],
+            requirements
+        )
 
     def test_latest_version(self):
         (
@@ -616,10 +620,13 @@ class ImportTest(unittest.TestCase):
             ])
         ])
 
-        self.assertEqual([
-            ImportedRequirement("hello", None, [], []),
-            ImportedRequirement("world", "pandas", [], []),
-        ], requirements)
+        self.assertEqual(
+            [
+                ImportedRequirement("hello", None, [], []),
+                ImportedRequirement("world", "pandas", [], []),
+            ],
+            requirements
+        )
 
     def test_inconsistant_version(self):
         with self.assertRaises(InconsistantLibraryVersionError):
@@ -650,9 +657,10 @@ class ImportTest(unittest.TestCase):
             ])
         ])
 
-        self.assertEqual([
-            ImportedRequirement("hello", None, [], ["==1"]),
-        ], requirements)
+        self.assertEqual(
+            [ImportedRequirement("hello", None, [], ["==1"])],
+            requirements
+        )
 
         (
             _,
@@ -665,9 +673,10 @@ class ImportTest(unittest.TestCase):
             ])
         ])
 
-        self.assertEqual([
-            ImportedRequirement("hello", None, [], ["==1"]),
-        ], requirements)
+        self.assertEqual(
+            [ImportedRequirement("hello", None, [], ["==1"])],
+            requirements
+        )
 
         (
             _,
@@ -681,9 +690,10 @@ class ImportTest(unittest.TestCase):
             ])
         ])
 
-        self.assertEqual([
-            ImportedRequirement("hello", None, [], ["==1"]),
-        ], requirements)
+        self.assertEqual(
+            [ImportedRequirement("hello", None, [], ["==1"])],
+            requirements
+        )
 
     def test_import_in_try_except(self):
         (
@@ -730,6 +740,126 @@ class ImportTest(unittest.TestCase):
         """).lstrip()
 
         self.assertEqual(content, source_code)
+
+
+class ImportRTest(unittest.TestCase):
+
+    def test_normal(self):
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "from rpy2.robjects.packages import importr",
+                "base = importr('base')",
+                "utils = importr('utils', d={})",
+            ])
+        ])
+
+        self.assertEqual(
+            [
+                ImportedRequirement("rpy2"),
+                ImportedRequirement("base", language=ImportedRequirementLanguage.R),
+                ImportedRequirement("utils", language=ImportedRequirementLanguage.R),
+            ],
+            requirements
+        )
+
+    def test_normal_with_type(self):
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "from rpy2.robjects.packages import importr",
+                "base: dict = importr('base')",
+                "utils: str = importr('utils', d={})",
+            ])
+        ])
+
+        self.assertEqual(
+            [
+                ImportedRequirement("rpy2"),
+                ImportedRequirement("base", language=ImportedRequirementLanguage.R),
+                ImportedRequirement("utils", language=ImportedRequirementLanguage.R),
+            ],
+            requirements
+        )
+
+    def test_importr_not_commented(self):
+        (
+            source_code,
+            _,
+            _,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "from rpy2.robjects.packages import importr",
+                "a = 42",
+                "base: dict = importr('base')",
+                "utils: str = importr('utils', d={})",
+            ]),
+        ])
+
+        content = textwrap.dedent("""
+            from rpy2.robjects.packages import importr
+            #a = 42
+            base: dict = importr('base')
+            utils: str = importr('utils', d={})
+        """).lstrip()
+
+        self.assertEqual(content, source_code)
+
+    def test_not_right_function_name(self):
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "from rpy2.robjects.packages import importr as r_import",
+                "base = r_import('base')",
+            ]),
+        ])
+
+        self.assertEqual(
+            [ImportedRequirement("rpy2")],
+            requirements
+        )
+
+    def test_not_call(self):
+        self._test_no_rimport_found("'base'")
+
+    def test_not_call_direct(self):
+        self._test_no_rimport_found("locals()['importr']('base')")
+
+    def test_not_call_value_string(self):
+        self._test_no_rimport_found("importr(base_name)")
+
+    def test_call_no_arguments(self):
+        self._test_no_rimport_found("importr()")
+
+    def test_call_argument_name_empty_string(self):
+        self._test_no_rimport_found("importr('')")
+        self._test_no_rimport_found("importr(\"\")")
+
+    def _test_no_rimport_found(self, line: str):
+        (
+            _,
+            _,
+            requirements,
+        ) = extract_cells([
+            _cell("a", "code", [
+                "from rpy2.robjects.packages import importr",
+                f"base = {line}",
+            ]),
+        ])
+
+        self.assertEqual(
+            [ImportedRequirement("rpy2")],
+            requirements
+        )
 
 
 class EmbedFilesTest(unittest.TestCase):

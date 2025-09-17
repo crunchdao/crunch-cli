@@ -15,9 +15,8 @@ def load_user_code(
     module = importlib.util.module_from_spec(spec)
 
     sys.path.insert(0, os.getcwd())
-    
-    with utils.limit_traceback():
-        spec.loader.exec_module(module)
+
+    spec.loader.exec_module(module)
 
     sys.modules[module_name] = module
 
