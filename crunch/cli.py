@@ -39,6 +39,26 @@ DATA_SIZE_VARIANTS = [
 ]
 
 
+class SubmissionNumberType(click.ParamType):
+    name = "number"
+
+    def convert(self, value: typing.Any, param: typing.Optional[click.Parameter] | None, ctx: typing.Optional[click.Context]):
+        if "latest" == value:
+            return "latest"
+
+        if "scratch" == value:
+            return "scratch"
+
+        if isinstance(value, int) or value.isdigit():
+            return int(value)
+
+        self.fail(
+            f"'{value}' is not a valid integer.",
+            param,
+            ctx
+        )
+
+
 def _format_directory(directory: str, competition_name: str, project_name: str):
     directory = directory \
         .replace("{competitionName}", competition_name) \
@@ -146,7 +166,7 @@ def init(
 
 @cli.command(help="Setup a workspace directory.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
-@click.option("--submission", "submission_number", required=False, type=int, help="Submission number to clone. (latest if not specified)")
+@click.option("--submission", "submission_number", required=False, type=SubmissionNumberType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
@@ -162,7 +182,7 @@ def init(
 @echo_version
 def setup(
     clone_token: str,
-    submission_number: str,
+    submission_number: command.SetupSubmissionNumber,
     no_data: bool,
     no_model: bool,
     force: bool,
@@ -237,7 +257,7 @@ def setup(
 
 
 @cli.command(help="Setup a notebook workspace.")
-@click.option("--submission", "submission_number", required=False, type=int, help="Submission number to clone. (latest if not specified)")
+@click.option("--submission", "submission_number", required=False, type=SubmissionNumberType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
@@ -246,7 +266,7 @@ def setup(
 @click.argument("clone-token")
 @echo_version
 def setup_notebook(
-    submission_number: str,
+    submission_number: command.SetupSubmissionNumber,
     no_data: bool,
     no_model: bool,
     model_directory_path: str,
