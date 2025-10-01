@@ -1,5 +1,5 @@
 import secrets
-from enum import StrEnum, auto
+from enum import Enum
 from io import BytesIO, UnsupportedOperation
 from typing import Any, BinaryIO, List, Optional, Self, Tuple, Union
 
@@ -55,11 +55,11 @@ MasterPublicKeyPem = str
 MasterPrivateKeyPem = str
 
 
-class _EncryptionStep(StrEnum):
-    INITIALIZATION_VECTOR = auto()
-    FILE = auto()
-    AUTH_TAG = auto()
-    DONE = auto()
+class _EncryptionStep(Enum):
+    INITIALIZATION_VECTOR = "INITIALIZATION_VECTOR"
+    FILE = "FILE"
+    AUTH_TAG = "AUTH_TAG"
+    DONE = "DONE"
 
 
 class ECIESReadableStream(BinaryIO):
