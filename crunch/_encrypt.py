@@ -62,7 +62,80 @@ class _EncryptionStep(StrEnum):
     DONE = auto()
 
 
-class ECIESEncryptStream(BinaryIO):
+class ECIESReadableStream(BinaryIO):
+
+    def __init__(
+        self,
+        file_io: BinaryIO,
+    ):
+        super().__init__()
+
+        if hasattr(file_io, "mode"):
+            assert file_io.mode == "rb", "file_io must be opened in binary read mode ('rb')"
+
+        self._file_io = file_io
+        self._closed = False
+
+        self._step = _EncryptionStep.INITIALIZATION_VECTOR
+
+    @property
+    def mode(self) -> str:
+        return "rb"
+
+    def close(self) -> None:
+        self._closed = True
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def fileno(self) -> int:
+        return self._file_io.fileno()
+
+    def flush(self) -> None:
+        pass
+
+    def isatty(self) -> bool:
+        return self._file_io.isatty()
+
+    def readable(self) -> bool:
+        return self._step != _EncryptionStep.DONE
+
+    def readline(self, limit: int = -1) -> bytes:
+        raise UnsupportedOperation()
+
+    def readlines(self, hint: int = -1) -> List[bytes]:
+        raise UnsupportedOperation()
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        raise UnsupportedOperation()
+
+    def seekable(self) -> bool:
+        return False
+
+    def tell(self) -> int:
+        return -1
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        raise UnsupportedOperation()
+
+    def writable(self) -> bool:
+        return False
+
+    def write(self, s: Union[bytes, bytearray]) -> int:  # type: ignore
+        raise UnsupportedOperation()
+
+    def writelines(self, lines: List[bytes]) -> None:  # type: ignore
+        raise UnsupportedOperation()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, type, value, traceback) -> None:  # type: ignore
+        pass
+
+
+class ECIESEncryptStream(ECIESReadableStream):
     """
     ECIES encryption using secp256k1 curve and AES-GCM.
     """
@@ -75,13 +148,10 @@ class ECIESEncryptStream(BinaryIO):
         initialization_vector: Optional[bytes] = None,
         backend: Any = None,
     ):
-        if hasattr(file_io, "mode"):
-            assert file_io.mode == "rb", "file_io must be opened in binary read mode ('rb')"
+        super().__init__(
+            file_io=file_io,
+        )
 
-        self._file_io = file_io
-        self._closed = False
-
-        self._step = _EncryptionStep.INITIALIZATION_VECTOR
         self._current_position = 0
 
         self._backend = backend or default_backend()
@@ -134,28 +204,8 @@ class ECIESEncryptStream(BinaryIO):
         self._encryptor = self._cipher.encryptor()
 
     @property
-    def mode(self) -> str:
-        return "rb"
-
-    @property
     def name(self) -> str:
         return f"ecies:encrypt:{self._file_io.name}"
-
-    def close(self) -> None:
-        self._closed = True
-
-    @property
-    def closed(self) -> bool:
-        return self._closed
-
-    def fileno(self) -> int:
-        return self._file_io.fileno()
-
-    def flush(self) -> None:
-        pass
-
-    def isatty(self) -> bool:
-        return self._file_io.isatty()
 
     def read(self, n: int = -1) -> bytes:
         if self._closed:
@@ -218,47 +268,11 @@ class ECIESEncryptStream(BinaryIO):
         else:
             raise UnsupportedOperation("invalid step")
 
-    def readable(self) -> bool:
-        return self._step != _EncryptionStep.DONE
-
-    def readline(self, limit: int = -1) -> bytes:
-        raise UnsupportedOperation()
-
-    def readlines(self, hint: int = -1) -> List[bytes]:
-        raise UnsupportedOperation()
-
-    def seek(self, offset: int, whence: int = 0) -> int:
-        raise UnsupportedOperation()
-
-    def seekable(self) -> bool:
-        return False
-
-    def tell(self) -> int:
-        return -1
-
-    def truncate(self, size: Optional[int] = None) -> int:
-        raise UnsupportedOperation()
-
-    def writable(self) -> bool:
-        return False
-
-    def write(self, s: Union[bytes, bytearray]) -> int:  # type: ignore
-        raise UnsupportedOperation()
-
-    def writelines(self, lines: List[bytes]) -> None:  # type: ignore
-        raise UnsupportedOperation()
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(self, type, value, traceback) -> None:  # type: ignore
-        pass
-
     def ephemeral_public_key_pem(self) -> EphemeralPublicKeyPem:
         return self._ephemeral_public_key_pem
 
 
-class ECIESDecryptStream(BinaryIO):
+class ECIESDecryptStream(ECIESReadableStream):
     """
     ECIES decryption using secp256k1 curve and AES-GCM.
     """
@@ -272,15 +286,13 @@ class ECIESDecryptStream(BinaryIO):
         ephemeral_public_key_pem: EphemeralPublicKeyPem,
         backend: Any = None,
     ):
-        if hasattr(file_io, "mode"):
-            assert file_io.mode == "rb", "file_io must be opened in binary write mode ('rb')"
+        super().__init__(
+            file_io=file_io,
+        )
+
         assert file_length >= 12 + 16, "file_length must be greater than 12 + 16 bytes (initialization vector + tag)"
 
-        self._file_io = file_io
         self._content_length = file_length - 12 - 16
-        self._closed = False
-
-        self._step = _EncryptionStep.INITIALIZATION_VECTOR
         self._read_length = 0
 
         self._backend = backend or default_backend()
@@ -316,28 +328,8 @@ class ECIESDecryptStream(BinaryIO):
         self._decryptor: AEADDecryptionContext = None  # type: ignore
 
     @property
-    def mode(self) -> str:
-        return "rb"
-
-    @property
     def name(self) -> str:
         return f"ecies:decrypt:{self._file_io.name}"
-
-    def close(self) -> None:
-        self._closed = True
-
-    @property
-    def closed(self) -> bool:
-        return self._closed
-
-    def fileno(self) -> int:
-        return self._file_io.fileno()
-
-    def flush(self) -> None:
-        pass
-
-    def isatty(self) -> bool:
-        return self._file_io.isatty()
 
     def read(self, n: int = -1) -> bytes:
         if self._closed:
@@ -399,42 +391,6 @@ class ECIESDecryptStream(BinaryIO):
 
         else:
             raise UnsupportedOperation("invalid step")
-
-    def readable(self) -> bool:
-        return self._step != _EncryptionStep.DONE
-
-    def readline(self, limit: int = -1) -> bytes:
-        raise UnsupportedOperation()
-
-    def readlines(self, hint: int = -1) -> List[bytes]:
-        raise UnsupportedOperation()
-
-    def seek(self, offset: int, whence: int = 0) -> int:
-        raise UnsupportedOperation()
-
-    def seekable(self) -> bool:
-        return False
-
-    def tell(self) -> int:
-        return -1
-
-    def truncate(self, size: Optional[int] = None) -> int:
-        raise UnsupportedOperation()
-
-    def writable(self) -> bool:
-        return False
-
-    def write(self, s: Union[bytes, bytearray]) -> int:  # type: ignore
-        raise UnsupportedOperation()
-
-    def writelines(self, lines: List[bytes]) -> None:  # type: ignore
-        raise UnsupportedOperation()
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(self, type, value, traceback) -> None:  # type: ignore
-        pass
 
     def _create_cipher(self, initialization_vector: bytes) -> None:
         assert self._decryptor is None, "cipher already created"
@@ -503,7 +459,7 @@ def generate_keypair_pem(
     public_key = private_key.public_key()
 
     private_key_bytes = private_key.private_numbers().private_value.to_bytes(32, "big")
-    private_key_hex = private_key_bytes.hex()
+    private_key_hex = private_key_bytes.hex()  # TODO Format as PEM
 
     public_key_pem = public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
