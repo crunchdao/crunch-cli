@@ -1,4 +1,5 @@
 import typing
+import warnings
 
 from ..identifiers import LeaderboardIdentifierType
 from ..resource import Collection, Model
@@ -142,14 +143,25 @@ class LeaderboardCollection(Collection):
         *,
         crunch: typing.Optional["Crunch"] = None,
     ):
-        return self.get(
-            "@mine",
-            crunch=crunch
+        return self._get_mine(
+            crunch=crunch,
         )
 
     @property
     def mine(self):
-        return self.get_mine()
+        return self._get_mine()
+
+    def _get_mine(
+        self,
+        *,
+        crunch: typing.Optional["Crunch"] = None,
+    ):
+        warnings.warn("@mine leaderboard are not available anymore, defaulting to @default", category=DeprecationWarning, stacklevel=3)
+
+        return self.get(
+            "@default",
+            crunch=crunch
+        )
 
     def list(
         self
