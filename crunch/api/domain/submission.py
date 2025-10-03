@@ -95,15 +95,16 @@ class SubmissionCollection(Collection):
 
     def create(
         self,
+        *,
         message: str,
         main_file_path: str,
         model_directory_path: str,
         type: SubmissionType,
-        preferred_packages_version: typing.Dict[str, str],
+        preferred_packages_version: typing.Dict[str, str] = {},
         code_files: typing.Dict[str, str],
         model_files: typing.Dict[str, str],
         sse_handler: typing.Optional[typing.Callable[["sseclient.Event"], None]] = None
-    ):
+    ) -> Submission:
         return self.prepare_model(
             self._client.api.create_submission(
                 self.project.competition.id,
@@ -118,6 +119,13 @@ class SubmissionCollection(Collection):
                 model_files,
                 sse_handler,
             )
+        )
+    
+    def get_next_encryption_id(self) -> str:
+        return self._client.api.get_submission_next_encryption_id(
+            self.project.competition.id,
+            self.project.user_id,
+            self.project.name,
         )
 
     def prepare_model(self, attrs):
@@ -193,4 +201,19 @@ class SubmissionEndpointMixin:
             ),
             json=True,
             sse_handler=sse_handler,
+        )
+
+    def get_submission_next_encryption_id(
+        self,
+        competition_identifier,
+        user_identifier,
+        project_identifier
+    ):
+        return self._result(
+            self.get(
+                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions/next-encryption-id",
+                params={
+                    "pushToken": self.auth_._token if isinstance(self.auth_, PushTokenAuth) else None,
+                },
+            ),
         )

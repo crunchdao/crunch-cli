@@ -7,6 +7,7 @@ import requests
 import tqdm
 import urllib3
 
+
 if typing.TYPE_CHECKING:
     from ..external import sseclient
 
@@ -35,6 +36,7 @@ from .domain.submission_file import SubmissionFileEndpointMixin
 from .domain.target import TargetEndpointMixin
 from .domain.upload import UploadCollection, UploadEndpointMixin
 from .domain.user import UserCollection, UserEndpointMixin
+from .domain.webapp import WebappEndpointMixin
 from .errors import convert_error
 from .pagination import PageRequest
 
@@ -61,6 +63,7 @@ class EndpointClient(
     TargetEndpointMixin,
     UploadEndpointMixin,
     UserEndpointMixin,
+    WebappEndpointMixin,
 ):
 
     def __init__(
@@ -281,7 +284,7 @@ class Client:
         auth: Auth,
         project_info: typing.Optional[utils.ProjectInfo] = None,
         *,
-        show_progress=True,
+        show_progress: bool = True,
     ):
         self.api = EndpointClient(api_base_url, auth, show_progress)
         self.web_base_url = web_base_url
@@ -308,6 +311,14 @@ class Client:
         return ProjectTokenCollection(
             competition=None,
             client=self
+        )
+
+    @property
+    def webapp(self):
+        from .domain.webapp import WebappNamespace
+
+        return WebappNamespace(
+            client=self,
         )
 
     def quickstarters(self, competition_format: CompetitionFormat):
