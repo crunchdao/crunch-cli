@@ -7,6 +7,8 @@ import typing
 
 import click
 
+from crunch.dev.cli import group as dev_group
+
 from . import __version__, api, command, constants, store, utils
 from .unstructured.cli import organize_test_group
 
@@ -838,3 +840,5 @@ def organize_group(
 
 
 organize_group.add_command(organize_test_group)
+
+cli.add_command(dev_group)

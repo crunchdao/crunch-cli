@@ -314,6 +314,8 @@ def _get_encryption_info(
     configuration = client.webapp.configuration
 
     encryption_id = project.submissions.get_next_encryption_id()
+    print(f"using encryption id: {encryption_id}")
+
     phala = requests.get(f"{configuration.phala.key_url}/keypair/{encryption_id}").json()
 
     return EncryptionInfo(
