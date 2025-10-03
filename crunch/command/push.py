@@ -7,6 +7,7 @@ import requests
 from crunch_encrypt.ecies import (EphemeralPublicKeyPem, PublicKeyPem,
                                   generate_keypair_pem)
 
+from crunch.api.domain.project import Project
 import crunch.constants as constants
 import crunch.utils as utils
 from crunch.api import ApiException, Client, Submission, SubmissionType, Upload
@@ -207,6 +208,26 @@ def _upload_files(
     print(f"total {group_name} size: {utils.format_bytes(total_size)}")
 
 
+def _get_encryption_info(
+    client: Client,
+    project: Project,
+) -> Optional[EncryptionInfo]:
+    competition = project.competition
+    if not competition.encrypt_submissions:
+        return None
+
+    configuration = client.webapp.configuration
+
+    encryption_id = project.submissions.get_next_encryption_id()
+    phala = requests.get(f"{configuration.phala.key_url}/keypair/{encryption_id}").json()
+
+    return EncryptionInfo(
+        id=encryption_id,
+        public_key_pem=phala["public_key"],  # type: ignore
+        certificate_chain=phala["certificate_chain"],  # type: ignore
+    )
+
+
 def push(
     message: str,
     main_file_path: str,
@@ -220,27 +241,8 @@ def push(
     competition = project.competition
 
     preferred_chunk_size = 50_000_000
-    encrypted = competition.encrypt_submissions
 
-    encryption_info: Optional[EncryptionInfo] = None
-    if encrypted:
-        encryption_id = project.submissions.get_next_encryption_id()
-
-        phala = requests.get(f"https://5bf6ff1b8e2002e6f0ca42465d1ef16abeabcd92-9010.dstack-pha-prod10.phala.network/keypair/{encryption_id}").json()
-
-        encryption_info = EncryptionInfo(
-            id=encryption_id,
-            public_key_pem=phala["public_key"],  # type: ignore
-            certificate_chain=phala["certificate_chain"],  # type: ignore
-        )
-
-        # private_key, public_key = generate_keypair_pem()
-        # encryption_info = EncryptionInfo(
-        #     id=encryption_id,
-        #     public_key_pem=public_key,
-        #     certificate_chain="",
-        # )
-        # open("private_key.pem", "w").write(private_key)
+    encryption_info = _get_encryption_info(client, project)
 
     code_uploads: Dict[str, Upload] = {}
     encrypted_code_files: List[EncryptedFileInfo] = []
