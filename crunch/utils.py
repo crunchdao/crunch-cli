@@ -13,7 +13,6 @@ import shutil
 import sys
 import tempfile
 import time
-import traceback
 import typing
 
 import click
@@ -39,7 +38,7 @@ def change_root():
             raise click.Abort()
 
 
-def _read_crunchdao_file(name: str, raise_if_missing=True):
+def _read_crunchdao_file(name: str, raise_if_missing: bool = True):
     path = os.path.join(constants.DOT_CRUNCHDAO_DIRECTORY, name)
 
     if not os.path.exists(path):
@@ -54,7 +53,7 @@ def _read_crunchdao_file(name: str, raise_if_missing=True):
         return fd.read()
 
 
-def write_token(plain_push_token: str, directory="."):
+def write_token(plain_push_token: str, directory: str = "."):
     dot_crunchdao_path = os.path.join(
         directory,
         constants.DOT_CRUNCHDAO_DIRECTORY
@@ -69,11 +68,11 @@ def write_token(plain_push_token: str, directory="."):
 class ProjectInfo:
     competition_name: str
     project_name: str
-    user_id: str
+    user_id: int
     size_variant: api.SizeVariant
 
 
-def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
+def write_project_info(info: ProjectInfo, directory: str = "."):
     dot_crunchdao_path = os.path.join(
         directory,
         constants.DOT_CRUNCHDAO_DIRECTORY
@@ -93,7 +92,7 @@ def write_project_info(info: ProjectInfo, directory=".") -> ProjectInfo:
         }, fd)
 
 
-def read_project_info(raise_if_missing=True) -> ProjectInfo:
+def read_project_info(raise_if_missing: bool = True) -> ProjectInfo:
     old_content = _read_crunchdao_file(constants.OLD_PROJECT_FILE, False)
     if old_content is not None:
         return ProjectInfo(

@@ -1,4 +1,5 @@
 click
+crunch-convert
 coloredlogs
 dataclasses_json
 importlib_metadata
