@@ -1,12 +1,16 @@
 import contextlib
 import dataclasses
 import enum
+from io import BytesIO
+import time
 import typing
 
 import dataclasses_json
 import requests
 import tqdm
-import time
+
+if typing.TYPE_CHECKING:
+    from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
 from ..resource import Collection, Model
 
@@ -40,7 +44,19 @@ class Upload(Model):
     resource_identifier_attribute = "id"
 
     @property
-    def chunked(self):
+    def id(self) -> str:
+        return self._attrs["id"]
+
+    @property
+    def size(self) -> int:
+        return self._attrs["size"]
+
+    @property
+    def encrypted(self) -> bool:
+        return self._attrs["encrypted"]
+
+    @property
+    def chunked(self) -> bool:
         return self._attrs["chunked"]
 
     @property
@@ -144,7 +160,7 @@ class UploadChunk(Model):
 
     def send(
         self,
-        fd: typing.IO[bytes],
+        fd: typing.BinaryIO,
         max_retry=10,
         byte_callback: typing.Optional[typing.Callable[[int], None]] = None,
         retry_callback: typing.Optional[typing.Callable[[], None]] = None,
@@ -196,28 +212,96 @@ class UploadCollection(Collection):
 
     def create(
         self,
+        *,
         name: str,
         size: int,
+        encrypted: bool = False,
         preferred_chunk_size: typing.Optional[int] = None
     ) -> Upload:
         return self.prepare_model(
             self._client.api.create_upload(
                 name,
                 size,
-                preferred_chunk_size
+                encrypted,
+                preferred_chunk_size,
             )
         )
 
+    def send_from_bytes(
+        self,
+        *,
+        data: bytes,
+        name: str,
+        preferred_chunk_size: typing.Optional[int] = None,
+        progress_bar: bool = False,
+        max_retry: int = 10,
+    ) -> Upload:
+        size = len(data)
+        upload = self.create(
+            name=name,
+            size=size,
+            encrypted=False,
+            preferred_chunk_size=preferred_chunk_size,
+        )
+
+        try:
+            with contextlib.ExitStack() as stack:
+                progress = stack.enter_context(tqdm.tqdm(
+                    total=size,
+                    desc=f"uploading {name}",
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    miniters=1,
+                    disable=not progress_bar,
+                    leave=False,
+                ))
+
+                for chunk in upload.chunks:
+                    def retry_callback():
+                        progress.last_print_n = progress.n = chunk.offset
+                        progress.refresh()
+
+                    if progress_bar:
+                        if upload.chunked:
+                            progress.desc = f"uploading `{name}` (chunk {chunk.number}/{len(upload.chunks)})"
+                        else:
+                            progress.desc = f"uploading `{name}` (direct)"
+
+                    chunk.send(
+                        BytesIO(data),
+                        max_retry=max_retry,
+                        byte_callback=progress.update,
+                        retry_callback=retry_callback,
+                    )
+        except (Exception, KeyboardInterrupt) as error:
+            try:
+                upload.abort()
+            except Exception as error2:
+                raise error from error2
+
+            raise error
+
+        upload.complete()
+
+        return upload
+
     def send_from_file(
         self,
+        *,
         path: str,
         name: str,
         size: int,
         preferred_chunk_size: typing.Optional[int] = None,
         progress_bar: bool = False,
-        max_retry=10,
+        max_retry: int = 10,
     ) -> Upload:
-        upload = self.create(name, size, preferred_chunk_size)
+        upload = self.create(
+            name=name,
+            size=size,
+            encrypted=False,
+            preferred_chunk_size=preferred_chunk_size,
+        )
 
         try:
             with contextlib.ExitStack() as stack:
@@ -262,13 +346,92 @@ class UploadCollection(Collection):
 
         return upload
 
+    def send_from_file_with_encryption(
+        self,
+        *,
+        path: str,
+        name: str,
+        original_size: int,
+        public_key_pem: "PublicKeyPem",
+        preferred_chunk_size: typing.Optional[int] = None,
+        progress_bar: bool = False,
+        max_retry: int = 10,
+    ) -> typing.Tuple[Upload, "EphemeralPublicKeyPem"]:
+        from crunch_encrypt.ecies import ECIESEncryptIO
+
+        size = original_size + 12 + 16
+
+        upload = self.create(
+            name=name,
+            size=size,
+            encrypted=True,
+            preferred_chunk_size=preferred_chunk_size,
+        )
+
+        ephemeral_public_key_pem: typing.Optional[str] = None
+
+        try:
+            with contextlib.ExitStack() as stack:
+                fd = stack.enter_context(open(path, "rb"))
+                progress = stack.enter_context(tqdm.tqdm(
+                    total=size,
+                    desc=f"uploading {name}",
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    miniters=1,
+                    disable=not progress_bar,
+                    leave=False,
+                ))
+
+                fd = ECIESEncryptIO(
+                    fd,
+                    public_key_pem=public_key_pem,
+                )
+
+                for chunk in upload.chunks:
+                    buffer = bytearray()
+                    while len(buffer) < chunk.size:
+                        buffer.extend(fd.read(chunk.size - len(buffer)))
+
+                    def retry_callback():
+                        progress.last_print_n = progress.n = chunk.offset
+                        progress.refresh()
+
+                    if progress_bar:
+                        if upload.chunked:
+                            progress.desc = f"uploading `{name}` (chunk {chunk.number}/{len(upload.chunks)})"
+                        else:
+                            progress.desc = f"uploading `{name}` (direct)"
+
+                    chunk.send(
+                        BytesIO(buffer),
+                        max_retry=max_retry,
+                        byte_callback=progress.update,
+                        retry_callback=retry_callback,
+                    )
+
+                ephemeral_public_key_pem = fd.ephemeral_public_key_pem
+        except (Exception, KeyboardInterrupt) as error:
+            try:
+                upload.abort()
+            except Exception as error2:
+                raise error from error2
+
+            raise error
+
+        upload.complete()
+
+        assert ephemeral_public_key_pem is not None
+        return upload, ephemeral_public_key_pem
+
     def get(
         self,
         id: str
     ) -> Upload:
         return self.prepare_model(
             self._client.api.get_upload(
-                id
+                id,
             )
         )
 
@@ -279,6 +442,7 @@ class UploadEndpointMixin:
         self,
         name,
         size,
+        encrypted,
         preferred_chunk_size
     ):
         return self._result(
@@ -287,6 +451,7 @@ class UploadEndpointMixin:
                 json={
                     "name": name,
                     "size": size,
+                    "encrypted": encrypted,
                     "preferredChunkSize": preferred_chunk_size
                 }
             ),
