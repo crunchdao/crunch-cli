@@ -565,7 +565,7 @@ class LimitedSizeIO:
 
     def __init__(
         self,
-        underlying_io: io.IOBase,
+        underlying_io: typing.BinaryIO,
         limit: int,
         callback: typing.Optional[typing.Callable[[int], None]] = None
     ):
@@ -574,7 +574,7 @@ class LimitedSizeIO:
         self.callback = callback
         self.read_so_far = 0
 
-    def read(self, size=-1):
+    def read(self, size: int = -1):
         if self.read_so_far >= self.limit:
             return b''
 

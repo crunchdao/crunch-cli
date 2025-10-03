@@ -1,16 +1,18 @@
 import json
 import os
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from io import BytesIO
+from typing import BinaryIO, Callable, Dict, Iterable, List, Optional, Tuple
 
 import requests
-from crunch_encrypt.ecies import (EphemeralPublicKeyPem, PublicKeyPem,
-                                  generate_keypair_pem)
+from crunch_convert import RequirementLanguage, requirements_txt
+from crunch_encrypt.ecies import (EphemeralPublicKeyPem, PublicKeyPem)
 
-from crunch.api.domain.project import Project
 import crunch.constants as constants
 import crunch.utils as utils
 from crunch.api import ApiException, Client, Submission, SubmissionType, Upload
+from crunch.api.domain.project import Project
+from crunch import store
 
 
 @dataclass
@@ -142,31 +144,54 @@ def _upload_files(
     preferred_chunk_size: int,
     encryption_info: Optional[EncryptionInfo],
     encrypted_files_storage: List[EncryptedFileInfo],
+    freeze_requirements: bool,
 ):
     total_size = 0
 
-    for path, name in file_iterator:
-        if name != "a":
-            continue
+    def handle_bytes(
+        data: bytes,
+        name: str,
+        encrypt_if_possible: bool = True,
+        log_action: Optional[str] = None,
+    ):
+        handle(
+            io=BytesIO(data),
+            name=name,
+            size=len(data),
+            encrypt_if_possible=encrypt_if_possible,
+            log_action=log_action,
+        )
 
-        size = os.path.getsize(path)
+    def handle(
+        io: BinaryIO,
+        name: str,
+        size: int,
+        encrypt_if_possible: bool = True,
+        log_action: Optional[str] = None,
+    ):
+        nonlocal total_size
+
         total_size += size
 
-        print(f"found {group_name} file: {name} ({utils.format_bytes(size)})")
-        if dry:
-            continue
+        if log_action:
+            print(f"{log_action}: {name} ({utils.format_bytes(size)})")
+        else:
+            print(f"found {group_name} file: {name} ({utils.format_bytes(size)})")
 
-        if encryption_info:
+        if dry:
+            return
+
+        if encrypt_if_possible and encryption_info:
             (
                 upload,
                 ephemeral_public_key_pem,
-            ) = client.uploads.send_from_file_with_encryption(
-                path=path,
+            ) = client.uploads.send_from_io(
+                io=io,
                 name=name,
-                original_size=size,
+                size=size,
                 public_key_pem=encryption_info.public_key_pem,
                 preferred_chunk_size=preferred_chunk_size,
-                progress_bar=True
+                progress_bar=True,
             )
 
             encrypted_files_storage.append(EncryptedFileInfo(
@@ -174,36 +199,106 @@ def _upload_files(
                 public_key_pem=ephemeral_public_key_pem,
             ))
         else:
-            upload = client.uploads.send_from_file(
-                path=path,
+            upload = client.uploads.send_from_io(
+                io=io,
                 name=name,
                 size=size,
+                public_key_pem=None,
                 preferred_chunk_size=preferred_chunk_size,
-                progress_bar=True
+                progress_bar=True,
             )
 
         storage[name] = upload
 
-    if not dry and len(storage) and encryption_info:
-        name = "encryption.json"
+    def handle_requirements(path: str, language: RequirementLanguage):
+        with open(path, "r") as fd:
+            original_requirements_file = fd.read()
 
+        requirements = requirements_txt.parse_from_file(
+            language=language,
+            file_content=original_requirements_file,
+        )
+
+        whitelist = requirements_txt.CachedWhitelist(
+            requirements_txt.CrunchHubWhitelist(
+                api_base_url=store.api_base_url,
+            )
+        )
+
+        frozen_requirements = requirements_txt.freeze(
+            requirements=requirements,
+            freeze_only_if_required=False,
+            version_finder=requirements_txt.LocalSitePackageVersionFinder(),
+        )
+
+        if requirements == frozen_requirements:
+            handle_bytes(
+                data=original_requirements_file.encode("utf-8"),
+                name=language.txt_file_name,
+                log_action="using original file",
+            )
+
+        else:
+            frozen_requirements_files = requirements_txt.format_files_from_named(
+                frozen_requirements,
+                header="frozen from local environment",
+                whitelist=whitelist,
+            )
+            
+            frozen_requirements_file = frozen_requirements_files[language]
+
+            handle_bytes(
+                data=frozen_requirements_file.encode("utf-8"),
+                name=language.txt_file_name,
+                log_action="froze file",
+            )
+
+            handle_bytes(
+                data=original_requirements_file.encode("utf-8"),
+                name=language.original_txt_file_name,
+                log_action="rename original file",
+            )
+
+
+    original_requirements_txts = (
+        RequirementLanguage.PYTHON.original_txt_file_name,
+        RequirementLanguage.R.original_txt_file_name,
+    )
+
+    python_requirements_txt = RequirementLanguage.PYTHON.txt_file_name
+    r_requirements_txt = RequirementLanguage.R.txt_file_name
+
+    for path, name in file_iterator:
+        if freeze_requirements:
+            if name in original_requirements_txts:
+                continue
+
+            elif name == python_requirements_txt:
+                handle_requirements(path, RequirementLanguage.PYTHON)
+                continue
+
+            elif name == r_requirements_txt:
+                handle_requirements(path, RequirementLanguage.R)
+                continue
+
+        with open(path, "rb") as fd:
+            size = os.fstat(fd.fileno()).st_size
+            handle(fd, name, size)
+
+    if dry:
+        return
+
+    if len(storage) and encryption_info:
         json_data = encryption_info.format_json(
             files=encrypted_files_storage,
         ).encode("utf-8")
 
-        size = len(json_data)
-        total_size += size
-
-        print(f"create {group_name} encryption file: {name} ({utils.format_bytes(size)})")
-
-        upload = client.uploads.send_from_bytes(
+        handle_bytes(
             data=json_data,
-            name=name,
-            preferred_chunk_size=preferred_chunk_size,
-            progress_bar=True,
+            name="encryption.json",
+            encrypt_if_possible=False,
+            log_action=f"create {group_name} encryption file",
         )
-
-        storage[name] = upload
 
     print(f"total {group_name} size: {utils.format_bytes(total_size)}")
 
@@ -260,6 +355,7 @@ def push(
             preferred_chunk_size=preferred_chunk_size,
             encryption_info=encryption_info,
             encrypted_files_storage=encrypted_code_files,
+            freeze_requirements=include_installed_packages_version,
         )
 
         _upload_files(
@@ -271,6 +367,7 @@ def push(
             preferred_chunk_size=preferred_chunk_size,
             encryption_info=encryption_info,
             encrypted_files_storage=encrypted_model_files,
+            freeze_requirements=False,
         )
 
         if dry:

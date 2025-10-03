@@ -1,9 +1,8 @@
-import contextlib
 import dataclasses
 import enum
-from io import BytesIO
 import time
 import typing
+from io import BytesIO
 
 import dataclasses_json
 import requests
@@ -36,7 +35,7 @@ class PresignedUploadRequest:
 
     method: str
     url: str
-    headers: dict
+    headers: typing.Dict[str, str]
 
 
 class Upload(Model):
@@ -141,7 +140,7 @@ class UploadChunk(Model):
         return self._attrs["completed"]
 
     @property
-    def request(self):
+    def request(self) -> PresignedUploadRequest:
         return PresignedUploadRequest.from_dict(
             self._client.api.get_upload_chunk_request(
                 self.upload.id,
@@ -161,17 +160,26 @@ class UploadChunk(Model):
     def send(
         self,
         fd: typing.BinaryIO,
-        max_retry=10,
+        max_retry: int = 10,
         byte_callback: typing.Optional[typing.Callable[[int], None]] = None,
         retry_callback: typing.Optional[typing.Callable[[], None]] = None,
     ):
         from ...utils import LimitedSizeIO
 
+        seek_back_to = self.offset
+        if not fd.seekable():
+            buffer = bytearray()
+            while len(buffer) < self.size:
+                buffer.extend(fd.read(self.size - len(buffer)))
+
+            fd = BytesIO(buffer)
+            seek_back_to = 0
+
         for retry in range(max_retry + 1):
             last = retry == max_retry
 
             try:
-                fd.seek(self.offset)
+                fd.seek(seek_back_to)
 
                 request = self.request
                 response = requests.request(
@@ -227,191 +235,96 @@ class UploadCollection(Collection):
             )
         )
 
-    def send_from_bytes(
+    @typing.overload
+    def send_from_io(
         self,
         *,
-        data: bytes,
-        name: str,
-        preferred_chunk_size: typing.Optional[int] = None,
-        progress_bar: bool = False,
-        max_retry: int = 10,
-    ) -> Upload:
-        size = len(data)
-        upload = self.create(
-            name=name,
-            size=size,
-            encrypted=False,
-            preferred_chunk_size=preferred_chunk_size,
-        )
-
-        try:
-            with contextlib.ExitStack() as stack:
-                progress = stack.enter_context(tqdm.tqdm(
-                    total=size,
-                    desc=f"uploading {name}",
-                    unit="B",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                    miniters=1,
-                    disable=not progress_bar,
-                    leave=False,
-                ))
-
-                for chunk in upload.chunks:
-                    def retry_callback():
-                        progress.last_print_n = progress.n = chunk.offset
-                        progress.refresh()
-
-                    if progress_bar:
-                        if upload.chunked:
-                            progress.desc = f"uploading `{name}` (chunk {chunk.number}/{len(upload.chunks)})"
-                        else:
-                            progress.desc = f"uploading `{name}` (direct)"
-
-                    chunk.send(
-                        BytesIO(data),
-                        max_retry=max_retry,
-                        byte_callback=progress.update,
-                        retry_callback=retry_callback,
-                    )
-        except (Exception, KeyboardInterrupt) as error:
-            try:
-                upload.abort()
-            except Exception as error2:
-                raise error from error2
-
-            raise error
-
-        upload.complete()
-
-        return upload
-
-    def send_from_file(
-        self,
-        *,
-        path: str,
+        io: typing.BinaryIO,
         name: str,
         size: int,
-        preferred_chunk_size: typing.Optional[int] = None,
-        progress_bar: bool = False,
+        public_key_pem: typing.Literal[None],
+        preferred_chunk_size: typing.Optional[int],
+        progress_bar: bool,
         max_retry: int = 10,
     ) -> Upload:
-        upload = self.create(
-            name=name,
-            size=size,
-            encrypted=False,
-            preferred_chunk_size=preferred_chunk_size,
-        )
+        pass
 
-        try:
-            with contextlib.ExitStack() as stack:
-                fd = stack.enter_context(open(path, "rb"))
-                progress = stack.enter_context(tqdm.tqdm(
-                    total=size,
-                    desc=f"uploading {name}",
-                    unit="B",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                    miniters=1,
-                    disable=not progress_bar,
-                    leave=False,
-                ))
-
-                for chunk in upload.chunks:
-                    def retry_callback():
-                        progress.last_print_n = progress.n = chunk.offset
-                        progress.refresh()
-
-                    if progress_bar:
-                        if upload.chunked:
-                            progress.desc = f"uploading `{name}` (chunk {chunk.number}/{len(upload.chunks)})"
-                        else:
-                            progress.desc = f"uploading `{name}` (direct)"
-
-                    chunk.send(
-                        fd,
-                        max_retry=max_retry,
-                        byte_callback=progress.update,
-                        retry_callback=retry_callback,
-                    )
-        except (Exception, KeyboardInterrupt) as error:
-            try:
-                upload.abort()
-            except Exception as error2:
-                raise error from error2
-
-            raise error
-
-        upload.complete()
-
-        return upload
-
-    def send_from_file_with_encryption(
+    @typing.overload
+    def send_from_io(
         self,
         *,
-        path: str,
+        io: typing.BinaryIO,
         name: str,
-        original_size: int,
+        size: int,
         public_key_pem: "PublicKeyPem",
+        preferred_chunk_size: typing.Optional[int],
+        progress_bar: bool,
+        max_retry: int = 10,
+    ) -> typing.Tuple[Upload, "EphemeralPublicKeyPem"]:
+        pass
+
+    def send_from_io(
+        self,
+        *,
+        io: typing.BinaryIO,
+        name: str,
+        size: int,
+        public_key_pem: typing.Optional["PublicKeyPem"],
         preferred_chunk_size: typing.Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
-    ) -> typing.Tuple[Upload, "EphemeralPublicKeyPem"]:
-        from crunch_encrypt.ecies import ECIESEncryptIO
+    ) -> typing.Union[Upload, typing.Tuple[Upload, "EphemeralPublicKeyPem"]]:
+        ephemeral_public_key_pem: typing.Optional[str] = None
 
-        size = original_size + 12 + 16
+        encrypted = public_key_pem is not None
+        if encrypted:
+            from crunch_encrypt.ecies import (OVERHEAD_BYTES_COUNT,
+                                              ECIESEncryptIO)
+
+            io = ECIESEncryptIO(
+                io,
+                public_key_pem=public_key_pem,
+            )
+
+            ephemeral_public_key_pem = io.ephemeral_public_key_pem
+            size += OVERHEAD_BYTES_COUNT
 
         upload = self.create(
             name=name,
             size=size,
-            encrypted=True,
+            encrypted=encrypted,
             preferred_chunk_size=preferred_chunk_size,
         )
 
-        ephemeral_public_key_pem: typing.Optional[str] = None
+        progress = tqdm.tqdm(
+            total=size,
+            desc=f"uploading {name}",
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+            miniters=1,
+            disable=not progress_bar,
+            leave=False,
+        )
 
         try:
-            with contextlib.ExitStack() as stack:
-                fd = stack.enter_context(open(path, "rb"))
-                progress = stack.enter_context(tqdm.tqdm(
-                    total=size,
-                    desc=f"uploading {name}",
-                    unit="B",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                    miniters=1,
-                    disable=not progress_bar,
-                    leave=False,
-                ))
+            for chunk in upload.chunks:
+                def retry_callback():
+                    progress.last_print_n = progress.n = chunk.offset
+                    progress.refresh()
 
-                fd = ECIESEncryptIO(
-                    fd,
-                    public_key_pem=public_key_pem,
+                if progress_bar:
+                    if upload.chunked:
+                        progress.desc = f"uploading `{name}` (chunk {chunk.number}/{len(upload.chunks)})"
+                    else:
+                        progress.desc = f"uploading `{name}` (direct)"
+
+                chunk.send(
+                    io,
+                    max_retry=max_retry,
+                    byte_callback=progress.update,  # type: ignore
+                    retry_callback=retry_callback,
                 )
-
-                for chunk in upload.chunks:
-                    buffer = bytearray()
-                    while len(buffer) < chunk.size:
-                        buffer.extend(fd.read(chunk.size - len(buffer)))
-
-                    def retry_callback():
-                        progress.last_print_n = progress.n = chunk.offset
-                        progress.refresh()
-
-                    if progress_bar:
-                        if upload.chunked:
-                            progress.desc = f"uploading `{name}` (chunk {chunk.number}/{len(upload.chunks)})"
-                        else:
-                            progress.desc = f"uploading `{name}` (direct)"
-
-                    chunk.send(
-                        BytesIO(buffer),
-                        max_retry=max_retry,
-                        byte_callback=progress.update,
-                        retry_callback=retry_callback,
-                    )
-
-                ephemeral_public_key_pem = fd.ephemeral_public_key_pem
         except (Exception, KeyboardInterrupt) as error:
             try:
                 upload.abort()
@@ -419,11 +332,16 @@ class UploadCollection(Collection):
                 raise error from error2
 
             raise error
+        finally:
+            progress.close()
 
         upload.complete()
 
-        assert ephemeral_public_key_pem is not None
-        return upload, ephemeral_public_key_pem
+        if public_key_pem is not None:
+            assert ephemeral_public_key_pem is not None
+            return upload, ephemeral_public_key_pem
+
+        return upload
 
     def get(
         self,
