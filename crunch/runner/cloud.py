@@ -15,6 +15,7 @@ import pandas
 import requests
 
 import requirements as requirements_parser
+from crunch.api import Upload
 
 from .. import api, downloader, store, unstructured, utils
 from .collector import MemoryPredictionCollector, PredictionCollector
@@ -287,7 +288,7 @@ class CloudRunner(Runner):
             file_urls = self.run.model
             self.have_model = len(file_urls) != 0
 
-            self.pre_model_files_modification = self.download_files(
+            self.pre_model_files_modification: typing.Dict[str, int] = self.download_files(
                 file_urls,
                 self.model_directory_path
             )
@@ -403,8 +404,8 @@ class CloudRunner(Runner):
         self.upload_results()
 
     def upload_results(self):
-        prediction_uploads = {}
-        model_uploads = {}
+        prediction_uploads: typing.Dict[str, Upload] = {}
+        model_uploads: typing.Dict[str, Upload] = {}
 
         # TODO Use decorator instead
         try:
@@ -451,7 +452,7 @@ class CloudRunner(Runner):
             self._delete_uploads(prediction_uploads.values())
             self._delete_uploads(model_uploads.values())
 
-    def _upload_prediction_files(self, uploads: typing.Dict[str, str]):
+    def _upload_prediction_files(self, uploads: typing.Dict[str, Upload]):
         prediction_file_name = os.path.basename(self.prediction_path)
         if prediction_file_name in uploads:
             self.log(f"reusing upload for prediction")
@@ -459,15 +460,17 @@ class CloudRunner(Runner):
 
         self.log(f"uploading prediction")
         uploads[prediction_file_name] = self.client.uploads.send_from_file(
-            self.prediction_path,
-            prediction_file_name,
-            os.path.getsize(self.prediction_path),
+            path=self.prediction_path,
+            name=prediction_file_name,
+            size=os.path.getsize(self.prediction_path),
             max_retry=3
         )
 
-    def _upload_model_files(self, uploads: typing.Dict[str, str]):
-        model_files, model_files_size = [], 0
-        post_model_files_modification = {}
+    def _upload_model_files(self, uploads: typing.Dict[str, Upload]):
+        model_files: typing.List[typing.Tuple[str, str]] = []
+        model_files_size = 0
+        post_model_files_modification: typing.Dict[str, int] = {}
+
         for file_path, file_name in self.find_model_files():
             stat = os.stat(file_path)
             file_size = stat.st_size
@@ -491,9 +494,9 @@ class CloudRunner(Runner):
 
             self.log(f"uploading {file_name}")
             uploads[file_name] = self.client.uploads.send_from_file(
-                file_path,
-                file_name,
-                os.path.getsize(file_path),
+                path=file_path,
+                name=file_name,
+                size=os.path.getsize(file_path),
                 max_retry=3
             )
 
@@ -553,8 +556,8 @@ class CloudRunner(Runner):
 
     def do_bash(
         self,
-        arguments: list,
-        env_vars: dict = None
+        arguments: typing.List[str],
+        env_vars: typing.Optional[typing.Dict[str, typing.Optional[str]]] = None
     ):
         env = None
         if env_vars:
@@ -580,8 +583,8 @@ class CloudRunner(Runner):
     def bash(
         self,
         prefix: str,
-        arguments: list,
-        env: dict = None
+        arguments: typing.List[str],
+        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = None
     ):
         arguments = [
             "prefix",
@@ -594,13 +597,13 @@ class CloudRunner(Runner):
 
     def bash2(
         self,
-        arguments: list
+        arguments: typing.List[str],
     ):
         self.bash(arguments[0], arguments)
 
     def pip(
         self,
-        arguments: list
+        arguments: typing.List[str],
     ):
         self.bash(
             "pip",
@@ -820,7 +823,7 @@ class CloudRunner(Runner):
         signal.signal(FUSE_SIGNAL, on_signal)
 
     @property
-    def venv_env(self):
+    def venv_env(self) -> typing.Dict[str, typing.Optional[str]]:
         venv_bin = os.path.join(self.venv_directory, "bin")
 
         return {
@@ -875,10 +878,11 @@ class CloudRunner(Runner):
 
     def download_files(
         self,
-        file_urls: dict,
+        file_urls: typing.Dict[str, str],
         directory_path: str
-    ) -> dict:
-        files_modification = {}
+    ) -> typing.Dict[str, int]:
+        files_modification: typing.Dict[str, int] = {}
+
         for relative_path, url in file_urls.items():
             path = os.path.join(directory_path, relative_path)
             self.download(url, path)

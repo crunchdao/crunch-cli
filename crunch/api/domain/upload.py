@@ -234,6 +234,27 @@ class UploadCollection(Collection):
                 preferred_chunk_size,
             )
         )
+    
+    def send_from_file(
+        self,
+        *,
+        path: str,
+        name: str,
+        size: int,
+        preferred_chunk_size: typing.Optional[int] = None,
+        progress_bar: bool = False,
+        max_retry: int = 10,
+    ) -> Upload:
+        with open(path, "rb") as file:
+            return self.send_from_io(
+                io=file,
+                name=name,
+                size=size,
+                public_key_pem=None,
+                preferred_chunk_size=preferred_chunk_size,
+                progress_bar=progress_bar,
+                max_retry=max_retry,
+            )
 
     @typing.overload
     def send_from_io(
