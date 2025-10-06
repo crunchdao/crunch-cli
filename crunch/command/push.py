@@ -6,13 +6,14 @@ from typing import BinaryIO, Callable, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from crunch_convert import RequirementLanguage, requirements_txt
-from crunch_encrypt.ecies import (EphemeralPublicKeyPem, PublicKeyPem)
+from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
 import crunch.constants as constants
 import crunch.utils as utils
+from crunch import store
 from crunch.api import ApiException, Client, Submission, SubmissionType, Upload
 from crunch.api.domain.project import Project
-from crunch import store
+from crunch.api.errors import ForbiddenLibraryException
 
 
 @dataclass
@@ -210,7 +211,12 @@ def _upload_files(
 
         storage[name] = upload
 
-    def handle_requirements(path: str, language: RequirementLanguage):
+    def handle_requirements(
+        *,
+        path: str,
+        language: RequirementLanguage,
+        validate_locally: bool,
+    ):
         with open(path, "r") as fd:
             original_requirements_file = fd.read()
 
@@ -224,6 +230,23 @@ def _upload_files(
                 api_base_url=store.api_base_url,
             )
         )
+
+        if validate_locally:
+            forbidden_names: List[str] = []
+            for requirement in requirements:
+                library = whitelist.find_library(
+                    language=requirement.language,
+                    name=requirement.name,
+                )
+
+                if library is None:
+                    forbidden_names.append(requirement.name)
+
+            if forbidden_names:
+                raise ForbiddenLibraryException(
+                    "forbidden packages has been found",
+                    packages=forbidden_names
+                )
 
         frozen_requirements = requirements_txt.freeze(
             requirements=requirements,
@@ -244,7 +267,7 @@ def _upload_files(
                 header="frozen from local environment",
                 whitelist=whitelist,
             )
-            
+
             frozen_requirements_file = frozen_requirements_files[language]
 
             handle_bytes(
@@ -259,7 +282,6 @@ def _upload_files(
                 log_action="rename original file",
             )
 
-
     original_requirements_txts = (
         RequirementLanguage.PYTHON.original_txt_file_name,
         RequirementLanguage.R.original_txt_file_name,
@@ -268,17 +290,32 @@ def _upload_files(
     python_requirements_txt = RequirementLanguage.PYTHON.txt_file_name
     r_requirements_txt = RequirementLanguage.R.txt_file_name
 
+    # TODO Should this even be a question? Always doing it locally would save on bandwidth.
+    # The backend would validate it a second time, but that is still better.
+    # Also, requirements files should be processed first.
+    validate_requirements_locally = encryption_info is not None
+
     for path, name in file_iterator:
         if freeze_requirements:
             if name in original_requirements_txts:
                 continue
 
             elif name == python_requirements_txt:
-                handle_requirements(path, RequirementLanguage.PYTHON)
+                handle_requirements(
+                    path=path,
+                    language=RequirementLanguage.PYTHON,
+                    validate_locally=validate_requirements_locally
+                )
+
                 continue
 
             elif name == r_requirements_txt:
-                handle_requirements(path, RequirementLanguage.R)
+                handle_requirements(
+                    path=path,
+                    language=RequirementLanguage.R,
+                    validate_locally=validate_requirements_locally
+                )
+
                 continue
 
         with open(path, "rb") as fd:
