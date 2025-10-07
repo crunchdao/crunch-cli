@@ -1,5 +1,4 @@
 from .convert import convert as convert
-from .convert import convert_cells_to_file as convert_cells_to_file
 from .download import download as download
 from .download import download_no_data_available as download_no_data_available
 from .init import init as init
