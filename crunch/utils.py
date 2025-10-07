@@ -168,38 +168,6 @@ def strip_python_special_lines(lines: typing.List[str]):
     )
 
 
-def pip_freeze():
-    import importlib_metadata
-
-    working_set = {}
-
-    installed_packages = {
-        package
-        for packages in importlib_metadata.packages_distributions().values()
-        for package in packages
-    }
-
-    for package in installed_packages:
-        version = importlib_metadata.version(package)
-
-        if not is_valid_version(version):
-            continue
-
-        working_set[package] = version
-
-    return working_set
-
-
-def is_valid_version(input: str):
-    import packaging.version
-
-    try:
-        packaging.version.Version(input)
-        return True
-    except:
-        return False
-
-
 def get_process_memory() -> int:
     import psutil
     process = psutil.Process(os.getpid())
@@ -565,7 +533,7 @@ class LimitedSizeIO:
 
     def __init__(
         self,
-        underlying_io: io.IOBase,
+        underlying_io: typing.BinaryIO,
         limit: int,
         callback: typing.Optional[typing.Callable[[int], None]] = None
     ):
@@ -574,7 +542,7 @@ class LimitedSizeIO:
         self.callback = callback
         self.read_so_far = 0
 
-    def read(self, size=-1):
+    def read(self, size: int = -1):
         if self.read_so_far >= self.limit:
             return b''
 

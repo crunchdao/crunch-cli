@@ -51,22 +51,6 @@ class LibraryCollection(Collection):
             )
         )
 
-    def freeze_imported_requirements(
-        self,
-        *,
-        requirements: typing.List["ImportedRequirement"],
-    ) -> typing.Dict["ImportedRequirementLanguage", str]:
-        from ...convert import ImportedRequirementLanguage
-
-        result = self._client.api.freeze_imported_requirements(
-            requirements=requirements,
-        )
-
-        return {
-            ImportedRequirementLanguage[lang]: version
-            for lang, version in result.items()
-        }
-
 
 class LibraryEndpointMixin:
 
@@ -101,28 +85,4 @@ class LibraryEndpointMixin:
                 }
             ),
             page_size=1000
-        )
-
-    def freeze_imported_requirements(
-        self,
-        requirements,
-    ):
-        body = {
-            "requirements": [
-                {
-                    "alias": requirement.alias,
-                    "name": requirement.name,
-                    "extras": requirement.extras,
-                    "specs": requirement.specs,
-                    "language": requirement.language.name,
-                } for requirement in requirements
-            ],
-        }
-
-        return self._result(
-            self.post(
-                "/v2/libraries/requirements/freeze/imported",
-                json=body,
-            ),
-            json=True
         )

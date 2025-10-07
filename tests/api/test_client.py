@@ -1,7 +1,6 @@
 import unittest
 
 import crunch.api as api
-from crunch.convert import ImportedRequirement, ImportedRequirementLanguage
 
 
 class ClientTest(unittest.TestCase):
@@ -75,33 +74,3 @@ class ClientTest(unittest.TestCase):
 
         self.assertTrue(url.startswith("http://") or url.startswith("https://"))
         self.assertTrue(url.endswith("/a/b/c"))
-
-
-class LibrariesTest(unittest.TestCase):
-
-    client: api.Client
-
-    @classmethod
-    def setUpClass(cls):
-        cls.client = api.Client.from_env()
-
-    @unittest.skip("Waiting until the API is deployed")
-    def test_freeze_imported_requirements(self):
-        frozen = self.client.libraries.freeze_imported_requirements(
-            requirements=[
-                ImportedRequirement(
-                    alias="crunch-cli",
-                    name="crunch-cli",
-                    specs=["==1.0.0"],
-                    language=ImportedRequirementLanguage.PYTHON,
-                ),
-                ImportedRequirement(
-                    alias="base",
-                    name="base",
-                    language=ImportedRequirementLanguage.R,
-                ),
-            ]
-        )
-
-        self.assertIsNotNone(frozen.get(ImportedRequirementLanguage.PYTHON))
-        self.assertIsNotNone(frozen.get(ImportedRequirementLanguage.R))

@@ -31,6 +31,9 @@ with open('requirements/default.txt') as fd:
 with open('requirements/test.txt') as fd:
     test_requirements = fd.read().splitlines()
 
+with open('requirements/dev.txt') as fd:
+    dev_requirements = fd.read().splitlines()
+
 with open('README.md') as fd:
     readme = fd.read()
 
@@ -51,6 +54,7 @@ setup(
     install_requires=requirements,
     extras_require={
         'test': test_requirements,
+        'dev': dev_requirements,
     },
     zip_safe=False,
     entry_points={
