@@ -393,7 +393,7 @@ def push(
 
 @cli.command(help="[DEPRECATED] Send a prediction as your submission.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
-@click.argument("file-path")
+@click.argument("file-path", type=click.Path(exists=True, dir_okay=False, readable=True))
 def push_prediction(
     message: str,
     file_path: str,

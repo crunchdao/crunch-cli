@@ -100,7 +100,6 @@ class SubmissionCollection(Collection):
         main_file_path: str,
         model_directory_path: str,
         type: SubmissionType,
-        preferred_packages_version: typing.Dict[str, str] = {},
         code_files: typing.Dict[str, str],
         model_files: typing.Dict[str, str],
         sse_handler: typing.Optional[typing.Callable[["sseclient.Event"], None]] = None
@@ -114,7 +113,6 @@ class SubmissionCollection(Collection):
                 main_file_path,
                 model_directory_path,
                 type.name,
-                preferred_packages_version,
                 code_files,
                 model_files,
                 sse_handler,
@@ -173,7 +171,6 @@ class SubmissionEndpointMixin:
         main_file_path,
         model_directory_path,
         type,
-        preferred_packages_version,
         code_files,
         model_files,
         sse_handler=None,
@@ -191,7 +188,6 @@ class SubmissionEndpointMixin:
                     "mainFilePath": main_file_path,
                     "modelDirectoryPath": model_directory_path,
                     "type": type,
-                    "preferredPackagesVersion": preferred_packages_version,
                     "codeFiles": code_files,
                     "modelFiles": model_files,
                     # TODO Use a better way to pass the push token
