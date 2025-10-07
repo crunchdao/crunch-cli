@@ -6,7 +6,6 @@ from typing import (TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List,
                     Optional, Tuple)
 
 import requests
-from crunch_convert import RequirementLanguage, requirements_txt
 
 from crunch import store
 from crunch.api import (ApiException, Client, ForbiddenLibraryException,
@@ -149,6 +148,8 @@ def _upload_files(
     encrypted_files_storage: List[EncryptedFileInfo],
     freeze_requirements: bool,
 ):
+    from crunch_convert import RequirementLanguage, requirements_txt
+
     total_size = 0
 
     def handle_bytes(
