@@ -2,32 +2,34 @@ import json
 import os
 from dataclasses import dataclass
 from io import BytesIO
-from typing import BinaryIO, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import (TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List,
+                    Optional, Tuple)
 
 import requests
 from crunch_convert import RequirementLanguage, requirements_txt
-from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
-import crunch.constants as constants
-import crunch.utils as utils
 from crunch import store
-from crunch.api import ApiException, Client, Submission, SubmissionType, Upload
-from crunch.api.domain.project import Project
-from crunch.api.errors import ForbiddenLibraryException
+from crunch.api import (ApiException, Client, ForbiddenLibraryException,
+                        Project, Submission, SubmissionType, Upload)
+from crunch.constants import IGNORED_CODE_FILES, IGNORED_MODEL_FILES
+from crunch.utils import format_bytes
+
+if TYPE_CHECKING:
+    from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
 
 @dataclass
 class EncryptedFileInfo:
 
     name: str
-    public_key_pem: EphemeralPublicKeyPem
+    public_key_pem: "EphemeralPublicKeyPem"
 
 
 @dataclass
 class EncryptionInfo:
 
     id: str
-    public_key_pem: PublicKeyPem
+    public_key_pem: "PublicKeyPem"
     certificate_chain: str
 
     def format_json(self, files: List[EncryptedFileInfo]) -> str:
@@ -113,7 +115,7 @@ def list_code_files(
     return _list_files(
         submission_directory_path,
         [
-            *constants.IGNORED_CODE_FILES,
+            *IGNORED_CODE_FILES,
             _to_unix_path(f"/{model_directory_relative_path}/"),
         ],
     )
@@ -130,7 +132,7 @@ def list_model_files(
 
     return _list_files(
         model_directory_path,
-        constants.IGNORED_MODEL_FILES,
+        IGNORED_MODEL_FILES,
         use_parent_gitignore=True,
     )
 
@@ -175,9 +177,9 @@ def _upload_files(
         total_size += size
 
         if log_action:
-            print(f"{log_action}: {name} ({utils.format_bytes(size)})")
+            print(f"{log_action}: {name} ({format_bytes(size)})")
         else:
-            print(f"found {group_name} file: {name} ({utils.format_bytes(size)})")
+            print(f"found {group_name} file: {name} ({format_bytes(size)})")
 
         if dry:
             return
@@ -337,7 +339,7 @@ def _upload_files(
             log_action=f"create {group_name} encryption file",
         )
 
-    print(f"total {group_name} size: {utils.format_bytes(total_size)}")
+    print(f"total {group_name} size: {format_bytes(total_size)}")
 
 
 def _get_encryption_info(
