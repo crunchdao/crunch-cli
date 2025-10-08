@@ -14,11 +14,11 @@ class Model:
 
     def __init__(
         self,
-        attrs: dict = None,
+        attrs: typing.Optional[typing.Dict[str, typing.Any]] = None,
         client: "Client" = None,
         collection: "Collection" = None
     ):
-        self._attrs = attrs or {}
+        self._attrs: typing.Dict[str, typing.Any] = attrs or {}
         self._client = client
         self._collection = collection
 

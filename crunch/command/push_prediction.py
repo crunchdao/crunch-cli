@@ -1,11 +1,13 @@
-from .. import api
+import os
+
+from crunch.api import Client, Submission, SubmissionType
 
 
 def push_prediction(
     message: str,
     file_path: str,
-):
-    client, project = api.Client.from_project()
+) -> Submission:
+    client, project = Client.from_project()
 
     print()
     print(f"deprecation: submitting a prediction is not the way to go")
@@ -13,26 +15,34 @@ def push_prediction(
     print(f"deprecation: read about the new code interface: https://docs.crunchdao.com/competitions/code-interface")
     print()
 
-    with open(file_path, "rb") as fd:
+    upload = client.uploads.send_from_file(
+        path=file_path,
+        name=os.path.basename(file_path),
+        size=os.path.getsize(file_path),
+    )
+
+    try:
         submission = project.submissions.create(
             message=message,
-            main_file_path=None,
-            model_directory_path=None,
-            type=api.SubmissionType.PREDICTION,
-            preferred_packages_version={},
-            files=[
-                ("codeFile", (file_path, fd))
-            ]
+            main_file_path="main.py",
+            model_directory_path="resources",
+            type=SubmissionType.PREDICTION,
+            code_files={
+                "prediction": upload.id,
+            },
+            model_files={},
         )
 
         _print_success(client, submission)
 
         return submission
+    finally:
+        upload.delete()
 
 
 def _print_success(
-    client: api.Client,
-    submission: api.Submission
+    client: Client,
+    submission: Submission
 ):
     print("\n---")
     print(f"prediction as submission #{submission.number} succesfully uploaded!")

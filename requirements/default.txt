@@ -1,13 +1,12 @@
 click
 crunch-convert
+crunch-encrypt
 coloredlogs
 dataclasses_json
-importlib_metadata
 inquirer
 joblib
 libcst
 networkx
-packaging>=24.2
 pandas
 psutil
 pyarrow

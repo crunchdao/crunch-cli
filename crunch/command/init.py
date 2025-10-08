@@ -3,13 +3,9 @@ import shutil
 
 import click
 
-from .. import api, constants, utils
-
-
-def _delete_tree_if_exists(path: str):
-    if os.path.exists(path):
-        print(f"delete {path}")
-        shutil.rmtree(path)
+from crunch.api import Client, SizeVariant
+from crunch.constants import DOT_CRUNCHDAO_DIRECTORY
+from crunch.utils import ProjectInfo, write_project_info, write_token
 
 
 def _check_if_already_exists(directory: str, force: bool):
@@ -23,20 +19,26 @@ def _check_if_already_exists(directory: str, force: bool):
         raise click.Abort()
 
 
+def _delete_tree_if_exists(path: str):
+    if os.path.exists(path):
+        print(f"delete {path}")
+        shutil.rmtree(path)
+
+
 def init(
     *,
     clone_token: str,
     directory: str,
     model_directory: str,
     force: bool,
-    data_size_variant=api.SizeVariant.DEFAULT
+    data_size_variant: SizeVariant = SizeVariant.DEFAULT
 ):
     should_delete = _check_if_already_exists(directory, force)
 
-    client = api.Client.from_env()
+    client = Client.from_env()
     project_token = client.project_tokens.upgrade(clone_token)
 
-    dot_crunchdao_path = os.path.join(directory, constants.DOT_CRUNCHDAO_DIRECTORY)
+    dot_crunchdao_path = os.path.join(directory, DOT_CRUNCHDAO_DIRECTORY)
     if should_delete:
         _delete_tree_if_exists(dot_crunchdao_path)
 
@@ -45,15 +47,15 @@ def init(
     plain = project_token.plain
     project = project_token.project
 
-    project_info = utils.ProjectInfo(
+    project_info = ProjectInfo(
         project.competition.name,
         project.name,
         project.user_id,
         data_size_variant,
     )
 
-    utils.write_project_info(project_info, directory)
-    utils.write_token(plain, directory)
+    write_project_info(project_info, directory)
+    write_token(plain, directory)
 
     os.chdir(directory)
     os.makedirs(model_directory, exist_ok=True)

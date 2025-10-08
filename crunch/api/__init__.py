@@ -22,6 +22,7 @@ from .errors import (
     InvalidProjectTokenException,
     MissingPhaseDataException,
     NeverSubmittedException,
+    EncryptedSubmissionException,
     ProjectNotFoundException,
     RunNotFoundException,
     RestrictedPhaseActionException,

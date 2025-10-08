@@ -3,9 +3,11 @@ import functools
 import json
 import os
 import sys
-import typing
+from typing import Any, List, Optional, Tuple
 
 import click
+
+from crunch.dev.cli import group as dev_group
 
 from . import __version__, api, command, constants, store, utils
 from .unstructured.cli import organize_test_group
@@ -42,7 +44,7 @@ DATA_SIZE_VARIANTS = [
 class SubmissionNumberType(click.ParamType):
     name = "number"
 
-    def convert(self, value: typing.Any, param: typing.Optional[click.Parameter] | None, ctx: typing.Optional[click.Context]):
+    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
         if "latest" == value:
             return "latest"
 
@@ -91,7 +93,7 @@ def cli(
     web_base_url: str,
     competitions_repository: str,
     competitions_branch: str,
-    competitions_directory_path: typing.Optional[str],
+    competitions_directory_path: Optional[str],
     environment_name: str,
 ):
     constants.RUN_VIA_CLI = True
@@ -391,7 +393,7 @@ def push(
 
 @cli.command(help="[DEPRECATED] Send a prediction as your submission.")
 @click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
-@click.argument("file-path")
+@click.argument("file-path", type=click.Path(exists=True, dir_okay=False, readable=True))
 def push_prediction(
     message: str,
     file_path: str,
@@ -440,7 +442,7 @@ def test(
 def download(
     round_number: str,
     force: bool,
-    size_variant_raw: typing.Optional[str],
+    size_variant_raw: Optional[str],
 ):
     utils.change_root()
 
@@ -718,7 +720,7 @@ def cloud_executor(
     prediction_path: str,
     trace_path: str,
     state_file: str,
-    ping_urls: typing.List[str],
+    ping_urls: List[str],
     # ---
     train: bool,
     loop_key: str,
@@ -731,7 +733,7 @@ def cloud_executor(
     side_column_name: str,
     input_column_name: str,
     output_column_name: str,
-    targets: typing.List[typing.Tuple[str, str, str, str, str]],
+    targets: List[Tuple[str, str, str, str, str]],
     # ---
     write_index: bool,
     # ---
@@ -740,8 +742,8 @@ def cloud_executor(
     exit_file_path: str,
     exit_content: str,
     # ---
-    runner_dot_py_file_path: typing.Optional[str],
-    parameters_json_string: typing.Optional[str],
+    runner_dot_py_file_path: Optional[str],
+    parameters_json_string: Optional[str],
 ):
     from .runner import is_inside
     if not is_inside:
@@ -838,3 +840,5 @@ def organize_group(
 
 
 organize_group.add_command(organize_test_group)
+
+cli.add_command(dev_group)

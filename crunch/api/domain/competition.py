@@ -39,6 +39,10 @@ class Competition(Model):
         return SplitKeyType[self._attrs["splitKeyType"]]
 
     @property
+    def encrypt_submissions(self) -> bool:
+        return self._attrs["encryptSubmissions"]
+
+    @property
     def checks(self):
         from .check import CheckCollection
 

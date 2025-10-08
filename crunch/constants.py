@@ -6,6 +6,7 @@ PROJECT_FILE = "project.json"
 DOT_GITIGNORE_FILE = ".gitignore"
 REQUIREMENTS_TXT = "requirements.txt"
 REQUIREMENTS_R_TXT = "requirements.r.txt"
+ENCRYPTION_JSON = "encryption.json"
 DEFAULT_MODEL_DIRECTORY = "resources"
 DEFAULT_MAIN_FILE_PATH = "main.py"
 DEFAULT_USER_CODE_MODULE_NAME = "user_code"
@@ -23,6 +24,7 @@ IGNORED_MODEL_FILES = [
     ".env",
     "*.pyc",
     *MACOS_HIDDEN_FILES,
+    ENCRYPTION_JSON,
 ]
 
 IGNORED_CODE_FILES = [

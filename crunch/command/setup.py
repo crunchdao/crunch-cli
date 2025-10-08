@@ -43,6 +43,7 @@ def setup(
 
         for path, url in urls.items():
             utils.download(url, path)
+
     except api.NeverSubmittedException:
         if show_quickstarters:
             command.quickstarter(
@@ -52,6 +53,9 @@ def setup(
             )
         else:
             print(f"you appear to have never submitted code before")
+
+    except api.EncryptedSubmissionException:
+        print(f"you appear to have submitted an encrypted submission")
 
 
 def setup_notebook(
