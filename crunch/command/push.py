@@ -10,7 +10,8 @@ import requests
 from crunch import store
 from crunch.api import (ApiException, Client, ForbiddenLibraryException,
                         Project, Submission, SubmissionType, Upload)
-from crunch.constants import IGNORED_CODE_FILES, IGNORED_MODEL_FILES
+from crunch.constants import (ENCRYPTION_JSON, IGNORED_CODE_FILES,
+                              IGNORED_MODEL_FILES)
 from crunch.utils import format_bytes
 
 if TYPE_CHECKING:
@@ -335,7 +336,7 @@ def _upload_files(
 
         handle_bytes(
             data=json_data,
-            name="encryption.json",
+            name=ENCRYPTION_JSON,
             encrypt_if_possible=False,
             log_action=f"create {group_name} encryption file",
         )
