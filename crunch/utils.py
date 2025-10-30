@@ -185,16 +185,16 @@ class _undefined:
     pass
 
 
-_smart_call_ignore = set()
-
+_smart_call_ignore: typing.Set[str] = set()
+_T = typing.TypeVar("_T")
 
 def smart_call(
-    function: callable,
-    default_values: dict,
-    specific_values={},
-    log=True,
-    logger=logging.getLogger(),
-):
+    function: typing.Callable[..., _T],
+    default_values: typing.Dict[str, typing.Any],
+    specific_values: typing.Dict[str, typing.Any]={},
+    log: bool=True,
+    logger: logging.Logger =logging.getLogger(),
+) -> _T:
     values = {
         **default_values,
         **specific_values

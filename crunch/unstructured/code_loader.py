@@ -1,13 +1,11 @@
-import abc
 import os
-import types
-import typing
+from abc import ABC, abstractmethod
+from types import ModuleType
+from typing import Any, Callable, Literal, Optional
 
-import requests
+import crunch.store as store
 
-from .. import constants, store
-
-ModuleFileName = typing.Literal["leaderboard", "runner", "scoring", "submission"]
+ModuleFileName = Literal["leaderboard", "runner", "scoring", "submission"]
 
 
 class NoCodeFoundError(RuntimeError):
@@ -26,28 +24,36 @@ class ModuleWrapper:
 
     def __init__(
         self,
-        module: types.ModuleType,
+        module: ModuleType,
     ):
         self._module = module
 
-    def _get_function(self, name: str, ensure: bool):
+    def _get_function(
+        self,
+        *,
+        name: str,
+        ensure: bool,
+    ) -> Callable[..., Any]:
         function = getattr(self._module, name, None)
 
         if ensure and function is None:
             raise MissingFunctionError(f"no `{name}` function from module {self._module}")
 
+        if not callable(function):
+            raise MissingFunctionError(f"function `{name}` from module {self._module} is not callable")
+
         return function
 
 
-class CodeLoader(abc.ABC):
+class CodeLoader(ABC):
 
     def load(self):
         location = self.location
         name = os.path.basename(location)
 
         try:
-            module = types.ModuleType(name)
-            module.__loader__ = self
+            module = ModuleType(name)
+            module.__loader__ = self  # type: ignore
             module.__file__ = location
             module.__path__ = [os.path.dirname(location)]
             module.__package__ = name.rpartition('.')[0]
@@ -62,12 +68,12 @@ class CodeLoader(abc.ABC):
         return module
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def location(self) -> str:
         pass
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def source(self) -> str:
         pass
 
@@ -76,11 +82,12 @@ class GithubCodeLoader(CodeLoader):
 
     def __init__(
         self,
+        *,
         competition_name: str,
         file_name: ModuleFileName,
-        repository: str = None,
-        branch: str = None,
-        user_agent="curl/7.88.1"
+        repository: Optional[str] = None,
+        branch: Optional[str] = None,
+        user_agent: str = "curl/7.88.1"
     ):
         repository = repository or store.competitions_repository
         branch = branch or store.competitions_branch
@@ -94,6 +101,8 @@ class GithubCodeLoader(CodeLoader):
 
     @property
     def source(self):
+        import requests
+
         response = requests.get(
             self._url,
             headers={
@@ -114,7 +123,11 @@ class GithubCodeLoader(CodeLoader):
 
 class LocalCodeLoader(CodeLoader):
 
-    def __init__(self, path: str):
+    def __init__(
+        self,
+        *,
+        path: str
+    ):
         self.path = path
 
     @property
@@ -132,7 +145,7 @@ class LocalCodeLoader(CodeLoader):
 
 def _format_relative_module_path(
     competition_name: str,
-    file_name: ModuleFileName
+    file_name: ModuleFileName,
 ):
     return os.path.join(
         "competitions",
@@ -143,11 +156,12 @@ def _format_relative_module_path(
 
 
 def deduce(
+    *,
     competition_name: str,
     file_name: ModuleFileName,
-    github_repository: typing.Optional[str] = None,
-    github_branch: typing.Optional[str] = None,
-    directory_path: typing.Optional[str] = None,
+    github_repository: Optional[str] = None,
+    github_branch: Optional[str] = None,
+    directory_path: Optional[str] = None,
 ):
     if not directory_path:
         directory_path = store.competitions_directory_path
@@ -158,6 +172,13 @@ def deduce(
             _format_relative_module_path(competition_name, file_name)
         )
 
-        return LocalCodeLoader(path)
-
-    return GithubCodeLoader(competition_name, file_name, github_repository, github_branch)
+        return LocalCodeLoader(
+            path=path,
+        )
+    else:
+        return GithubCodeLoader(
+            competition_name=competition_name,
+            file_name=file_name,
+            repository=github_repository,
+            branch=github_branch,
+        )

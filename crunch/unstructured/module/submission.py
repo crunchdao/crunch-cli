@@ -1,38 +1,53 @@
-import typing
+from typing import Any, Callable, List, Optional
 
-from .. import code_loader, execute, file
+from deprecated import deprecated
+
+from crunch.scoring import ScoredMetricDetail as ScoredMetricDetail
+from crunch.unstructured.code_loader import (CodeLoader, ModuleWrapper,
+                                             NoCodeFoundError)
+from crunch.unstructured.execute import call_function
+from crunch.unstructured.file import File
+
+__all__ = [
+    "SubmissionModule",
+]
 
 
-class SubmissionModule:
-    """
-    Duck typing class that represent a `submission.py` usable for a custom checker.
-    """
+class SubmissionModule(ModuleWrapper):
 
-    check: typing.Callable
+    def get_check_function(
+        self,
+        *,
+        ensure: bool = True
+    ) -> Callable[..., None]:
+        return self._get_function(
+            name="check",
+            ensure=ensure,
+        )
+
+    def check(
+        self,
+        *,
+        submission_files: List[File],
+        model_files: List[File],
+        print: Optional[Callable[[Any], None]] = None,
+    ):
+        call_function(
+            self.get_check_function(ensure=True),
+            kwargs={
+                "submission_files": submission_files,
+                "model_files": model_files,
+            },
+            print=print,
+        )
 
     @staticmethod
-    def load(loader: code_loader.CodeLoader):
+    def load(loader: CodeLoader):
         try:
             module = loader.load()
-        except code_loader.NoCodeFoundError:
+            return SubmissionModule(module)
+        except NoCodeFoundError:
             return None
 
-        assert hasattr(module, "check"), "`check` function is missing"
 
-        return typing.cast(SubmissionModule, module)
-
-
-def check(
-    module: SubmissionModule,
-    submission_files: typing.List[file.File],
-    model_files: typing.List[file.File],
-    logger=print,
-):
-    return execute.call_function(
-        module.check,
-        {
-            "submission_files": submission_files,
-            "model_files": model_files,
-        },
-        logger,
-    )
+check = deprecated("use SubmissionModule.check(...) instead")(SubmissionModule.check)
