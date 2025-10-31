@@ -136,7 +136,7 @@ def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
-def read(path: str, kwargs={}) -> typing.Any:
+def read(path: str, kwargs: KwargsLike = {}) -> typing.Any:
     if path.endswith(".parquet"):
         return pandas.read_parquet(path, **kwargs)
 
@@ -297,7 +297,7 @@ def _download_head(
         if log and not logged:
             print(f"downloading {path} from {cut_url(url)}")
 
-        if response is not None: # type: ignore
+        if response is not None:  # type: ignore
             response.close()
 
         raise

@@ -26,6 +26,7 @@ def load_user_code(
 def test(
     main_file_path: str,
     model_directory_path: str,
+    prediction_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
     round_number: str,
@@ -47,6 +48,7 @@ def test(
         module,
         runner_module,
         model_directory_path,
+        prediction_directory_path,
         force_first_train,
         train_frequency,
         round_number,

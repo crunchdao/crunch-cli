@@ -30,6 +30,7 @@ class RunnerContext(ABC):
     def log(
         self,
         message: str,
+        *,
         important: bool = False,
         error: bool = False,
     ) -> Literal[True]:

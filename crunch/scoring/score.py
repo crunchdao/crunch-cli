@@ -210,7 +210,7 @@ def score(
             y_test_keys,
             metric,
             scorer,
-            dataframe,
+            merged,
             column_names,
             target_column_names,
         )

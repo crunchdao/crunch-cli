@@ -3,11 +3,12 @@ import functools
 import json
 import os
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 import click
 
 from crunch.dev.cli import group as dev_group
+from crunch.runner.types import KwargsLike
 
 from . import __version__, api, command, constants, store, utils
 from .unstructured.cli import organize_test_group
@@ -409,8 +410,8 @@ def push_prediction(
         utils.exit_via(error)
 
 
-def local_options(f):
-    options = [
+def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
+    options: List[Callable[..., Callable[..., Any]]] = [
         click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
         click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored."),
         click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop."),
@@ -430,7 +431,7 @@ def local_options(f):
 @click.pass_context
 def test(
     context: click.Context,
-    **kwargs
+    **kwargs: KwargsLike,
 ):
     context.forward(local, **kwargs)
 
@@ -537,6 +538,7 @@ def local(
             command.test(
                 main_file_path,
                 model_directory_path,
+                constants.DOT_PREDICTION_DIRECTORY,
                 not no_force_first_train,
                 train_frequency,
                 round_number,

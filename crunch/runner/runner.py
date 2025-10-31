@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 from typing import List, Literal, Tuple, Union
 
@@ -9,19 +10,19 @@ from crunch.runner.collector import MemoryPredictionCollector
 
 class Runner(ABC):
 
-    force_first_train: bool
-    column_names: ColumnNames
-
     def __init__(
         self,
         *,
         competition_format: CompetitionFormat,
-        prediction_parquet_file_path: str,
+        prediction_directory_path: str,
         determinism_check_enabled: bool = False,
     ):
         self.competition_format = competition_format
 
+        # TODO Remove this when TIMESERIES competition are removed
+        prediction_parquet_file_path = os.path.join(prediction_directory_path, "prediction.parquet")
         self.prediction_parquet_file_path = prediction_parquet_file_path
+        self.prediction_directory_path = prediction_directory_path
 
         self.determinism_check_enabled = determinism_check_enabled
         self.deterministic = True if determinism_check_enabled else None
@@ -35,7 +36,7 @@ class Runner(ABC):
             self.have_model,
         ) = self.initialize()
 
-        # TODO Break once DataCrunch competition is over
+        # TODO Remove once datacrunch competition is over
         if self.competition_format == CompetitionFormat.TIMESERIES:
             self.log("starting timeseries loop...")
             self.start_timeseries()
@@ -57,6 +58,10 @@ class Runner(ABC):
         self.log("ended")
 
         self.teardown()
+
+    force_first_train: bool
+    train_frequency: int
+    column_names: ColumnNames
 
     def start_timeseries(self) -> None:
         collector = MemoryPredictionCollector()
@@ -86,9 +91,8 @@ class Runner(ABC):
             collector.discard()
             raise
 
-        collector.persist(
-            self.prediction_parquet_file_path,
-        )
+        self.log(f"save prediction - path={self.prediction_parquet_file_path}", important=True)
+        collector.persist(self.prediction_parquet_file_path)
 
     @abstractmethod
     def timeseries_loop(
@@ -123,6 +127,7 @@ class Runner(ABC):
     def log(
         self,
         message: str,
+        *,
         important: bool = False,
         error: bool = False,
     ) -> Literal[True]:

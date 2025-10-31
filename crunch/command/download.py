@@ -46,7 +46,7 @@ def _get_data_urls(
 
 def download(
     round_number: api.RoundIdentifierType = "@current",
-    force=False,
+    force: bool = False,
     size_variant: typing.Optional[api.SizeVariant] = None,
 ):
     client, project = api.Client.from_project()

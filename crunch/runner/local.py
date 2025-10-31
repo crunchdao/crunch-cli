@@ -1,46 +1,48 @@
 import logging
 import os
 import time
-import typing
+from typing import Any, Literal, Optional
 
 import click
 import pandas
 
-from .. import (api, checker, command, constants, container, unstructured, ensure,
-                meta, monkey_patches, tester, utils)
-from .collector import FilePredictionCollector, MemoryPredictionCollector, PredictionCollector
-from .unstructured import RunnerContext, RunnerExecutorContext, UserModule
-from .runner import Runner
+import crunch.checker as checker
+import crunch.ensure as ensure
+import crunch.monkey_patches as monkey_patches
+import crunch.tester as tester
+from crunch.api import Competition, CrunchNotFoundException, KnownData, MissingPhaseDataException, RoundIdentifierType
+from crunch.command import download, download_no_data_available
+from crunch.container import Columns
+from crunch.runner.runner import Runner
+from crunch.runner.types import KwargsLike
+from crunch.runner.unstructured import RunnerContext, RunnerExecutorContext, UserModule
+from crunch.unstructured import RunnerModule
+from crunch.utils import format_bytes, get_process_memory, read, smart_call
 
 
 class LocalRunner(Runner):
 
     def __init__(
         self,
-        user_module: typing.Any,
-        runner_module: unstructured.RunnerModule,
+        user_module: Any,
+        runner_module: Optional[RunnerModule],
         model_directory_path: str,
+        prediction_directory_path: str,
         force_first_train: bool,
         train_frequency: int,
-        round_number: str,
-        competition: api.Competition,
+        round_number: RoundIdentifierType,
+        competition: Competition,
         has_gpu: bool,
         checks: bool,
         determinism_check_enabled: bool,
-        read_kwargs: dict,
-        write_kwargs: dict,
+        read_kwargs: KwargsLike,
+        write_kwargs: KwargsLike,
         logger: logging.Logger,
     ):
-        collector = (
-            MemoryPredictionCollector()
-            if not competition.format.unstructured
-            else FilePredictionCollector()
-        )
-
         super().__init__(
-            collector,
-            competition.format,
-            determinism_check_enabled
+            competition_format=competition.format,
+            prediction_directory_path=prediction_directory_path,
+            determinism_check_enabled=determinism_check_enabled,
         )
 
         self.user_module = user_module
@@ -48,7 +50,7 @@ class LocalRunner(Runner):
         self.model_directory_path = model_directory_path
         self.force_first_train = force_first_train
         self.train_frequency = train_frequency
-        self.round_number = round_number
+        self.round_number: RoundIdentifierType = round_number
         self.has_gpu = has_gpu
         self.checks = checks
         self.read_kwargs = read_kwargs
@@ -58,28 +60,27 @@ class LocalRunner(Runner):
         self.metrics = competition.metrics.list()
 
     def start(self):
-        memory_before = utils.get_process_memory()
+        memory_before = get_process_memory()
         start = time.time()
 
         try:
             return super().start()
         finally:
             self.log(
-                'duration - time=%s' % (
+                "duration - time=%s" % (
                     time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
                 ),
                 important=True,
             )
 
-            memory_after = utils.get_process_memory()
+            memory_after = get_process_memory()
             self.log(
                 'memory - before="%s" after="%s" consumed="%s"' % (
-                    utils.format_bytes(memory_before),
-                    utils.format_bytes(memory_after),
-                    utils.format_bytes(memory_after - memory_before)
+                    format_bytes(memory_before),
+                    format_bytes(memory_after),
+                    format_bytes(memory_after - memory_before)
                 ),
                 important=True,
-
             )
 
     def setup(self):
@@ -87,12 +88,12 @@ class LocalRunner(Runner):
         monkey_patches.display_add()
 
     def initialize(self):
-        self.log('running local test')
+        self.log("running local test")
         self.log("internet access isn't restricted, no check will be done", important=True)
         self.log("")
 
-        self.train_function = ensure.is_function(self.user_module, "train", logger=self.logger)
-        self.infer_function = ensure.is_function(self.user_module, "infer", logger=self.logger)
+        os.makedirs(self.model_directory_path, exist_ok=True)
+        os.makedirs(self.prediction_directory_path, exist_ok=True)
 
         try:
             (
@@ -103,65 +104,81 @@ class LocalRunner(Runner):
                 self.column_names,
                 self.data_directory_path,
                 self.data_paths,
-            ) = command.download(
-                round_number=self.round_number
+            ) = download(
+                round_number=self.round_number,
             )
-
-            if not self.competition_format.unstructured:
-                self.x_train_path = self.data_paths.get(api.KnownData.X_TRAIN)
-                self.y_train_path = self.data_paths.get(api.KnownData.Y_TRAIN)
-                self.x_test_path = self.data_paths.get(api.KnownData.X_TEST)
-                self.y_test_path = self.data_paths.get(api.KnownData.Y_TEST)
-                self.example_prediction_path = self.data_paths.get(api.KnownData.EXAMPLE_PREDICTION)
-        except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-            command.download_no_data_available()
+        except (CrunchNotFoundException, MissingPhaseDataException):
+            download_no_data_available()
             raise click.Abort()
-
-        if self.competition_format == api.CompetitionFormat.TIMESERIES:
-            self.full_x = pandas.concat([
-                utils.read(self.x_train_path, kwargs=self.read_kwargs),
-                utils.read(self.x_test_path, kwargs=self.read_kwargs),
-            ])
-
-            if self.y_test_path:
-                self.full_y = pandas.concat([
-                    utils.read(self.y_train_path, kwargs=self.read_kwargs),
-                    utils.read(self.y_test_path, kwargs=self.read_kwargs),
-                ])
-            else:
-                self.full_y = utils.read(self.y_train_path, kwargs=self.read_kwargs)
-
-            self.full_x = pandas.concat([
-                utils.read(self.x_train_path, kwargs=self.read_kwargs),
-                utils.read(self.x_test_path, kwargs=self.read_kwargs),
-            ])
-
-            if self.y_test_path:
-                self.full_y = pandas.concat([
-                    utils.read(self.y_train_path, kwargs=self.read_kwargs),
-                    utils.read(self.y_test_path, kwargs=self.read_kwargs),
-                ])
-            else:
-                self.full_y = utils.read(self.y_train_path, kwargs=self.read_kwargs)
-
-            for dataframe in [self.full_x, self.full_y]:
-                dataframe.set_index(self.column_names.moon, drop=True, inplace=True)
-
-        os.makedirs(self.model_directory_path, exist_ok=True)
 
         return (
             self.keys,
-            False,
+            True  # False,
         )
+
+    def start_timeseries(self) -> None:
+        self.log(f"finding functions", important=True)
+        self.train_function = ensure.is_function(self.user_module, "train", logger=self.logger)
+        self.infer_function = ensure.is_function(self.user_module, "infer", logger=self.logger)
+
+        self.log(f"loading data", important=True)
+        self.x_train_path = self.data_paths[KnownData.X_TRAIN]
+        self.y_train_path = self.data_paths[KnownData.Y_TRAIN]
+        self.x_test_path = self.data_paths[KnownData.X_TEST]
+        self.y_test_path = self.data_paths.get(KnownData.Y_TEST)
+        self.example_prediction_path = self.data_paths[KnownData.EXAMPLE_PREDICTION]
+
+        self.full_x: pandas.DataFrame = pandas.concat([
+            read(self.x_train_path, kwargs=self.read_kwargs),
+            read(self.x_test_path, kwargs=self.read_kwargs),
+        ])
+
+        if self.y_test_path:
+            self.full_y: pandas.DataFrame = pandas.concat([
+                read(self.y_train_path, kwargs=self.read_kwargs),
+                read(self.y_test_path, kwargs=self.read_kwargs),
+            ])
+        else:
+            self.full_y: pandas.DataFrame = read(self.y_train_path, kwargs=self.read_kwargs)
+
+        for dataframe in [self.full_x, self.full_y]:
+            dataframe.set_index(self.column_names.moon, drop=True, inplace=True)
+
+        super().start_timeseries()
+
+        if self.checks and not self.competition_format.unstructured:
+            prediction: pandas.DataFrame = read(self.prediction_parquet_file_path)
+            example_prediction: pandas.DataFrame = read(self.example_prediction_path)
+
+            try:
+                checker.run_via_api(
+                    prediction,
+                    example_prediction,
+                    self.column_names,
+                    self.logger,
+                )
+
+                self.log(f"prediction is valid", important=True)
+            except checker.CheckError as error:
+                cause = error.__cause__
+                if not isinstance(cause, checker.CheckError):
+                    self.logger.exception(
+                        f"check failed - message=`{error}`",
+                        exc_info=cause
+                    )
+                else:
+                    self.log(f"check failed - message=`{error}`", error=True)
+
+                return None
 
     def timeseries_loop(
         self,
         moon: int,
         train: bool
     ) -> pandas.DataFrame:
-        target_column_names, prediction_column_names = container.Columns.from_model(self.column_names)
+        target_column_names, prediction_column_names = Columns.from_model(self.column_names)
 
-        default_values = {
+        default_values: KwargsLike = {
             "number_of_features": self.number_of_features,
             "model_directory_path": self.model_directory_path,
             "id_column_name": self.column_names.id,
@@ -180,11 +197,11 @@ class LocalRunner(Runner):
         }
 
         if train:
-            self.log('call: train', important=True)
+            self.log("call: train", important=True)
             x_train = self.filter_embargo(self.full_x, moon)
             y_train = self.filter_embargo(self.full_y, moon)
 
-            utils.smart_call(
+            smart_call(
                 self.train_function,
                 default_values,
                 {
@@ -197,10 +214,10 @@ class LocalRunner(Runner):
             )
 
         if True:
-            self.log('call: infer', important=True)
+            self.log("call: infer", important=True)
             x_test = self.filter_at(self.full_x, moon)
 
-            prediction = utils.smart_call(
+            prediction = smart_call(
                 self.infer_function,
                 default_values,
                 {
@@ -220,58 +237,32 @@ class LocalRunner(Runner):
 
         return prediction
 
-    def start_unstructured(self):
+    def start_unstructured(self) -> None:
         if self.runner_module is None:
             self.log("no runner is available for this competition", error=True)
             raise click.Abort()
 
         context = LocalRunnerContext(self)
 
-        prediction = self.runner_module.run(
+        self.runner_module.run(
             context=context,
             data_directory_path=self.data_directory_path,
             model_directory_path=self.model_directory_path,
             prediction_directory_path=self.prediction_directory_path,
         )
 
-        return prediction
+        self.log(f"save prediction - path={self.prediction_directory_path}", important=True)
 
     def finalize(self):
-        prediction_path = os.path.join(
-            constants.DOT_DATA_DIRECTORY,
-            "prediction.parquet"
-        )
+        pass
 
-        self.log('save prediction - path=%s' % prediction_path, important=True)
-        if self.prediction_collector is not None:
-            self.prediction_collector.persist(prediction_path)
-
-        if self.checks and not self.competition_format.unstructured:
-            prediction = utils.read(prediction_path)
-            example_prediction = utils.read(self.example_prediction_path)
-
-            try:
-                checker.run_via_api(
-                    prediction,
-                    example_prediction,
-                    self.column_names,
-                    self.logger,
-                )
-
-                self.log(f"prediction is valid", important=True)
-            except checker.CheckError as error:
-                if not isinstance(error.__cause__, checker.CheckError):
-                    self.logger.exception(
-                        "check failed - message=`%s`",
-                        error,
-                        exc_info=error.__cause__
-                    )
-                else:
-                    self.log("check failed - message=`%s`" % error, error=True)
-
-                return None
-
-    def log(self, message: str, important=False, error=False):
+    def log(
+        self,
+        message: str,
+        *,
+        important: bool = False,
+        error: bool = False,
+    ):
         if error:
             self.logger.error(message)
         elif important:
@@ -320,27 +311,34 @@ class LocalRunnerContext(RunnerContext):
     def log(
         self,
         message: str,
-        important=False,
-        error=False
-    ):
-        self.runner.log(message, important=important, error=error)
+        *,
+        important: bool = False,
+        error: bool = False,
+    ) -> Literal[True]:
+        return self.runner.log(
+            message,
+            important=important,
+            error=error,
+        )
 
     def execute(
         self,
-        command,
-        parameters=None,
-        return_prediction=False
-    ):
+        *,
+        command: str,
+        parameters: Optional[KwargsLike] = None,
+    ) -> None:
         self.log(f"executing - command={command}")
 
         user_module = LocalUserModule(self.runner)
         executor_context = LocalRunnerExecutorContext(self.runner)
 
+        assert self.runner.runner_module
         handlers = self.runner.runner_module.execute(
-            executor_context,
-            user_module,
-            self.runner.data_directory_path,
-            self.runner.model_directory_path,
+            context=executor_context,
+            module=user_module,
+            data_directory_path=self.runner.data_directory_path,
+            model_directory_path=self.runner.model_directory_path,
+            prediction_directory_path=self.runner.prediction_directory_path,
         )
 
         handler = handlers.get(command)
@@ -348,17 +346,10 @@ class LocalRunnerContext(RunnerContext):
             self.log(f"command not found: {command}", error=True)
             return None
 
-        result = utils.smart_call(
+        smart_call(
             handler,
             parameters or {},
         )
-
-        if isinstance(return_prediction, PredictionCollector):
-            ensure.is_dataframe(result, "result", logger=self.runner.logger)
-            return_prediction.append(result)
-        elif return_prediction == True:
-            ensure.is_dataframe(result, "result", logger=self.runner.logger)
-            return result
 
 
 class LocalRunnerExecutorContext(RunnerExecutorContext):

@@ -109,12 +109,9 @@ class CloudRunner(Runner):
         max_retry: int,
         retry_seconds: int
     ):
-        # TODO Remove this when TIMESERIES competition are removed
-        prediction_parquet_file_path = os.path.join(prediction_directory_path, "prediction.parquet")
-
         super().__init__(
             competition_format=competition.format,
-            prediction_parquet_file_path=prediction_parquet_file_path,
+            prediction_directory_path=prediction_directory_path,
             determinism_check_enabled=determinism_check_enabled,
         )
 
@@ -455,7 +452,13 @@ class CloudRunner(Runner):
     def teardown(self):
         self.report_current(f"shutting down")
 
-    def log(self, message: typing.Any, important: bool = False, error: bool = False):
+    def log(
+        self,
+        message: str,
+        *,
+        important: bool = False,
+        error: bool = False,
+    ):
         file = sys.stderr if error else sys.stdout
         prefix = f"<runner/{file.name[4:-1]}>"
 
@@ -963,6 +966,7 @@ class CloudRunnerContext(RunnerContext):
     def log(
         self,
         message: str,
+        *,
         important: bool = False,
         error: bool = False,
     ) -> typing.Literal[True]:
