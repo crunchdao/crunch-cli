@@ -1,16 +1,16 @@
-import abc
 import re
-import typing
+from abc import ABC, abstractmethod
+from typing import Dict, Optional
 
 
-class Auth(metaclass=abc.ABCMeta):
+class Auth(ABC):
 
-    @abc.abstractmethod
+    @abstractmethod
     def apply(
         self,
-        headers: dict,
-        params: dict,
-        data: typing.Optional[dict],
+        headers: Dict[str, str],
+        params: Dict[str, str],
+        data: Optional[Dict[str, str]],
     ):
         ...
 
@@ -25,9 +25,9 @@ class NoneAuth(Auth):
 
     def apply(
         self,
-        headers: dict,
-        params: dict,
-        data: typing.Optional[dict],
+        headers: Dict[str, str],
+        params: Dict[str, str],
+        data: Optional[Dict[str, str]],
     ):
         pass
 
@@ -44,9 +44,9 @@ class ApiKeyAuth(Auth):
 
     def apply(
         self,
-        headers: dict,
-        params: dict,
-        data: typing.Optional[dict],
+        headers: Dict[str, str],
+        params: Dict[str, str],
+        data: Optional[Dict[str, str]],
     ):
         headers["Authorization"] = f"API-Key {self._key}"
 
@@ -63,9 +63,9 @@ class PushTokenAuth(Auth):
 
     def apply(
         self,
-        headers: dict,
-        params: dict,
-        data: typing.Optional[dict],
+        headers: Dict[str, str],
+        params: Dict[str, str],
+        data: Optional[Dict[str, str]],
     ):
         if data is not None:
             data["pushToken"] = self._token
@@ -95,8 +95,8 @@ class RunTokenAuth(Auth):
 
     def apply(
         self,
-        headers: dict,
-        params: dict,
-        data: typing.Optional[dict],
+        headers: Dict[str, str],
+        params: Dict[str, str],
+        data: Optional[Dict[str, str]],
     ):
         headers["X-Run-Token"] = self._token
