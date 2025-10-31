@@ -7,15 +7,12 @@ Deprecated
 inquirer
 joblib
 libcst
-networkx
 pandas
 psutil
 pyarrow
 python-dotenv
-pyyaml
 requests
 requests-toolbelt
 requirements-parser>=0.11.0
 scikit-learn
-scipy
 tqdm

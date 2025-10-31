@@ -9,7 +9,7 @@ import pandas
 def is_function(
     module: types.ModuleType,
     name: str,
-    logger=logging.getLogger(),
+    logger: logging.Logger = logging.getLogger(),
 ):
     if not hasattr(module, name):
         logger.error("no `%s` function found", name)
@@ -21,7 +21,7 @@ def is_function(
 def is_dataframe(
     input: typing.Any,
     name: str,
-    logger=logging.getLogger(),
+    logger: logging.Logger = logging.getLogger(),
 ):
     if not isinstance(input, pandas.DataFrame):
         logger.error(f"`%s` must be a dataframe", name)
@@ -29,11 +29,11 @@ def is_dataframe(
 
 
 def return_infer(
-    result,
+    result: typing.Any,
     id_column_name: str,
     moon_column_name: str,
-    prediction_column_names: list,
-    logger=logging.getLogger()
+    prediction_column_names: typing.List[str],
+    logger: logging.Logger = logging.getLogger()
 ) -> pandas.DataFrame:
     is_dataframe(result, "prediction")
 

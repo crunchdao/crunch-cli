@@ -21,6 +21,8 @@ import pandas
 import requests
 import tqdm
 
+from crunch.runner.types import ArgsLike, KwargsLike
+
 from . import api, constants
 
 
@@ -134,7 +136,7 @@ def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
-def read(path: str, kwargs={}) -> typing.Any:
+def read(path: str, kwargs: KwargsLike = {}) -> typing.Any:
     if path.endswith(".parquet"):
         return pandas.read_parquet(path, **kwargs)
 
@@ -295,7 +297,7 @@ def _download_head(
         if log and not logged:
             print(f"downloading {path} from {cut_url(url)}")
 
-        if response is not None: # type: ignore
+        if response is not None:  # type: ignore
             response.close()
 
         raise
@@ -394,10 +396,10 @@ def exit_via(error: "api.ApiException", **kwargs) -> None:
     exit(1)
 
 
-def timeit(params: list):
-    def decorator(func):
+def timeit(params: typing.Optional[typing.List[str]]):
+    def decorator(func: typing.Callable[..., _T]) -> typing.Callable[..., _T]:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: ArgsLike, **kwargs: KwargsLike):
             kwargs.update(zip(
                 func.__code__.co_varnames[:func.__code__.co_argcount],
                 args
@@ -423,30 +425,6 @@ def timeit(params: list):
         return wrapper
 
     return decorator
-
-
-timeit_noarg = timeit(None)
-
-
-def split_at_nans(
-    dataframe: pandas.DataFrame,
-    column_name: str,
-    keep_empty=False,
-):
-    dataframe = dataframe.reset_index(drop=True)
-
-    indices = dataframe.index[dataframe[column_name].isna()].tolist()
-    indices = [-1] + indices + [len(dataframe)]
-
-    parts = []
-    for i in range(len(indices) - 1):
-        start = indices[i] + 1
-        end = indices[i + 1]
-
-        if start != end or keep_empty:
-            parts.append(dataframe.iloc[start:end])
-
-    return parts
 
 
 class Tracer:

@@ -10,21 +10,24 @@ import sys
 import time
 import typing
 import urllib.parse
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Generator, List, Optional, Tuple
 
 import pandas
 import requests
 
+import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Upload
+from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, KnownData, RunnerRun, Upload
+from crunch.api.errors import ModelTooBigException, PredictionTooBigException
+from crunch.downloader import prepare_all, save_all
+from crunch.runner.runner import Runner
 from crunch.runner.types import KwargsLike
-
-from .. import api, downloader, store, unstructured, utils
-from .collector import MemoryPredictionCollector, PredictionCollector
-from .runner import Runner
-from .unstructured import RunnerContext
+from crunch.runner.unstructured import RunnerContext
+from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
+from crunch.utils import download
 
 UploadedFiles = Dict[str, Upload]
+LastModifications = Dict[str, int]
 
 PACKAGES_WITH_PRIORITY = [
     "torch"
@@ -77,9 +80,9 @@ class CloudRunner(Runner):
 
     def __init__(
         self,
-        competition: api.Competition,
-        run: api.RunnerRun,
-        client: api.Client,
+        competition: Competition,
+        run: RunnerRun,
+        client: Client,
         # ---
         context_directory: str,
         scoring_directory: str,
@@ -106,22 +109,10 @@ class CloudRunner(Runner):
         max_retry: int,
         retry_seconds: int
     ):
-        prediction_collector = None
-        if competition.format != api.CompetitionFormat.UNSTRUCTURED:
-            prediction_collector = MemoryPredictionCollector(
-                write_index=(
-                    # TODO Very ugly... A plugin-like runner for unstructured competition is needed.
-                    competition.name in [
-                        "broad-2",
-                        "broad-3",
-                    ]
-                )
-            )
-
         super().__init__(
-            prediction_collector,
-            competition.format,
-            determinism_check_enabled
+            competition_format=competition.format,
+            prediction_directory_path=prediction_directory_path,
+            determinism_check_enabled=determinism_check_enabled,
         )
 
         self.competition = competition
@@ -157,7 +148,6 @@ class CloudRunner(Runner):
 
         self.sandbox_restriction_flag = "--change-network-namespace" if gpu else "--filter-socket-syscalls"
 
-        self.prediction_parquet_file_path = os.path.join(self.prediction_directory_path, "prediction.parquet")
 
     def start(self):
         self.report_current("starting")
@@ -167,15 +157,15 @@ class CloudRunner(Runner):
         self.report_current("ending")
 
     def initialize(self):
-        if self.competition_format == api.CompetitionFormat.UNSTRUCTURED and self.log("downloading runner..."):
+        if self.competition_format == CompetitionFormat.UNSTRUCTURED and self.log("downloading runner..."):
             self.report_current("download runner")
 
-            loader = unstructured.deduce_code_loader(
+            loader = deduce_code_loader(
                 competition_name=self.competition.name,
                 file_name="runner",
             )
 
-            if isinstance(loader, unstructured.GithubCodeLoader):
+            if isinstance(loader, GithubCodeLoader):
                 source = loader.source
 
                 self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
@@ -184,19 +174,22 @@ class CloudRunner(Runner):
 
                 self.bash2(["chmod", "a+r", self.runner_dot_py_file_path])
 
-                loader = unstructured.LocalCodeLoader(path=self.runner_dot_py_file_path)
-            elif isinstance(loader, unstructured.LocalCodeLoader):  # type: ignore
+                loader = LocalCodeLoader(path=self.runner_dot_py_file_path)
+            elif isinstance(loader, LocalCodeLoader):  # type: ignore
                 self.runner_dot_py_file_path = os.path.realpath(loader.path)
 
-            self.runner_module = unstructured.RunnerModule.load(loader)
+            self.runner_module = RunnerModule.load(loader)
             if self.runner_module is None:
                 raise RuntimeError("no runner is available for this competition")
 
         if False and self.log("downloading code..."):
             self.report_current("download code")
 
-            file_urls = self.run.code
-            self.download_files(file_urls, self.code_directory)
+            _download_files(
+                file_urls=self.run.code,
+                directory_path=self.code_directory,
+                print=self.log, # type: ignore
+            )
 
         if False and os.path.exists(self.requirements_r_txt_path):
             self.report_current("install r requirements")
@@ -281,7 +274,7 @@ class CloudRunner(Runner):
                 *CONFLICTING_GPU_PACKAGES
             ], self.venv_env)
 
-        if self.log("downloading data..."):
+        if True and self.log("downloading data..."):
             self.report_current("download data")
 
             self.prepare_data()
@@ -297,9 +290,10 @@ class CloudRunner(Runner):
             file_urls = self.run.model
             self.have_model = len(file_urls) != 0
 
-            self.pre_model_files_modification: typing.Dict[str, int] = self.download_files(
-                file_urls,
-                self.model_directory_path
+            self.pre_model_files_modification = _download_files(
+                file_urls=file_urls,
+                directory_path=self.model_directory_path,
+                print=self.log,  # type: ignore
             )
 
             self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
@@ -326,77 +320,16 @@ class CloudRunner(Runner):
     ) -> pandas.DataFrame:
         self.report_current("process loop", moon)
 
-        return self.sandbox(
+        self.sandbox(
             train=train,
             loop_key=moon,
-            return_result=True,
         )
 
-    def start_dag(self):
-        self.report_current("process dag")
-        self.create_trace_file()
-
-        return super().start_dag()
-
-    def dag_loop(
-        self,
-        train: bool
-    ) -> pandas.DataFrame:
-        return self.sandbox(
-            train=train,
-            loop_key=-1,
-            return_result=True,
+        return pandas.read_parquet(
+            self.prediction_parquet_file_path,
         )
 
-    def start_stream(self):
-        self.create_trace_file()
-
-        return super().start_stream()
-
-    def stream_no_model(
-        self,
-    ):
-        self.sandbox(
-            True,
-            -1,
-            return_result=False,
-        )
-
-    def stream_loop(
-        self,
-        target_column_names: api.TargetColumnNames,
-    ) -> pandas.DataFrame:
-        return self.sandbox(
-            train=False,
-            loop_key=target_column_names.name,
-            return_result=True,
-        )
-
-    def start_spatial(self):
-        self.create_trace_file()
-
-        return super().start_spatial()
-
-    def spatial_train(
-        self,
-    ) -> None:
-        self.sandbox(
-            True,
-            -1,
-            return_result=False,
-        )
-
-    def spatial_loop(
-        self,
-        target_column_names: api.TargetColumnNames
-    ) -> pandas.DataFrame:
-        return self.sandbox(
-            train=False,
-            loop_key=target_column_names.name,
-            return_result=True,
-        )
-
-    def start_unstructured(self) -> None:
+    def start_unstructured(self):
         self.create_trace_file()
 
         if self.runner_module is None:
@@ -414,16 +347,6 @@ class CloudRunner(Runner):
     def finalize(self):
         self.report_current("upload result")
         self.log("uploading result...")
-
-        if self.prediction is not None:
-            write_index = self.prediction_collector.is_write_index if self.prediction_collector else True
-
-            self.prediction.to_parquet(
-                self.prediction_parquet_file_path,
-                index=write_index,
-            )
-        elif self.prediction_collector is not None:
-            self.prediction_collector.persist(self.prediction_parquet_file_path)
 
         self.upload_results()
 
@@ -461,7 +384,7 @@ class CloudRunner(Runner):
 
                     self.log("result submitted")
                     break
-                except (api.errors.ModelTooBigException, api.errors.PredictionTooBigException) as exception:
+                except (ModelTooBigException, PredictionTooBigException) as exception:
                     self.log(f"failed to submit result: {exception}: {exception.size}/{exception.maximum_size} bytes", error=True)
                     exit(1)
                 except Exception as exception:
@@ -529,7 +452,13 @@ class CloudRunner(Runner):
     def teardown(self):
         self.report_current(f"shutting down")
 
-    def log(self, message: typing.Any, important: bool = False, error: bool = False):
+    def log(
+        self,
+        message: str,
+        *,
+        important: bool = False,
+        error: bool = False,
+    ):
         file = sys.stderr if error else sys.stdout
         prefix = f"<runner/{file.name[4:-1]}>"
 
@@ -649,7 +578,7 @@ class CloudRunner(Runner):
             "-maxdepth", "1",
             "-exec", *commands, ";"
         ])
-    
+
     def delete_content(
         self,
         directory_path: str,
@@ -663,33 +592,12 @@ class CloudRunner(Runner):
             ["rm", "-rf", "{}"]
         )
 
-    @typing.overload
     def sandbox(
         self,
         train: bool,
         loop_key: typing.Union[int, str],
-        return_result: typing.Literal[True],
-        parameters: typing.Optional[KwargsLike] = None,
-    ) -> pandas.DataFrame:
-        ...
-
-    @typing.overload
-    def sandbox(
-        self,
-        train: bool,
-        loop_key: typing.Union[int, str],
-        return_result: typing.Literal[False],
-        parameters: typing.Optional[KwargsLike] = None,
+        parameters: KwargsLike = {},
     ) -> None:
-        ...
-
-    def sandbox(
-        self,
-        train: bool,
-        loop_key: typing.Union[int, str],
-        return_result: bool = True,
-        parameters: typing.Optional[KwargsLike] = None,
-    ):
         is_regular = not self.competition_format.unstructured
 
         try:
@@ -760,7 +668,7 @@ class CloudRunner(Runner):
                     for target_column_names in self.column_names.targets
                 ],
                 # ---
-                "write-index": self.prediction_collector.is_write_index if self.prediction_collector else False,
+                "write-index": False,
                 # ---
                 "fuse-pid": os.getpid(),
                 "fuse-signal-number": FUSE_SIGNAL.value,
@@ -768,7 +676,7 @@ class CloudRunner(Runner):
                 "exit-content": self.exit_content,
                 # ---
                 "runner-py-file": self.runner_dot_py_file_path,
-                "parameters": json.dumps(parameters) if parameters is not None else None,
+                "parameters": json.dumps(parameters),
             }
 
             # TODO move to a dedicated function
@@ -819,9 +727,6 @@ class CloudRunner(Runner):
         except SystemExit:
             self.report_trace(loop_key)
             raise
-
-        if return_result:
-            return utils.read(self.prediction_parquet_file_path)
 
     def _prepare_exit(self):
         if not os.path.exists(self.exit_file_path):
@@ -891,50 +796,22 @@ class CloudRunner(Runner):
         self.keys = sorted([
             split.key
             for split in self.splits
-            if split.group == api.DataReleaseSplitGroup.TEST
+            if split.group == DataReleaseSplitGroup.TEST
         ])
 
-        file_paths = downloader.save_all(
-            downloader.prepare_all(
+        file_paths = save_all(
+            prepare_all(
                 self.data_directory,
                 data_files,
             ),
             False,
-            self.log,
+            print=self.log, # type: ignore
             progress_bar=False,
         )
 
-        self.x_path = file_paths.get(api.KnownData.X)
-        self.y_path = file_paths.get(api.KnownData.Y)
-        self.y_raw_path = file_paths.get(api.KnownData.Y_RAW)
-
-    def download(
-        self,
-        url: str,
-        path: str
-    ):
-        return utils.download(
-            url,
-            path,
-            print=self.log,
-            progress_bar=False,
-        )
-
-    def download_files(
-        self,
-        file_urls: typing.Dict[str, str],
-        directory_path: str
-    ) -> typing.Dict[str, int]:
-        files_modification: typing.Dict[str, int] = {}
-
-        for relative_path, url in file_urls.items():
-            path = os.path.join(directory_path, relative_path)
-            # self.download(url, path)
-
-            stat = os.stat(path)
-            files_modification[relative_path] = stat.st_mtime_ns
-
-        return files_modification
+        self.x_path = file_paths.get(KnownData.X)
+        self.y_path = file_paths.get(KnownData.Y)
+        self.y_raw_path = file_paths.get(KnownData.Y_RAW)
 
     def report_current(
         self,
@@ -968,6 +845,29 @@ class CloudRunner(Runner):
             )
 
 
+def _download_files(
+    *,
+    file_urls: Dict[str, str],
+    directory_path: str,
+    print: Callable[[str], None],
+) -> LastModifications:
+    pre_modifications: LastModifications = {}
+
+    for relative_path, url in file_urls.items():
+        path = os.path.join(directory_path, relative_path)
+        download(
+            url,
+            path,
+            print=print,
+            progress_bar=False,
+        )
+
+        stat = os.stat(path)
+        pre_modifications[relative_path] = stat.st_mtime_ns
+
+    return pre_modifications
+
+
 def _find_files(
     directory_path: str,
 ) -> Generator[Tuple[str, str], None, None]:
@@ -991,9 +891,9 @@ def _upload_files(
     category: str,
     directory_path: str,
     uploads: UploadedFiles,
-    client: api.Client,
+    client: Client,
     log: Callable[[str], None],
-    pre_modifications: Optional[Dict[str, int]] = None,
+    pre_modifications: Optional[LastModifications] = None,
 ) -> bool:
     """
     Uploads files from the given directory.
@@ -1006,7 +906,7 @@ def _upload_files(
 
     files: List[Tuple[str, str]] = []
     total_size = 0
-    post_modifications: Dict[str, int] = {}
+    post_modifications: LastModifications = {}
 
     for file_path, file_name in _find_files(directory_path):
         stat = os.stat(file_path)
@@ -1066,6 +966,7 @@ class CloudRunnerContext(RunnerContext):
     def log(
         self,
         message: str,
+        *,
         important: bool = False,
         error: bool = False,
     ) -> typing.Literal[True]:
@@ -1079,19 +980,12 @@ class CloudRunnerContext(RunnerContext):
         self,
         *,
         command: str,
-        parameters: KwargsLike = {},
-        return_prediction: typing.Union[bool, PredictionCollector] = False,
-    ) -> typing.Union[None, "pandas.DataFrame"]:
+        parameters: Optional[KwargsLike] = None,
+    ) -> None:
         self.log(f"executing - command={command}")
 
-        result = self.runner.sandbox(
+        self.runner.sandbox(
             self.runner.force_first_train,
             command,
-            return_result=return_prediction != False,
             parameters=parameters or {},
         )
-
-        if isinstance(return_prediction, PredictionCollector):
-            return_prediction.append(result)
-        elif return_prediction == True:
-            return result

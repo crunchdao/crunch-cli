@@ -7,15 +7,12 @@ Deprecated
 
 joblib
 
-
 pandas
 psutil
 pyarrow
 python-dotenv
-
 requests
 requests-toolbelt
 requirements-parser>=0.11.0
-
 
 tqdm
