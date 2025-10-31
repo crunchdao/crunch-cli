@@ -1,17 +1,17 @@
-import dataclasses
-import functools
 import os
-import typing
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Any, Dict, List
 
-import dataclasses_json
 import requests
+from dataclasses_json import LetterCase, Undefined, dataclass_json
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE,
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,  # type: ignore
+    undefined=Undefined.EXCLUDE,
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class File:
 
     path: str
@@ -26,7 +26,7 @@ class File:
     def directory(self):
         return os.path.dirname(self.path)
 
-    @functools.cached_property
+    @cached_property
     def text(self):
         if not self.uri:
             return None
@@ -40,9 +40,9 @@ class File:
     @classmethod
     def from_dict_array(
         cls,
-        input: typing.List[dict],
-    ):
+        input: List[Dict[str, Any]],
+    ) -> List['File']:
         return [
-            cls.from_dict(x)
+            cls.from_dict(x)  # type: ignore
             for x in input
         ]

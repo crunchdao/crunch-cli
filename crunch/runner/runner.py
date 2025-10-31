@@ -1,25 +1,25 @@
-import abc
-import typing
+from abc import ABC, abstractmethod
+from typing import List, Literal, Optional, Tuple, Union
 
 import pandas
 
-from .. import api
-from .collector import PredictionCollector
+from crunch.api import ColumnNames, CompetitionFormat, TargetColumnNames
+from crunch.runner.collector import PredictionCollector
 
 
-class Runner(abc.ABC):
+class Runner(ABC):
 
     force_first_train: bool
-    column_names: api.ColumnNames
+    column_names: ColumnNames
 
     def __init__(
         self,
-        prediction_collector: PredictionCollector,
-        competition_format: api.CompetitionFormat,
-        determinism_check_enabled=False,
+        prediction_collector: Optional[PredictionCollector],
+        competition_format: CompetitionFormat,
+        determinism_check_enabled: bool = False,
     ):
         self.prediction_collector = prediction_collector
-        self.prediction: pandas.DataFrame = None  # TODO remove this, use the collector directly
+        self.prediction: Optional[pandas.DataFrame] = None  # TODO remove this, use the collector directly
         self.competition_format = competition_format
 
         self.determinism_check_enabled = determinism_check_enabled
@@ -35,36 +35,40 @@ class Runner(abc.ABC):
         ) = self.initialize()
 
         try:
-            if self.competition_format == api.CompetitionFormat.TIMESERIES:
+            if self.competition_format == CompetitionFormat.TIMESERIES:
                 self.log("starting timeseries loop...")
                 result = self.start_timeseries()
 
-            elif self.competition_format == api.CompetitionFormat.DAG:
+            elif self.competition_format == CompetitionFormat.DAG:
                 self.log("starting dag process...")
                 result = self.start_dag()
 
-            elif self.competition_format == api.CompetitionFormat.STREAM:
+            elif self.competition_format == CompetitionFormat.STREAM:
                 self.log("starting stream loop...")
                 result = self.start_stream()
 
-            elif self.competition_format == api.CompetitionFormat.SPATIAL:
+            elif self.competition_format == CompetitionFormat.SPATIAL:
                 self.log("starting spatial loop...")
                 result = self.start_spatial()
 
-            elif self.competition_format == api.CompetitionFormat.UNSTRUCTURED:
+            elif self.competition_format == CompetitionFormat.UNSTRUCTURED:
                 self.log("starting unstructured loop...")
                 result = self.start_unstructured()
 
             else:
                 raise ValueError(f"unsupported: {self.competition_format}")
 
-            if isinstance(result, pandas.DataFrame):
+            if isinstance(result, pandas.DataFrame):  # pyright: ignore[reportUnnecessaryIsInstance]
                 self.prediction = result
-            elif isinstance(result, PredictionCollector):
-                self.prediction_collector.discard()  # TODO use a factory to avoid useless instanciation
+            elif isinstance(result, PredictionCollector):  # pyright: ignore[reportUnnecessaryIsInstance]
+                if self.prediction_collector is not None:
+                    self.prediction_collector.discard()  # TODO use a factory to avoid useless instanciation
+
                 self.prediction_collector = result
         except:
-            self.prediction_collector.discard()
+            if self.prediction_collector is not None:
+                self.prediction_collector.discard()
+
             raise
 
         if self.determinism_check_enabled:
@@ -100,7 +104,7 @@ class Runner(abc.ABC):
 
             self.prediction_collector.append(prediction)
 
-    @abc.abstractmethod
+    @abstractmethod
     def timeseries_loop(
         self,
         moon: int,
@@ -117,7 +121,7 @@ class Runner(abc.ABC):
             self.deterministic = prediction.equals(prediction2)
             self.log(f"deterministic: {str(self.deterministic).lower()}")
 
-    @abc.abstractmethod
+    @abstractmethod
     def dag_loop(
         self,
         train: bool
@@ -144,16 +148,16 @@ class Runner(abc.ABC):
     def stream_have_model(self):
         return self.have_model
 
-    @abc.abstractmethod
+    @abstractmethod
     def stream_no_model(
         self,
     ):
         ...
 
-    @abc.abstractmethod
+    @abstractmethod
     def stream_loop(
         self,
-        target_column_name: api.TargetColumnNames,
+        target_column_names: TargetColumnNames,
     ) -> pandas.DataFrame:
         ...
 
@@ -179,40 +183,45 @@ class Runner(abc.ABC):
 
             self.prediction_collector.append(prediction)
 
-    @abc.abstractmethod
+    @abstractmethod
     def spatial_train(
         self,
     ) -> None:
         ...
 
-    @abc.abstractmethod
+    @abstractmethod
     def spatial_loop(
         self,
-        target_column_names: api.TargetColumnNames
+        target_column_names: TargetColumnNames,
     ) -> pandas.DataFrame:
         ...
 
-    @abc.abstractmethod
-    def start_unstructured(self):
+    @abstractmethod
+    def start_unstructured(self) -> None:
         ...
 
     def setup(self):
         ...
 
-    @abc.abstractmethod
-    def initialize(self) -> typing.Tuple[
-        typing.List[typing.Union[str, int]],  # keys
+    @abstractmethod
+    def initialize(self) -> Tuple[
+        List[Union[str, int]],  # keys
         bool,  # have_model
     ]:
         ...
 
-    @abc.abstractmethod
+    @abstractmethod
     def finalize(self):
         ...
 
     def teardown(self):
         ...
 
-    @abc.abstractmethod
-    def log(self, message: str, important=False, error=False):
+    @abstractmethod
+    def log(
+        self,
+        message: str,
+        important: bool = False,
+        error: bool = False,
+    ) -> Literal[True]:
         ...

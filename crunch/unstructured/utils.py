@@ -44,7 +44,7 @@ def delta_message(
 
     return message
 
-def group_metrics_by_target(metrics: typing.List[api.Target]):
+def group_metrics_by_target(metrics: typing.List[api.Metric]):
     return [
         (target, list(metrics))
         for target, metrics in itertools.groupby(

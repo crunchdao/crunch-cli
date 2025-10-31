@@ -1,7 +1,8 @@
+from typing import Any, Callable, Dict, Optional, TypeVar
 
-import typing
+from crunch.utils import smart_call
 
-from .. import utils
+_T = TypeVar("_T")
 
 
 class ParticipantVisibleError(Exception):
@@ -9,15 +10,16 @@ class ParticipantVisibleError(Exception):
 
 
 def call_function(
-    function: typing.Callable,
-    kwargs: dict,
-    print: typing.Optional[typing.Callable[[typing.Any], None]] = None,
-):
+    function: Callable[..., _T],
+    kwargs: Dict[str, Any],
+    *,
+    print: Optional[Callable[..., None]] = None,
+) -> _T:
     try:
         if print:
             print(f"\n\ncalling {function}\n")
 
-        return utils.smart_call(
+        return smart_call(
             function,
             kwargs,
         )
