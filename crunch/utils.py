@@ -147,7 +147,7 @@ def read(path: str, kwargs={}) -> typing.Any:
     return joblib.load(path)
 
 
-def write(dataframe: typing.Any, path: str, kwargs={}) -> None:
+def write(dataframe: typing.Any, path: str, kwargs: typing.Dict[str, typing.Any] = {}) -> None:
     if path.endswith(".parquet"):
         return dataframe.to_parquet(path, **kwargs)
 
@@ -188,12 +188,13 @@ class _undefined:
 _smart_call_ignore: typing.Set[str] = set()
 _T = typing.TypeVar("_T")
 
+
 def smart_call(
     function: typing.Callable[..., _T],
     default_values: typing.Dict[str, typing.Any],
-    specific_values: typing.Dict[str, typing.Any]={},
-    log: bool=True,
-    logger: logging.Logger =logging.getLogger(),
+    specific_values: typing.Dict[str, typing.Any] = {},
+    log: bool = True,
+    logger: logging.Logger = logging.getLogger(),
 ) -> _T:
     values = {
         **default_values,
@@ -294,7 +295,7 @@ def _download_head(
         if log and not logged:
             print(f"downloading {path} from {cut_url(url)}")
 
-        if response is not None:
+        if response is not None: # type: ignore
             response.close()
 
         raise
@@ -303,10 +304,10 @@ def _download_head(
 def download(
     url: str,
     path: str,
-    log=True,
-    print=print,
-    progress_bar=True,
-    max_retry=10,
+    log: bool = True,
+    print: typing.Callable[[typing.Any], typing.Any] = print,
+    progress_bar: bool = True,
+    max_retry: int = 10,
     session: typing.Optional[requests.Session] = None
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)

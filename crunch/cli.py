@@ -558,6 +558,7 @@ def local(
 @click.option("--data-directory", envvar="DATA_DIRECTORY", default="{context}/data")
 @click.option("--code-directory", envvar="CODE_DIRECTORY", default="{context}/code")
 @click.option("--model-directory", envvar="MODEL_DIRECTORY", default="model")
+@click.option("--prediction-directory", envvar="PREDICTION_DIRECTORY", default="{context}/prediction")
 @click.option("--main-file", envvar=constants.MAIN_FILE_PATH_ENV_VAR, default=constants.DEFAULT_MAIN_FILE_PATH)
 # ---
 @click.option("--run-id", envvar="RUN_ID", required=True)
@@ -581,6 +582,7 @@ def cloud(
     data_directory: str,
     code_directory: str,
     model_directory: str,
+    prediction_directory: str,
     main_file: str,
     # ---
     run_id: str,
@@ -605,6 +607,7 @@ def cloud(
     os.unsetenv("LOG_SECRET")
 
     code_directory = code_directory.replace("{context}", context_directory)
+    prediction_directory = prediction_directory.replace("{context}", context_directory)
     scoring_directory = scoring_directory.replace("{context}", context_directory)
     data_directory = data_directory.replace("{context}", context_directory)
     venv_directory = venv_directory.replace("{context}", context_directory)
@@ -613,9 +616,6 @@ def cloud(
     requirements_txt_path = os.path.join(code_directory, "requirements.txt")
     requirements_r_txt_path = os.path.join(code_directory, "requirements.r.txt")
     model_directory_path = os.path.join(code_directory, model_directory)
-
-    prediction_file_name = "prediction.parquet"
-    prediction_path = os.path.join(context_directory, prediction_file_name)
 
     trace_file_name = "trace.txt"
     trace_path = os.path.join(context_directory, trace_file_name)
@@ -646,7 +646,7 @@ def cloud(
         requirements_txt_path,
         requirements_r_txt_path,
         model_directory_path,
-        prediction_path,
+        prediction_directory,
         trace_path,
         exit_file_path,
         # ---
@@ -677,6 +677,7 @@ def cloud(
 @click.option("--main-file", required=True)
 @click.option("--code-directory", required=True)
 @click.option("--model-directory", "model_directory_path", required=True)
+@click.option("--prediction-directory", "prediction_directory_path", required=True)
 @click.option("--prediction", "prediction_path", required=True)
 @click.option("--trace", "trace_path", required=True)
 @click.option("--state-file", "state_file", required=True)
@@ -717,6 +718,7 @@ def cloud_executor(
     main_file: str,
     code_directory: str,
     model_directory_path: str,
+    prediction_directory_path: str,
     prediction_path: str,
     trace_path: str,
     state_file: str,
@@ -774,6 +776,7 @@ def cloud_executor(
         main_file,
         code_directory,
         model_directory_path,
+        prediction_directory_path,
         prediction_path,
         trace_path,
         state_file,

@@ -1,8 +1,11 @@
 from logging import Logger
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
-from crunch.unstructured.code_loader import (CodeLoader, ModuleWrapper,
-                                             NoCodeFoundError)
+from crunch.unstructured.code_loader import (
+    CodeLoader,
+    ModuleWrapper,
+    NoCodeFoundError
+)
 from crunch.unstructured.execute import call_function
 
 if TYPE_CHECKING:
@@ -58,6 +61,7 @@ class RunnerModule(ModuleWrapper):
         context: "RunnerContext",
         data_directory_path: str,
         model_directory_path: str,
+        prediction_directory_path: str,
         print: Optional[Callable[[Any], None]] = None,
     ) -> Any:
         return call_function(
@@ -66,6 +70,7 @@ class RunnerModule(ModuleWrapper):
                 "context": context,
                 "data_directory_path": data_directory_path,
                 "model_directory_path": model_directory_path,
+                "prediction_directory_path": prediction_directory_path,
             },
             print=print,
         )
@@ -87,8 +92,9 @@ class RunnerModule(ModuleWrapper):
         module: "UserModule",
         data_directory_path: str,
         model_directory_path: str,
+        prediction_directory_path: str,
         print: Optional[Callable[[Any], None]] = None,
-    ) -> Any:
+    ) -> Dict[str, Callable[..., Any]]:
         return call_function(
             self.get_execute_function(ensure=True),
             {
@@ -96,6 +102,7 @@ class RunnerModule(ModuleWrapper):
                 "module": module,
                 "data_directory_path": data_directory_path,
                 "model_directory_path": model_directory_path,
+                "prediction_directory_path": prediction_directory_path,
             },
             print=print,
         )

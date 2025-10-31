@@ -1,5 +1,4 @@
 import enum
-import functools
 import gc
 import importlib
 import importlib.util
@@ -9,9 +8,13 @@ import sys
 import time
 import traceback
 import typing
+from functools import cached_property
+from types import ModuleType
 
 import pandas
 import requests
+
+from crunch.runner.types import KwargsLike
 
 from .. import api, meta, unstructured, utils
 from ..container import Columns, Features, GeneratorWrapper, StreamMessage
@@ -82,13 +85,13 @@ def write(dataframe: pandas.DataFrame, path: str, index=False) -> None:
 
 @utils.timeit([])
 def ping(urls: typing.List[str]):
-    for url in urls:
-        try:
-            requests.get(url)
+    # for url in urls:
+    #     try:
+    #         requests.get(url)
 
-            print(f"managed to have access to the internet: {url}", file=sys.stderr)
-            exit(1)
-        except requests.exceptions.RequestException:
+    #         print(f"managed to have access to the internet: {url}", file=sys.stderr)
+    #         exit(1)
+    #     except requests.exceptions.RequestException:
             pass
 
 
@@ -107,6 +110,7 @@ class SandboxExecutor:
         main_file: str,
         code_directory: str,
         model_directory_path: str,
+        prediction_directory_path: str,
         prediction_path: str,
         trace_path: str,
         state_file: str,
@@ -125,8 +129,8 @@ class SandboxExecutor:
         fuse_pid: int,
         fuse_signal_number: int,
         # ---
-        runner_dot_py_file_path: str,
-        parameters: dict,
+        runner_dot_py_file_path: typing.Optional[str],
+        parameters: KwargsLike,
     ):
         self.competition_name = competition_name
         self.competition_format = competition_format
@@ -139,6 +143,7 @@ class SandboxExecutor:
         self.main_file = main_file
         self.code_directory = code_directory
         self.model_directory_path = model_directory_path
+        self.prediction_directory_path = prediction_directory_path
         self.prediction_path = prediction_path
         self.trace_path = trace_path
         self.state_file = state_file
@@ -277,7 +282,7 @@ class SandboxExecutor:
                 index=self.write_index
             )
 
-    def load_module(self):
+    def load_module(self) -> ModuleType:
         from ..command.test import load_user_code
 
         main_file_path = os.path.join(self.code_directory, self.main_file)
@@ -462,7 +467,10 @@ class SandboxExecutor:
             return prediction
 
     def process_unstructured(self):
-        loader = unstructured.LocalCodeLoader(self.runner_dot_py_file_path)
+        assert self.runner_dot_py_file_path is not None
+
+        loader = unstructured.LocalCodeLoader(path=self.runner_dot_py_file_path)
+        print(self.runner_dot_py_file_path)
         runner_module = unstructured.RunnerModule.load(loader)
         assert runner_module is not None
 
@@ -470,18 +478,18 @@ class SandboxExecutor:
         executor_context = CloudExecutorRunnerExecutorContext(self)
 
         handlers = runner_module.execute(
-            executor_context,
-            user_module,
-            self.data_directory_path,
-            self.model_directory_path,
+            context=executor_context,
+            module=user_module,
+            data_directory_path=self.data_directory_path,
+            model_directory_path=self.model_directory_path,
+            prediction_directory_path=self.prediction_directory_path,
         )
 
-        command = self.loop_key  # TODO Don't repurpose loop-key and use a dedicated property
+        command = str(self.loop_key)  # TODO Don't repurpose loop-key and use a dedicated property
 
         handler = handlers.get(command)
         if handler is None:
-            self.log(f"command not found: {command}", error=True)
-            return None
+            raise ValueError(f"command `{command}` not found")
 
         return utils.smart_call(
             handler,
@@ -592,6 +600,10 @@ class CloudExecutorUserModule(UserModule):
     def __init__(self, executor: SandboxExecutor):
         self.executor = executor
 
-    @functools.cached_property
+    @property
     def module(self):
+        return self._cached_module
+
+    @cached_property
+    def _cached_module(self):
         return self.executor.load_module()

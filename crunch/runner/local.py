@@ -431,9 +431,10 @@ class LocalRunner(Runner):
         context = LocalRunnerContext(self)
 
         prediction = self.runner_module.run(
-            context,
-            self.data_directory_path,
-            self.model_directory_path,
+            context=context,
+            data_directory_path=self.data_directory_path,
+            model_directory_path=self.model_directory_path,
+            prediction_directory_path=self.prediction_directory_path,
         )
 
         return prediction
