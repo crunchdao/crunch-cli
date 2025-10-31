@@ -4,12 +4,12 @@ import sys
 import types
 import typing
 
-from .. import api, constants, tester, unstructured, utils
+from .. import api, constants, tester, unstructured
 
 
 def load_user_code(
     main_file_path: str,
-    module_name=constants.DEFAULT_USER_CODE_MODULE_NAME,
+    module_name: str = constants.DEFAULT_USER_CODE_MODULE_NAME,
 ) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location(module_name, main_file_path)
     module = importlib.util.module_from_spec(spec)
@@ -38,7 +38,7 @@ def test(
 
     runner_module = None
     if competition.format == api.CompetitionFormat.UNSTRUCTURED:
-        loader = unstructured.deduce_code_loader(competition.name, "runner")
+        loader = unstructured.deduce_code_loader(competition_name=competition.name, file_name="runner")
         runner_module = unstructured.RunnerModule.load(loader)
 
     module = load_user_code(main_file_path)

@@ -6,14 +6,8 @@ import warnings
 
 import pandas
 
-from .. import api, meta
+from .. import api
 from . import reducers, scorers
-
-
-@dataclasses.dataclass
-class ScoredMetric:
-    value: typing.Optional[float]
-    details: typing.List["ScoredMetricDetail"] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -23,19 +17,27 @@ class ScoredMetricDetail:
     reduced: bool
 
 
+def _detail_list_factory() -> typing.List[ScoredMetricDetail]:
+    return []
+
+
+@dataclasses.dataclass
+class ScoredMetric:
+    value: typing.Optional[float]
+    details: typing.List[ScoredMetricDetail] = dataclasses.field(default_factory=_detail_list_factory)
+
+
 def merge_keys(
     column_names: api.ColumnNames,
     target_column_names: api.TargetColumnNames,
     metric: api.Metric,
 ):
-    output = target_column_names.output or column_names.output
+    output: str = target_column_names.output or column_names.output
 
     if metric.scorer_function.is_meta:
-        output = meta.to_column_name(metric, output)
+        raise NotImplementedError("meta metrics are not supported anymore")
 
-        return None, output
-
-    input = target_column_names.input or column_names.input
+    input: str = target_column_names.input or column_names.input
     if input == output:
         input += "_x"
         output += "_y"
@@ -169,29 +171,9 @@ def score(
             column_names,
             metrics,
         )
-
-    elif competition_format == api.CompetitionFormat.DAG:
-        from ._format.dag import merge
-
-        # TODO Add support for meta-metrics
-        merged = merge(
-            y_test,
-            prediction,
-            column_names,
-        )
-
-    elif competition_format == api.CompetitionFormat.STREAM:
-        from ._format.stream import merge
-
-        merged = merge(
-            y_test,
-            prediction,
-            column_names,
-            metrics,
-        )
-
+    
     else:
-        raise ValueError(f"unsupported competition format: {competition_format}")
+        raise NotImplementedError(f"{competition_format.name} format is not supported anymore")
 
     logger.warning(f"merged - merged.len={len(merged)}")
 
@@ -213,15 +195,10 @@ def score(
             logger.warning(f"unknown metric - target_name={target_name} metric_name={metric.name} function={metric.scorer_function.name}")
             continue
 
-        dataframe = merged
-        if competition_format == api.CompetitionFormat.STREAM:
-            dataframe = merged[merged[column_names.id] == target_name] \
-                .set_index(column_names.moon)
-
         all_details = _call_scorer_grouped(
             metric,
             scorer,
-            dataframe,
+            merged,
             column_names,
             target_column_names
         )

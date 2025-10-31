@@ -7,6 +7,8 @@ import click
 import pandas
 import psutil
 
+from crunch.runner.types import KwargsLike
+
 from . import (__version__, api, command, constants, container, unstructured, runner,
                tester, utils)
 
@@ -108,54 +110,9 @@ class _Inline:
 
     def load_streams(
         self,
-        round_number="@current",
-        force=False,
-        **kwargs,
+        **kwargs: KwargsLike,
     ) -> typing.Tuple[Streams, Streams]:
-        if self._competition.format.unstructured:
-            self.logger.error(f"Please follow the competition instructions to load the data.")
-            return None, None
-
-        if self._competition.format != api.CompetitionFormat.STREAM:
-            self.logger.error(f"Please call `.load_data()` instead.")
-            return None, None
-
-        try:
-            (
-                _,  # embargo
-                _,  # number of features
-                _,  # split keys
-                _,  # features
-                column_names,
-                _,  # data_directory_path,
-                data_paths,
-            ) = command.download(
-                round_number=round_number,
-                force=force,
-            )
-
-            x_train_path = data_paths.get(api.KnownData.X_TRAIN)
-            x_test_path = data_paths.get(api.KnownData.X_TEST)
-        except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-            command.download_no_data_available()
-            raise click.Abort()
-
-        x_train = utils.read(x_train_path, kwargs=kwargs)
-        x_test = utils.read(x_test_path, kwargs=kwargs)
-
-        def as_iterators(dataframe: pandas.DataFrame):
-            column_name = typing.cast(str, column_names.side)
-
-            return [
-                container.CallableIterable.from_dataframe(part, column_name, container.StreamMessage)
-                for _, group in dataframe.groupby(column_names.id)
-                for part in utils.split_at_nans(group, column_name)
-            ]
-
-        x_train = as_iterators(x_train)
-        x_test = as_iterators(x_test)
-
-        return x_train, x_test
+        raise NotImplementedError("STREAM competition format is not supported anymore")
 
     def test(
         self,

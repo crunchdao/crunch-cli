@@ -19,7 +19,7 @@ class CompetitionFormat(enum.Enum):
 
     @property
     def unstructured(self):
-        return self in [CompetitionFormat.SPATIAL, CompetitionFormat.UNSTRUCTURED]
+        return self == CompetitionFormat.UNSTRUCTURED
 
 
 class Competition(Model):

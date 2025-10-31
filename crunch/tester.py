@@ -43,13 +43,7 @@ def run(
     monkey_patches.pickle_unpickler_find_class()
     monkey_patches.joblib_parallel_initializer()
 
-    if competition.format == api.CompetitionFormat.STREAM:
-        if no_determinism_check == False:
-            logger.warning("determinism check not available for stream competitions")
-            logger.warning("")
-
-        no_determinism_check = True
-    elif no_determinism_check is None:
+    if no_determinism_check is None:
         no_determinism_check = False
 
     from .runner.local import LocalRunner
