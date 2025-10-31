@@ -2,8 +2,11 @@
 Heavily inspired (copied) from https://github.com/docker/docker-py/blob/main/docker/models/resource.py.
 """
 
-import types
-import typing
+from types import GeneratorType
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Type, TypeVar, Union
+
+if TYPE_CHECKING:
+    from crunch.api.client import Client
 
 
 # TODO: add better support for composite key resources
@@ -14,11 +17,11 @@ class Model:
 
     def __init__(
         self,
-        attrs: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        client: "Client" = None,
-        collection: "Collection" = None
+        attrs: Optional[Dict[str, Any]] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["Collection"] = None
     ):
-        self._attrs: typing.Dict[str, typing.Any] = attrs or {}
+        self._attrs: Dict[str, Any] = attrs or {}
         self._client = client
         self._collection = collection
 
@@ -36,14 +39,14 @@ class Model:
 
         return f"{repr})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return isinstance(other, self.__class__) and self.id == other.id
 
     def __hash__(self):
         return hash(f"{self.__class__.__name__}:{self.id}")
 
     @property
-    def id(self) -> typing.Union[int, str]:
+    def id(self) -> Union[int, str]:
         return self._attrs.get(self.id_attribute)
 
     @property
@@ -85,7 +88,7 @@ class Model:
     @classmethod
     def from_dict_array(
         cls,
-        input: typing.List[dict],
+        input: List[dict],
         *args
     ):
         return [
@@ -94,17 +97,17 @@ class Model:
         ]
 
 
-T = typing.TypeVar('T', Model, Model)
+T = TypeVar('T', Model, Model)
 
 
 class Collection:
 
-    model: typing.Type[T] = None
+    model: Type[T] = None
 
-    def __init__(self, client=None):
+    def __init__(self, client: Optional["Client"] = None):
         self._client = client
 
-    def __iter__(self) -> typing.Iterator[T]:
+    def __iter__(self) -> Iterator[T]:
         return iter(self.list())
 
     def __getitem__(self, key) -> T:
@@ -113,7 +116,7 @@ class Collection:
 
         collection = self.list()
 
-        if isinstance(collection, types.GeneratorType):
+        if isinstance(collection, GeneratorType):
             for _ in range(key):
                 next(collection)
 
@@ -124,7 +127,7 @@ class Collection:
     def __getslice__(self, start, stop, step):
         collection = self.list()
 
-        if isinstance(collection, types.GeneratorType):
+        if isinstance(collection, GeneratorType):
             if start:
                 for _ in range(start):
                     next(collection)
@@ -137,7 +140,7 @@ class Collection:
 
         return collection[start:stop]
 
-    def list(self) -> typing.List[T]:
+    def list(self) -> List[T]:
         raise NotImplementedError
 
     def get(self, key) -> T:
@@ -181,8 +184,8 @@ class Collection:
 
         raise Exception(f"can't create {self.model.__name__} from {attrs}")
 
-    def prepare_models(self, attrs_list, *args) -> typing.List[T]:
-        if isinstance(attrs_list, types.GeneratorType):
+    def prepare_models(self, attrs_list, *args) -> List[T]:
+        if isinstance(attrs_list, GeneratorType):
             return self._prepare_models_with_yield(attrs_list, args)
 
         return [

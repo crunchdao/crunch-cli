@@ -42,3 +42,13 @@ LeaderboardIdentifierType = typing.Union[
         "@mine",
     ]
 ]
+
+UserIdentifierType = typing.Union[
+    int,
+    str,
+]
+
+ProjectIdentifierType = typing.Union[
+    int,
+    str,
+]
