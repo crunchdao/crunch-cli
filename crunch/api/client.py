@@ -7,15 +7,10 @@ import requests
 import tqdm
 import urllib3
 
-
-if typing.TYPE_CHECKING:
-    from ..external import sseclient
-
 from .. import constants, store, utils
 from .auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
 from .domain.check import CheckEndpointMixin
-from .domain.competition import (CompetitionCollection,
-                                 CompetitionEndpointMixin, CompetitionFormat)
+from .domain.competition import CompetitionCollection, CompetitionEndpointMixin, CompetitionFormat
 from .domain.crunch import CrunchEndpointMixin
 from .domain.data_release import DataReleaseEndpointMixin
 from .domain.leaderboard import LeaderboardEndpointMixin
@@ -23,10 +18,8 @@ from .domain.library import LibraryCollection, LibraryEndpointMixin
 from .domain.metric import MetricEndpointMixin
 from .domain.phase import PhaseEndpointMixin
 from .domain.prediction import PredictionEndpointMixin
-from .domain.project import (Project, ProjectEndpointMixin,
-                             ProjectTokenCollection)
-from .domain.quickstarter import (QuickstarterCollection,
-                                  QuickstarterEndpointMixin)
+from .domain.project import Project, ProjectEndpointMixin, ProjectTokenCollection
+from .domain.quickstarter import QuickstarterCollection, QuickstarterEndpointMixin
 from .domain.round import RoundEndpointMixin
 from .domain.run import RunEndpointMixin
 from .domain.runner import RunnerRun, RunnerRunEndpointMixin
@@ -193,17 +186,13 @@ class EndpointClient(
     def _result(
         self,
         response: requests.Response,
-        json=False,
-        binary=False,
-        sse_handler=None,
+        json: bool = False,
+        binary: bool = False,
     ):
         assert not (json and binary)
         self._raise_for_status(response)
 
         content_type = response.headers.get("content-type")
-
-        if sse_handler and content_type == "text/event-stream":
-            return self._result_sse(response, sse_handler, json)
 
         if json:
             if content_type != "application/json":
@@ -218,34 +207,6 @@ class EndpointClient(
             return response.content
 
         return response.text
-
-    def _result_sse(
-        self,
-        response: requests.Response,
-        sse_handler: typing.Callable[["sseclient.Event"], None],
-        as_json=False,
-    ):
-        from ..external import sseclient
-
-        client = sseclient.SSEClient(response)
-        for event in client.events():
-            is_error = event.event.startswith("error:")
-            is_result = event.event == "result"
-
-            if as_json or is_error:
-                try:
-                    event.data = json.loads(event.data)
-                except json.decoder.JSONDecodeError:
-                    pass
-
-            if is_error:
-                converted = convert_error(event.data)
-                raise converted
-
-            if is_result:
-                return event.data
-
-            sse_handler(event)
 
     def _paginated(
         self,
