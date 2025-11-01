@@ -100,7 +100,7 @@ class CloudRunner(Runner):
         exit_file_path: str,
         # ---
         log_secret: str,
-        train_frequency: str,
+        train_frequency: int,
         force_first_train: bool,
         determinism_check_enabled: bool,
         gpu: bool,
@@ -325,9 +325,7 @@ class CloudRunner(Runner):
             loop_key=moon,
         )
 
-        return pandas.read_parquet(
-            self.prediction_parquet_file_path,
-        )
+        return pandas.read_parquet(self.prediction_parquet_file_path)
 
     def start_unstructured(self):
         self.create_trace_file()
