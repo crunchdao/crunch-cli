@@ -4,14 +4,10 @@ import warnings
 from crunch_convert.notebook import ConverterError as ConverterError
 from crunch_convert.notebook import EmbeddedFile as EmbedFile
 from crunch_convert.notebook import ImportedRequirement as ImportedRequirement
-from crunch_convert.notebook import \
-    ImportedRequirementLanguage as ImportedRequirementLanguage
-from crunch_convert.notebook import \
-    InconsistantLibraryVersionError as InconsistantLibraryVersionError
-from crunch_convert.notebook import \
-    NotebookCellParseError as NotebookCellParseError
-from crunch_convert.notebook import \
-    RequirementVersionParseError as RequirementVersionParseError
+from crunch_convert.notebook import ImportedRequirementLanguage as ImportedRequirementLanguage
+from crunch_convert.notebook import InconsistantLibraryVersionError as InconsistantLibraryVersionError
+from crunch_convert.notebook import NotebookCellParseError as NotebookCellParseError
+from crunch_convert.notebook import RequirementVersionParseError as RequirementVersionParseError
 from crunch_convert.notebook import extract_from_cells
 
 

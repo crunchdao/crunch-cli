@@ -1,9 +1,10 @@
 import logging
-import typing
+from typing import Any, Optional
 
+import crunch.monkey_patches as monkey_patches
+from crunch.api import Competition, RoundIdentifierType
 from crunch.runner.types import KwargsLike
-
-from . import api, unstructured, monkey_patches
+from crunch.unstructured import RunnerModule
 
 _logged_installed = False
 
@@ -29,17 +30,17 @@ def install_logger():
 
 
 def run(
-    user_module: typing.Any,
-    runner_module: unstructured.RunnerModule,
+    user_module: Any,
+    runner_module: Optional[RunnerModule],
     model_directory_path: str,
     prediction_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
-    round_number: str,
-    competition: api.Competition,
+    round_number: RoundIdentifierType,
+    competition: Competition,
     has_gpu: bool = False,
     checks: bool = True,
-    no_determinism_check: typing.Optional[bool] = True,
+    no_determinism_check: Optional[bool] = True,
     read_kwargs: KwargsLike = {},
     write_kwargs: KwargsLike = {},
 ):
