@@ -8,19 +8,19 @@ import typing
 import click
 import pandas
 
-from .. import __version__, api, constants, utils
+from .. import api, constants, utils
 
 if typing.TYPE_CHECKING:
     from . import CodeLoader, ModuleFileName
 
 
 def _load_code(context: click.Context, file_name: "ModuleFileName") -> typing.Tuple[api.Competition, "CodeLoader"]:
-    from . import CodeLoader, ModuleFileName
+    from . import CodeLoader
 
     competition, load_code = typing.cast(
         typing.Tuple[
             api.Competition,
-            typing.Callable[[ModuleFileName], CodeLoader],
+            typing.Callable[["ModuleFileName"], CodeLoader],
         ],
         context.obj
     )
@@ -346,9 +346,8 @@ def submission_check(
     root_directory_path: str,
     model_directory_path: str,
 ):
-    from ..command.push import list_code_files, list_model_files
-    from . import (File, ParticipantVisibleError, SubmissionModule,
-                   submission_check)
+    from crunch.command.push import list_code_files, list_model_files
+    from crunch.unstructured import File, ParticipantVisibleError, SubmissionModule
 
     _, loader = _load_code(context, "submission")
 
@@ -357,31 +356,20 @@ def submission_check(
         print(f"no custom submission check found")
         raise click.Abort()
 
-    def from_local(path: str, name: str):
-        _, extension = os.path.splitext(path)
-        can_load = extension in constants.TEXT_FILE_EXTENSIONS
-
-        return File(
-            name,
-            uri=path if can_load else None,
-            size=os.path.getsize(path),
-        )
-
     submission_files = [
-        from_local(path, name)
+        File.from_local(path, name)
         for path, name in list_code_files(root_directory_path, model_directory_path)
     ]
 
     model_files = [
-        from_local(path, name)
+        File.from_local(path, name)
         for path, name in list_model_files(root_directory_path, model_directory_path)
     ]
 
     try:
-        submission_check(
-            SubmissionModule.load(loader),
-            submission_files,
-            model_files,
+        module.check(
+            submission_files=submission_files,
+            model_files=model_files,
         )
 
         print(f"\n\nSubmission is valid!")
