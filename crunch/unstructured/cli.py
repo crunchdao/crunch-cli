@@ -2,14 +2,14 @@ import json
 import os
 import random
 import traceback
-from typing import TYPE_CHECKING, Callable, List, Tuple, cast
+from typing import TYPE_CHECKING, Callable, List, Sequence, Tuple, cast
 
 import click
 import pandas
 
 from crunch.api import ApiException, Competition, PhaseType
 from crunch.constants import DEFAULT_MODEL_DIRECTORY
-from crunch.utils import ascii_table, exit_via, read
+from crunch.utils import exit_via
 
 if TYPE_CHECKING:
     from . import CodeLoader, ModuleFileName
@@ -122,7 +122,7 @@ def leaderboard_rank(
         }
 
         print(f"\nResults:")
-        ascii_table(
+        _ascii_table(
             (
                 "Rank",
                 "Reward Rank",
@@ -201,7 +201,7 @@ def leaderboard_compare(
         }
 
         print(f"\nResults:")
-        ascii_table(
+        _ascii_table(
             (
                 "Target Name",
                 "Left",
@@ -280,29 +280,33 @@ def scoring_check(
 
 @scoring_group.command(name="score")
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
-@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
+@click.option("--prediction-directory", "prediction_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.option("--phase-type", "phase_type_string", type=click.Choice(PHASE_TYPE_NAMES), default=PHASE_TYPE_NAMES[0])
 @click.pass_context
 def scoring_score(
     context: click.Context,
     data_directory_path: str,
-    prediction_file_path: str,
+    prediction_directory_path: str,
     phase_type_string: str,
 ):
-    from . import ParticipantVisibleError, ScoringModule, scoring_score
+    from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
     competition, loader = _load_code(context, "scoring")
+
+    module = ScoringModule.load(loader)
+    if module is None:
+        print(f"no custom scoring score found")
+        raise click.Abort()
 
     phase_type = PhaseType[phase_type_string]
 
     try:
         metrics = competition.metrics.list()
-        results = scoring_score(
-            ScoringModule.load(loader),
-            phase_type,
-            metrics,
-            read(prediction_file_path),
-            data_directory_path,
+        results = module.score(
+            phase_type=phase_type,
+            metrics=metrics,
+            prediction_directory_path=prediction_directory_path,
+            data_directory_path=data_directory_path,
         )
 
         metric_by_id = {
@@ -313,7 +317,7 @@ def scoring_score(
         print(f"\n\nPrediction is scorable!")
 
         print(f"\nResults:")
-        ascii_table(
+        _ascii_table(
             ("Target", "Metric", "Score", "Details"),
             [
                 (
@@ -387,3 +391,29 @@ def submission_check(
         print(f"\n\nSubmission check function failed: {error}")
 
         traceback.print_exc()
+
+
+def _ascii_table(
+    headers: Sequence[str],
+    values: List[Sequence[Sequence[str]]],
+):
+    rows: List[Sequence[str]] = [
+        list(map(str, row))
+        for row in values
+    ]
+
+    rows.insert(0, headers)
+
+    max_length_per_columns = [
+        max((len(row[index]) for row in rows))
+        for index in range(len(rows[0]))
+    ]
+
+    for row in rows:
+        print("  ", end="")
+
+        for column_index, value in enumerate(row):
+            width = max_length_per_columns[column_index] + 3
+            print(value.ljust(width), end="")
+
+        print()
