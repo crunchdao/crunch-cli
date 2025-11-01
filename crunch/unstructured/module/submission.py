@@ -1,7 +1,5 @@
 from typing import Any, Callable, List, Optional
 
-from deprecated import deprecated
-
 from crunch.scoring import ScoredMetricDetail as ScoredMetricDetail
 from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured.execute import call_function
@@ -47,6 +45,3 @@ class SubmissionModule(ModuleWrapper):
             return SubmissionModule(module)
         except NoCodeFoundError:
             return None
-
-
-check = deprecated("use SubmissionModule.check(...) instead")(SubmissionModule.check)

@@ -7,6 +7,7 @@ from typing import Any, Callable, List, Optional, Tuple
 
 import click
 
+from crunch.api.identifiers import RoundIdentifierType
 from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
 
@@ -441,7 +442,7 @@ def test(
 @click.option("--force", is_flag=True, help="Force the download of the data.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
 def download(
-    round_number: str,
+    round_number: RoundIdentifierType,
     force: bool,
     size_variant_raw: Optional[str],
 ):

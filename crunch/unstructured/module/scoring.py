@@ -1,7 +1,5 @@
 from typing import Any, Callable, Dict, List, Optional
 
-from deprecated import deprecated
-
 from crunch.api import Metric, PhaseType
 from crunch.scoring import ScoredMetric
 from crunch.scoring import ScoredMetricDetail as ScoredMetricDetail
@@ -134,7 +132,3 @@ class ScoringModule(ModuleWrapper):
             return ScoringModule(module)
         except NoCodeFoundError:
             return None
-
-
-check = deprecated("use ScoringModule.check(...) instead")(ScoringModule.check)
-score = deprecated("use ScoringModule.score(...) instead")(ScoringModule.score)

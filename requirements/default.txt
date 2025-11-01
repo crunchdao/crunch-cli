@@ -3,7 +3,6 @@ crunch-convert
 crunch-encrypt
 coloredlogs
 dataclasses_json
-Deprecated
 inquirer
 joblib
 libcst

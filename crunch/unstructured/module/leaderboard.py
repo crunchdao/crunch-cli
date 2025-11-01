@@ -4,7 +4,6 @@ from itertools import combinations
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from dataclasses_json import DataClassJsonMixin
-from deprecated import deprecated
 
 from crunch.api import Metric, Target
 from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
@@ -68,15 +67,6 @@ class ComparedSimilarity(DataClassJsonMixin):
 
 class LeaderboardModule(ModuleWrapper):
 
-    @deprecated("use get_compare_function(...) instead")
-    def compare_function(
-        self,
-        ensure: bool = True,
-    ) -> Callable[..., List[ComparedSimilarity]]:
-        return self.get_compare_function(
-            ensure=ensure,
-        )
-
     def get_compare_function(
         self,
         *,
@@ -115,15 +105,6 @@ class LeaderboardModule(ModuleWrapper):
         )
 
         return similarities
-
-    @deprecated("use get_rank_function(...) instead")
-    def rank_function(
-        self,
-        ensure: bool = True,
-    ) -> Callable[..., List[RankedProject]]:
-        return self.get_rank_function(
-            ensure=ensure,
-        )
 
     def get_rank_function(
         self,

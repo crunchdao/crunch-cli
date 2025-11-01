@@ -164,7 +164,6 @@ def score(
     if competition_format == api.CompetitionFormat.TIMESERIES:
         from ._format.timeseries import merge
 
-        # TODO Add support for meta-metrics
         merged = merge(
             y_test,
             prediction,

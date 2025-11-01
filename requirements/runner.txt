@@ -3,7 +3,6 @@ click
 
 
 dataclasses_json
-Deprecated
 
 joblib
 

@@ -36,7 +36,7 @@ class Runner(ABC):
             self.have_model,
         ) = self.initialize()
 
-        # TODO Remove once datacrunch competition is over
+        # TODO Remove this when TIMESERIES competition are removed
         if self.competition_format == CompetitionFormat.TIMESERIES:
             self.log("starting timeseries loop...")
             self.start_timeseries()
