@@ -1,31 +1,32 @@
-import functools
 import json
 import os
 import random
 import traceback
-import typing
+from typing import TYPE_CHECKING, Callable, List, Tuple, cast
 
 import click
 import pandas
 
-from .. import api, constants, utils
+from crunch.api import ApiException, Competition, PhaseType
+from crunch.constants import DEFAULT_MODEL_DIRECTORY
+from crunch.utils import ascii_table, exit_via, read
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from . import CodeLoader, ModuleFileName
 
 
-def _load_code(context: click.Context, file_name: "ModuleFileName") -> typing.Tuple[api.Competition, "CodeLoader"]:
+def _load_code(context: click.Context, file_name: "ModuleFileName") -> Tuple[Competition, "CodeLoader"]:
     from . import CodeLoader
 
-    competition, load_code = typing.cast(
-        typing.Tuple[
-            api.Competition,
-            typing.Callable[["ModuleFileName"], CodeLoader],
+    competition, load_code = cast(
+        Tuple[
+            Competition,
+            Callable[["ModuleFileName"], CodeLoader],
         ],
         context.obj
     )
 
-    loader = load_code(file_name=file_name)
+    loader = load_code(file_name)
     print(f"organizer: loaded {file_name} code from {loader.location}")
 
     return competition, loader
@@ -38,12 +39,13 @@ def organize_test_group(
 ):
     from . import deduce_code_loader
 
-    competition: api.Competition = context.obj
+    competition: Competition = context.obj
 
-    load_code = functools.partial(
-        deduce_code_loader,
-        competition_name=context.obj.name,
-    )
+    def load_code(file_name: "ModuleFileName") -> "CodeLoader":
+        return deduce_code_loader(
+            competition_name=competition.name,
+            file_name=file_name,
+        )
 
     context.obj = (competition, load_code)
 
@@ -120,7 +122,7 @@ def leaderboard_rank(
         }
 
         print(f"\nResults:")
-        utils.ascii_table(
+        ascii_table(
             (
                 "Rank",
                 "Reward Rank",
@@ -143,8 +145,8 @@ def leaderboard_rank(
                 for ranked_project in ranked_projects
             ]
         )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nLeaderboard rank function failed: {error}")
 
@@ -157,7 +159,7 @@ def leaderboard_rank(
 @click.pass_context
 def leaderboard_compare(
     context: click.Context,
-    prediction_file_paths: typing.List[typing.Tuple[int, str]],
+    prediction_file_paths: List[Tuple[int, str]],
     data_directory_path: str,
 ):
     from . import LeaderboardModule
@@ -199,7 +201,7 @@ def leaderboard_compare(
         }
 
         print(f"\nResults:")
-        utils.ascii_table(
+        ascii_table(
             (
                 "Target Name",
                 "Left",
@@ -216,8 +218,8 @@ def leaderboard_compare(
                 for similarity in similarities
             ]
         )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nLeaderboard rank function failed: {error}")
 
@@ -229,43 +231,47 @@ def scoring_group():
     pass
 
 
-LOWER_PHASE_TYPES = list(map(lambda x: x.name, [
-    api.PhaseType.SUBMISSION,
-    api.PhaseType.OUT_OF_SAMPLE,
-]))
+PHASE_TYPE_NAMES = [
+    PhaseType.SUBMISSION.name,
+    PhaseType.OUT_OF_SAMPLE.name,
+]
 
 
 @scoring_group.command(name="check")
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
-@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
-@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
+@click.option("--prediction-directory", "prediction_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
+@click.option("--phase-type", "phase_type_string", type=click.Choice(PHASE_TYPE_NAMES), default=PHASE_TYPE_NAMES[0])
 @click.pass_context
 def scoring_check(
     context: click.Context,
     data_directory_path: str,
-    prediction_file_path: str,
+    prediction_directory_path: str,
     phase_type_string: str,
 ):
-    from . import ParticipantVisibleError, ScoringModule, scoring_check
+    from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
     competition, loader = _load_code(context, "scoring")
 
-    phase_type = api.PhaseType[phase_type_string]
+    module = ScoringModule.load(loader)
+    if module is None:
+        print(f"no custom scoring check found")
+        raise click.Abort()
+
+    phase_type = PhaseType[phase_type_string]
 
     try:
-        scoring_check(
-            ScoringModule.load(loader),
-            phase_type,
-            competition.metrics.list(),
-            utils.read(prediction_file_path),
-            data_directory_path
+        module.check(
+            phase_type=phase_type,
+            metrics=competition.metrics.list(),
+            prediction_directory_path=prediction_directory_path,
+            data_directory_path=data_directory_path,
         )
 
         print(f"\n\nPrediction is valid!")
     except ParticipantVisibleError as error:
         print(f"\n\nPrediction is not valid: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nPrediction check function failed: {error}")
 
@@ -275,7 +281,7 @@ def scoring_check(
 @scoring_group.command(name="score")
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
-@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
+@click.option("--phase-type", "phase_type_string", type=click.Choice(PHASE_TYPE_NAMES), default=PHASE_TYPE_NAMES[0])
 @click.pass_context
 def scoring_score(
     context: click.Context,
@@ -287,7 +293,7 @@ def scoring_score(
 
     competition, loader = _load_code(context, "scoring")
 
-    phase_type = api.PhaseType[phase_type_string]
+    phase_type = PhaseType[phase_type_string]
 
     try:
         metrics = competition.metrics.list()
@@ -295,7 +301,7 @@ def scoring_score(
             ScoringModule.load(loader),
             phase_type,
             metrics,
-            utils.read(prediction_file_path),
+            read(prediction_file_path),
             data_directory_path,
         )
 
@@ -307,7 +313,7 @@ def scoring_score(
         print(f"\n\nPrediction is scorable!")
 
         print(f"\nResults:")
-        utils.ascii_table(
+        ascii_table(
             ("Target", "Metric", "Score", "Details"),
             [
                 (
@@ -324,8 +330,8 @@ def scoring_score(
         )
     except ParticipantVisibleError as error:
         print(f"\n\nPrediction is not scorable: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nPrediction score function failed: {error}")
 
@@ -339,7 +345,7 @@ def submission_group():
 
 @submission_group.command(name="check")
 @click.option("--root-directory", "root_directory_path", type=click.Path(exists=True, file_okay=False), required=True)
-@click.option("--model-directory", "model_directory_path", type=click.Path(file_okay=False), default=constants.DEFAULT_MODEL_DIRECTORY, help="Resources directory relative to root directory.")
+@click.option("--model-directory", "model_directory_path", type=click.Path(file_okay=False), default=DEFAULT_MODEL_DIRECTORY, help="Resources directory relative to root directory.")
 @click.pass_context
 def submission_check(
     context: click.Context,
@@ -375,8 +381,8 @@ def submission_check(
         print(f"\n\nSubmission is valid!")
     except ParticipantVisibleError as error:
         print(f"\n\nSubmission is not valid: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nSubmission check function failed: {error}")
 
