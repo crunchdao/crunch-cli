@@ -1,11 +1,9 @@
 import json
-import os
 import random
 import traceback
-from typing import TYPE_CHECKING, Callable, List, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Callable, Dict, List, Sequence, Tuple, cast
 
 import click
-import pandas
 
 from crunch.api import ApiException, Competition, PhaseType
 from crunch.constants import DEFAULT_MODEL_DIRECTORY
@@ -154,15 +152,15 @@ def leaderboard_rank(
 
 
 @leaderboard_group.command(name="compare")
-@click.option("--prediction-file", "prediction_file_paths", type=(int, click.Path(exists=True, dir_okay=False)), multiple=True)
+@click.option("--prediction-directory", "prediction_directory_paths", type=(int, click.Path(file_okay=False, readable=True)), multiple=True)
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.pass_context
 def leaderboard_compare(
     context: click.Context,
-    prediction_file_paths: List[Tuple[int, str]],
+    prediction_directory_paths: List[Tuple[int, str]],
     data_directory_path: str,
 ):
-    from . import LeaderboardModule
+    from crunch.unstructured import LeaderboardModule
 
     competition, loader = _load_code(context, "leaderboard")
 
@@ -171,21 +169,21 @@ def leaderboard_compare(
         print(f"no custom leaderboard script found")
         raise click.Abort()
 
-    predictions = {}
-    for prediction_id, prediction_file_path in prediction_file_paths:
-        if prediction_id in predictions:
+    prediction_directory_path_by_id: Dict[int, str] = {}
+    for prediction_id, prediction_file_path in prediction_directory_paths:
+        if prediction_id in prediction_directory_path_by_id:
             print(f"prediction id {prediction_id} specified multiple time")
             raise click.Abort()
 
-        predictions[prediction_id] = pandas.read_parquet(prediction_file_path)
+        prediction_directory_path_by_id[prediction_id] = prediction_file_path
 
     try:
         targets = competition.targets.list()
 
         similarities = module.compare(
-            targets,
-            predictions,
-            data_directory_path,
+            targets=targets,
+            prediction_directory_path_by_id=prediction_directory_path_by_id,
+            data_directory_path=data_directory_path,
         )
 
         print(f"\n\nSimilarities have been compared")
@@ -193,11 +191,6 @@ def leaderboard_compare(
         target_per_id = {
             target.id: target
             for target in targets
-        }
-
-        prediction_name_per_id = {
-            id: os.path.splitext(path)[0]
-            for id, path in prediction_file_paths
         }
 
         print(f"\nResults:")
@@ -211,9 +204,9 @@ def leaderboard_compare(
             [
                 (
                     target_per_id[similarity.target_id].name,
-                    prediction_name_per_id[similarity.left_id],
-                    prediction_name_per_id[similarity.right_id],
-                    similarity.value,
+                    str(similarity.left_id),
+                    str(similarity.right_id),
+                    str(similarity.value),
                 )
                 for similarity in similarities
             ]

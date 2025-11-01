@@ -1,7 +1,11 @@
-import typing
+from typing import TYPE_CHECKING, Iterator, List, Optional
 
-from ..resource import Collection, Model
-from .competition import Competition
+from crunch.api.resource import Collection, Model
+
+if TYPE_CHECKING:
+    from crunch.api.client import Client
+    from crunch.api.domain.competition import Competition
+    from crunch.api.types import Attrs
 
 
 class Target(Model):
@@ -10,14 +14,18 @@ class Target(Model):
 
     def __init__(
         self,
-        competition: Competition,
-        attrs=None,
-        client=None,
-        collection=None
+        competition: "Competition",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["TargetCollection"] = None,
     ):
         super().__init__(attrs, client, collection)
 
         self._competition = competition
+
+    @property
+    def id(self) -> int:
+        return self._attrs["id"]
 
     @property
     def competition(self):
@@ -52,19 +60,19 @@ class TargetCollection(Collection):
 
     def __init__(
         self,
-        competition: Competition,
-        client=None
+        competition: "Competition",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.competition = competition
 
-    def __iter__(self) -> typing.Iterator[Target]:
+    def __iter__(self) -> Iterator[Target]:
         return super().__iter__()
 
     def get(
         self,
-        name: str
+        name: str,
     ) -> Target:
         return self.prepare_model(
             self._client.api.get_target(
@@ -75,9 +83,9 @@ class TargetCollection(Collection):
 
     def list(
         self,
-        name: typing.Optional[str] = None,
-        virtual: typing.Optional[bool] = None,
-    ) -> Target:
+        name: Optional[str] = None,
+        virtual: Optional[bool] = None,
+    ) -> List[Target]:
         return self.prepare_models(
             self._client.api.list_targets(
                 self.competition.id,
@@ -86,10 +94,10 @@ class TargetCollection(Collection):
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: "Attrs"):
         return super().prepare_model(
             attrs,
-            self.competition
+            self.competition,
         )
 
 

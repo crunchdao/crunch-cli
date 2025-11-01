@@ -439,18 +439,17 @@ class Tracer:
 
     def loop(
         self,
-        iterator: iter,
-        action: typing.Union[str, callable],
-        value_placeholder="{value}",
+        iterable: typing.Iterable[_T],
+        action: typing.Union[str, typing.Callable[[_T], str]],
+        value_placeholder: str = "{value}",
     ):
         has_value_placeholder = False
-        is_callable = callable(action)
-        if not is_callable:
+        if not callable(action):
             action = str(action)
             has_value_placeholder = value_placeholder in action
 
-        for value in iterator:
-            if is_callable:
+        for value in iterable:
+            if callable(action):
                 action_message = str(action(value))
             else:
                 action_message = action
