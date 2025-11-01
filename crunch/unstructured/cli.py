@@ -55,35 +55,37 @@ def leaderboard_group():
 
 @leaderboard_group.command(name="rank")
 @click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
-@click.option("--rank-pass", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
+@click.option("--rank-pass", "rank_pass_string", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
 @click.option("--shuffle", is_flag=True)
 @click.pass_context
 def leaderboard_rank(
     context: click.Context,
     score_file_path: str,
-    rank_pass: str,
+    rank_pass_string: str,
     shuffle: bool,
 ):
-    from . import LeaderboardModule, RankableProject, RankPass
+    from crunch.unstructured import LeaderboardModule, RankableProject, RankPass
 
     competition, loader = _load_code(context, "leaderboard")
-
-    rank_pass = RankPass[rank_pass]
 
     module = LeaderboardModule.load(loader)
     if module is None:
         print(f"no custom leaderboard script found")
         raise click.Abort()
 
+    rank_pass = RankPass[rank_pass_string]
+
     with open(score_file_path, "r") as fd:
         root = json.load(fd)
         if not isinstance(root, list):
             raise ValueError("root must be a list")
 
-        projects = [
-            RankableProject.from_dict(item)
-            for item in root
-        ]
+        projects: List[RankableProject] = []
+        for index, item in enumerate(root):  # type: ignore
+            if not isinstance(item, dict):
+                raise ValueError(f"root[{index}] must be a dict: {item}")
+
+            projects.append(RankableProject.from_dict(item))  # type: ignore
 
         if shuffle:
             random.shuffle(projects)
@@ -92,9 +94,9 @@ def leaderboard_rank(
         metrics = competition.metrics.list()
 
         ranked_projects = module.rank(
-            metrics,
-            projects,
-            rank_pass,
+            metrics=metrics,
+            projects=projects,
+            rank_pass=rank_pass,
         )
 
         print(f"\n\nLeaderboard is ranked (pass: {rank_pass.name})")
@@ -121,7 +123,7 @@ def leaderboard_rank(
 
         print(f"\nResults:")
         _ascii_table(
-            (
+            headers=(
                 "Rank",
                 "Reward Rank",
                 "Project ID",
@@ -130,18 +132,18 @@ def leaderboard_rank(
                     for id in used_metric_ids
                 ]
             ),
-            [
+            values=[
                 (
-                    ranked_project.rank,
-                    ranked_project.reward_rank,
-                    ranked_project.id,
+                    str(ranked_project.rank),
+                    str(ranked_project.reward_rank),
+                    str(ranked_project.id),
                     *(
-                        score_by_metric_id_by_project_id[ranked_project.id].get(metric_id)
+                        str(score_by_metric_id_by_project_id[ranked_project.id].get(metric_id))
                         for metric_id in used_metric_ids
                     )
                 )
                 for ranked_project in ranked_projects
-            ]
+            ],
         )
     except ApiException as error:
         exit_via(error)
@@ -195,13 +197,13 @@ def leaderboard_compare(
 
         print(f"\nResults:")
         _ascii_table(
-            (
+            headers=(
                 "Target Name",
                 "Left",
                 "Right",
                 "Similarity"
             ),
-            [
+            values=[
                 (
                     target_per_id[similarity.target_id].name,
                     str(similarity.left_id),
@@ -209,7 +211,7 @@ def leaderboard_compare(
                     str(similarity.value),
                 )
                 for similarity in similarities
-            ]
+            ],
         )
     except ApiException as error:
         exit_via(error)
@@ -311,8 +313,13 @@ def scoring_score(
 
         print(f"\nResults:")
         _ascii_table(
-            ("Target", "Metric", "Score", "Details"),
-            [
+            headers=(
+                "Target",
+                "Metric",
+                "Score",
+                "Details",
+            ),
+            values=[
                 (
                     metric_by_id[metric_id].target.name,
                     metric_by_id[metric_id].name,
@@ -387,6 +394,7 @@ def submission_check(
 
 
 def _ascii_table(
+    *,
     headers: Sequence[str],
     values: List[Sequence[Sequence[str]]],
 ):
