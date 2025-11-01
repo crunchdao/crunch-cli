@@ -1,18 +1,19 @@
-import itertools
-import typing
+from itertools import groupby
+from typing import TYPE_CHECKING, Any, Iterable, List, Set
 
-from .. import api
+if TYPE_CHECKING:
+    from crunch.api import Metric
 
 
 def truncate(
-    values: set,
-    max_size=10
-):
+    values: Set[str],
+    max_size: int = 10
+) -> str:
     size = len(values)
 
     is_bigger = size > max_size
     if is_bigger:
-        values = list(values)[:max_size]
+        values = list(values)[:max_size]  # type: ignore
 
     string = ', '.join(map(str, values))
 
@@ -23,9 +24,9 @@ def truncate(
 
 
 def delta_message(
-    expected: typing.Iterable[typing.Any],
-    predicted: typing.Iterable[typing.Any],
-):
+    expected: Iterable[Any],
+    predicted: Iterable[Any],
+) -> str:
     expected = set(expected)
     predicted = set(predicted)
 
@@ -44,10 +45,11 @@ def delta_message(
 
     return message
 
-def group_metrics_by_target(metrics: typing.List[api.Metric]):
+
+def group_metrics_by_target(metrics: List["Metric"]):
     return [
         (target, list(metrics))
-        for target, metrics in itertools.groupby(
+        for target, metrics in groupby(
             sorted(
                 metrics,
                 key=lambda x: x.target.id

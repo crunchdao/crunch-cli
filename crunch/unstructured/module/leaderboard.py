@@ -7,8 +7,7 @@ from dataclasses_json import DataClassJsonMixin
 from deprecated import deprecated
 
 from crunch.api import Metric, Target
-from crunch.unstructured.code_loader import (CodeLoader, ModuleWrapper,
-                                             NoCodeFoundError)
+from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured.execute import call_function
 from crunch.unstructured.utils import group_metrics_by_target
 
@@ -153,7 +152,7 @@ class LeaderboardModule(ModuleWrapper):
         target_and_metrics = group_metrics_by_target(metrics)
 
         ranked_projects = call_function(
-            self.rank_function(ensure=True),
+            self.get_rank_function(ensure=True),
             {
                 "target_and_metrics": target_and_metrics,
                 "projects": projects,

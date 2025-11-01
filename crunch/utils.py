@@ -390,7 +390,7 @@ def download(
         )
 
 
-def exit_via(error: "api.ApiException", **kwargs) -> None:
+def exit_via(error: "api.ApiException", **kwargs: KwargsLike) -> None:
     print("\n---")
     error.print_helper(**kwargs)
     exit(1)
@@ -439,18 +439,17 @@ class Tracer:
 
     def loop(
         self,
-        iterator: iter,
-        action: typing.Union[str, callable],
-        value_placeholder="{value}",
+        iterable: typing.Iterable[_T],
+        action: typing.Union[str, typing.Callable[[_T], str]],
+        value_placeholder: str = "{value}",
     ):
         has_value_placeholder = False
-        is_callable = callable(action)
-        if not is_callable:
+        if not callable(action):
             action = str(action)
             has_value_placeholder = value_placeholder in action
 
-        for value in iterator:
-            if is_callable:
+        for value in iterable:
+            if callable(action):
                 action_message = str(action(value))
             else:
                 action_message = action
@@ -480,32 +479,6 @@ class Tracer:
 
             end = datetime.datetime.now()
             self._printer(f"{start} {self.padding} {action} took {end - start}")
-
-
-def ascii_table(
-    headers: typing.List[str],
-    rows: typing.List[typing.List[str]]
-):
-    rows = [
-        list(map(str, row))
-        for row in rows
-    ]
-
-    rows.insert(0, headers)
-
-    max_length_per_columns = [
-        max((len(row[index]) for row in rows))
-        for index in range(len(rows[0]))
-    ]
-
-    for row in rows:
-        print("  ", end="")
-
-        for column_index, value in enumerate(row):
-            width = max_length_per_columns[column_index] + 3
-            print(value.ljust(width), end="")
-
-        print()
 
 
 class LimitedSizeIO:

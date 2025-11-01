@@ -1,10 +1,12 @@
 import os
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import requests
 from dataclasses_json import LetterCase, Undefined, dataclass_json
+
+from crunch.constants import TEXT_FILE_EXTENSIONS
 
 
 @dataclass_json(
@@ -15,7 +17,7 @@ from dataclasses_json import LetterCase, Undefined, dataclass_json
 class File:
 
     path: str
-    uri: str
+    uri: Optional[str]
     size: int
 
     @property
@@ -46,3 +48,18 @@ class File:
             cls.from_dict(x)  # type: ignore
             for x in input
         ]
+
+    @classmethod
+    def from_local(
+        cls,
+        path: str,
+        name: str,
+    ):
+        _, extension = os.path.splitext(path)
+        can_load = extension in TEXT_FILE_EXTENSIONS
+
+        return File(
+            name,
+            uri=path if can_load else None,
+            size=os.path.getsize(path),
+        )

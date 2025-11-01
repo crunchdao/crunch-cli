@@ -5,8 +5,7 @@ from deprecated import deprecated
 from crunch.api import Metric, PhaseType
 from crunch.scoring import ScoredMetric
 from crunch.scoring import ScoredMetricDetail as ScoredMetricDetail
-from crunch.unstructured.code_loader import (CodeLoader, ModuleWrapper,
-                                             NoCodeFoundError)
+from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured.execute import call_function
 from crunch.unstructured.utils import group_metrics_by_target
 

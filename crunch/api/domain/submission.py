@@ -29,7 +29,7 @@ class Submission(Model):
         project: "Project",
         attrs: Optional["Attrs"] = None,
         client: Optional["Client"] = None,
-        collection: Optional["SubmissionCollection"] = None
+        collection: Optional["SubmissionCollection"] = None,
     ):
         super().__init__(attrs, client, collection)
 
@@ -128,7 +128,7 @@ class SubmissionCollection(Collection):
     def prepare_model(self, attrs: "Attrs"):
         return super().prepare_model(
             attrs,
-            self.project
+            self.project,
         )
 
 
