@@ -5,10 +5,8 @@ from types import ModuleType
 from typing import Any, Dict, List, Optional, Set, overload
 
 from crunch_convert import RequirementLanguage
-from crunch_convert.notebook import extract_from_cells
-from crunch_convert.requirements_txt import (CachedWhitelist,
-                                             CrunchHubWhitelist, Whitelist,
-                                             parse_from_file)
+from crunch_convert.notebook import BadCellHandling, extract_from_cells
+from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist, Whitelist, parse_from_file
 
 from crunch.api import Client
 from crunch.constants import REQUIREMENTS_R_TXT, REQUIREMENTS_TXT
@@ -70,6 +68,7 @@ def extract_from_notebook_modules(
         cells,
         print=None,
         validate=False,
+        bad_cell_handling=BadCellHandling.IGNORE,
     )
 
     packages: Dict[RequirementLanguage, Set[str]] = defaultdict(set)
@@ -181,7 +180,7 @@ def scan(
         _log_forbidden(
             forbidden=forbidden,
             logger=logger,
-            is_alias=True
+            is_alias=True,
         )
 
     else:
