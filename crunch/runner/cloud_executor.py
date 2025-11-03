@@ -375,11 +375,11 @@ def write(
 
 @timeit([])
 def ping(urls: List[str]):
-    # for url in urls:
-    #     try:
-    #         requests.get(url)
+    for url in urls:
+        try:
+            requests.get(url)
 
-    #         print(f"managed to have access to the internet: {url}", file=sys.stderr)
-    #         exit(1)
-    #     except requests.exceptions.RequestException:
-    pass
+            print(f"managed to have access to the internet: {url}", file=sys.stderr)
+            exit(1)
+        except requests.exceptions.RequestException:
+            pass

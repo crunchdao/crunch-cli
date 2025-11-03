@@ -182,7 +182,7 @@ class CloudRunner(Runner):
             if self.runner_module is None:
                 raise RuntimeError("no runner is available for this competition")
 
-        if False and self.log("downloading code..."):
+        if self.log("downloading code..."):
             self.report_current("download code")
 
             _download_files(
@@ -191,7 +191,7 @@ class CloudRunner(Runner):
                 print=self.log, # type: ignore
             )
 
-        if False and os.path.exists(self.requirements_r_txt_path):
+        if os.path.exists(self.requirements_r_txt_path):
             self.report_current("install r requirements")
 
             self.log("installing r...")
@@ -222,7 +222,7 @@ class CloudRunner(Runner):
             if len(user_site_library_paths):
                 self.bash2(["rm", "-r", *user_site_library_paths])
 
-        if False and self.log("installing python requirements..."):
+        if self.log("installing python requirements..."):
             if os.path.exists(self.requirements_txt_path):
                 self.report_current("install python requirements")
 
@@ -250,7 +250,7 @@ class CloudRunner(Runner):
             else:
                 self.log("no requirements.txt found")
 
-        if False and self.log("installing crunch-cli..."):
+        if self.log("installing crunch-cli..."):
             self.report_current("install crunch-cli")
 
             self.pip([
@@ -260,7 +260,7 @@ class CloudRunner(Runner):
                 f"git+https://github.com/crunchdao/crunch-cli@{self.crunch_cli_commit_hash}"
             ])
 
-        if False and self.gpu and self.log("fixing gpu requirements..."):
+        if self.gpu and self.log("fixing gpu requirements..."):
             self.report_current("fix gpu requirements")
 
             self.bash("pip", [
@@ -274,7 +274,7 @@ class CloudRunner(Runner):
                 *CONFLICTING_GPU_PACKAGES
             ], self.venv_env)
 
-        if True and self.log("downloading data..."):
+        if self.log("downloading data..."):
             self.report_current("download data")
 
             self.prepare_data()
@@ -707,7 +707,7 @@ class CloudRunner(Runner):
                     "sandbox",
                     "--verbose",
                     "--chown-directory", self.model_directory_path,
-                    # self.sandbox_restriction_flag,
+                    self.sandbox_restriction_flag,
                     "--",
                     "prefix", "user-code",
                     "--",
