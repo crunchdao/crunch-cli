@@ -1,5 +1,6 @@
 from typing import Any, Callable, List, Optional
 
+from crunch.api import SubmissionType
 from crunch.scoring import ScoredMetricDetail as ScoredMetricDetail
 from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured.execute import call_function
@@ -25,6 +26,7 @@ class SubmissionModule(ModuleWrapper):
     def check(
         self,
         *,
+        submission_type: List[SubmissionType],
         submission_files: List[File],
         model_files: List[File],
         print: Optional[Callable[[Any], None]] = None,
@@ -32,6 +34,7 @@ class SubmissionModule(ModuleWrapper):
         call_function(
             self.get_check_function(ensure=True),
             kwargs={
+                "submission_type": submission_type,
                 "submission_files": submission_files,
                 "model_files": model_files,
             },
