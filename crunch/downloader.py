@@ -8,7 +8,7 @@ import zipfile
 
 import click
 
-from . import api, utils, constants
+from . import api, constants, utils
 
 # TODO Remove me
 LEGACY_NAME_MAPPING = {
@@ -152,8 +152,8 @@ def save_one(
 def save_all(
     data_files: typing.Dict[str, PreparedDataFile],
     force: bool,
-    print=print,
-    progress_bar=True,
+    print: typing.Callable[[str], None] = print,
+    progress_bar: bool = True,
 ):
     for data_file in data_files.values():
         save_one(data_file, force, print, progress_bar)

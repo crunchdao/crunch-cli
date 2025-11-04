@@ -1,31 +1,30 @@
-import functools
 import json
-import os
 import random
 import traceback
-import typing
+from typing import TYPE_CHECKING, Callable, Dict, List, Sequence, Tuple, cast
 
 import click
-import pandas
 
-from .. import __version__, api, constants, utils
+from crunch.api import ApiException, Competition, PhaseType
+from crunch.constants import DEFAULT_MODEL_DIRECTORY
+from crunch.utils import exit_via
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from . import CodeLoader, ModuleFileName
 
 
-def _load_code(context: click.Context, file_name: "ModuleFileName") -> typing.Tuple[api.Competition, "CodeLoader"]:
-    from . import CodeLoader, ModuleFileName
+def _load_code(context: click.Context, file_name: "ModuleFileName") -> Tuple[Competition, "CodeLoader"]:
+    from . import CodeLoader
 
-    competition, load_code = typing.cast(
-        typing.Tuple[
-            api.Competition,
-            typing.Callable[[ModuleFileName], CodeLoader],
+    competition, load_code = cast(
+        Tuple[
+            Competition,
+            Callable[["ModuleFileName"], CodeLoader],
         ],
         context.obj
     )
 
-    loader = load_code(file_name=file_name)
+    loader = load_code(file_name)
     print(f"organizer: loaded {file_name} code from {loader.location}")
 
     return competition, loader
@@ -38,12 +37,13 @@ def organize_test_group(
 ):
     from . import deduce_code_loader
 
-    competition: api.Competition = context.obj
+    competition: Competition = context.obj
 
-    load_code = functools.partial(
-        deduce_code_loader,
-        competition_name=context.obj.name,
-    )
+    def load_code(file_name: "ModuleFileName") -> "CodeLoader":
+        return deduce_code_loader(
+            competition_name=competition.name,
+            file_name=file_name,
+        )
 
     context.obj = (competition, load_code)
 
@@ -55,35 +55,37 @@ def leaderboard_group():
 
 @leaderboard_group.command(name="rank")
 @click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
-@click.option("--rank-pass", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
+@click.option("--rank-pass", "rank_pass_string", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
 @click.option("--shuffle", is_flag=True)
 @click.pass_context
 def leaderboard_rank(
     context: click.Context,
     score_file_path: str,
-    rank_pass: str,
+    rank_pass_string: str,
     shuffle: bool,
 ):
-    from . import LeaderboardModule, RankableProject, RankPass
+    from crunch.unstructured import LeaderboardModule, RankableProject, RankPass
 
     competition, loader = _load_code(context, "leaderboard")
-
-    rank_pass = RankPass[rank_pass]
 
     module = LeaderboardModule.load(loader)
     if module is None:
         print(f"no custom leaderboard script found")
         raise click.Abort()
 
+    rank_pass = RankPass[rank_pass_string]
+
     with open(score_file_path, "r") as fd:
         root = json.load(fd)
         if not isinstance(root, list):
             raise ValueError("root must be a list")
 
-        projects = [
-            RankableProject.from_dict(item)
-            for item in root
-        ]
+        projects: List[RankableProject] = []
+        for index, item in enumerate(root):  # type: ignore
+            if not isinstance(item, dict):
+                raise ValueError(f"root[{index}] must be a dict: {item}")
+
+            projects.append(RankableProject.from_dict(item))  # type: ignore
 
         if shuffle:
             random.shuffle(projects)
@@ -92,9 +94,9 @@ def leaderboard_rank(
         metrics = competition.metrics.list()
 
         ranked_projects = module.rank(
-            metrics,
-            projects,
-            rank_pass,
+            metrics=metrics,
+            projects=projects,
+            rank_pass=rank_pass,
         )
 
         print(f"\n\nLeaderboard is ranked (pass: {rank_pass.name})")
@@ -120,8 +122,8 @@ def leaderboard_rank(
         }
 
         print(f"\nResults:")
-        utils.ascii_table(
-            (
+        _ascii_table(
+            headers=(
                 "Rank",
                 "Reward Rank",
                 "Project ID",
@@ -130,21 +132,21 @@ def leaderboard_rank(
                     for id in used_metric_ids
                 ]
             ),
-            [
+            values=[
                 (
-                    ranked_project.rank,
-                    ranked_project.reward_rank,
-                    ranked_project.id,
+                    str(ranked_project.rank),
+                    str(ranked_project.reward_rank),
+                    str(ranked_project.id),
                     *(
-                        score_by_metric_id_by_project_id[ranked_project.id].get(metric_id)
+                        str(score_by_metric_id_by_project_id[ranked_project.id].get(metric_id))
                         for metric_id in used_metric_ids
                     )
                 )
                 for ranked_project in ranked_projects
-            ]
+            ],
         )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nLeaderboard rank function failed: {error}")
 
@@ -152,15 +154,15 @@ def leaderboard_rank(
 
 
 @leaderboard_group.command(name="compare")
-@click.option("--prediction-file", "prediction_file_paths", type=(int, click.Path(exists=True, dir_okay=False)), multiple=True)
+@click.option("--prediction-directory", "prediction_directory_paths", type=(int, click.Path(file_okay=False, readable=True)), multiple=True)
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.pass_context
 def leaderboard_compare(
     context: click.Context,
-    prediction_file_paths: typing.List[typing.Tuple[int, str]],
+    prediction_directory_paths: List[Tuple[int, str]],
     data_directory_path: str,
 ):
-    from . import LeaderboardModule
+    from crunch.unstructured import LeaderboardModule
 
     competition, loader = _load_code(context, "leaderboard")
 
@@ -169,21 +171,21 @@ def leaderboard_compare(
         print(f"no custom leaderboard script found")
         raise click.Abort()
 
-    predictions = {}
-    for prediction_id, prediction_file_path in prediction_file_paths:
-        if prediction_id in predictions:
+    prediction_directory_path_by_id: Dict[int, str] = {}
+    for prediction_id, prediction_file_path in prediction_directory_paths:
+        if prediction_id in prediction_directory_path_by_id:
             print(f"prediction id {prediction_id} specified multiple time")
             raise click.Abort()
 
-        predictions[prediction_id] = pandas.read_parquet(prediction_file_path)
+        prediction_directory_path_by_id[prediction_id] = prediction_file_path
 
     try:
         targets = competition.targets.list()
 
         similarities = module.compare(
-            targets,
-            predictions,
-            data_directory_path,
+            targets=targets,
+            prediction_directory_path_by_id=prediction_directory_path_by_id,
+            data_directory_path=data_directory_path,
         )
 
         print(f"\n\nSimilarities have been compared")
@@ -193,31 +195,26 @@ def leaderboard_compare(
             for target in targets
         }
 
-        prediction_name_per_id = {
-            id: os.path.splitext(path)[0]
-            for id, path in prediction_file_paths
-        }
-
         print(f"\nResults:")
-        utils.ascii_table(
-            (
+        _ascii_table(
+            headers=(
                 "Target Name",
                 "Left",
                 "Right",
                 "Similarity"
             ),
-            [
+            values=[
                 (
                     target_per_id[similarity.target_id].name,
-                    prediction_name_per_id[similarity.left_id],
-                    prediction_name_per_id[similarity.right_id],
-                    similarity.value,
+                    str(similarity.left_id),
+                    str(similarity.right_id),
+                    str(similarity.value),
                 )
                 for similarity in similarities
-            ]
+            ],
         )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nLeaderboard rank function failed: {error}")
 
@@ -229,43 +226,47 @@ def scoring_group():
     pass
 
 
-LOWER_PHASE_TYPES = list(map(lambda x: x.name, [
-    api.PhaseType.SUBMISSION,
-    api.PhaseType.OUT_OF_SAMPLE,
-]))
+PHASE_TYPE_NAMES = [
+    PhaseType.SUBMISSION.name,
+    PhaseType.OUT_OF_SAMPLE.name,
+]
 
 
 @scoring_group.command(name="check")
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
-@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
-@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
+@click.option("--prediction-directory", "prediction_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
+@click.option("--phase-type", "phase_type_string", type=click.Choice(PHASE_TYPE_NAMES), default=PHASE_TYPE_NAMES[0])
 @click.pass_context
 def scoring_check(
     context: click.Context,
     data_directory_path: str,
-    prediction_file_path: str,
+    prediction_directory_path: str,
     phase_type_string: str,
 ):
-    from . import ParticipantVisibleError, ScoringModule, scoring_check
+    from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
     competition, loader = _load_code(context, "scoring")
 
-    phase_type = api.PhaseType[phase_type_string]
+    module = ScoringModule.load(loader)
+    if module is None:
+        print(f"no custom scoring check found")
+        raise click.Abort()
+
+    phase_type = PhaseType[phase_type_string]
 
     try:
-        scoring_check(
-            ScoringModule.load(loader),
-            phase_type,
-            competition.metrics.list(),
-            utils.read(prediction_file_path),
-            data_directory_path
+        module.check(
+            phase_type=phase_type,
+            metrics=competition.metrics.list(),
+            prediction_directory_path=prediction_directory_path,
+            data_directory_path=data_directory_path,
         )
 
         print(f"\n\nPrediction is valid!")
     except ParticipantVisibleError as error:
         print(f"\n\nPrediction is not valid: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nPrediction check function failed: {error}")
 
@@ -274,29 +275,33 @@ def scoring_check(
 
 @scoring_group.command(name="score")
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
-@click.option("--prediction-file", "prediction_file_path", type=click.Path(dir_okay=False, readable=True), required=True)
-@click.option("--phase-type", "phase_type_string", type=click.Choice(LOWER_PHASE_TYPES), default=LOWER_PHASE_TYPES[0])
+@click.option("--prediction-directory", "prediction_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
+@click.option("--phase-type", "phase_type_string", type=click.Choice(PHASE_TYPE_NAMES), default=PHASE_TYPE_NAMES[0])
 @click.pass_context
 def scoring_score(
     context: click.Context,
     data_directory_path: str,
-    prediction_file_path: str,
+    prediction_directory_path: str,
     phase_type_string: str,
 ):
-    from . import ParticipantVisibleError, ScoringModule, scoring_score
+    from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
     competition, loader = _load_code(context, "scoring")
 
-    phase_type = api.PhaseType[phase_type_string]
+    module = ScoringModule.load(loader)
+    if module is None:
+        print(f"no custom scoring score found")
+        raise click.Abort()
+
+    phase_type = PhaseType[phase_type_string]
 
     try:
         metrics = competition.metrics.list()
-        results = scoring_score(
-            ScoringModule.load(loader),
-            phase_type,
-            metrics,
-            utils.read(prediction_file_path),
-            data_directory_path,
+        results = module.score(
+            phase_type=phase_type,
+            metrics=metrics,
+            prediction_directory_path=prediction_directory_path,
+            data_directory_path=data_directory_path,
         )
 
         metric_by_id = {
@@ -307,9 +312,14 @@ def scoring_score(
         print(f"\n\nPrediction is scorable!")
 
         print(f"\nResults:")
-        utils.ascii_table(
-            ("Target", "Metric", "Score", "Details"),
-            [
+        _ascii_table(
+            headers=(
+                "Target",
+                "Metric",
+                "Score",
+                "Details",
+            ),
+            values=[
                 (
                     metric_by_id[metric_id].target.name,
                     metric_by_id[metric_id].name,
@@ -324,8 +334,8 @@ def scoring_score(
         )
     except ParticipantVisibleError as error:
         print(f"\n\nPrediction is not scorable: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nPrediction score function failed: {error}")
 
@@ -339,16 +349,15 @@ def submission_group():
 
 @submission_group.command(name="check")
 @click.option("--root-directory", "root_directory_path", type=click.Path(exists=True, file_okay=False), required=True)
-@click.option("--model-directory", "model_directory_path", type=click.Path(file_okay=False), default=constants.DEFAULT_MODEL_DIRECTORY, help="Resources directory relative to root directory.")
+@click.option("--model-directory", "model_directory_path", type=click.Path(file_okay=False), default=DEFAULT_MODEL_DIRECTORY, help="Resources directory relative to root directory.")
 @click.pass_context
 def submission_check(
     context: click.Context,
     root_directory_path: str,
     model_directory_path: str,
 ):
-    from ..command.push import list_code_files, list_model_files
-    from . import (File, ParticipantVisibleError, SubmissionModule,
-                   submission_check)
+    from crunch.command.push import list_code_files, list_model_files
+    from crunch.unstructured import File, ParticipantVisibleError, SubmissionModule
 
     _, loader = _load_code(context, "submission")
 
@@ -357,39 +366,55 @@ def submission_check(
         print(f"no custom submission check found")
         raise click.Abort()
 
-    def from_local(path: str, name: str):
-        _, extension = os.path.splitext(path)
-        can_load = extension in constants.TEXT_FILE_EXTENSIONS
-
-        return File(
-            name,
-            uri=path if can_load else None,
-            size=os.path.getsize(path),
-        )
-
     submission_files = [
-        from_local(path, name)
+        File.from_local(path, name)
         for path, name in list_code_files(root_directory_path, model_directory_path)
     ]
 
     model_files = [
-        from_local(path, name)
+        File.from_local(path, name)
         for path, name in list_model_files(root_directory_path, model_directory_path)
     ]
 
     try:
-        submission_check(
-            SubmissionModule.load(loader),
-            submission_files,
-            model_files,
+        module.check(
+            submission_files=submission_files,
+            model_files=model_files,
         )
 
         print(f"\n\nSubmission is valid!")
     except ParticipantVisibleError as error:
         print(f"\n\nSubmission is not valid: {error}")
-    except api.ApiException as error:
-        utils.exit_via(error)
+    except ApiException as error:
+        exit_via(error)
     except BaseException as error:
         print(f"\n\nSubmission check function failed: {error}")
 
         traceback.print_exc()
+
+
+def _ascii_table(
+    *,
+    headers: Sequence[str],
+    values: List[Sequence[Sequence[str]]],
+):
+    rows: List[Sequence[str]] = [
+        list(map(str, row))
+        for row in values
+    ]
+
+    rows.insert(0, headers)
+
+    max_length_per_columns = [
+        max((len(row[index]) for row in rows))
+        for index in range(len(rows[0]))
+    ]
+
+    for row in rows:
+        print("  ", end="")
+
+        for column_index, value in enumerate(row):
+            width = max_length_per_columns[column_index] + 3
+            print(value.ljust(width), end="")
+
+        print()

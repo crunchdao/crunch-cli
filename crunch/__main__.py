@@ -1,3 +1,3 @@
-from . import cli
+from crunch.cli import cli
 
-cli.cli()
+cli()

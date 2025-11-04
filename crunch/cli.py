@@ -3,11 +3,13 @@ import functools
 import json
 import os
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 import click
 
+from crunch.api.identifiers import RoundIdentifierType
 from crunch.dev.cli import group as dev_group
+from crunch.runner.types import KwargsLike
 
 from . import __version__, api, command, constants, store, utils
 from .unstructured.cli import organize_test_group
@@ -409,8 +411,8 @@ def push_prediction(
         utils.exit_via(error)
 
 
-def local_options(f):
-    options = [
+def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
+    options: List[Callable[..., Callable[..., Any]]] = [
         click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
         click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored."),
         click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop."),
@@ -430,7 +432,7 @@ def local_options(f):
 @click.pass_context
 def test(
     context: click.Context,
-    **kwargs
+    **kwargs: KwargsLike,
 ):
     context.forward(local, **kwargs)
 
@@ -440,7 +442,7 @@ def test(
 @click.option("--force", is_flag=True, help="Force the download of the data.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
 def download(
-    round_number: str,
+    round_number: RoundIdentifierType,
     force: bool,
     size_variant_raw: Optional[str],
 ):
@@ -537,6 +539,7 @@ def local(
             command.test(
                 main_file_path,
                 model_directory_path,
+                constants.DOT_PREDICTION_DIRECTORY,
                 not no_force_first_train,
                 train_frequency,
                 round_number,
@@ -558,6 +561,7 @@ def local(
 @click.option("--data-directory", envvar="DATA_DIRECTORY", default="{context}/data")
 @click.option("--code-directory", envvar="CODE_DIRECTORY", default="{context}/code")
 @click.option("--model-directory", envvar="MODEL_DIRECTORY", default="model")
+@click.option("--prediction-directory", envvar="PREDICTION_DIRECTORY", default="{context}/prediction")
 @click.option("--main-file", envvar=constants.MAIN_FILE_PATH_ENV_VAR, default=constants.DEFAULT_MAIN_FILE_PATH)
 # ---
 @click.option("--run-id", envvar="RUN_ID", required=True)
@@ -581,6 +585,7 @@ def cloud(
     data_directory: str,
     code_directory: str,
     model_directory: str,
+    prediction_directory: str,
     main_file: str,
     # ---
     run_id: str,
@@ -605,6 +610,7 @@ def cloud(
     os.unsetenv("LOG_SECRET")
 
     code_directory = code_directory.replace("{context}", context_directory)
+    prediction_directory = prediction_directory.replace("{context}", context_directory)
     scoring_directory = scoring_directory.replace("{context}", context_directory)
     data_directory = data_directory.replace("{context}", context_directory)
     venv_directory = venv_directory.replace("{context}", context_directory)
@@ -613,9 +619,6 @@ def cloud(
     requirements_txt_path = os.path.join(code_directory, "requirements.txt")
     requirements_r_txt_path = os.path.join(code_directory, "requirements.r.txt")
     model_directory_path = os.path.join(code_directory, model_directory)
-
-    prediction_file_name = "prediction.parquet"
-    prediction_path = os.path.join(context_directory, prediction_file_name)
 
     trace_file_name = "trace.txt"
     trace_path = os.path.join(context_directory, trace_file_name)
@@ -646,7 +649,7 @@ def cloud(
         requirements_txt_path,
         requirements_r_txt_path,
         model_directory_path,
-        prediction_path,
+        prediction_directory,
         trace_path,
         exit_file_path,
         # ---
@@ -677,6 +680,7 @@ def cloud(
 @click.option("--main-file", required=True)
 @click.option("--code-directory", required=True)
 @click.option("--model-directory", "model_directory_path", required=True)
+@click.option("--prediction-directory", "prediction_directory_path", required=True)
 @click.option("--prediction", "prediction_path", required=True)
 @click.option("--trace", "trace_path", required=True)
 @click.option("--state-file", "state_file", required=True)
@@ -717,6 +721,7 @@ def cloud_executor(
     main_file: str,
     code_directory: str,
     model_directory_path: str,
+    prediction_directory_path: str,
     prediction_path: str,
     trace_path: str,
     state_file: str,
@@ -774,6 +779,7 @@ def cloud_executor(
         main_file,
         code_directory,
         model_directory_path,
+        prediction_directory_path,
         prediction_path,
         trace_path,
         state_file,

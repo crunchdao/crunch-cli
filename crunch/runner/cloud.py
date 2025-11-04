@@ -10,17 +10,24 @@ import sys
 import time
 import typing
 import urllib.parse
+from typing import Callable, Dict, Generator, List, Optional, Tuple
 
 import pandas
 import requests
 
+import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Upload
+from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, KnownData, RunnerRun, Upload
+from crunch.api.errors import ModelTooBigException, PredictionTooBigException
+from crunch.downloader import prepare_all, save_all
+from crunch.runner.runner import Runner
+from crunch.runner.types import KwargsLike
+from crunch.runner.unstructured import RunnerContext
+from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
+from crunch.utils import download
 
-from .. import api, downloader, store, unstructured, utils
-from .collector import MemoryPredictionCollector, PredictionCollector
-from .runner import Runner
-from .unstructured import RunnerContext
+UploadedFiles = Dict[str, Upload]
+LastModifications = Dict[str, int]
 
 PACKAGES_WITH_PRIORITY = [
     "torch"
@@ -45,7 +52,7 @@ CHMOD_RESET = "go=,u=r"
 SIGCONT is the only allowed signal.
 SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
 """
-FUSE_SIGNAL = signal.SIGCONT
+FUSE_SIGNAL: int = signal.SIGCONT  # type: ignore
 
 
 R_SITE_LIBRARY_PATHS = [
@@ -54,7 +61,7 @@ R_SITE_LIBRARY_PATHS = [
 ]
 
 
-def link(tmp_directory: str, path: str, fake: bool = False):
+def link(tmp_directory: str, path: typing.Optional[str], fake: bool = False):
     if path is None:
         return None
 
@@ -73,9 +80,9 @@ class CloudRunner(Runner):
 
     def __init__(
         self,
-        competition: api.Competition,
-        run: api.RunnerRun,
-        client: api.Client,
+        competition: Competition,
+        run: RunnerRun,
+        client: Client,
         # ---
         context_directory: str,
         scoring_directory: str,
@@ -88,12 +95,12 @@ class CloudRunner(Runner):
         requirements_txt_path: str,
         requirements_r_txt_path: str,
         model_directory_path: str,
-        prediction_path: str,
+        prediction_directory_path: str,
         trace_path: str,
         exit_file_path: str,
         # ---
         log_secret: str,
-        train_frequency: str,
+        train_frequency: int,
         force_first_train: bool,
         determinism_check_enabled: bool,
         gpu: bool,
@@ -103,18 +110,9 @@ class CloudRunner(Runner):
         retry_seconds: int
     ):
         super().__init__(
-            MemoryPredictionCollector(
-                # TODO Very ugly... A plugin-like runner for unstructured competition is needed.
-                write_index=(
-                    competition.name in [
-                        "broad-2",
-                        "broad-3",
-                    ]
-                    or competition.format == api.CompetitionFormat.UNSTRUCTURED
-                )
-            ),
-            competition.format,
-            determinism_check_enabled
+            competition_format=competition.format,
+            prediction_directory_path=prediction_directory_path,
+            determinism_check_enabled=determinism_check_enabled,
         )
 
         self.competition = competition
@@ -133,7 +131,7 @@ class CloudRunner(Runner):
         self.requirements_txt_path = requirements_txt_path
         self.requirements_r_txt_path = requirements_r_txt_path
         self.model_directory_path = model_directory_path
-        self.prediction_path = prediction_path
+        self.prediction_directory_path = prediction_directory_path
         self.trace_path = trace_path
 
         self.exit_file_path = exit_file_path
@@ -150,6 +148,7 @@ class CloudRunner(Runner):
 
         self.sandbox_restriction_flag = "--change-network-namespace" if gpu else "--filter-socket-syscalls"
 
+
     def start(self):
         self.report_current("starting")
 
@@ -158,15 +157,15 @@ class CloudRunner(Runner):
         self.report_current("ending")
 
     def initialize(self):
-        if self.competition_format == api.CompetitionFormat.UNSTRUCTURED and self.log("downloading runner..."):
+        if self.competition_format == CompetitionFormat.UNSTRUCTURED and self.log("downloading runner..."):
             self.report_current("download runner")
 
-            loader = unstructured.deduce_code_loader(
-                self.competition.name,
-                "runner",
+            loader = deduce_code_loader(
+                competition_name=self.competition.name,
+                file_name="runner",
             )
 
-            if isinstance(loader, unstructured.GithubCodeLoader):
+            if isinstance(loader, GithubCodeLoader):
                 source = loader.source
 
                 self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
@@ -175,19 +174,22 @@ class CloudRunner(Runner):
 
                 self.bash2(["chmod", "a+r", self.runner_dot_py_file_path])
 
-                loader = unstructured.LocalCodeLoader(self.runner_dot_py_file_path)
-            elif isinstance(loader, unstructured.LocalCodeLoader):
-                self.runner_dot_py_file_path = loader.path
+                loader = LocalCodeLoader(path=self.runner_dot_py_file_path)
+            elif isinstance(loader, LocalCodeLoader):  # type: ignore
+                self.runner_dot_py_file_path = os.path.realpath(loader.path)
 
-            self.runner_module = unstructured.RunnerModule.load(loader)
+            self.runner_module = RunnerModule.load(loader)
             if self.runner_module is None:
                 raise RuntimeError("no runner is available for this competition")
 
         if self.log("downloading code..."):
             self.report_current("download code")
 
-            file_urls = self.run.code
-            self.download_files(file_urls, self.code_directory)
+            _download_files(
+                file_urls=self.run.code,
+                directory_path=self.code_directory,
+                print=self.log, # type: ignore
+            )
 
         if os.path.exists(self.requirements_r_txt_path):
             self.report_current("install r requirements")
@@ -224,7 +226,7 @@ class CloudRunner(Runner):
             if os.path.exists(self.requirements_txt_path):
                 self.report_current("install python requirements")
 
-                priority_packages = []
+                priority_packages: typing.List[str] = []
                 with open(self.requirements_txt_path) as fd:
                     for line in fd:
                         line = line.strip()
@@ -288,12 +290,18 @@ class CloudRunner(Runner):
             file_urls = self.run.model
             self.have_model = len(file_urls) != 0
 
-            self.pre_model_files_modification: typing.Dict[str, int] = self.download_files(
-                file_urls,
-                self.model_directory_path
+            self.pre_model_files_modification = _download_files(
+                file_urls=file_urls,
+                directory_path=self.model_directory_path,
+                print=self.log,  # type: ignore
             )
 
             self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
+
+        if self.log("prepare prediction directory..."):
+            self.bash2(["mkdir", "-p", self.prediction_directory_path])
+            self.delete_content(self.prediction_directory_path)
+            self.bash2(["chmod", "-R", "o+rw", self.prediction_directory_path])
 
         return (
             self.keys,
@@ -312,68 +320,12 @@ class CloudRunner(Runner):
     ) -> pandas.DataFrame:
         self.report_current("process loop", moon)
 
-        return self.sandbox(
-            train,
-            moon,
-        )
-
-    def start_dag(self):
-        self.report_current("process dag")
-        self.create_trace_file()
-
-        return super().start_dag()
-
-    def dag_loop(
-        self,
-        train: bool
-    ):
-        return self.sandbox(train, -1)
-
-    def start_stream(self):
-        self.create_trace_file()
-
-        return super().start_stream()
-
-    def stream_no_model(
-        self,
-    ):
         self.sandbox(
-            True,
-            -1,
-            return_result=False,
+            train=train,
+            loop_key=moon,
         )
 
-    def stream_loop(
-        self,
-        target_column_names: api.TargetColumnNames,
-    ) -> pandas.DataFrame:
-        return self.sandbox(
-            False,
-            target_column_names.name
-        )
-
-    def start_spatial(self):
-        self.create_trace_file()
-
-        return super().start_spatial()
-
-    def spatial_train(
-        self,
-    ) -> None:
-        self.sandbox(
-            True,
-            -1,
-            return_result=False,
-        )
-
-    def spatial_loop(
-        self,
-        target_column_names: api.TargetColumnNames
-    ) -> pandas.DataFrame:
-        return self.sandbox(
-            False,
-            target_column_names.name
-        )
+        return pandas.read_parquet(self.prediction_parquet_file_path)
 
     def start_unstructured(self):
         self.create_trace_file()
@@ -384,28 +336,21 @@ class CloudRunner(Runner):
         context = CloudRunnerContext(self)
 
         return self.runner_module.run(
-            context,
-            self.data_directory,
-            self.model_directory_path,
+            context=context,
+            data_directory_path=self.data_directory,
+            model_directory_path=self.model_directory_path,
+            prediction_directory_path=self.prediction_directory_path,
         )
 
     def finalize(self):
         self.report_current("upload result")
         self.log("uploading result...")
 
-        if self.prediction is not None:
-            self.prediction.to_parquet(
-                self.prediction_path,
-                index=self.prediction_collector.is_write_index
-            )
-        else:
-            self.prediction_collector.persist(self.prediction_path)
-
         self.upload_results()
 
     def upload_results(self):
-        prediction_uploads: typing.Dict[str, Upload] = {}
-        model_uploads: typing.Dict[str, Upload] = {}
+        prediction_uploads: UploadedFiles = {}
+        model_uploads: UploadedFiles = {}
 
         # TODO Use decorator instead
         try:
@@ -437,7 +382,7 @@ class CloudRunner(Runner):
 
                     self.log("result submitted")
                     break
-                except (api.errors.ModelTooBigException, api.errors.PredictionTooBigException) as exception:
+                except (ModelTooBigException, PredictionTooBigException) as exception:
                     self.log(f"failed to submit result: {exception}: {exception.size}/{exception.maximum_size} bytes", error=True)
                     exit(1)
                 except Exception as exception:
@@ -449,61 +394,54 @@ class CloudRunner(Runner):
                 self.log("max retry reached", error=True)
                 exit(1)
         finally:
-            self._delete_uploads(prediction_uploads.values())
-            self._delete_uploads(model_uploads.values())
+            self._delete_uploads(prediction_uploads)
+            self._delete_uploads(model_uploads)
 
-    def _upload_prediction_files(self, uploads: typing.Dict[str, Upload]):
-        prediction_file_name = os.path.basename(self.prediction_path)
-        if prediction_file_name in uploads:
-            self.log(f"reusing upload for prediction")
-            return
+    def _upload_prediction_files(
+        self,
+        uploads: UploadedFiles,
+    ):
+        """
+        Uploads the prediction files.
+        """
 
-        self.log(f"uploading prediction")
-        uploads[prediction_file_name] = self.client.uploads.send_from_file(
-            path=self.prediction_path,
-            name=prediction_file_name,
-            size=os.path.getsize(self.prediction_path),
-            max_retry=3
+        _upload_files(
+            category="prediction",
+            directory_path=self.prediction_directory_path,
+            uploads=uploads,
+            client=self.client,
+            log=self.log,  # type: ignore
         )
 
-    def _upload_model_files(self, uploads: typing.Dict[str, Upload]):
-        model_files: typing.List[typing.Tuple[str, str]] = []
-        model_files_size = 0
-        post_model_files_modification: typing.Dict[str, int] = {}
+    def _upload_model_files(
+        self,
+        uploads: UploadedFiles,
+    ):
+        """
+        Uploads the models files.
 
-        for file_path, file_name in self.find_model_files():
-            stat = os.stat(file_path)
-            file_size = stat.st_size
+        Returns:
+            True if the model files have changed, False otherwise.
+        """
 
-            self.log(f"found model file: {file_name} ({file_size})")
+        return _upload_files(
+            category="model",
+            directory_path=self.model_directory_path,
+            uploads=uploads,
+            client=self.client,
+            log=self.log,  # type: ignore
+            pre_modifications=self.pre_model_files_modification,
+        )
 
-            model_files.append((file_path, file_name))
-            post_model_files_modification[file_name] = stat.st_mtime_ns
-            model_files_size += file_size
+    def _delete_uploads(
+        self,
+        uploads: UploadedFiles,
+    ):
+        """
+        Delete the uploads.
+        """
 
-        has_model_changed = self.pre_model_files_modification != post_model_files_modification
-        self.log(f"model file_count={len(model_files)} files_size={model_files_size} has_changed={has_model_changed}")
-
-        if not has_model_changed:
-            return False
-
-        for file_path, file_name in model_files:
-            if file_name in uploads:
-                self.log(f"reusing upload for {file_name}")
-                continue
-
-            self.log(f"uploading {file_name}")
-            uploads[file_name] = self.client.uploads.send_from_file(
-                path=file_path,
-                name=file_name,
-                size=os.path.getsize(file_path),
-                max_retry=3
-            )
-
-        return True
-
-    def _delete_uploads(self, uploads: typing.Iterable[api.Upload]):
-        for upload in uploads:
+        for upload in uploads.values():
             try:
                 upload.delete()
             except Exception as exception:
@@ -512,7 +450,13 @@ class CloudRunner(Runner):
     def teardown(self):
         self.report_current(f"shutting down")
 
-    def log(self, message: str, important=False, error=False):
+    def log(
+        self,
+        message: str,
+        *,
+        important: bool = False,
+        error: bool = False,
+    ):
         file = sys.stderr if error else sys.stdout
         prefix = f"<runner/{file.name[4:-1]}>"
 
@@ -524,11 +468,11 @@ class CloudRunner(Runner):
         return True
 
     def create_trace_file(self):
-        self.bash2(["touch", self.prediction_path, self.trace_path])
-        self.bash2(["chmod", "o+w", self.prediction_path, self.trace_path])
+        self.bash2(["touch", self.trace_path])
+        self.bash2(["chmod", "o+w", self.trace_path])
 
     def initialize_state(self):
-        state = {
+        state: KwargsLike = {
             "splits": [
                 {
                     "key": split.key,
@@ -537,16 +481,16 @@ class CloudRunner(Runner):
                 for split in self.splits
             ],
             "metrics": [
-                metric._attrs
+                metric._attrs  # type: ignore
                 for metric in self.competition.metrics
             ],
             "checks": [
-                check._attrs
+                check._attrs  # type: ignore
                 for check in self.competition.checks
             ],
             "default_feature_group": self.default_feature_group,
             "features": [
-                feature.to_dict()
+                feature.to_dict()  # type: ignore
                 for feature in self.features
             ]
         }
@@ -620,31 +564,38 @@ class CloudRunner(Runner):
             self.venv_env
         )
 
-    @typing.overload
-    def sandbox(
+    def recursive_bash(
         self,
-        return_result: typing.Literal[True] = True,
-        *args,
-        **kwargs,
-    ) -> pandas.DataFrame:
-        ...
+        directory_path: str,
+        commands: List[str],
+    ):
+        self.bash2([
+            "find",
+            directory_path,
+            "-mindepth", "1",
+            "-maxdepth", "1",
+            "-exec", *commands, ";"
+        ])
 
-    @typing.overload
-    def sandbox(
+    def delete_content(
         self,
-        return_result: typing.Literal[False],
-        *args,
-        **kwargs,
-    ) -> None:
-        ...
+        directory_path: str,
+    ):
+        """
+        Deletes all content in the given directory.
+        """
+
+        self.recursive_bash(
+            directory_path,
+            ["rm", "-rf", "{}"]
+        )
 
     def sandbox(
         self,
         train: bool,
         loop_key: typing.Union[int, str],
-        return_result=True,
-        parameters: dict = None,
-    ):
+        parameters: KwargsLike = {},
+    ) -> None:
         is_regular = not self.competition_format.unstructured
 
         try:
@@ -656,7 +607,7 @@ class CloudRunner(Runner):
 
                 assert self.x_path is not None
 
-                path_options = {
+                path_options: KwargsLike = {
                     "x": self.x_path,
                     "y": self.y_path if train else None,
                     "y-raw": self.y_raw_path,
@@ -670,7 +621,7 @@ class CloudRunner(Runner):
 
                 self._install_permission_fuse()
 
-            options = {
+            options: KwargsLike = {
                 "competition-name": self.competition.name,
                 "competition-format": self.competition.format.name,
                 "split-key-type": self.competition.split_key_type.name,
@@ -681,7 +632,8 @@ class CloudRunner(Runner):
                 "main-file": self.main_file,
                 "code-directory": self.code_directory,
                 "model-directory": self.model_directory_path,
-                "prediction": self.prediction_path,
+                "prediction-directory": self.prediction_directory_path,
+                "prediction": self.prediction_parquet_file_path,
                 "trace": self.trace_path,
                 "state-file": self.state_file,
                 "ping-url": [
@@ -714,7 +666,7 @@ class CloudRunner(Runner):
                     for target_column_names in self.column_names.targets
                 ],
                 # ---
-                "write-index": self.prediction_collector.write_index,
+                "write-index": False,
                 # ---
                 "fuse-pid": os.getpid(),
                 "fuse-signal-number": FUSE_SIGNAL.value,
@@ -722,7 +674,7 @@ class CloudRunner(Runner):
                 "exit-content": self.exit_content,
                 # ---
                 "runner-py-file": self.runner_dot_py_file_path,
-                "parameters": json.dumps(parameters) if parameters is not None else None,
+                "parameters": json.dumps(parameters),
             }
 
             # TODO move to a dedicated function
@@ -774,9 +726,6 @@ class CloudRunner(Runner):
             self.report_trace(loop_key)
             raise
 
-        if return_result:
-            return utils.read(self.prediction_path)
-
     def _prepare_exit(self):
         if not os.path.exists(self.exit_file_path):
             self.bash2(["touch", self.exit_file_path])
@@ -790,7 +739,8 @@ class CloudRunner(Runner):
         self.exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
     def _validate_exit(self):
-        self.exit_content, expected_content = None, self.exit_content
+        expected_content = typing.cast(str, self.exit_content)
+        self.exit_content = None
 
         with open(self.exit_file_path) as fd:
             got_content = fd.read()
@@ -802,18 +752,15 @@ class CloudRunner(Runner):
     def _install_permission_fuse(
         self,
     ):
-        def call_chmod(mode):
-            self.bash2([
-                "find",
+        def call_chmod(mode: str):
+            self.recursive_bash(
                 self.data_directory,
-                "-mindepth", "1",
-                "-maxdepth", "1",
-                "-exec", "chmod", mode, "-R", "{}", ";"
-            ])
+                ["chmod", mode, "-R", "{}"],
+            )
 
         call_chmod("o+r")
 
-        def on_signal(signum, stack):
+        def on_signal(signum: int, stack: typing.Any):
             signal.signal(FUSE_SIGNAL, signal.SIG_DFL)
 
             call_chmod(CHMOD_RESET)
@@ -847,67 +794,39 @@ class CloudRunner(Runner):
         self.keys = sorted([
             split.key
             for split in self.splits
-            if split.group == api.DataReleaseSplitGroup.TEST
+            if split.group == DataReleaseSplitGroup.TEST
         ])
 
-        file_paths = downloader.save_all(
-            downloader.prepare_all(
+        file_paths = save_all(
+            prepare_all(
                 self.data_directory,
                 data_files,
             ),
             False,
-            self.log,
+            print=self.log, # type: ignore
             progress_bar=False,
         )
 
-        self.x_path = file_paths.get(api.KnownData.X)
-        self.y_path = file_paths.get(api.KnownData.Y)
-        self.y_raw_path = file_paths.get(api.KnownData.Y_RAW)
-
-    def download(
-        self,
-        url: str,
-        path: str
-    ):
-        return utils.download(
-            url,
-            path,
-            print=self.log,
-            progress_bar=False,
-        )
-
-    def download_files(
-        self,
-        file_urls: typing.Dict[str, str],
-        directory_path: str
-    ) -> typing.Dict[str, int]:
-        files_modification: typing.Dict[str, int] = {}
-
-        for relative_path, url in file_urls.items():
-            path = os.path.join(directory_path, relative_path)
-            self.download(url, path)
-
-            stat = os.stat(path)
-            files_modification[relative_path] = stat.st_mtime_ns
-
-        return files_modification
+        self.x_path = file_paths.get(KnownData.X)
+        self.y_path = file_paths.get(KnownData.Y)
+        self.y_raw_path = file_paths.get(KnownData.Y_RAW)
 
     def report_current(
         self,
         work: str,
-        moon: int = None
+        moon: typing.Optional[int] = None,
     ):
         try:
             self.run.report_current(work, moon)
         except BaseException as ignored:
             self.log(
                 f"ignored exception when reporting current: {type(ignored).__name__}({ignored})",
-                error=True
+                error=True,
             )
 
     def report_trace(
         self,
-        moon: int
+        moon: typing.Optional[int] = None,
     ):
         try:
             content = "<no trace>"
@@ -923,16 +842,103 @@ class CloudRunner(Runner):
                 error=True
             )
 
-    def find_model_files(self):
-        model_root_length = len(self.model_directory_path) + 1
-        for root, _, filenames in os.walk(self.model_directory_path):
-            relative = root[model_root_length:]
 
-            for filename in filenames:
-                file_path = os.path.join(root, filename)
-                file_name = os.path.join(relative, filename)
+def _download_files(
+    *,
+    file_urls: Dict[str, str],
+    directory_path: str,
+    print: Callable[[str], None],
+) -> LastModifications:
+    pre_modifications: LastModifications = {}
 
-                yield file_path, file_name
+    for relative_path, url in file_urls.items():
+        path = os.path.join(directory_path, relative_path)
+        download(
+            url,
+            path,
+            print=print,
+            progress_bar=False,
+        )
+
+        stat = os.stat(path)
+        pre_modifications[relative_path] = stat.st_mtime_ns
+
+    return pre_modifications
+
+
+def _find_files(
+    directory_path: str,
+) -> Generator[Tuple[str, str], None, None]:
+    """
+    Recursively finds all files in the given directory and yields their absolute paths and relative names.
+    """
+
+    root_length = len(directory_path) + 1
+    for root, _, filenames in os.walk(directory_path):
+        relative = root[root_length:]
+
+        for filename in filenames:
+            file_path = os.path.join(root, filename)
+            file_name = os.path.join(relative, filename)
+
+            yield file_path, file_name
+
+
+def _upload_files(
+    *,
+    category: str,
+    directory_path: str,
+    uploads: UploadedFiles,
+    client: Client,
+    log: Callable[[str], None],
+    pre_modifications: Optional[LastModifications] = None,
+) -> bool:
+    """
+    Uploads files from the given directory.
+    If a files is already uploaded, it will be reused.
+
+    Returns:
+        True if the files have changed, False otherwise.
+        Always True if `pre_modifications` is None.
+    """
+
+    files: List[Tuple[str, str]] = []
+    total_size = 0
+    post_modifications: LastModifications = {}
+
+    for file_path, file_name in _find_files(directory_path):
+        stat = os.stat(file_path)
+        file_size = stat.st_size
+
+        log(f"{category}: found file name=`{file_name}` size={file_size}")
+
+        files.append((file_path, file_name))
+        post_modifications[file_name] = stat.st_mtime_ns
+        total_size += file_size
+
+    if pre_modifications is not None:
+        has_changed = pre_modifications != post_modifications
+        log(f"{category}: done walking files.len={len(files)} total_size={total_size} has_changed={has_changed}")
+
+        if not has_changed:
+            return False
+    else:
+        log(f"{category}: done walking files.len={len(files)} total_size={total_size}")
+
+    for file_path, file_name in files:
+        if file_name in uploads:
+            log(f"{category}: reusing upload name=`{file_name}`")
+            continue
+
+        log(f"{category}: uploading name=`{file_name}`")
+        uploads[file_name] = client.uploads.send_from_file(
+            path=file_path,
+            name=file_name,
+            size=os.path.getsize(file_path),
+            max_retry=3
+        )
+
+    return True
 
 
 class CloudRunnerContext(RunnerContext):
@@ -958,27 +964,26 @@ class CloudRunnerContext(RunnerContext):
     def log(
         self,
         message: str,
-        important=False,
-        error=False
-    ):
-        self.runner.log(message, important=important, error=error)
+        *,
+        important: bool = False,
+        error: bool = False,
+    ) -> typing.Literal[True]:
+        return self.runner.log(
+            message,
+            important=important,
+            error=error,
+        )
 
     def execute(
         self,
-        command,
-        parameters=None,
-        return_prediction=False
-    ):
+        *,
+        command: str,
+        parameters: Optional[KwargsLike] = None,
+    ) -> None:
         self.log(f"executing - command={command}")
 
-        result = self.runner.sandbox(
+        self.runner.sandbox(
             self.runner.force_first_train,
             command,
-            return_result=return_prediction != False,
             parameters=parameters or {},
         )
-
-        if isinstance(return_prediction, PredictionCollector):
-            return_prediction.append(result)
-        elif return_prediction == True:
-            return result

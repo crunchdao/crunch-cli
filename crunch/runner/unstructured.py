@@ -1,63 +1,69 @@
-import abc
-import types
-import typing
+from abc import ABC, abstractmethod
+from types import ModuleType
+from typing import Any, Callable, Literal, Optional
 
-from . import collector
-
-if typing.TYPE_CHECKING:
-    import pandas
+from crunch.runner.types import KwargsLike
 
 
-class RunnerContext(abc.ABC):
+class RunnerContext(ABC):
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def force_first_train(self) -> bool:
-        ...
+        pass  # pragma: no cover
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def is_local(self) -> bool:
-        ...
+        pass  # pragma: no cover
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def is_determinism_check_enabled(self) -> bool:
-        ...
+        pass  # pragma: no cover
 
-    @abc.abstractmethod
+    @abstractmethod
     def report_determinism(self, deterministic: bool) -> None:
-        ...
+        pass  # pragma: no cover
 
-    @abc.abstractmethod
-    def log(self, message: str, important=False, error=False) -> True:
-        ...
+    @abstractmethod
+    def log(
+        self,
+        message: str,
+        *,
+        important: bool = False,
+        error: bool = False,
+    ) -> Literal[True]:
+        pass  # pragma: no cover
 
-    @abc.abstractmethod
+    @abstractmethod
     def execute(
         self,
+        *,
         command: str,
-        parameters: dict = None,
-        return_prediction: typing.Union[bool, collector.PredictionCollector] = False
-    ) -> "pandas.DataFrame":
-        ...
+        parameters: Optional[KwargsLike] = None,
+    ) -> None:
+        pass  # pragma: no cover
 
 
-class RunnerExecutorContext(abc.ABC):
+class RunnerExecutorContext(ABC):
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def is_local(self) -> bool:
-        ...
+        pass  # pragma: no cover
 
-    @abc.abstractmethod
+    @abstractmethod
     def trip_data_fuse(self) -> None:
-        ...
+        pass  # pragma: no cover
 
 
-class UserModule(abc.ABC):
+class UserModule(ABC):
 
-    def get_function(self, name: str) -> typing.Callable:
+    def get_function(
+        self,
+        name: str,
+    ) -> Callable[..., Any]:
         function = getattr(self.module, name, None)
 
         if not callable(function):
@@ -66,6 +72,6 @@ class UserModule(abc.ABC):
         return function
 
     @property
-    @abc.abstractmethod
-    def module(self) -> types.ModuleType:
-        ...
+    @abstractmethod
+    def module(self) -> ModuleType:
+        pass  # pragma: no cover

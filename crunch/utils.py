@@ -21,6 +21,8 @@ import pandas
 import requests
 import tqdm
 
+from crunch.runner.types import ArgsLike, KwargsLike
+
 from . import api, constants
 
 
@@ -134,7 +136,7 @@ def read_token():
     return _read_crunchdao_file(constants.TOKEN_FILE)
 
 
-def read(path: str, kwargs={}) -> typing.Any:
+def read(path: str, kwargs: KwargsLike = {}) -> typing.Any:
     if path.endswith(".parquet"):
         return pandas.read_parquet(path, **kwargs)
 
@@ -147,7 +149,7 @@ def read(path: str, kwargs={}) -> typing.Any:
     return joblib.load(path)
 
 
-def write(dataframe: typing.Any, path: str, kwargs={}) -> None:
+def write(dataframe: typing.Any, path: str, kwargs: typing.Dict[str, typing.Any] = {}) -> None:
     if path.endswith(".parquet"):
         return dataframe.to_parquet(path, **kwargs)
 
@@ -185,16 +187,17 @@ class _undefined:
     pass
 
 
-_smart_call_ignore = set()
+_smart_call_ignore: typing.Set[str] = set()
+_T = typing.TypeVar("_T")
 
 
 def smart_call(
-    function: callable,
-    default_values: dict,
-    specific_values={},
-    log=True,
-    logger=logging.getLogger(),
-):
+    function: typing.Callable[..., _T],
+    default_values: typing.Dict[str, typing.Any],
+    specific_values: typing.Dict[str, typing.Any] = {},
+    log: bool = True,
+    logger: logging.Logger = logging.getLogger(),
+) -> _T:
     values = {
         **default_values,
         **specific_values
@@ -294,7 +297,7 @@ def _download_head(
         if log and not logged:
             print(f"downloading {path} from {cut_url(url)}")
 
-        if response is not None:
+        if response is not None:  # type: ignore
             response.close()
 
         raise
@@ -303,10 +306,10 @@ def _download_head(
 def download(
     url: str,
     path: str,
-    log=True,
-    print=print,
-    progress_bar=True,
-    max_retry=10,
+    log: bool = True,
+    print: typing.Callable[[typing.Any], typing.Any] = print,
+    progress_bar: bool = True,
+    max_retry: int = 10,
     session: typing.Optional[requests.Session] = None
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -387,16 +390,16 @@ def download(
         )
 
 
-def exit_via(error: "api.ApiException", **kwargs) -> None:
+def exit_via(error: "api.ApiException", **kwargs: KwargsLike) -> None:
     print("\n---")
     error.print_helper(**kwargs)
     exit(1)
 
 
-def timeit(params: list):
-    def decorator(func):
+def timeit(params: typing.Optional[typing.List[str]]):
+    def decorator(func: typing.Callable[..., _T]) -> typing.Callable[..., _T]:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: ArgsLike, **kwargs: KwargsLike):
             kwargs.update(zip(
                 func.__code__.co_varnames[:func.__code__.co_argcount],
                 args
@@ -424,30 +427,6 @@ def timeit(params: list):
     return decorator
 
 
-timeit_noarg = timeit(None)
-
-
-def split_at_nans(
-    dataframe: pandas.DataFrame,
-    column_name: str,
-    keep_empty=False,
-):
-    dataframe = dataframe.reset_index(drop=True)
-
-    indices = dataframe.index[dataframe[column_name].isna()].tolist()
-    indices = [-1] + indices + [len(dataframe)]
-
-    parts = []
-    for i in range(len(indices) - 1):
-        start = indices[i] + 1
-        end = indices[i + 1]
-
-        if start != end or keep_empty:
-            parts.append(dataframe.iloc[start:end])
-
-    return parts
-
-
 class Tracer:
 
     def __init__(self, printer=print):
@@ -460,18 +439,17 @@ class Tracer:
 
     def loop(
         self,
-        iterator: iter,
-        action: typing.Union[str, callable],
-        value_placeholder="{value}",
+        iterable: typing.Iterable[_T],
+        action: typing.Union[str, typing.Callable[[_T], str]],
+        value_placeholder: str = "{value}",
     ):
         has_value_placeholder = False
-        is_callable = callable(action)
-        if not is_callable:
+        if not callable(action):
             action = str(action)
             has_value_placeholder = value_placeholder in action
 
-        for value in iterator:
-            if is_callable:
+        for value in iterable:
+            if callable(action):
                 action_message = str(action(value))
             else:
                 action_message = action
@@ -501,32 +479,6 @@ class Tracer:
 
             end = datetime.datetime.now()
             self._printer(f"{start} {self.padding} {action} took {end - start}")
-
-
-def ascii_table(
-    headers: typing.List[str],
-    rows: typing.List[typing.List[str]]
-):
-    rows = [
-        list(map(str, row))
-        for row in rows
-    ]
-
-    rows.insert(0, headers)
-
-    max_length_per_columns = [
-        max((len(row[index]) for row in rows))
-        for index in range(len(rows[0]))
-    ]
-
-    for row in rows:
-        print("  ", end="")
-
-        for column_index, value in enumerate(row):
-            width = max_length_per_columns[column_index] + 3
-            print(value.ljust(width), end="")
-
-        print()
 
 
 class LimitedSizeIO:

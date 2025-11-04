@@ -1,26 +1,28 @@
-import abc
-import typing
+import os
+from abc import ABC, abstractmethod
+from typing import List, Literal, Tuple, Union
 
 import pandas
 
-from .. import api
-from .collector import PredictionCollector
+from crunch.api import ColumnNames, CompetitionFormat
+from crunch.runner.collector import MemoryPredictionCollector
 
 
-class Runner(abc.ABC):
-
-    force_first_train: bool
-    column_names: api.ColumnNames
+class Runner(ABC):
 
     def __init__(
         self,
-        prediction_collector: PredictionCollector,
-        competition_format: api.CompetitionFormat,
-        determinism_check_enabled=False,
+        *,
+        competition_format: CompetitionFormat,
+        prediction_directory_path: str,
+        determinism_check_enabled: bool = False,
     ):
-        self.prediction_collector = prediction_collector
-        self.prediction: pandas.DataFrame = None  # TODO remove this, use the collector directly
         self.competition_format = competition_format
+
+        # TODO Remove this when TIMESERIES competition are removed
+        prediction_parquet_file_path = os.path.join(prediction_directory_path, "prediction.parquet")
+        self.prediction_parquet_file_path = prediction_parquet_file_path
+        self.prediction_directory_path = prediction_directory_path
 
         self.determinism_check_enabled = determinism_check_enabled
         self.deterministic = True if determinism_check_enabled else None
@@ -34,38 +36,17 @@ class Runner(abc.ABC):
             self.have_model,
         ) = self.initialize()
 
-        try:
-            if self.competition_format == api.CompetitionFormat.TIMESERIES:
-                self.log("starting timeseries loop...")
-                result = self.start_timeseries()
+        # TODO Remove this when TIMESERIES competition are removed
+        if self.competition_format == CompetitionFormat.TIMESERIES:
+            self.log("starting timeseries loop...")
+            self.start_timeseries()
 
-            elif self.competition_format == api.CompetitionFormat.DAG:
-                self.log("starting dag process...")
-                result = self.start_dag()
+        elif self.competition_format == CompetitionFormat.UNSTRUCTURED:
+            self.log("starting unstructured loop...")
+            self.start_unstructured()
 
-            elif self.competition_format == api.CompetitionFormat.STREAM:
-                self.log("starting stream loop...")
-                result = self.start_stream()
-
-            elif self.competition_format == api.CompetitionFormat.SPATIAL:
-                self.log("starting spatial loop...")
-                result = self.start_spatial()
-
-            elif self.competition_format == api.CompetitionFormat.UNSTRUCTURED:
-                self.log("starting unstructured loop...")
-                result = self.start_unstructured()
-
-            else:
-                raise ValueError(f"unsupported: {self.competition_format}")
-
-            if isinstance(result, pandas.DataFrame):
-                self.prediction = result
-            elif isinstance(result, PredictionCollector):
-                self.prediction_collector.discard()  # TODO use a factory to avoid useless instanciation
-                self.prediction_collector = result
-        except:
-            self.prediction_collector.discard()
-            raise
+        else:
+            raise NotImplementedError(f"{self.competition_format.name} format is not supported anymore.")
 
         if self.determinism_check_enabled:
             if self.deterministic:
@@ -78,29 +59,42 @@ class Runner(abc.ABC):
 
         self.teardown()
 
-    def start_timeseries(self):
-        for index, moon in enumerate(self.keys):
-            train, forced_train = False, False
-            if self.train_frequency != 0 and moon % self.train_frequency == 0:
-                train = True
-            elif index == 0 and not self.have_model:
-                train = True
-            elif index == 0 and self.force_first_train:
-                train, forced_train = True, True
+    force_first_train: bool
+    train_frequency: int
+    column_names: ColumnNames
 
-            forced_train = " forced=True" if forced_train else ""
-            self.log(f"looping moon={moon} train={train}{forced_train} ({index + 1}/{len(self.keys)})")
+    def start_timeseries(self) -> None:
+        collector = MemoryPredictionCollector()
 
-            prediction = self.timeseries_loop(moon, train)
+        try:
+            for index, moon in enumerate(self.keys):
+                train, forced_train = False, False
+                if self.train_frequency != 0 and moon % self.train_frequency == 0:
+                    train = True
+                elif index == 0 and not self.have_model:
+                    train = True
+                elif index == 0 and self.force_first_train:
+                    train, forced_train = True, True
 
-            if self.deterministic:
-                prediction2 = self.timeseries_loop(moon, False)
-                self.deterministic = prediction.equals(prediction2)
-                self.log(f"deterministic: {str(self.deterministic).lower()}")
+                forced_train = " forced=True" if forced_train else ""
+                self.log(f"looping moon={moon} train={train}{forced_train} ({index + 1}/{len(self.keys)})")
 
-            self.prediction_collector.append(prediction)
+                prediction = self.timeseries_loop(moon, train)
 
-    @abc.abstractmethod
+                if self.deterministic:
+                    prediction2 = self.timeseries_loop(moon, False)
+                    self.deterministic = prediction.equals(prediction2)
+                    self.log(f"deterministic: {str(self.deterministic).lower()}")
+
+                collector.append(prediction)
+        except:
+            collector.discard()
+            raise
+
+        self.log(f"save prediction - path={self.prediction_parquet_file_path}", important=True)
+        collector.persist(self.prediction_parquet_file_path)
+
+    @abstractmethod
     def timeseries_loop(
         self,
         moon: int,
@@ -108,111 +102,33 @@ class Runner(abc.ABC):
     ) -> pandas.DataFrame:
         ...
 
-    def start_dag(self):
-        prediction = self.dag_loop(True)
-        self.prediction_collector.append(prediction)
-
-        if self.deterministic:
-            prediction2 = self.dag_loop(False)
-            self.deterministic = prediction.equals(prediction2)
-            self.log(f"deterministic: {str(self.deterministic).lower()}")
-
-    @abc.abstractmethod
-    def dag_loop(
-        self,
-        train: bool
-    ) -> pandas.DataFrame:
-        ...
-
-    def start_stream(self):
-        if not self.have_model:
-            self.stream_no_model()
-
-        target_column_namess = self.column_names.targets
-        for index, target_column_names in enumerate(target_column_namess):
-            self.log(f"looping stream=`{target_column_names.name}` ({index + 1}/{len(target_column_namess)})")
-
-            prediction = self.stream_loop(target_column_names)
-
-            if self.deterministic:
-                prediction2 = self.stream_loop(target_column_names)
-                self.deterministic = prediction.equals(prediction2)
-                self.log(f"deterministic: {str(self.deterministic).lower()}")
-
-            self.prediction_collector.append(prediction)
-
-    def stream_have_model(self):
-        return self.have_model
-
-    @abc.abstractmethod
-    def stream_no_model(
-        self,
-    ):
-        ...
-
-    @abc.abstractmethod
-    def stream_loop(
-        self,
-        target_column_name: api.TargetColumnNames,
-    ) -> pandas.DataFrame:
-        ...
-
-    def start_spatial(self):
-        if self.force_first_train:
-            self.spatial_train()
-
-        target_column_namess = self.column_names.targets
-        require_target_column = len(target_column_namess) > 1
-
-        for index, target_column_names in enumerate(target_column_namess):
-            self.log(f"looping target=`{target_column_names.name}` ({index + 1}/{len(target_column_namess)})")
-
-            prediction = self.spatial_loop(target_column_names)
-
-            if self.deterministic:
-                prediction2 = self.spatial_loop(target_column_names)
-                self.deterministic = prediction.equals(prediction2)
-                self.log(f"deterministic: {str(self.deterministic).lower()}")
-
-            if require_target_column:
-                prediction["sample"] = target_column_names.name
-
-            self.prediction_collector.append(prediction)
-
-    @abc.abstractmethod
-    def spatial_train(
-        self,
-    ) -> None:
-        ...
-
-    @abc.abstractmethod
-    def spatial_loop(
-        self,
-        target_column_names: api.TargetColumnNames
-    ) -> pandas.DataFrame:
-        ...
-
-    @abc.abstractmethod
-    def start_unstructured(self):
+    @abstractmethod
+    def start_unstructured(self) -> None:
         ...
 
     def setup(self):
         ...
 
-    @abc.abstractmethod
-    def initialize(self) -> typing.Tuple[
-        typing.List[typing.Union[str, int]],  # keys
+    @abstractmethod
+    def initialize(self) -> Tuple[
+        List[Union[str, int]],  # keys
         bool,  # have_model
     ]:
         ...
 
-    @abc.abstractmethod
+    @abstractmethod
     def finalize(self):
         ...
 
     def teardown(self):
         ...
 
-    @abc.abstractmethod
-    def log(self, message: str, important=False, error=False):
+    @abstractmethod
+    def log(
+        self,
+        message: str,
+        *,
+        important: bool = False,
+        error: bool = False,
+    ) -> Literal[True]:
         ...

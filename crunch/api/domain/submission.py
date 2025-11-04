@@ -1,15 +1,16 @@
-import enum
-import typing
+from enum import Enum
+from typing import TYPE_CHECKING, Dict, Iterator, List, Optional
 
-from ..resource import Collection, Model
-from .project import Project
-from ..auth import PushTokenAuth
+from crunch.api.auth import PushTokenAuth
+from crunch.api.resource import Collection, Model
 
-if typing.TYPE_CHECKING:
-    from ...external import sseclient
+if TYPE_CHECKING:
+    from crunch.api.client import Client
+    from crunch.api.domain.project import Project
+    from crunch.api.types import Attrs
 
 
-class SubmissionType(enum.Enum):
+class SubmissionType(Enum):
 
     CODE = "CODE"
     NOTEBOOK = "NOTEBOOK"
@@ -25,10 +26,10 @@ class Submission(Model):
 
     def __init__(
         self,
-        project: Project,
-        attrs=None,
-        client=None,
-        collection=None
+        project: "Project",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["SubmissionCollection"] = None,
     ):
         super().__init__(attrs, client, collection)
 
@@ -59,19 +60,19 @@ class SubmissionCollection(Collection):
 
     def __init__(
         self,
-        project: Project,
-        client=None
+        project: "Project",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.project = project
 
-    def __iter__(self) -> typing.Iterator[Submission]:
+    def __iter__(self) -> Iterator[Submission]:
         return super().__iter__()
 
     def get(
         self,
-        number: int
+        number: int,
     ) -> Submission:
         return self.prepare_model(
             self._client.api.get_submission(
@@ -84,7 +85,7 @@ class SubmissionCollection(Collection):
 
     def list(
         self
-    ) -> typing.List[Submission]:
+    ) -> List[Submission]:
         return self.prepare_models(
             self._client.api.list_submissions(
                 self.project.competition.id,
@@ -100,9 +101,8 @@ class SubmissionCollection(Collection):
         main_file_path: str,
         model_directory_path: str,
         type: SubmissionType,
-        code_files: typing.Dict[str, str],
-        model_files: typing.Dict[str, str],
-        sse_handler: typing.Optional[typing.Callable[["sseclient.Event"], None]] = None
+        code_files: Dict[str, str],
+        model_files: Dict[str, str],
     ) -> Submission:
         return self.prepare_model(
             self._client.api.create_submission(
@@ -115,10 +115,9 @@ class SubmissionCollection(Collection):
                 type.name,
                 code_files,
                 model_files,
-                sse_handler,
             )
         )
-    
+
     def get_next_encryption_id(self) -> str:
         return self._client.api.get_submission_next_encryption_id(
             self.project.competition.id,
@@ -126,10 +125,10 @@ class SubmissionCollection(Collection):
             self.project.name,
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: "Attrs"):
         return super().prepare_model(
             attrs,
-            self.project
+            self.project,
         )
 
 
@@ -173,16 +172,10 @@ class SubmissionEndpointMixin:
         type,
         code_files,
         model_files,
-        sse_handler=None,
     ):
-        sse = sse_handler is not None
-
         return self._result(
             self.post(
                 f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
-                params={
-                    "sse": sse,
-                },
                 json={
                     "message": message,
                     "mainFilePath": main_file_path,
@@ -193,10 +186,8 @@ class SubmissionEndpointMixin:
                     # TODO Use a better way to pass the push token
                     "pushToken": self.auth_._token if isinstance(self.auth_, PushTokenAuth) else None,
                 },
-                stream=sse
             ),
             json=True,
-            sse_handler=sse_handler,
         )
 
     def get_submission_next_encryption_id(

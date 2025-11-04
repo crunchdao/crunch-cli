@@ -1,22 +1,22 @@
-import abc
 import os
 import shutil
-import typing
+from abc import ABC, abstractmethod
+from typing import List, Optional
 
 import pandas
 
-from .. import utils
+from crunch.utils import write
 
 
-class PredictionCollector(abc.ABC):
+class PredictionCollector(ABC):
 
-    @abc.abstractmethod
+    @abstractmethod
     def append(self, prediction: pandas.DataFrame) -> None:
         """
         Collect a new dataframe.
         """
 
-    @abc.abstractmethod
+    @abstractmethod
     def persist(self, file_path: str) -> None:
         """
         Persist the entire dataframe to a file.
@@ -24,7 +24,7 @@ class PredictionCollector(abc.ABC):
         This is a terminal operation, do not call `append' again afterwards.
         """
 
-    @abc.abstractmethod
+    @abstractmethod
     def discard(self) -> None:
         """
         Discard the contents of the collector and close resources if necessary.
@@ -33,7 +33,7 @@ class PredictionCollector(abc.ABC):
         """
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def is_write_index(self) -> bool:
         ...
 
@@ -45,25 +45,25 @@ class MemoryPredictionCollector(PredictionCollector):
 
     def __init__(
         self,
-        write_index=False,
+        write_index: bool = False,
     ):
         self.write_index = write_index
 
-        self.dataframes: typing.List[pandas.DataFrame] = []
+        self.dataframes: List[pandas.DataFrame] = []
 
-    def append(self, prediction):
+    def append(self, prediction: pandas.DataFrame) -> None:
         self.dataframes.append(prediction)
 
     def persist(self, file_path: str):
         dataframe = pandas.concat(self.dataframes)
         self._clear()
 
-        utils.write(
+        write(
             dataframe,
             file_path,
             kwargs={
                 "index": self.write_index,
-            }
+            },
         )
 
     def discard(self):
@@ -88,10 +88,10 @@ class FilePredictionCollector(PredictionCollector):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.temporary_file_path = os.path.join(self.temporary_directory.name, "file.parquet")
 
-        self.schema: typing.Optional[pyarrow.Schema] = None
-        self.writer: typing.Optional[pyarrow.parquet.ParquetWriter] = None
+        self.schema: Optional[pyarrow.Schema] = None
+        self.writer: Optional[pyarrow.parquet.ParquetWriter] = None
 
-    def append(self, prediction):
+    def append(self, prediction: pandas.DataFrame) -> None:
         import pyarrow
 
         table = pyarrow.Table.from_pandas(prediction)

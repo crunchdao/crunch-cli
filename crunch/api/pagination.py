@@ -1,14 +1,12 @@
-import dataclasses
-import typing
-
-T = typing.TypeVar("T")
+from dataclasses import dataclass
+from typing import Optional
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class PageRequest:
 
     number: int = 0
-    size: typing.Optional[int] = None
+    size: Optional[int] = None
 
     def next(self):
         return PageRequest(self.number + 1, self.size)

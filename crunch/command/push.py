@@ -2,16 +2,13 @@ import json
 import os
 from dataclasses import dataclass
 from io import BytesIO
-from typing import (TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List,
-                    Optional, Tuple)
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List, Optional, Tuple
 
 import requests
 
 from crunch import store
-from crunch.api import (ApiException, Client, ForbiddenLibraryException,
-                        Project, Submission, SubmissionType, Upload)
-from crunch.constants import (ENCRYPTION_JSON, IGNORED_CODE_FILES,
-                              IGNORED_MODEL_FILES)
+from crunch.api import ApiException, Client, ForbiddenLibraryException, Project, Submission, SubmissionType, Upload
+from crunch.constants import ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES
 from crunch.utils import format_bytes
 
 if TYPE_CHECKING:
@@ -308,7 +305,7 @@ def _upload_files(
                 handle_requirements(
                     path=path,
                     language=RequirementLanguage.PYTHON,
-                    validate_locally=validate_requirements_locally
+                    validate_locally=validate_requirements_locally,
                 )
 
                 continue
@@ -317,7 +314,7 @@ def _upload_files(
                 handle_requirements(
                     path=path,
                     language=RequirementLanguage.R,
-                    validate_locally=validate_requirements_locally
+                    validate_locally=validate_requirements_locally,
                 )
 
                 continue

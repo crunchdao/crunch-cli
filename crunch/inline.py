@@ -1,34 +1,36 @@
-import functools
 import logging
 import sys
-import typing
+from functools import cached_property
+from types import ModuleType
+from typing import Optional, Tuple, Union
 
 import click
 import pandas
 import psutil
 
-from . import (__version__, api, command, constants, container, unstructured, runner,
-               tester, utils)
-
-LoadedData = typing.Union[
-    pandas.DataFrame,
-    typing.Dict[str, pandas.DataFrame]
-]
-
-Streams = typing.List[typing.Iterable[container.StreamMessage]]
+import crunch.tester as tester
+from crunch.__version__ import __version__
+from crunch.api import Client, CompetitionFormat, CrunchNotFoundException, KnownData, MissingPhaseDataException, RoundIdentifierType
+from crunch.command.download import download, download_no_data_available
+from crunch.constants import DEFAULT_MODEL_DIRECTORY, DOT_PREDICTION_DIRECTORY
+from crunch.runner import is_inside
+from crunch.runner.types import KwargsLike
+from crunch.unstructured import RunnerModule, deduce_code_loader
+from crunch.utils import read
 
 
 class _Inline:
 
     def __init__(
         self,
-        user_module: typing.Any,
-        model_directory: str,
+        *,
+        user_module: ModuleType,
+        model_directory_path: str,
         logger: logging.Logger,
-        has_gpu=False,
+        has_gpu: bool = False,
     ):
         self.user_module = user_module
-        self.model_directory = model_directory
+        self.model_directory_path = model_directory_path
         self.logger = logger
         self.has_gpu = has_gpu
 
@@ -40,7 +42,7 @@ class _Inline:
 
         print()
 
-        version = __version__.__version__
+        version = __version__
         print(f"cli version: {version}")
 
         available_ram = psutil.virtual_memory().total / (1024 ** 3)
@@ -51,22 +53,21 @@ class _Inline:
 
         print(f"----")
 
-    @functools.cached_property
+    @cached_property
     def _competition(self):
-        _, project = api.Client.from_project()
+        _, project = Client.from_project()
         competition = project.competition.reload()
 
         return competition
 
     def load_data(
         self,
-        round_number="@current",
-        force=False,
-        **kwargs,
-    ) -> typing.Tuple[LoadedData, LoadedData, LoadedData]:
-        if self._competition.format == api.CompetitionFormat.STREAM:
-            self.logger.error(f"Please call `.load_streams()` instead.")
-            return None, None, None
+        round_number: RoundIdentifierType = "@current",
+        force: bool = False,
+        **kwargs: KwargsLike,
+    ) -> Tuple[Optional[pandas.DataFrame], Optional[pandas.DataFrame], Optional[pandas.DataFrame]]:
+        if self._competition.format == CompetitionFormat.STREAM:
+            self.load_streams()
 
         try:
             (
@@ -77,15 +78,27 @@ class _Inline:
                 _,  # column_names
                 data_directory_path,
                 data_paths,
-            ) = command.download(
+            ) = download(
                 round_number=round_number,
                 force=force,
             )
-        except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-            command.download_no_data_available()
+        except (CrunchNotFoundException, MissingPhaseDataException):
+            download_no_data_available()
             raise click.Abort()
 
-        if self._competition.format.unstructured:
+        competition_format = self._competition.format
+        if competition_format == CompetitionFormat.TIMESERIES:
+            x_train_path = data_paths[KnownData.X_TRAIN]
+            y_train_path = data_paths[KnownData.Y_TRAIN]
+            x_test_path = data_paths[KnownData.X_TEST]
+
+            x_train = read(x_train_path, kwargs=kwargs)
+            y_train = read(y_train_path, kwargs=kwargs)
+            x_test = read(x_test_path, kwargs=kwargs)
+
+            return x_train, y_train, x_test
+
+        elif competition_format == CompetitionFormat.UNSTRUCTURED:
             module = self._runner_module
             if module is None or module.get_load_data_function(ensure=False) is None:
                 self.logger.info("Please follow the competition instructions to load the data.")
@@ -96,77 +109,25 @@ class _Inline:
                 logger=self.logger,
             )
 
-        x_train_path = data_paths.get(api.KnownData.X_TRAIN)
-        y_train_path = data_paths.get(api.KnownData.Y_TRAIN)
-        x_test_path = data_paths.get(api.KnownData.X_TEST)
-
-        x_train = utils.read(x_train_path, kwargs=kwargs)
-        y_train = utils.read(y_train_path, kwargs=kwargs)
-        x_test = utils.read(x_test_path, kwargs=kwargs)
-
-        return x_train, y_train, x_test
+        else:
+            raise NotImplementedError(f"{competition_format.name} competition format is not supported anymore")
 
     def load_streams(
         self,
-        round_number="@current",
-        force=False,
-        **kwargs,
-    ) -> typing.Tuple[Streams, Streams]:
-        if self._competition.format.unstructured:
-            self.logger.error(f"Please follow the competition instructions to load the data.")
-            return None, None
-
-        if self._competition.format != api.CompetitionFormat.STREAM:
-            self.logger.error(f"Please call `.load_data()` instead.")
-            return None, None
-
-        try:
-            (
-                _,  # embargo
-                _,  # number of features
-                _,  # split keys
-                _,  # features
-                column_names,
-                _,  # data_directory_path,
-                data_paths,
-            ) = command.download(
-                round_number=round_number,
-                force=force,
-            )
-
-            x_train_path = data_paths.get(api.KnownData.X_TRAIN)
-            x_test_path = data_paths.get(api.KnownData.X_TEST)
-        except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-            command.download_no_data_available()
-            raise click.Abort()
-
-        x_train = utils.read(x_train_path, kwargs=kwargs)
-        x_test = utils.read(x_test_path, kwargs=kwargs)
-
-        def as_iterators(dataframe: pandas.DataFrame):
-            column_name = typing.cast(str, column_names.side)
-
-            return [
-                container.CallableIterable.from_dataframe(part, column_name, container.StreamMessage)
-                for _, group in dataframe.groupby(column_names.id)
-                for part in utils.split_at_nans(group, column_name)
-            ]
-
-        x_train = as_iterators(x_train)
-        x_test = as_iterators(x_test)
-
-        return x_train, x_test
+        **kwargs: KwargsLike,
+    ) -> None:
+        raise NotImplementedError("STREAM competition format is not supported anymore")
 
     def test(
         self,
-        force_first_train=True,
-        train_frequency=1,
-        raise_abort=False,
-        round_number="@current",
-        no_checks=False,
-        no_determinism_check: typing.Optional[bool] = None,
-        read_kwargs={},
-        write_kwargs={},
+        force_first_train: bool = True,
+        train_frequency: int = 1,
+        raise_abort: bool = False,
+        round_number: RoundIdentifierType = "@current",
+        no_checks: bool = False,
+        no_determinism_check: Optional[bool] = None,
+        read_kwargs: KwargsLike = {},
+        write_kwargs: KwargsLike = {},
     ):
         from . import library, tester
 
@@ -182,7 +143,8 @@ class _Inline:
             return tester.run(
                 self.user_module,
                 self._runner_module,
-                self.model_directory,
+                self.model_directory_path,
+                DOT_PREDICTION_DIRECTORY,
                 force_first_train,
                 train_frequency,
                 round_number,
@@ -205,31 +167,35 @@ class _Inline:
 
     @property
     def is_inside_runner(self):
-        return runner.is_inside
+        return is_inside
 
-    @functools.cached_property
+    @cached_property
     def _runner_module(self):
-        loader = unstructured.deduce_code_loader(
-            self._competition.name,
-            "runner",
+        loader = deduce_code_loader(
+            competition_name=self._competition.name,
+            file_name="runner",
         )
 
-        return unstructured.RunnerModule.load(loader)
+        return RunnerModule.load(loader)
 
-    def __getattr__(self, key):
+    def __getattr__(self, key: str):
         import crunch
 
         return getattr(crunch, key)
 
 
 def load(
-    module_or_module_name: typing.Any = "__main__",
-    model_directory=constants.DEFAULT_MODEL_DIRECTORY
+    module_name_or_module: Union[ModuleType, str] = "__main__",
+    model_directory_path: str = DEFAULT_MODEL_DIRECTORY,
 ):
-    if isinstance(module_or_module_name, str):
-        module = sys.modules[module_or_module_name]
+    if isinstance(module_name_or_module, str):
+        module = sys.modules[module_name_or_module]
     else:
-        module = module_or_module_name
+        module = module_name_or_module
 
     logger = tester.install_logger()
-    return _Inline(module, model_directory, logger)
+    return _Inline(
+        user_module=module,
+        model_directory_path=model_directory_path,
+        logger=logger,
+    )
