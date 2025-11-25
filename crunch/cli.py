@@ -88,7 +88,7 @@ def echo_version(f):
 @click.option("--competitions-repository", envvar=constants.COMPETITIONS_REPOSITORY_ENV_VAR, default=constants.COMPETITIONS_REPOSITORY, help="Set the Competitions GitHub repository name.")
 @click.option("--competitions-branch", envvar=constants.COMPETITIONS_BRANCH_ENV_VAR, default=constants.COMPETITIONS_BRANCH, help="Set the Competitions GitHub branch name (only for testing).")
 @click.option("--competitions-directory-path", envvar=constants.COMPETITIONS_DIRECTORY_PATH_ENV_VAR, default=None, required=False, help="Set the Competitions repository to a local directory (only for testing).")
-@click.option("--environment", "--env", "environment_name", help="Connect to another environment.")
+@click.option("--environment", "--env", "environment_name", envvar=constants.ENVIRONMENT_ENV_VAR, help="Connect to another environment.")
 def cli(
     debug: bool,
     api_base_url: str,
