@@ -26,7 +26,7 @@ class SubmissionModule(ModuleWrapper):
     def check(
         self,
         *,
-        submission_type: List[SubmissionType],
+        submission_type: SubmissionType,
         submission_files: List[File],
         model_files: List[File],
         print: Optional[Callable[[Any], None]] = None,

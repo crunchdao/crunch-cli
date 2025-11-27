@@ -4,8 +4,7 @@ import traceback
 from typing import TYPE_CHECKING, Callable, Dict, List, Sequence, Tuple, cast
 
 import click
-
-from crunch.api import ApiException, Competition, PhaseType
+from crunch.api import ApiException, Competition, PhaseType, SubmissionType
 from crunch.constants import DEFAULT_MODEL_DIRECTORY
 from crunch.utils import exit_via
 
@@ -347,12 +346,20 @@ def submission_group():
     pass
 
 
+SUBMISSION_TYPE_NAMES = [
+    SubmissionType.CODE.name,
+    SubmissionType.PREDICTION.name,
+]
+
+
 @submission_group.command(name="check")
+@click.option("--submission-type", "submission_type_string", type=click.Choice(SUBMISSION_TYPE_NAMES), default=SUBMISSION_TYPE_NAMES[0])
 @click.option("--root-directory", "root_directory_path", type=click.Path(exists=True, file_okay=False), required=True)
 @click.option("--model-directory", "model_directory_path", type=click.Path(file_okay=False), default=DEFAULT_MODEL_DIRECTORY, help="Resources directory relative to root directory.")
 @click.pass_context
 def submission_check(
     context: click.Context,
+    submission_type_string: str,
     root_directory_path: str,
     model_directory_path: str,
 ):
@@ -366,6 +373,8 @@ def submission_check(
         print(f"no custom submission check found")
         raise click.Abort()
 
+    submission_type = SubmissionType[submission_type_string]
+
     submission_files = [
         File.from_local(path, name)
         for path, name in list_code_files(root_directory_path, model_directory_path)
@@ -378,6 +387,7 @@ def submission_check(
 
     try:
         module.check(
+            submission_type=submission_type,
             submission_files=submission_files,
             model_files=model_files,
         )
