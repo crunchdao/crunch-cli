@@ -288,7 +288,7 @@ class CloudRunner(Runner):
             self.bash2(["mkdir", "-p", self.model_directory_path])
 
             file_urls = self.run.model
-            self.have_model = len(file_urls) != 0
+            self.has_model = len(file_urls) != 0
 
             self.pre_model_files_modification = _download_files(
                 file_urls=file_urls,
@@ -305,7 +305,7 @@ class CloudRunner(Runner):
 
         return (
             self.keys,
-            self.have_model
+            self.has_model
         )
 
     def start_timeseries(self):

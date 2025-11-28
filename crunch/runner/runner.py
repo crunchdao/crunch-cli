@@ -33,7 +33,7 @@ class Runner(ABC):
 
         (
             self.keys,
-            self.have_model,
+            self.has_model,
         ) = self.initialize()
 
         # TODO Remove this when TIMESERIES competition are removed
@@ -71,7 +71,7 @@ class Runner(ABC):
                 train, forced_train = False, False
                 if self.train_frequency != 0 and moon % self.train_frequency == 0:
                     train = True
-                elif index == 0 and not self.have_model:
+                elif index == 0 and not self.has_model:
                     train = True
                 elif index == 0 and self.force_first_train:
                     train, forced_train = True, True
@@ -112,7 +112,7 @@ class Runner(ABC):
     @abstractmethod
     def initialize(self) -> Tuple[
         List[Union[str, int]],  # keys
-        bool,  # have_model
+        bool,  # has_model
     ]:
         ...
 
