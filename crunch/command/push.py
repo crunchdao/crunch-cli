@@ -46,6 +46,9 @@ class EncryptionInfo:
 
 
 def _to_unix_path(input: str):
+    if input == ".":
+        return input + "/"
+
     return os.path.normpath(input)\
         .replace("\\", "/")\
         .replace("//", "/")
