@@ -39,6 +39,7 @@ ENVIRONMENTS = {
 
 DATA_SIZE_VARIANTS = [
     api.SizeVariant.DEFAULT.name.lower(),
+    api.SizeVariant.SMALL.name.lower(),
     api.SizeVariant.LARGE.name.lower(),
 ]
 
