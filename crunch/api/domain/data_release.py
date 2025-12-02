@@ -147,6 +147,7 @@ class DataReleaseFeature:
 class SizeVariant(enum.Enum):
 
     DEFAULT = "DEFAULT"
+    SMALL = "SMALL"
     LARGE = "LARGE"
 
     def __repr__(self):
