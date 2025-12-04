@@ -4,7 +4,7 @@ import shutil
 import click
 
 from crunch.api import Client, SizeVariant
-from crunch.constants import DOT_CRUNCHDAO_DIRECTORY
+from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
 from crunch.utils import ProjectInfo, write_project_info, write_token
 
 
@@ -59,3 +59,5 @@ def init(
 
     os.chdir(directory)
     os.makedirs(model_directory, exist_ok=True)
+    os.makedirs(DOT_DATA_DIRECTORY, exist_ok=True)
+    os.makedirs(DOT_PREDICTION_DIRECTORY, exist_ok=True)
