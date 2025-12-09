@@ -54,10 +54,16 @@ def download(
     project_info = client.project_info
     if size_variant is None:
         size_variant = project_info.size_variant
+
+        changed_variant = True
     elif project_info.size_variant != size_variant:
         project_info.size_variant = size_variant
         utils.write_project_info(project_info)
         print(f"project: set default size variant: {size_variant.name.lower()}")
+
+        changed_variant = True
+    else:
+        changed_variant = False
 
     competition = project.competition
 
@@ -89,6 +95,12 @@ def download(
         data_directory_path,
         size_variant,
     )
+
+    if changed_variant:
+        downloader.delete_other_uncompressed_markers(
+            data_directory_path,
+            list(prepared_data_files.values()),
+        )
 
     file_paths = downloader.save_all(
         prepared_data_files,

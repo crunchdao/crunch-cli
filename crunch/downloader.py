@@ -35,6 +35,38 @@ class PreparedDataFile:
     def has_size(self):
         return self.size != -1
 
+    @property
+    def uncompressed_marker_path(self):
+        file_name = os.path.basename(self.path)
+        parent_directory_path = os.path.dirname(self.path)
+
+        return os.path.join(
+            parent_directory_path,
+            f".{file_name}.uncompressed"
+        )
+
+
+def delete_other_uncompressed_markers(
+    data_directory_path: str,
+    data_files: typing.List[PreparedDataFile],
+):
+    expected_markers = {
+        data_file.uncompressed_marker_path
+        for data_file in data_files
+    }
+
+    found_markers: typing.Set[str] = set()
+    for root, _, files in os.walk(data_directory_path, topdown=False):
+        for file in files:
+            if file.startswith(".") and file.endswith(".uncompressed"):
+                path = os.path.join(root, file)
+
+                found_markers.add(path)
+
+    useless_markers = found_markers - expected_markers
+    for marker in useless_markers:
+        os.unlink(marker)
+
 
 def prepare_all(
     data_directory_path: str,
@@ -68,10 +100,10 @@ def prepare_one(
 
 
 def save_one(
-    data_file: PreparedDataFile,
+    data_file: typing.Optional[PreparedDataFile],
     force: bool,
-    print=print,
-    progress_bar=True,
+    print: typing.Callable[[typing.Any], None] = print,
+    progress_bar: bool = True,
 ):
     if data_file is None:
         return
@@ -81,10 +113,7 @@ def save_one(
     file_name = os.path.basename(file_path)
     parent_directory_path = os.path.dirname(file_path)
 
-    uncompressed_marker = os.path.join(
-        parent_directory_path,
-        f".{file_name}.uncompressed"
-    )
+    uncompressed_marker = data_file.uncompressed_marker_path
 
     local_size = _read_size(file_path, uncompressed_marker)
 
@@ -144,6 +173,7 @@ def save_one(
             shutil.move(source_path, parent_directory_path)
 
     with open(uncompressed_marker, 'w') as fd:
+        # TODO Should include name of unzipped files as well for later cleanup
         fd.write(str(file_size))
 
     os.unlink(file_path)
