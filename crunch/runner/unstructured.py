@@ -33,13 +33,6 @@ class RunnerContext(ABC):
 
     @property
     @abstractmethod
-    def is_first_time(self) -> bool:
-        """
-        Whether this submission is running for the first time.
-        """
-
-    @property
-    @abstractmethod
     def has_model(self) -> bool:
         """
         Whether this submission originally had a model.

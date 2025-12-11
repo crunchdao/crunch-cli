@@ -7,7 +7,7 @@ from typing import Any, Callable, List, Optional, Tuple
 
 import click
 
-from crunch.api.identifiers import RoundIdentifierType
+from crunch.api import PhaseType, RoundIdentifierType
 from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
 
@@ -551,7 +551,6 @@ def local(
         except api.ApiException as error:
             utils.exit_via(error)
 
-
 @runner_group.command(help="Cloud runner, do not directly run!")
 @click.option("--competition-name", envvar="COMPETITION_NAME", required=True)
 # ---
@@ -565,13 +564,14 @@ def local(
 @click.option("--prediction-directory", envvar="PREDICTION_DIRECTORY", default="{context}/prediction")
 @click.option("--main-file", envvar=constants.MAIN_FILE_PATH_ENV_VAR, default=constants.DEFAULT_MAIN_FILE_PATH)
 # ---
-@click.option("--run-id", envvar="RUN_ID", required=True)
+@click.option("--run-id", envvar="RUN_ID", required=True, type=int)
 @click.option("--run-token", envvar="RUN_TOKEN", required=True)
 @click.option("--log-secret", envvar="LOG_SECRET", default=None, type=str)
 @click.option("--train-frequency", envvar="TRAIN_FREQUENCY", type=int, default=0)
 @click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", type=bool, default=False)
 @click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", type=bool, default=False)
 @click.option("--gpu", envvar="GPU", type=bool, default=False)
+@click.option("--phase-type", "phase_type_string", envvar="PHASE_TYPE", type=click.Choice([PhaseType.SUBMISSION.name, PhaseType.OUT_OF_SAMPLE.name]), default=PhaseType.SUBMISSION.name)
 @click.option("--crunch-cli-commit-hash", default="master", envvar="CRUNCH_CLI_COMMIT_HASH")
 # ---
 @click.option("--max-retry", envvar="MAX_RETRY", default=3, type=int)
@@ -589,13 +589,14 @@ def cloud(
     prediction_directory: str,
     main_file: str,
     # ---
-    run_id: str,
+    run_id: int,
     run_token: str,
     log_secret: str,
     train_frequency: int,
     force_first_train: bool,
     determinism_check_enabled: bool,
     gpu: bool,
+    phase_type_string: str,
     crunch_cli_commit_hash: str,
     # ---
     max_retry: int,
@@ -609,6 +610,8 @@ def cloud(
     os.unsetenv("RUN_ID")
     os.unsetenv("RUN_TOKEN")
     os.unsetenv("LOG_SECRET")
+
+    phase_type = PhaseType[phase_type_string]
 
     code_directory = code_directory.replace("{context}", context_directory)
     prediction_directory = prediction_directory.replace("{context}", context_directory)
@@ -659,10 +662,11 @@ def cloud(
         force_first_train,
         determinism_check_enabled,
         gpu,
+        phase_type,
         crunch_cli_commit_hash,
         # ---
         max_retry,
-        retry_seconds
+        retry_seconds,
     )
 
     runner.start()
