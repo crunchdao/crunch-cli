@@ -17,7 +17,7 @@ import requests
 
 import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, KnownData, RunnerRun, Upload
+from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, KnownData, PhaseType, RunnerRun, Upload
 from crunch.api.errors import ModelTooBigException, PredictionTooBigException
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
@@ -78,6 +78,8 @@ def link(tmp_directory: str, path: typing.Optional[str], fake: bool = False):
 
 class CloudRunner(Runner):
 
+    has_model: bool
+
     def __init__(
         self,
         competition: Competition,
@@ -104,6 +106,7 @@ class CloudRunner(Runner):
         force_first_train: bool,
         determinism_check_enabled: bool,
         gpu: bool,
+        phase_type: PhaseType,
         crunch_cli_commit_hash: str,
         # ---
         max_retry: int,
@@ -141,6 +144,7 @@ class CloudRunner(Runner):
         self.train_frequency = train_frequency
         self.force_first_train = force_first_train
         self.gpu = gpu
+        self.phase_type = phase_type
         self.crunch_cli_commit_hash = crunch_cli_commit_hash
 
         self.max_retry = max_retry
@@ -947,12 +951,24 @@ class CloudRunnerContext(RunnerContext):
         self.runner = runner
 
     @property
+    def train_frequency(self):
+        return self.runner.train_frequency
+
+    @property
     def force_first_train(self):
         return self.runner.force_first_train
 
     @property
     def is_local(self):
         return False
+
+    @property
+    def is_submission_phase(self):
+        return self.runner.phase_type == PhaseType.SUBMISSION
+
+    @property
+    def has_model(self):
+        return self.runner.has_model
 
     @property
     def is_determinism_check_enabled(self):

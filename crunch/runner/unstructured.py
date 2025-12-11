@@ -9,13 +9,34 @@ class RunnerContext(ABC):
 
     @property
     @abstractmethod
+    def train_frequency(self) -> int:
+        pass  # pragma: no cover
+
+    @property
+    @abstractmethod
     def force_first_train(self) -> bool:
         pass  # pragma: no cover
 
     @property
     @abstractmethod
     def is_local(self) -> bool:
-        pass  # pragma: no cover
+        """
+        Whether the runner is running in a local (or Colab) environment.
+        """
+
+    @property
+    @abstractmethod
+    def is_submission_phase(self) -> bool:
+        """
+        Whether the runner is running for the Submission Phase.
+        """
+
+    @property
+    @abstractmethod
+    def has_model(self) -> bool:
+        """
+        Whether this submission originally had a model.
+        """
 
     @property
     @abstractmethod

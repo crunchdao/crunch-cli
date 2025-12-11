@@ -294,12 +294,24 @@ class LocalRunnerContext(RunnerContext):
         self.runner = runner
 
     @property
+    def train_frequency(self):
+        return self.runner.train_frequency
+
+    @property
     def force_first_train(self):
         return self.runner.force_first_train
 
     @property
     def is_local(self):
         return True
+
+    @property
+    def is_submission_phase(self):
+        return True
+
+    @property
+    def has_model(self):
+        return False
 
     @property
     def is_determinism_check_enabled(self):
