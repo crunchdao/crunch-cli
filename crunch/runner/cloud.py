@@ -951,6 +951,10 @@ class CloudRunnerContext(RunnerContext):
         self.runner = runner
 
     @property
+    def train_frequency(self):
+        return self.runner.train_frequency
+
+    @property
     def force_first_train(self):
         return self.runner.force_first_train
 
