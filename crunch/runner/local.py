@@ -310,10 +310,6 @@ class LocalRunnerContext(RunnerContext):
         return True
 
     @property
-    def is_first_time(self):
-        return True
-
-    @property
     def has_model(self):
         return False
 
