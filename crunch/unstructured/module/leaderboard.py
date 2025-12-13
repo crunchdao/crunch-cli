@@ -119,6 +119,7 @@ class LeaderboardModule(ModuleWrapper):
     def rank(
         self,
         *,
+        target: Target,
         metrics: List[Metric],
         projects: List[RankableProject],
         rank_pass: RankPass,
@@ -130,12 +131,12 @@ class LeaderboardModule(ModuleWrapper):
         Return: An ordered list of project ids to use as the ranking.
         """
 
-        target_and_metrics = group_metrics_by_target(metrics)
-
         ranked_projects = call_function(
             self.get_rank_function(ensure=True),
             {
-                "target_and_metrics": target_and_metrics,
+                "target": target,
+                "metrics": metrics,
+                "target_and_metrics": [(target, metrics)],  # deprecated
                 "projects": projects,
                 "rank_pass": rank_pass,
             },

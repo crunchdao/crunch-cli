@@ -1,9 +1,10 @@
 import json
 import random
 import traceback
-from typing import TYPE_CHECKING, Callable, Dict, List, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Tuple, cast
 
 import click
+
 from crunch.api import ApiException, Competition, PhaseType, SubmissionType
 from crunch.constants import DEFAULT_MODEL_DIRECTORY
 from crunch.utils import exit_via
@@ -55,12 +56,14 @@ def leaderboard_group():
 @leaderboard_group.command(name="rank")
 @click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
 @click.option("--rank-pass", "rank_pass_string", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
+@click.option("--target-name", required=False, default=None)
 @click.option("--shuffle", is_flag=True)
 @click.pass_context
 def leaderboard_rank(
     context: click.Context,
     score_file_path: str,
     rank_pass_string: str,
+    target_name: Optional[str],
     shuffle: bool,
 ):
     from crunch.unstructured import LeaderboardModule, RankableProject, RankPass
@@ -89,10 +92,26 @@ def leaderboard_rank(
         if shuffle:
             random.shuffle(projects)
 
-    try:
-        metrics = competition.metrics.list()
+    if target_name is None:
+        target = next(
+            (
+                target
+                for target in competition.targets.list()
+                if target.primary
+            ),
+            None
+        )
 
+        if target is None:
+            raise ValueError("primary target not found?")
+    else:
+        target = competition.targets.get(target_name)
+
+    metrics = target.metrics.list()
+
+    try:
         ranked_projects = module.rank(
+            target=target,
             metrics=metrics,
             projects=projects,
             rank_pass=rank_pass,

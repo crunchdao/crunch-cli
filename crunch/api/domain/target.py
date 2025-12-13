@@ -53,6 +53,10 @@ class Target(Model):
     def virtual(self) -> bool:
         return self._attrs["virtual"]
 
+    @property
+    def primary(self) -> bool:
+        return self._attrs["primary"]
+
 
 class TargetCollection(Collection):
 
