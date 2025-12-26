@@ -310,6 +310,10 @@ class LocalRunnerContext(RunnerContext):
         return True
 
     @property
+    def chain_height(self):
+        return 1
+
+    @property
     def has_model(self):
         return False
 

@@ -30,6 +30,21 @@ class RunnerContext(ABC):
         """
         Whether the runner is running for the Submission Phase.
         """
+    
+    @property
+    def is_first_time(self) -> bool:
+        if self.is_submission_phase:
+            return True
+        
+        # 1 is for the submission phase
+        return self.chain_height <= 2
+
+    @property
+    @abstractmethod
+    def chain_height(self) -> int:
+        """
+        How many consecutive runs are there with the same parameters?
+        """
 
     @property
     @abstractmethod

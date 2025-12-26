@@ -572,6 +572,7 @@ def local(
 @click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", type=bool, default=False)
 @click.option("--gpu", envvar="GPU", type=bool, default=False)
 @click.option("--phase-type", "phase_type_string", envvar="PHASE_TYPE", type=click.Choice([PhaseType.SUBMISSION.name, PhaseType.OUT_OF_SAMPLE.name]), default=PhaseType.SUBMISSION.name)
+@click.option("--chain-height", envvar="CHAIN_HEIGHT", type=int, default=1)
 @click.option("--crunch-cli-commit-hash", default="master", envvar="CRUNCH_CLI_COMMIT_HASH")
 # ---
 @click.option("--max-retry", envvar="MAX_RETRY", default=3, type=int)
@@ -597,6 +598,7 @@ def cloud(
     determinism_check_enabled: bool,
     gpu: bool,
     phase_type_string: str,
+    chain_height: int,
     crunch_cli_commit_hash: str,
     # ---
     max_retry: int,
@@ -663,6 +665,7 @@ def cloud(
         determinism_check_enabled,
         gpu,
         phase_type,
+        chain_height,
         crunch_cli_commit_hash,
         # ---
         max_retry,
