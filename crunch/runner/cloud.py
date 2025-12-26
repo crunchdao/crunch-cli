@@ -107,6 +107,7 @@ class CloudRunner(Runner):
         determinism_check_enabled: bool,
         gpu: bool,
         phase_type: PhaseType,
+        chain_height: int,
         crunch_cli_commit_hash: str,
         # ---
         max_retry: int,
@@ -145,6 +146,7 @@ class CloudRunner(Runner):
         self.force_first_train = force_first_train
         self.gpu = gpu
         self.phase_type = phase_type
+        self.chain_height = chain_height
         self.crunch_cli_commit_hash = crunch_cli_commit_hash
 
         self.max_retry = max_retry
@@ -947,7 +949,10 @@ def _upload_files(
 
 class CloudRunnerContext(RunnerContext):
 
-    def __init__(self, runner: CloudRunner):
+    def __init__(
+        self,
+        runner: CloudRunner,
+    ):
         self.runner = runner
 
     @property
@@ -965,6 +970,10 @@ class CloudRunnerContext(RunnerContext):
     @property
     def is_submission_phase(self):
         return self.runner.phase_type == PhaseType.SUBMISSION
+
+    @property
+    def chain_height(self):
+        return self.runner.chain_height
 
     @property
     def has_model(self):
