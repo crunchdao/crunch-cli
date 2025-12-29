@@ -58,14 +58,18 @@ def _build_gitignore(
     directory_path: str,
     ignored_paths: List[str],
     use_parent_gitignore: bool,
-) -> Callable[[str], tuple[bool, bool]]:
+) -> Callable[[str], Tuple[bool, bool]]:
     from ..external import gitignorefile
 
+    rules: List[gitignorefile._IgnoreRule] = [] # type: ignore
+    for line in ignored_paths:
+        line = line.rstrip("\r\n")
+        rule = gitignorefile._rule_from_pattern(line)  # type: ignore
+        if rule:
+            rules.append(rule)
+
     ignored_files = gitignorefile._IgnoreRules(  # type: ignore
-        rules=[
-            gitignorefile._rule_from_pattern(line)  # type: ignore
-            for line in ignored_paths
-        ],
+        rules=rules,
         base_path=directory_path,
     )
 
