@@ -32,6 +32,12 @@ class PhaseType(enum.Enum):
 
         return self._default_slug()
 
+    def first_chain_height(self):
+        if self == PhaseType.OUT_OF_SAMPLE:
+            return 2
+
+        return 1
+
     def _default_slug(self):
         return str(self).lower().replace("_", "-")
 

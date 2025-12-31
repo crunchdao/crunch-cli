@@ -254,12 +254,14 @@ PHASE_TYPE_NAMES = [
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.option("--prediction-directory", "prediction_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.option("--phase-type", "phase_type_string", type=click.Choice(PHASE_TYPE_NAMES), default=PHASE_TYPE_NAMES[0])
+@click.option("--chain-height", "chain_height", type=int, required=False)
 @click.pass_context
 def scoring_check(
     context: click.Context,
     data_directory_path: str,
     prediction_directory_path: str,
     phase_type_string: str,
+    chain_height: Optional[int],
 ):
     from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
@@ -272,9 +274,13 @@ def scoring_check(
 
     phase_type = PhaseType[phase_type_string]
 
+    if chain_height is None:
+        chain_height = phase_type.first_chain_height()
+
     try:
         module.check(
             phase_type=phase_type,
+            chain_height=chain_height,
             metrics=competition.metrics.list(),
             prediction_directory_path=prediction_directory_path,
             data_directory_path=data_directory_path,

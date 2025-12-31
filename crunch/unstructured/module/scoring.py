@@ -30,6 +30,7 @@ class ScoringModule(ModuleWrapper):
         self,
         *,
         phase_type: PhaseType,
+        chain_height: int,
         metrics: List[Metric],
         prediction_directory_path: str,
         data_directory_path: str,
@@ -44,6 +45,7 @@ class ScoringModule(ModuleWrapper):
             self.get_check_function(ensure=True),
             kwargs={
                 "phase_type": phase_type,
+                "chain_height": chain_height,
                 "prediction_directory_path": prediction_directory_path,
                 "data_directory_path": data_directory_path,
                 "target_names": target_names,
@@ -66,6 +68,7 @@ class ScoringModule(ModuleWrapper):
         self,
         *,
         phase_type: PhaseType,
+        chain_height: int,
         metrics: List[Metric],
         prediction_directory_path: str,
         data_directory_path: str,
@@ -85,6 +88,7 @@ class ScoringModule(ModuleWrapper):
             self.get_score_function(ensure=True),
             kwargs={
                 "phase_type": phase_type,
+                "chain_height": chain_height,
                 "prediction_directory_path": prediction_directory_path,
                 "data_directory_path": data_directory_path,
                 "target_names": target_names,
