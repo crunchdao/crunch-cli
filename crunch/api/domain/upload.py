@@ -6,7 +6,7 @@ from io import BytesIO
 
 import dataclasses_json
 import requests
-import tqdm
+from tqdm.auto import tqdm
 
 if typing.TYPE_CHECKING:
     from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
@@ -317,9 +317,9 @@ class UploadCollection(Collection):
             preferred_chunk_size=preferred_chunk_size,
         )
 
-        progress = tqdm.tqdm(
+        progress = tqdm(
             total=size,
-            desc=f"uploading {name}",
+            desc=f"uploading `{name}`",
             unit="B",
             unit_scale=True,
             unit_divisor=1024,

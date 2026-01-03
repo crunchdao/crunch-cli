@@ -4,7 +4,7 @@ import typing
 import urllib.parse
 
 import requests
-import tqdm
+from tqdm.auto import tqdm
 import urllib3
 
 from .. import constants, store, utils
@@ -80,7 +80,7 @@ class EndpointClient(
 
         self.auth_.apply(headers, params, data)
 
-        progress: tqdm.tqdm = None
+        progress: tqdm = None
 
         if files is not None:
             import requests_toolbelt
@@ -108,7 +108,7 @@ class EndpointClient(
             if not self.show_progress:
                 data = encoder
             else:
-                progress = tqdm.tqdm(
+                progress = tqdm(
                     desc="upload",
                     unit="B",
                     unit_scale=True,
