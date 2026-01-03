@@ -4,7 +4,6 @@ import datetime
 import functools
 import gc
 import inspect
-import io
 import json
 import logging
 import os
@@ -19,7 +18,7 @@ import click
 import joblib
 import pandas
 import requests
-import tqdm
+from tqdm.auto import tqdm
 
 from crunch.runner.types import ArgsLike, KwargsLike
 
@@ -353,7 +352,7 @@ def download(
 
                     response.raise_for_status()
 
-                    with tqdm.tqdm(
+                    with tqdm(
                         initial=total_read,
                         total=file_length,
                         unit='iB',

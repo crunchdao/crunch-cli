@@ -2,7 +2,7 @@ import json
 import os
 from dataclasses import dataclass
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List, Literal, Optional, Tuple, overload
 
 import requests
 
@@ -68,7 +68,7 @@ def _build_gitignore(
 ) -> Callable[[str], Tuple[bool, bool]]:
     from ..external import gitignorefile
 
-    rules: List[gitignorefile._IgnoreRule] = [] # type: ignore
+    rules: List[gitignorefile._IgnoreRule] = []  # type: ignore
     for line in ignored_paths:
         line = line.rstrip("\r\n")
         rule = gitignorefile._rule_from_pattern(line)  # type: ignore
@@ -377,13 +377,41 @@ def _get_encryption_info(
     )
 
 
+@overload
 def push(
+    *,
     message: str,
     main_file_path: str,
     model_directory_relative_path: str,
     include_installed_packages_version: bool,
+    no_afterword: bool,
+    dry: Literal[True]
+) -> None:
+    ...
+
+
+@overload
+def push(
+    *,
+    message: str,
+    main_file_path: str,
+    model_directory_relative_path: str,
+    include_installed_packages_version: bool,
+    no_afterword: bool,
+    dry: Literal[False],
+) -> Submission:
+    ...
+
+
+def push(
+    *,
+    message: str,
+    main_file_path: str,
+    model_directory_relative_path: str,
+    include_installed_packages_version: bool,
+    no_afterword: bool,
     dry: bool,
-):
+) -> Optional[Submission]:
     submission_directory_path = os.path.abspath(".")
 
     client, project = Client.from_project()
@@ -444,7 +472,8 @@ def push(
             },
         )
 
-        _print_success(client, submission)
+        if not no_afterword:
+            _print_success(client, submission)
 
         return submission
     finally:
