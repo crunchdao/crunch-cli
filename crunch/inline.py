@@ -193,6 +193,9 @@ class _Inline:
             from google.colab import _message  # type: ignore
             response = _message.blocking_request('get_ipynb', request='', timeout_sec=5)  # type: ignore
 
+            if response is None:
+                raise NotImplementedError(f"google.colab._message.blocking_request did not answered")
+
             error = response.get("error")  # type: ignore
             if error is not None:
                 raise NotImplementedError(f"{error.get('type')}: {error.get('description')}")  # type: ignore
