@@ -8,7 +8,7 @@ import requests
 
 from crunch import store
 from crunch.api import ApiException, Client, ForbiddenLibraryException, Project, Submission, SubmissionType, Upload
-from crunch.constants import ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES
+from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES
 from crunch.utils import format_bytes
 
 if TYPE_CHECKING:
@@ -123,10 +123,13 @@ def list_code_files(
     submission_directory_path: str,
     model_directory_relative_path: str,
 ):
+    is_in_colab = os.getenv(COLAB_DETECTION_ENV_VAR) is not None
+
     return _list_files(
         submission_directory_path,
         [
             *IGNORED_CODE_FILES,
+            *(COLAB_IGNORED_CODE_FILES if is_in_colab else []),
             _to_unix_path(f"/{model_directory_relative_path}/"),
         ],
     )
