@@ -306,9 +306,9 @@ def setup_notebook(
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
     print(f"Next recommended actions:")
-    print(f"1. Load the Crunch Toolings: `crunch = crunch.load_notebook()`")
+    print(f"1. Load the Crunch Toolings: `crunch_tools = crunch.load_notebook()`")
     print(f"2. Execute the cells with your code")
-    print(f"3. Run a test: `crunch.test()`")
+    print(f"3. Run a test: `crunch_tools.test()`")
     print(f"4. Download and submit your code to the platform!")
 
 
