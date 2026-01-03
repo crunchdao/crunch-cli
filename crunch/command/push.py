@@ -49,23 +49,34 @@ def _to_unix_path(input: str):
     if input == ".":
         return input + "/"
 
-    return os.path.normpath(input)\
+    has_trailing_slash = input.endswith(("/", "\\"))
+
+    input = os.path.normpath(input)\
         .replace("\\", "/")\
         .replace("//", "/")
+
+    if has_trailing_slash and not input.endswith("/"):
+        input += "/"
+
+    return input
 
 
 def _build_gitignore(
     directory_path: str,
     ignored_paths: List[str],
     use_parent_gitignore: bool,
-) -> Callable[[str], tuple[bool, bool]]:
+) -> Callable[[str], Tuple[bool, bool]]:
     from ..external import gitignorefile
 
+    rules: List[gitignorefile._IgnoreRule] = [] # type: ignore
+    for line in ignored_paths:
+        line = line.rstrip("\r\n")
+        rule = gitignorefile._rule_from_pattern(line)  # type: ignore
+        if rule:
+            rules.append(rule)
+
     ignored_files = gitignorefile._IgnoreRules(  # type: ignore
-        rules=[
-            gitignorefile._rule_from_pattern(line)  # type: ignore
-            for line in ignored_paths
-        ],
+        rules=rules,
         base_path=directory_path,
     )
 
@@ -102,7 +113,7 @@ def _list_files(
             relative_path = _to_unix_path(os.path.join(root, file))
             absolute_path = _to_unix_path(os.path.join(directory_path, relative_path))
 
-            if any(is_ignored(absolute_path)):
+            if any(is_ignored(relative_path)):
                 continue
 
             yield absolute_path, relative_path
