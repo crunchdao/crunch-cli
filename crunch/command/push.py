@@ -379,10 +379,12 @@ def _get_encryption_info(
 
 @overload
 def push(
+    *,
     message: str,
     main_file_path: str,
     model_directory_relative_path: str,
     include_installed_packages_version: bool,
+    no_afterword: bool,
     dry: Literal[True]
 ) -> None:
     ...
@@ -390,20 +392,24 @@ def push(
 
 @overload
 def push(
+    *,
     message: str,
     main_file_path: str,
     model_directory_relative_path: str,
     include_installed_packages_version: bool,
+    no_afterword: bool,
     dry: Literal[False],
 ) -> Submission:
     ...
 
 
 def push(
+    *,
     message: str,
     main_file_path: str,
     model_directory_relative_path: str,
     include_installed_packages_version: bool,
+    no_afterword: bool,
     dry: bool,
 ) -> Optional[Submission]:
     submission_directory_path = os.path.abspath(".")
@@ -466,7 +472,8 @@ def push(
             },
         )
 
-        _print_success(client, submission)
+        if not no_afterword:
+            _print_success(client, submission)
 
         return submission
     finally:

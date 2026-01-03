@@ -275,6 +275,7 @@ class _Inline:
                 main_file_path=main_file_name,
                 model_directory_relative_path=model_directory_relative_path,
                 include_installed_packages_version=include_installed_packages_version,
+                no_afterword=True,
                 dry=False,
             )
         except ApiException as error:

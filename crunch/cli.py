@@ -371,7 +371,7 @@ def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
-    export_path: str,
+    export_path: Optional[str],
     no_pip_freeze: bool,
     dry: bool,
 ):
@@ -384,11 +384,12 @@ def push(
     with convert_if_necessary(main_file_path):
         try:
             command.push(
-                message,
-                main_file_path,
-                model_directory_path,
-                not no_pip_freeze,
-                dry,
+                message=message,
+                main_file_path=main_file_path,
+                model_directory_relative_path=model_directory_path,
+                include_installed_packages_version=not no_pip_freeze,
+                no_afterword=False,
+                dry=dry,
             )
         except api.ApiException as error:
             utils.exit_via(error)
