@@ -1,15 +1,16 @@
 import json
 import logging
+import os
 import sys
+import urllib.parse
 from functools import cached_property
 from textwrap import dedent
 from types import ModuleType
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 import click
 import pandas
 import psutil
-from IPython.display import Markdown, display
 
 import crunch.tester as tester
 from crunch.__version__ import __version__
@@ -182,6 +183,13 @@ class _Inline:
             message = input("Message: ")
 
         try:
+            from IPython.display import Markdown, display  # type: ignore
+        except ImportError as error:
+            print(f"submit: could not import ipython, are you running in a notebook?", file=sys.stderr)
+            print(f"submit: catched error: {error}", file=sys.stderr)
+            return
+
+        try:
             from google.colab import _message  # type: ignore
             response = _message.blocking_request('get_ipynb', request='', timeout_sec=5)  # type: ignore
 
@@ -196,13 +204,15 @@ class _Inline:
             if ipynb.get("cells") is None:  # type: ignore
                 raise NotImplementedError(f"missing cells, available keys are: {list(ipynb.keys())}")  # type: ignore
         except (ImportError, NotImplementedError) as error:
+            encoded_message = urllib.parse.quote_plus(message)
+
             display(Markdown(dedent(f"""
                 Your work could not be submitted automatically, please do so manually:
                 1. Download your Notebook from Colab
                 2. Upload it to the platform
                 3. Create a run to validate it
 
-                ### >> [https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook](https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook?message=qsd)
+                ### >> [https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook](https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook?message={encoded_message})
 
                 <img alt="Download and Submit Notebook" src=https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/download-and-submit-notebook.gif height="600px" />
 
@@ -211,6 +221,38 @@ class _Inline:
             """)))
             return
 
+        files_before = set(os.listdir("."))
+
+        try:
+            return self._do_submit(
+                ipynb=ipynb,
+                message=message,
+                model_directory_relative_path=model_directory_relative_path,
+                include_installed_packages_version=include_installed_packages_version,
+                notebook_file_name=notebook_file_name,
+                main_file_name=main_file_name,
+            )
+        finally:
+            files_after = set(os.listdir("."))
+            new_files = files_after - files_before
+
+            for file in new_files:
+                try:
+                    os.unlink(file)
+                except FileNotFoundError:
+                    pass
+
+    def _do_submit(
+        self,
+        ipynb: Any,
+        message: str,
+        model_directory_relative_path: str,
+        include_installed_packages_version: bool,
+        notebook_file_name: str,
+        main_file_name: str,
+    ):
+        from IPython.display import Markdown, display  # type: ignore
+
         with open(notebook_file_name, "w") as fd:
             json.dump(ipynb, fd)
 
@@ -218,6 +260,8 @@ class _Inline:
             convert(
                 notebook_file_path=notebook_file_name,
                 python_file_path=main_file_name,
+                write_requirements=True,
+                write_embedded_files=True,
                 override=True,
             )
         except SystemExit as error:
@@ -226,7 +270,7 @@ class _Inline:
                 return
 
         try:
-            push(
+            submission = push(
                 message=message,
                 main_file_path=main_file_name,
                 model_directory_relative_path=model_directory_relative_path,
@@ -238,8 +282,11 @@ class _Inline:
             error.print_helper()
             return
 
+        project = submission.project
         display(Markdown(dedent(f"""
             Next step is to run your submission in the cloud:
+
+            ### >> https://hub.crunchdao.com/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/runs/create?submissionNumber={submission.number}
 
             <img alt="Run in the Cloud" src=https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/create-run.gif height="600px" />
         """)))
