@@ -210,6 +210,8 @@ class _Inline:
             encoded_message = urllib.parse.quote_plus(message)
 
             display(Markdown(dedent(f"""
+                ---
+
                 Your work could not be submitted automatically, please do so manually:
                 1. Download your Notebook from Colab
                 2. Upload it to the platform
@@ -288,6 +290,8 @@ class _Inline:
 
         project = submission.project
         display(Markdown(dedent(f"""
+            ---
+
             Next step is to run your submission in the cloud:
 
             ### >> https://hub.crunchdao.com/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/runs/create?submissionNumber={submission.number}
