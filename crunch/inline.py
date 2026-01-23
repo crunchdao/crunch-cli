@@ -267,6 +267,7 @@ class _Inline:
                 python_file_path=main_file_name,
                 write_requirements=True,
                 write_embedded_files=True,
+                no_freeze=True,  # will be frozen on push
                 override=True,
             )
         except SystemExit as error:
