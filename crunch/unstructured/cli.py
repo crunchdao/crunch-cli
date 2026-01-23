@@ -301,12 +301,14 @@ def scoring_check(
 @click.option("--data-directory", "data_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.option("--prediction-directory", "prediction_directory_path", type=click.Path(file_okay=False, readable=True), required=True)
 @click.option("--phase-type", "phase_type_string", type=click.Choice(PHASE_TYPE_NAMES), default=PHASE_TYPE_NAMES[0])
+@click.option("--chain-height", default=1)
 @click.pass_context
 def scoring_score(
     context: click.Context,
     data_directory_path: str,
     prediction_directory_path: str,
     phase_type_string: str,
+    chain_height: int,
 ):
     from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
@@ -323,6 +325,7 @@ def scoring_score(
         metrics = competition.metrics.list()
         results = module.score(
             phase_type=phase_type,
+            chain_height=chain_height,
             metrics=metrics,
             prediction_directory_path=prediction_directory_path,
             data_directory_path=data_directory_path,
