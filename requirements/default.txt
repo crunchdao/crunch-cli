@@ -1,5 +1,5 @@
 click
-crunch-convert>=0.4.0
+crunch-convert>=0.4.1
 crunch-encrypt
 coloredlogs
 dataclasses_json
