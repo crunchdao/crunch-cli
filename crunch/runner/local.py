@@ -74,11 +74,13 @@ class LocalRunner(Runner):
             )
 
             memory_after = get_process_memory()
+            memory_consumed = memory_after - memory_before
+
             self.log(
-                'memory - before="%s" after="%s" consumed="%s"' % (
+                'memory - before="%s" after="%s" consumed=%s' % (
                     format_bytes(memory_before),
                     format_bytes(memory_after),
-                    format_bytes(memory_after - memory_before)
+                    f'"{format_bytes(memory_consumed)}"' if memory_consumed > 0 else "unknown"
                 ),
                 important=True,
             )
