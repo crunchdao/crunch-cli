@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from dataclasses import dataclass
 from io import BytesIO
 from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List, Literal, Optional, Tuple, overload
@@ -418,7 +419,7 @@ def push(
 ) -> Optional[Submission]:
     message_length = len(message)
     if message_length > SUBMISSION_MESSAGE_LENGTH:
-        print(f"submission: message too long: {message_length}/{SUBMISSION_MESSAGE_LENGTH}")
+        print(f"submission: message too long: {message_length}/{SUBMISSION_MESSAGE_LENGTH}", file=sys.stderr)
         raise click.Abort()
 
     submission_directory_path = os.path.abspath(".")
