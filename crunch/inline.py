@@ -237,6 +237,8 @@ class _Inline:
                 notebook_file_name=notebook_file_name,
                 main_file_name=main_file_name,
             )
+        except click.Abort:
+            print("aborted", file=sys.stderr)
         finally:
             files_after = set(os.listdir("."))
             new_files = files_after - files_before
