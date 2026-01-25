@@ -101,13 +101,18 @@ def _list_files(
     use_parent_gitignore: bool = False,
 ):
     directory_path = _to_unix_path(directory_path)
+    directory_path_prefix = (
+        len(directory_path)
+        + int(not directory_path.endswith("/"))  # add 1 if value not ends with a slash
+    )
+
     is_ignored = _build_gitignore(directory_path, ignored_paths, use_parent_gitignore)
 
     for root, _, files in os.walk(directory_path, topdown=False):
         root = _to_unix_path(root)
 
         if root.startswith(directory_path):
-            root = root[len(directory_path) + len("/"):]
+            root = root[directory_path_prefix:]
         elif root == directory_path:
             root = ""
 
