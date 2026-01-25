@@ -174,13 +174,16 @@ class _Inline:
     def submit(
         self,
         message: Optional[str] = None,
-        model_directory_relative_path: str = DEFAULT_MODEL_DIRECTORY,
+        model_directory_relative_path: str = "",
         include_installed_packages_version: bool = False,
         notebook_file_name: str = "notebook.ipynb",
         main_file_name: str = DEFAULT_MAIN_FILE_PATH,
     ):
         if message is None:
             message = input("Message: ")
+
+        if not model_directory_relative_path or os.path.realpath(model_directory_relative_path) == os.path.realpath("."):
+            model_directory_relative_path = DEFAULT_MODEL_DIRECTORY
 
         try:
             from IPython.display import Markdown, display  # type: ignore
