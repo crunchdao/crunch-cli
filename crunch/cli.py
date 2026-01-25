@@ -361,7 +361,7 @@ def convert_if_necessary(
 
 
 @cli.command(help="Send the new submission of your code.")
-@click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
+@click.option("-m", "--message", prompt=True, default="", help=f"Specify the change of your code. (like a commit message, limited to {constants.SUBMISSION_MESSAGE_LENGTH} characters)")
 @click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")

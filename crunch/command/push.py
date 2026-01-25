@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List, Literal, Optional, Tuple, overload
 
+import click
 import requests
 
 from crunch import store
 from crunch.api import ApiException, Client, ForbiddenLibraryException, Project, Submission, SubmissionType, Upload
-from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES
+from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, SUBMISSION_MESSAGE_LENGTH
 from crunch.utils import format_bytes
 
 if TYPE_CHECKING:
@@ -415,6 +416,11 @@ def push(
     no_afterword: bool,
     dry: bool,
 ) -> Optional[Submission]:
+    message_length = len(message)
+    if message_length > SUBMISSION_MESSAGE_LENGTH:
+        print(f"submission: message too long: {message_length}/{SUBMISSION_MESSAGE_LENGTH}")
+        raise click.Abort()
+
     submission_directory_path = os.path.abspath(".")
 
     client, project = Client.from_project()
