@@ -94,7 +94,6 @@ class Competition(Model):
 
         return QuickstarterCollection(
             competition=self,
-            competition_format=None,
             client=self._client
         )
 

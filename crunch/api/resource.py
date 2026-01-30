@@ -61,8 +61,8 @@ class Model:
 
     def reload(
         self,
-        *args,
-        **kwargs
+        *args, # type: ignore
+        **kwargs, # type: ignore
     ):
         resource_identifier = self.resource_identifier
         if not isinstance(resource_identifier, (list, tuple)):
