@@ -74,11 +74,11 @@ class Quickstarter(Model):
         return self._competition
 
     @property
-    def name(self) -> bool:
+    def name(self) -> str:
         return self._attrs["name"]
 
     @property
-    def title(self) -> bool:
+    def title(self) -> str:
         return self._attrs["title"]
 
     @property

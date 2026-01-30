@@ -19,7 +19,7 @@ def _select(
 
     if quickstarter_name is not None:
         for quickstarter in quickstarters:
-            if quickstarter_name in (quickstarter.name, quickstarter.title):
+            if quickstarter_name in [quickstarter.name, quickstarter.title]:
                 return quickstarter
 
             print(f"{competition_name}: no quickstarter named `{quickstarter_name}`")
