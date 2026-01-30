@@ -282,13 +282,6 @@ class Client:
             client=self,
         )
 
-    def quickstarters(self, competition_format: CompetitionFormat):
-        return QuickstarterCollection(
-            competition=None,
-            competition_format=competition_format,
-            client=self
-        )
-
     def get_runner_run(self, run_id: int):
         return RunnerRun(
             run_id,

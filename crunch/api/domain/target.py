@@ -72,7 +72,7 @@ class TargetCollection(Collection):
         self.competition = competition
 
     def __iter__(self) -> Iterator[Target]:
-        return super().__iter__()
+        return super().__iter__()  # type: ignore
 
     def get(
         self,

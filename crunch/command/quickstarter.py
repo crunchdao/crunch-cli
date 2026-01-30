@@ -15,11 +15,7 @@ def _select(
     import inquirer
 
     competition = client.competitions.get(competition_name)
-
-    quickstarters = [
-        *client.quickstarters(competition.format).list(),
-        *competition.quickstarters.list()
-    ]
+    quickstarters = competition.quickstarters.list()
 
     if quickstarter_name is not None:
         for quickstarter in quickstarters:
@@ -97,8 +93,7 @@ def quickstarter(
         if not click.confirm("continue?"):
             raise click.Abort()
 
-    from_ = f"competitions/{quickstarter.competition.name}" if quickstarter.competition else "generic"
-    print(f"quickstarter {quickstarter.name} from {from_}")
+    print(f"quickstarter {quickstarter.name} from competitions/{quickstarter.competition.name}")
 
     for file in files:
         path = os.path.join(".", file.name)  # useful?
