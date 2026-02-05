@@ -389,7 +389,7 @@ def download(
         )
 
 
-def exit_via(error: "api.ApiException", **kwargs: KwargsLike) -> None:
+def exit_via(error: "api.ApiException", **kwargs: KwargsLike) -> typing.NoReturn:
     print("\n---")
     error.print_helper(**kwargs)
     exit(1)
