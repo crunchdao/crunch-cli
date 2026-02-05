@@ -128,6 +128,23 @@ def ping():
         print(f"server is down? ({exception})")
 
 
+@cli.command(name="list", help="List all available competitions.")
+def list_competitions():
+    client = api.Client.from_env()
+
+    try:
+        competitions = client.competitions.list()
+    except api.ApiException as error:
+        utils.exit_via(error)
+
+    if not competitions:
+        print("No competitions found.")
+        return
+
+    for competition in competitions:
+        print(f"  {competition.name} ({competition.format.name})")
+
+
 @cli.command(help="Initialize an empty workspace directory.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
