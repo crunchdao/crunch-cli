@@ -141,8 +141,10 @@ def list_competitions():
         print("No competitions found.")
         return
 
+    print("Available competitions:")
     for competition in competitions:
-        print(f"  {competition.name} ({competition.format.name})")
+        category = "external" if competition.external else competition.format.name.lower()
+        print(f"- {competition.name} ({category})")
 
 
 @cli.command(help="Initialize an empty workspace directory.")
