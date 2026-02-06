@@ -3,16 +3,16 @@ import functools
 import json
 import os
 import sys
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import click
 
 from crunch.api import PhaseType, RoundIdentifierType
 from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
+from crunch.unstructured.cli import organize_test_group
 
 from . import __version__, api, command, constants, store, utils
-from .unstructured.cli import organize_test_group
 
 store.load_from_env()
 
@@ -72,13 +72,8 @@ def _format_directory(directory: str, competition_name: str, project_name: str):
     return os.path.normpath(directory)
 
 
-def echo_version(f):
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-        click.echo(f"{__version__.__title__}, version {__version__.__version__}")
-        return f(*args, **kwargs)
-
-    return wrapper
+def _echo_version():
+    click.echo(f"{__version__.__title__}, version {__version__.__version__}")
 
 
 @click.group()
@@ -129,11 +124,41 @@ def ping():
 
 
 @cli.command(name="list", help="List all available competitions.")
-def list_competitions():
+@click.option("--format", "format_raw", required=False, type=click.Choice([x.name for x in api.CompetitionFormat], case_sensitive=False), help="Filter competitions by their format.")
+@click.option("--mode", "mode_raw", required=False, type=click.Choice([x.name for x in api.CompetitionMode], case_sensitive=False), help="Filter competitions by their mode.")
+@click.option("--status", "status_raw", required=False, type=click.Choice([x.name for x in api.CompetitionStatus], case_sensitive=False), help="Filter competitions by their status.")
+@click.option("--continuous", required=False, type=bool, help="Filter continuous competitions.")
+@click.option("--external", required=False, type=bool, help="Filter continuous competitions.")
+@click.option("--featured", required=False, type=bool, help="Filter continuous competitions.")
+@click.option("--organizer-name", required=False, type=str, help="Filter continuous competitions.")
+@click.option("--team-based", required=False, type=bool, help="Filter continuous competitions.")
+def list_competitions(
+    format_raw: Optional[str],
+    status_raw: Optional[str],
+    mode_raw: Optional[str],
+    continuous: Optional[bool],
+    external: Optional[bool],
+    featured: Optional[bool],
+    organizer_name: Optional[str],
+    team_based: Optional[bool],
+):
+    format = api.CompetitionFormat[format_raw.upper()] if format_raw else None
+    mode = api.CompetitionMode[mode_raw.upper()] if mode_raw else None
+    status = api.CompetitionStatus[status_raw.upper()] if status_raw else None
+
     client = api.Client.from_env()
 
     try:
-        competitions = client.competitions.list()
+        competitions = client.competitions.list(
+            format=format,
+            status=status,
+            mode=mode,
+            continuous=continuous,
+            external=external,
+            featured=featured,
+            organizer_name=organizer_name,
+            team_based=team_based,
+        )
     except api.ApiException as error:
         utils.exit_via(error)
 
@@ -203,7 +228,6 @@ def init(
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
-@echo_version
 def setup(
     clone_token: str,
     submission_number: command.SetupSubmissionNumber,
@@ -215,11 +239,13 @@ def setup(
     directory: str,
     model_directory_path: str,
     no_quickstarter: bool,
-    quickstarter_name: str,
+    quickstarter_name: Optional[str],
     show_notebook_quickstarters: bool,
     notebook: bool,
     data_size_variant_raw: str,
 ):
+    _echo_version()
+
     if notebook:
         if force:
             print("notebook `--force` is implicit", file=sys.stderr)
@@ -288,7 +314,6 @@ def setup(
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
 @click.argument("clone-token")
-@echo_version
 def setup_notebook(
     submission_number: command.SetupSubmissionNumber,
     no_data: bool,
@@ -298,6 +323,8 @@ def setup_notebook(
     competition_name: str,
     clone_token: str,
 ):
+    _echo_version()
+
     directory = os.getcwd()
 
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
@@ -549,7 +576,7 @@ def local(
     round_number: str,
     has_gpu: bool,
     no_checks: bool,
-    no_determinism_check: bool,
+    no_determinism_check: Optional[bool],
 ):
     from . import library, tester
 
@@ -579,6 +606,7 @@ def local(
             )
         except api.ApiException as error:
             utils.exit_via(error)
+
 
 @runner_group.command(help="Cloud runner, do not directly run!")
 @click.option("--competition-name", envvar="COMPETITION_NAME", required=True)
@@ -706,8 +734,8 @@ def cloud(
 
 @runner_group.command(help="Cloud executor, do not directly run!")
 @click.option("--competition-name", required=True)
-@click.option("--competition-format", required=True)
-@click.option("--split-key-type", required=True)
+@click.option("--competition-format", "competition_format_raw", required=True)
+@click.option("--split-key-type", "split_key_type_raw", required=True)
 # ---
 @click.option("--x", "x_path", default=None)
 @click.option("--y", "y_path", default=None)
@@ -747,8 +775,8 @@ def cloud(
 @click.option("--parameters", "parameters_json_string", type=str, default=None)
 def cloud_executor(
     competition_name: str,
-    competition_format: str,
-    split_key_type: str,
+    competition_format_raw: str,
+    split_key_type_raw: str,
     # ---
     x_path: str,
     y_path: str,
@@ -765,7 +793,7 @@ def cloud_executor(
     ping_urls: List[str],
     # ---
     train: bool,
-    loop_key: str,
+    loop_key: Union[str, int],
     embargo: int,
     number_of_features: int,
     gpu: bool,
@@ -795,13 +823,11 @@ def cloud_executor(
     from . import monkey_patches
     monkey_patches.apply_all()
 
-    competition_format = api.CompetitionFormat[competition_format]
+    competition_format = api.CompetitionFormat[competition_format_raw]
 
-    if competition_format == api.CompetitionFormat.TIMESERIES:
-        split_key_type = api.SplitKeyType[split_key_type]
-
-        if split_key_type == api.SplitKeyType.INTEGER:
-            loop_key = int(loop_key)
+    split_key_type = api.SplitKeyType[split_key_type_raw]
+    if split_key_type == api.SplitKeyType.INTEGER:
+        loop_key = int(loop_key)
 
     from .runner.cloud_executor import SandboxExecutor
     executor = SandboxExecutor(
@@ -873,7 +899,7 @@ def organize_group(
 
     try:
         competition = client.competitions.get(competition_name)
-    except api.errors.CompetitionNameNotFoundException:
+    except api.CompetitionNameNotFoundException:
         print(f"competition {competition_name} not found", file=sys.stderr)
         raise click.Abort()
     except api.ApiException as error:

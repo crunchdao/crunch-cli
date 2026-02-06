@@ -1,12 +1,11 @@
-import enum
-import typing
+from enum import Enum
+from typing import Generator, Iterator, Optional
+from crunch.api.identifiers import CompetitionIdentifierType
+from crunch.api.resource import Collection, Model
+from crunch.api.domain.enum_ import SplitKeyType
 
-from ..identifiers import CompetitionIdentifierType
-from ..resource import Collection, Model
-from .enum_ import SplitKeyType
 
-
-class CompetitionFormat(enum.Enum):
+class CompetitionFormat(Enum):
 
     TIMESERIES = "TIMESERIES"
     DAG = "DAG"
@@ -20,6 +19,26 @@ class CompetitionFormat(enum.Enum):
     @property
     def unstructured(self):
         return self == CompetitionFormat.UNSTRUCTURED
+
+
+class CompetitionMode(Enum):
+
+    OFFLINE = "OFFLINE"
+    REAL_TIME = "REAL_TIME"
+
+    def __repr__(self):
+        return self.name
+
+
+
+class CompetitionStatus(Enum):
+
+    PENDING = "PENDING"
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
+
+    def __repr__(self):
+        return self.name
 
 
 class Competition(Model):
@@ -124,8 +143,8 @@ class CompetitionCollection(Collection):
 
     model = Competition
 
-    def __iter__(self) -> typing.Iterator[Competition]:
-        return super().__iter__()
+    def __iter__(self) -> Iterator[Competition]:
+        return super().__iter__()  # type: ignore
 
     def get(
         self,
@@ -138,23 +157,80 @@ class CompetitionCollection(Collection):
         )
 
     def list(
-        self
-    ) -> typing.List[Competition]:
+        self,
+        *,
+        format: Optional[CompetitionFormat] = None,
+        mode: Optional[CompetitionMode] = None,
+        status: Optional[CompetitionStatus] = None,
+        continuous: Optional[bool] = None,
+        external: Optional[bool] = None,
+        featured: Optional[bool] = None,
+        organizer_name: Optional[str] = None,
+        team_based: Optional[bool] = None,
+    ) -> Generator[Competition, None, None]:
         return self.prepare_models(
-            self._client.api.list_competitions()
+            self._client.api.list_competitions_v2(
+                format=format,
+                mode=mode,
+                status=status,
+                continuous=continuous,
+                external=external,
+                featured=featured,
+                organizer_name=organizer_name,
+                team_based=team_based,
+            )
         )
 
 
 class CompetitionEndpointMixin:
 
-    def list_competitions(
-        self
-    ):
-        return self._result(
-            self.get(
-                "/v1/competitions"
+    def list_competitions_v2(
+        self,
+        format: Optional[CompetitionFormat],
+        mode: Optional[CompetitionMode],
+        status: Optional[CompetitionStatus],
+        continuous: Optional[bool],
+        external: Optional[bool],
+        featured: Optional[bool],
+        organizer_name: Optional[str],
+        team_based: Optional[bool],
+    ) -> Generator[dict, None, None]:
+        params = {}
+
+        if format is not None:
+            params["format"] = format.name
+
+        if mode is not None:
+            params["mode"] = mode.name
+
+        if status is not None:
+            params["status"] = status.name
+
+        if continuous is not None:
+            params["continuous"] = continuous
+
+        if external is not None:
+            params["external"] = external
+
+        if featured is not None:
+            params["featured"] = featured
+
+        if organizer_name is not None:
+            params["organizerName"] = organizer_name
+
+        if team_based is not None:
+            params["teamBased"] = team_based
+
+        return self._paginated(
+            lambda page_request: self.get(
+                "/v2/competitions",
+                params={
+                    **params,
+                    "page": page_request.number,
+                    "size": page_request.size,
+                },
             ),
-            json=True
+            page_size=1000,
         )
 
     def get_competition(

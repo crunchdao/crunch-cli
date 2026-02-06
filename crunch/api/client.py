@@ -1,37 +1,40 @@
-import json
 import os
-import typing
 import urllib.parse
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Optional, Tuple, cast
 
 import requests
 from tqdm.auto import tqdm
-import urllib3
+from urllib3.exceptions import RequestError
 
-from .. import constants, store, utils
-from .auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
-from .domain.check import CheckEndpointMixin
-from .domain.competition import CompetitionCollection, CompetitionEndpointMixin, CompetitionFormat
-from .domain.crunch import CrunchEndpointMixin
-from .domain.data_release import DataReleaseEndpointMixin
-from .domain.leaderboard import LeaderboardEndpointMixin
-from .domain.library import LibraryCollection, LibraryEndpointMixin
-from .domain.metric import MetricEndpointMixin
-from .domain.phase import PhaseEndpointMixin
-from .domain.prediction import PredictionEndpointMixin
-from .domain.project import Project, ProjectEndpointMixin, ProjectTokenCollection
-from .domain.quickstarter import QuickstarterCollection, QuickstarterEndpointMixin
-from .domain.round import RoundEndpointMixin
-from .domain.run import RunEndpointMixin
-from .domain.runner import RunnerRun, RunnerRunEndpointMixin
-from .domain.score import ScoreEndpointMixin
-from .domain.submission import SubmissionEndpointMixin
-from .domain.submission_file import SubmissionFileEndpointMixin
-from .domain.target import TargetEndpointMixin
-from .domain.upload import UploadCollection, UploadEndpointMixin
-from .domain.user import UserCollection, UserEndpointMixin
-from .domain.webapp import WebappEndpointMixin
-from .errors import convert_error
-from .pagination import PageRequest
+import crunch.store as store
+from crunch.api.auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
+from crunch.api.domain.check import CheckEndpointMixin
+from crunch.api.domain.competition import CompetitionCollection, CompetitionEndpointMixin
+from crunch.api.domain.crunch import CrunchEndpointMixin
+from crunch.api.domain.data_release import DataReleaseEndpointMixin
+from crunch.api.domain.leaderboard import LeaderboardEndpointMixin
+from crunch.api.domain.library import LibraryCollection, LibraryEndpointMixin
+from crunch.api.domain.metric import MetricEndpointMixin
+from crunch.api.domain.phase import PhaseEndpointMixin
+from crunch.api.domain.prediction import PredictionEndpointMixin
+from crunch.api.domain.project import Project, ProjectEndpointMixin, ProjectTokenCollection
+from crunch.api.domain.quickstarter import QuickstarterEndpointMixin
+from crunch.api.domain.round import RoundEndpointMixin
+from crunch.api.domain.run import RunEndpointMixin
+from crunch.api.domain.runner import RunnerRun, RunnerRunEndpointMixin
+from crunch.api.domain.score import ScoreEndpointMixin
+from crunch.api.domain.submission import SubmissionEndpointMixin
+from crunch.api.domain.submission_file import SubmissionFileEndpointMixin
+from crunch.api.domain.target import TargetEndpointMixin
+from crunch.api.domain.upload import UploadCollection, UploadEndpointMixin
+from crunch.api.domain.user import UserCollection, UserEndpointMixin
+from crunch.api.domain.webapp import WebappEndpointMixin
+from crunch.api.errors import convert_error
+from crunch.api.pagination import PageRequest
+from crunch.constants import API_KEY_ENV_VAR
+
+if TYPE_CHECKING:
+    from crunch.utils import ProjectInfo
 
 
 class EndpointClient(
@@ -72,15 +75,15 @@ class EndpointClient(
         self.show_progress = show_progress
         self.page_size = 100
 
-    def request(self, method, url, *args, **kwargs):
+    def request(self, method: str, url: str, *args: Any, **kwargs: Any):
         headers = kwargs.pop("headers", {})
         params = kwargs.pop("params", {})
-        data: dict = kwargs.pop("data", None)
-        files: tuple = kwargs.pop("files", None)
+        data: Any = kwargs.pop("data", None)
+        files: Any = kwargs.pop("files", None)
 
         self.auth_.apply(headers, params, data)
 
-        progress: tqdm = None
+        progress: Optional[tqdm] = None
 
         if files is not None:
             import requests_toolbelt
@@ -92,12 +95,12 @@ class EndpointClient(
             if isinstance(data, dict):
                 fields.extend((
                     (key, str(value))
-                    for key, value in data.items()
+                    for key, value in cast(Dict[str, Any], data).items()
                     if value is not None
                 ))
             elif isinstance(data, (list, tuple)):
                 # TODO Filter `None`s?
-                fields.extend(data)
+                fields.extend(cast(Iterable[Tuple[str, Any]], data))
             elif data is not None:
                 raise ValueError(f"unsupported data: {data}")
 
@@ -113,7 +116,7 @@ class EndpointClient(
                     unit="B",
                     unit_scale=True,
                     unit_divisor=1024,
-                    total=encoder.len,
+                    total=encoder.len,  # type: ignore
                 )
 
                 def callback(monitor: requests_toolbelt.MultipartEncoderMonitor):
@@ -165,7 +168,7 @@ class EndpointClient(
             if isinstance(arg, BaseException):
                 self._strip_secrets(arg)
 
-                if isinstance(arg, urllib3.exceptions.RequestError):
+                if isinstance(arg, RequestError):
                     arg.url = self.auth_.strip(arg.url) or arg.url
 
                 continue
@@ -210,8 +213,8 @@ class EndpointClient(
 
     def _paginated(
         self,
-        requester: typing.Callable[[PageRequest], requests.Response],
-        page_size: typing.Optional[int] = None
+        requester: Callable[[PageRequest], requests.Response],
+        page_size: Optional[int] = None
     ):
         if not page_size:
             page_size = self.page_size
@@ -243,7 +246,7 @@ class Client:
         api_base_url: str,
         web_base_url: str,
         auth: Auth,
-        project_info: typing.Optional[utils.ProjectInfo] = None,
+        project_info: Optional["ProjectInfo"] = None,
         *,
         show_progress: bool = True,
     ):
@@ -296,14 +299,14 @@ class Client:
 
     @staticmethod
     def from_env(
-        auth: typing.Optional[Auth] = None,
+        auth: Optional[Auth] = None,
         *,
-        show_progress=True,
+        show_progress: bool = True,
     ):
         store.load_from_env()
 
         if auth is None:
-            api_key = os.getenv(constants.API_KEY_ENV_VAR)
+            api_key = os.getenv(API_KEY_ENV_VAR)
             if api_key:
                 auth = ApiKeyAuth(api_key)
             else:
@@ -319,12 +322,14 @@ class Client:
     @staticmethod
     def from_project(
         *,
-        show_progress=True,
-    ) -> typing.Tuple["Client", Project]:
+        show_progress: bool = True,
+    ) -> Tuple["Client", Project]:
+        from crunch.utils import read_project_info, read_token
+
         store.load_from_env()
 
-        project_info = utils.read_project_info()
-        push_token = utils.read_token()
+        project_info = read_project_info()
+        push_token = read_token()
 
         client = Client(
             store.api_base_url,

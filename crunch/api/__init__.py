@@ -1,40 +1,82 @@
-from .domain import *
-from .client import Client
-from . import auth
+import crunch.api.auth as auth  # pyright: ignore[reportUnusedImport]
+from crunch.api.client import Client as Client
+from crunch.api.domain.check import Check as Check
+from crunch.api.domain.check import CheckFunction as CheckFunction
+from crunch.api.domain.check import CheckFunctionScope as CheckFunctionScope
+from crunch.api.domain.common import GpuRequirement as GpuRequirement
+from crunch.api.domain.competition import Competition as Competition
+from crunch.api.domain.competition import CompetitionFormat as CompetitionFormat
+from crunch.api.domain.competition import CompetitionMode as CompetitionMode
+from crunch.api.domain.competition import CompetitionStatus as CompetitionStatus
+from crunch.api.domain.crunch import Crunch as Crunch
+from crunch.api.domain.data_release import ColumnNames as ColumnNames
+from crunch.api.domain.data_release import DataFile as DataFile
+from crunch.api.domain.data_release import DataFiles as DataFiles
+from crunch.api.domain.data_release import DataFilesUnion as DataFilesUnion
+from crunch.api.domain.data_release import DataRelease as DataRelease
+from crunch.api.domain.data_release import DataReleaseFeature as DataReleaseFeature
+from crunch.api.domain.data_release import DataReleaseSplit as DataReleaseSplit
+from crunch.api.domain.data_release import DataReleaseSplitGroup as DataReleaseSplitGroup
+from crunch.api.domain.data_release import DataReleaseSplitReduced as DataReleaseSplitReduced
+from crunch.api.domain.data_release import DataReleaseTargetResolution as DataReleaseTargetResolution
+from crunch.api.domain.data_release import KnownData as KnownData
+from crunch.api.domain.data_release import OriginalFiles as OriginalFiles
+from crunch.api.domain.data_release import SizeVariant as SizeVariant
+from crunch.api.domain.data_release import SplitKeyPythonType as SplitKeyPythonType
+from crunch.api.domain.data_release import TargetColumnNames as TargetColumnNames
+from crunch.api.domain.enum_ import Language as Language
+from crunch.api.domain.enum_ import SplitKeyType as SplitKeyType
+from crunch.api.domain.leaderboard import Leaderboard as Leaderboard
+from crunch.api.domain.library import Library as Library
+from crunch.api.domain.metric import Metric as Metric
+from crunch.api.domain.metric import ReducerFunction as ReducerFunction
+from crunch.api.domain.metric import ScorerFunction as ScorerFunction
+from crunch.api.domain.phase import Phase as Phase
+from crunch.api.domain.phase import PhaseType as PhaseType
+from crunch.api.domain.prediction import Prediction as Prediction
+from crunch.api.domain.project import Project as Project
+from crunch.api.domain.project import ProjectToken as ProjectToken
+from crunch.api.domain.project import ProjectTokenType as ProjectTokenType
+from crunch.api.domain.quickstarter import Quickstarter as Quickstarter
+from crunch.api.domain.quickstarter import QuickstarterFile as QuickstarterFile
+from crunch.api.domain.round import Round as Round
+from crunch.api.domain.run import Run as Run
+from crunch.api.domain.runner import RunnerRun as RunnerRun
+from crunch.api.domain.score import Score as Score
+from crunch.api.domain.submission import Submission as Submission
+from crunch.api.domain.submission import SubmissionType as SubmissionType
+from crunch.api.domain.submission_file import SubmissionFile as SubmissionFile
+from crunch.api.domain.target import Target as Target
+from crunch.api.domain.upload import Upload as Upload
+from crunch.api.domain.user import User as User
+from crunch.api.errors import AnnotatedConnectException as AnnotatedConnectException
+from crunch.api.errors import ApiException as ApiException
+from crunch.api.errors import AuthorizationDeniedException as AuthorizationDeniedException
+from crunch.api.errors import CheckException as CheckException
+from crunch.api.errors import CompetitionNameNotFoundException as CompetitionNameNotFoundException
+from crunch.api.errors import CrunchNotFoundException as CrunchNotFoundException
+from crunch.api.errors import CurrentPhaseNotFoundException as CurrentPhaseNotFoundException
+from crunch.api.errors import CurrentRoundNotFoundException as CurrentRoundNotFoundException
+from crunch.api.errors import DailySubmissionLimitExceededException as DailySubmissionLimitExceededException
+from crunch.api.errors import EncryptedSubmissionException as EncryptedSubmissionException
+from crunch.api.errors import ForbiddenLibraryException as ForbiddenLibraryException
+from crunch.api.errors import InternalServerException as InternalServerException
+from crunch.api.errors import InvalidProjectTokenException as InvalidProjectTokenException
+from crunch.api.errors import LatestRoundNotFoundException as LatestRoundNotFoundException
+from crunch.api.errors import MissingPhaseDataException as MissingPhaseDataException
+from crunch.api.errors import NeverSubmittedException as NeverSubmittedException
+from crunch.api.errors import NextRoundNotFoundException as NextRoundNotFoundException
+from crunch.api.errors import NullPointerException as NullPointerException
+from crunch.api.errors import ProjectNotFoundException as ProjectNotFoundException
+from crunch.api.errors import RestrictedPhaseActionException as RestrictedPhaseActionException
+from crunch.api.errors import RetryableException as RetryableException
+from crunch.api.errors import RoundNotFoundException as RoundNotFoundException
+from crunch.api.errors import RunNotFoundException as RunNotFoundException
+from crunch.api.errors import ValidationFailedException as ValidationFailedException
+from crunch.api.identifiers import CompetitionIdentifierType as CompetitionIdentifierType
+from crunch.api.identifiers import CrunchIdentifierType as CrunchIdentifierType
+from crunch.api.identifiers import PhaseIdentifierType as PhaseIdentifierType
+from crunch.api.identifiers import RoundIdentifierType as RoundIdentifierType
 
 # update errors list:
 # python -c 'import crunch.api.errors; print("\n".join(list(filter(lambda x: x.endswith("Exception"), vars(crunch.api.errors).keys()))))'
-
-from .errors import (
-    ApiException,
-    InternalServerException,
-    RetryableException,
-    AnnotatedConnectException,
-    NullPointerException,
-    AuthorizationDeniedException,
-    ValidationFailedException,
-    CheckException,
-    CompetitionNameNotFoundException,
-    CrunchNotFoundException,
-    CurrentPhaseNotFoundException,
-    DailySubmissionLimitExceededException,
-    ForbiddenLibraryException,
-    InvalidProjectTokenException,
-    MissingPhaseDataException,
-    NeverSubmittedException,
-    EncryptedSubmissionException,
-    ProjectNotFoundException,
-    RunNotFoundException,
-    RestrictedPhaseActionException,
-    RoundNotFoundException,
-    CurrentRoundNotFoundException,
-    LatestRoundNotFoundException,
-    NextRoundNotFoundException
-)
-
-from .identifiers import (
-    CompetitionIdentifierType,
-    RoundIdentifierType,
-    PhaseIdentifierType,
-    CrunchIdentifierType,
-)
