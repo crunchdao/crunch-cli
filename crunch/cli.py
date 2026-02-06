@@ -128,10 +128,10 @@ def ping():
 @click.option("--mode", "mode_raw", required=False, type=click.Choice([x.name for x in api.CompetitionMode], case_sensitive=False), help="Filter competitions by their mode.")
 @click.option("--status", "status_raw", required=False, type=click.Choice([x.name for x in api.CompetitionStatus], case_sensitive=False), help="Filter competitions by their status.")
 @click.option("--continuous", required=False, type=bool, help="Filter continuous competitions.")
-@click.option("--external", required=False, type=bool, help="Filter continuous competitions.")
-@click.option("--featured", required=False, type=bool, help="Filter continuous competitions.")
-@click.option("--organizer-name", required=False, type=str, help="Filter continuous competitions.")
-@click.option("--team-based", required=False, type=bool, help="Filter continuous competitions.")
+@click.option("--external", required=False, type=bool, help="Filter external competitions.")
+@click.option("--featured", required=False, type=bool, help="Filter featured competitions.")
+@click.option("--organizer-name", required=False, type=str, help="Filter competitions by their organizer's name.")
+@click.option("--team-based", required=False, type=bool, help="Filter team based competitions.")
 def list_competitions(
     format_raw: Optional[str],
     status_raw: Optional[str],
