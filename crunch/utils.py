@@ -20,16 +20,18 @@ import pandas
 import requests
 from tqdm.auto import tqdm
 
+from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, OLD_PROJECT_FILE, PROJECT_FILE, TOKEN_FILE
 from crunch.runner.types import ArgsLike, KwargsLike
 
-from . import api, constants
+if typing.TYPE_CHECKING:
+    from crunch.api import ApiException, SizeVariant
 
 
 def change_root():
     while True:
         current = os.getcwd()
 
-        if os.path.exists(constants.DOT_CRUNCHDAO_DIRECTORY):
+        if os.path.exists(DOT_CRUNCHDAO_DIRECTORY):
             print(f"project: found {current}")
             return
 
@@ -39,8 +41,11 @@ def change_root():
             raise click.Abort()
 
 
-def _read_crunchdao_file(name: str, raise_if_missing: bool = True):
-    path = os.path.join(constants.DOT_CRUNCHDAO_DIRECTORY, name)
+def _read_crunchdao_file(
+    name: str,
+    raise_if_missing: bool = True,
+):
+    path = os.path.join(DOT_CRUNCHDAO_DIRECTORY, name)
 
     if not os.path.exists(path):
         if raise_if_missing:
@@ -57,10 +62,10 @@ def _read_crunchdao_file(name: str, raise_if_missing: bool = True):
 def write_token(plain_push_token: str, directory: str = "."):
     dot_crunchdao_path = os.path.join(
         directory,
-        constants.DOT_CRUNCHDAO_DIRECTORY
+        DOT_CRUNCHDAO_DIRECTORY
     )
 
-    token_file_path = os.path.join(dot_crunchdao_path, constants.TOKEN_FILE)
+    token_file_path = os.path.join(dot_crunchdao_path, TOKEN_FILE)
     with open(token_file_path, "w") as fd:
         fd.write(plain_push_token)
 
@@ -70,20 +75,20 @@ class ProjectInfo:
     competition_name: str
     project_name: str
     user_id: int
-    size_variant: api.SizeVariant
+    size_variant: "SizeVariant"
 
 
 def write_project_info(info: ProjectInfo, directory: str = "."):
     dot_crunchdao_path = os.path.join(
         directory,
-        constants.DOT_CRUNCHDAO_DIRECTORY
+        DOT_CRUNCHDAO_DIRECTORY
     )
 
-    old_path = os.path.join(dot_crunchdao_path, constants.OLD_PROJECT_FILE)
+    old_path = os.path.join(dot_crunchdao_path, OLD_PROJECT_FILE)
     if os.path.exists(old_path):
         os.remove(old_path)
 
-    path = os.path.join(dot_crunchdao_path, constants.PROJECT_FILE)
+    path = os.path.join(dot_crunchdao_path, PROJECT_FILE)
     with open(path, "w") as fd:
         json.dump({
             "competitionName": info.competition_name,
@@ -94,7 +99,9 @@ def write_project_info(info: ProjectInfo, directory: str = "."):
 
 
 def read_project_info(raise_if_missing: bool = True) -> ProjectInfo:
-    old_content = _read_crunchdao_file(constants.OLD_PROJECT_FILE, False)
+    from crunch.api import SizeVariant
+
+    old_content = _read_crunchdao_file(OLD_PROJECT_FILE, False)
     if old_content is not None:
         return ProjectInfo(
             "adialab",
@@ -102,16 +109,16 @@ def read_project_info(raise_if_missing: bool = True) -> ProjectInfo:
             root["userId"],
         )
 
-    content = _read_crunchdao_file(constants.PROJECT_FILE, raise_if_missing)
+    content = _read_crunchdao_file(PROJECT_FILE, raise_if_missing)
     if not raise_if_missing and content is None:
         return None
 
     root = json.loads(content)
 
     try:
-        size_variant = api.SizeVariant[root["sizeVariant"]]
+        size_variant = SizeVariant[root["sizeVariant"]]
     except:
-        size_variant = api.SizeVariant.DEFAULT
+        size_variant = SizeVariant.DEFAULT
 
     # TODO: need of a better system for handling file versions
     return ProjectInfo(
@@ -132,7 +139,7 @@ def try_get_competition_name():
 
 
 def read_token():
-    return _read_crunchdao_file(constants.TOKEN_FILE)
+    return _read_crunchdao_file(TOKEN_FILE)
 
 
 def read(path: str, kwargs: KwargsLike = {}) -> typing.Any:
@@ -177,9 +184,9 @@ def get_process_memory() -> int:
 
 
 def format_bytes(bytes: int):
-    from .external import humanfriendly
+    from crunch.external.humanfriendly import format_size  # type: ignore
 
-    return humanfriendly.format_size(bytes)
+    return format_size(bytes)
 
 
 class _undefined:
@@ -389,7 +396,7 @@ def download(
         )
 
 
-def exit_via(error: "api.ApiException", **kwargs: KwargsLike) -> None:
+def exit_via(error: "ApiException", **kwargs: typing.Any) -> typing.NoReturn:
     print("\n---")
     error.print_helper(**kwargs)
     exit(1)

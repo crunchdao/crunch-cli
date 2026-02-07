@@ -1,17 +1,18 @@
 import os
-import typing
+from typing import Optional
 
 import click
 
-from .. import api, utils
+from crunch.api import Client, Quickstarter
+from crunch.utils import download
 
 
 def _select(
-    client: api.Client,
+    client: Client,
     competition_name: str,
-    quickstarter_name: typing.Optional[str],
+    quickstarter_name: Optional[str],
     show_notebook_quickstarters: bool,
-) -> typing.Optional[api.Quickstarter]:
+) -> Optional[Quickstarter]:
     import inquirer
 
     competition = client.competitions.get(competition_name)
@@ -52,16 +53,16 @@ def _select(
         ),
     ]
 
-    answers = inquirer.prompt(questions, raise_keyboard_interrupt=True)
-    return mapping[answers["quickstarter"]]
+    answers = inquirer.prompt(questions, raise_keyboard_interrupt=True)  # type: ignore
+    return mapping[answers["quickstarter"]]  # type: ignore
 
 
 def quickstarter(
-    name: typing.Optional[str],
+    name: Optional[str],
     show_notebook: bool,
     overwrite: bool,
 ):
-    client, project = api.Client.from_project()
+    client, project = Client.from_project()
     competition = project.competition
 
     quickstarter = _select(
@@ -97,4 +98,4 @@ def quickstarter(
 
     for file in files:
         path = os.path.join(".", file.name)  # useful?
-        utils.download(file.url, path)
+        download(file.url, path)

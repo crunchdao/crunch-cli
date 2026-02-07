@@ -1,14 +1,15 @@
 import json
 import sys
-import typing
+from typing import Any, Dict, List, Optional, Union
 
-from .. import utils
-from ..external import inflection
-from .domain import *
+from crunch.api.domain.phase import PhaseType
+from crunch.api.domain.project import ProjectTokenType
+from crunch.external.inflection import camelize, underscore
+from crunch.utils import format_bytes, smart_call, try_get_competition_name
 
 
 def _print_contact(
-    and_: typing.Optional[str] = None
+    and_: Optional[str] = None
 ):
     message = "If you think that is an error"
     if and_:
@@ -25,7 +26,10 @@ class ApiException(Exception):
         self.message = message  # because python does not keep a reference himself...
         super().__init__(message)
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"A problem occured: {self.message}")
 
         _print_contact()
@@ -36,7 +40,10 @@ class InternalServerException(ApiException):
     def __init__(self, message: str):
         super().__init__(message)
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"An internal error occured: {self.message}")
 
         print(f"\nPlease contact an administrator.")
@@ -52,7 +59,10 @@ NullPointerException = InternalServerException
 
 class AuthorizationDeniedException(ApiException):
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"You do not have permission to access this resource: {self.message}")
 
         _print_contact()
@@ -63,13 +73,16 @@ class ValidationFailedException(ApiException):
     def __init__(
         self,
         message: str,
-        field_errors: list,
+        field_errors: List[Any],
     ):
         super().__init__(message)
 
         self.field_errors = field_errors
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"A validation error occured: {self.message}")
 
         print(json.dumps(self.field_errors, indent=4))
@@ -86,7 +99,10 @@ class CheckException(ApiException):
     def __init__(self, message: str):
         super().__init__(message)
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"Checks failed with error: {self.message}")
 
 
@@ -101,7 +117,10 @@ class CompetitionNameNotFoundException(ApiException):
 
         self.competition_name = competition_name
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"Competition `{self.competition_name}` not found.")
 
         _print_contact()
@@ -112,7 +131,7 @@ class CrunchNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        phase_type: typing.Optional[typing.Union[str, PhaseType]],
+        phase_type: Optional[Union[str, PhaseType]],
         round_number: int,
         competition_name: str
     ):
@@ -125,7 +144,10 @@ class CrunchNotFoundException(ApiException):
         self.round_number = round_number
         self.competition_name = competition_name
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Crunch not found.")
         print("")
         print("The competition may be over or the server is not correctly configured.")
@@ -144,7 +166,10 @@ class CrunchNotPublishedException(ApiException):
 
         self.crunch_number = crunch_number
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Crunch not published.")
         print("")
         print("The leaderboard should be published soon.")
@@ -160,7 +185,10 @@ class CurrentPhaseNotFoundException(ApiException):
     ):
         super().__init__(message)
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Current phase not found.")
         print("")
         print("The competition may be over or the server is not correctly configured.")
@@ -179,7 +207,10 @@ class DailySubmissionLimitExceededException(ApiException):
 
         self.limit = limit
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Daily submission limit exceeded.")
 
         print(f"\nCurrent limit: {self.limit}")
@@ -192,19 +223,23 @@ class ForbiddenLibraryException(ApiException):
     def __init__(
         self,
         message: str,
-        packages: typing.List[str]
+        packages: List[str]
     ):
         super().__init__(message)
 
         self.packages = packages
 
-    def print_helper(self, competition_name: str = None, **kwargs):
+    def print_helper(
+        self,
+        competition_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         from .client import Client
 
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
         if competition_name is None:
-            competition_name = utils.try_get_competition_name()
+            competition_name = try_get_competition_name()
 
         client = Client.from_env()
 
@@ -224,19 +259,23 @@ class InvalidProjectTokenException(ApiException):
     def __init__(
         self,
         message: str,
-        token_type: ProjectTokenType
+        token_type: ProjectTokenType,
     ):
         super().__init__(message)
 
         self.token_type = token_type
 
-    def print_helper(self, competition_name: str = None, **kwargs):
+    def print_helper(
+        self,
+        competition_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         from .client import Client
 
         print("Your token seems to have expired or is invalid.")
 
         if competition_name is None:
-            competition_name = utils.try_get_competition_name()
+            competition_name = try_get_competition_name()
 
         client = Client.from_env()
 
@@ -270,7 +309,7 @@ class MissingPhaseDataException(ApiException):
         self,
         message: str,
         phase_id: int,
-        phase_type: typing.Union[str, PhaseType],
+        phase_type: Union[str, PhaseType],
     ):
         super().__init__(message)
 
@@ -280,7 +319,10 @@ class MissingPhaseDataException(ApiException):
         self.phase_id = phase_id
         self.phase_type = phase_type
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("No data is available for local download.")
 
 
@@ -289,7 +331,7 @@ class ModelTooBigException(ApiException):
     def __init__(
         self,
         message: str,
-        size: typing.Optional[int],
+        size: Optional[int],
         maximum_size: int,
     ):
         super().__init__(message)
@@ -297,9 +339,12 @@ class ModelTooBigException(ApiException):
         self.size = size
         self.maximum_size = maximum_size
 
-    def print_helper(self, **kwargs):
-        size = utils.format_bytes(self.size) if self.size is not None else None
-        maximum_size = utils.format_bytes(self.maximum_size)
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        size = format_bytes(self.size) if self.size is not None else None
+        maximum_size = format_bytes(self.maximum_size)
 
         sizes = f"{size}/{maximum_size}" if size is not None else f"max. {maximum_size}"
         print(f"The resources directory is too big. ({sizes})")
@@ -310,7 +355,10 @@ class NeverSubmittedException(ApiException):
     def __init__(self, message: str):
         super().__init__(message)
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         raise NotImplementedError()
 
 
@@ -319,7 +367,10 @@ class EncryptedSubmissionException(ApiException):
     def __init__(self, message: str):
         super().__init__(message)
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         raise NotImplementedError()
 
 
@@ -331,7 +382,10 @@ class PredictionSubmissionNotAllowedException(ApiException):
     ):
         super().__init__(message)
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Prediction submission are not allowed for this competition.")
 
 
@@ -348,8 +402,11 @@ class PredictionTooBigException(ApiException):
         self.size = size
         self.maximum_size = maximum_size
 
-    def print_helper(self, **kwargs):
-        print(f"Prediction is too big. ({utils.format_bytes(self.size)}/{utils.format_bytes(self.maximum_size)})")
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"Prediction is too big. ({format_bytes(self.size)}/{format_bytes(self.maximum_size)})")
 
 
 class ProjectNotFoundException(ApiException):
@@ -365,7 +422,10 @@ class ProjectNotFoundException(ApiException):
         self.competition_id = competition_id
         self.user_id = user_id
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         from .client import Client
 
         print("Project not found.")
@@ -383,13 +443,16 @@ class RunNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        run_id: typing.Optional[int],
+        run_id: Optional[int],
     ):
         super().__init__(message)
 
         self.run_id = run_id
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Run not found.")
         print("")
         print("The run may have been removed or the project is not the owner.")
@@ -408,7 +471,10 @@ class RestrictedPhaseActionException(ApiException):
 
         self.phase_type = PhaseType[phase_type]
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"This action cannot be done during the {self.phase_type.pretty()} phase.")
 
         _print_contact()
@@ -419,13 +485,16 @@ class RoundNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        round_number: typing.Optional[int],
+        round_number: Optional[int],
     ):
         super().__init__(message)
 
         self.round_number = round_number
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Round not found.")
         print("")
         print("The competition may be over or the server is not correctly configured.")
@@ -444,7 +513,10 @@ class SubmissionCustomCheckFailedException(ApiException):
 
         self.check_message = check_message
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print("Competition specific checks did not pass.")
         print("")
         print(f"Reason: {self.check_message}")
@@ -463,7 +535,10 @@ class SubmissionNotFoundException(ApiException):
 
         self.submission_number = submission_number
 
-    def print_helper(self, **kwargs):
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
         print(f"The submission #{self.submission_number} does not exists.")
 
 
@@ -480,8 +555,11 @@ class SubmissionTooBigException(ApiException):
         self.size = size
         self.maximum_size = maximum_size
 
-    def print_helper(self, **kwargs):
-        print(f"Submission is too big. ({utils.format_bytes(self.size)}/{utils.format_bytes(self.maximum_size)})")
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"Submission is too big. ({format_bytes(self.size)}/{format_bytes(self.maximum_size)})")
 
 
 # TODO Only use one class like crunch
@@ -491,13 +569,13 @@ NextRoundNotFoundException = RoundNotFoundException
 
 
 def convert_error(
-    response: dict
+    response: Dict[str, Any]
 ):
     code = response.pop("code", "")
     message = response.pop("message", "")
 
     props = {
-        inflection.underscore(key): value
+        underscore(key): value
         for key, value in response.items()
     }
 
@@ -505,7 +583,7 @@ def convert_error(
     if error_class == ApiException:
         message = f"{code}: {message}"
 
-    return utils.smart_call(
+    return smart_call(
         error_class,
         props,
         {
@@ -521,7 +599,7 @@ def find_error_class(
     module = sys.modules[__name__]
 
     if code:
-        base_class_name = inflection.camelize(code.lower())
+        base_class_name = camelize(code.lower())
 
         for suffix in ["Exception", "Error"]:
             class_name = base_class_name + suffix

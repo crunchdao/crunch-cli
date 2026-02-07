@@ -17,7 +17,7 @@ class Auth(ABC):
     def strip(
         self,
         error_message: str,
-    ) -> str:
+    ) -> Optional[str]:
         return error_message
 
 
