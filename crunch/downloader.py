@@ -224,12 +224,15 @@ def _uncompress(
     unzip = shutil.which("unzip")
 
     if unzip:
-        subprocess.call([
+        return_code = subprocess.call([
             unzip,
             "-q",
             "-d", output_directory_path,
             zip_file_path
         ])
+
+        if return_code != 0:
+            raise zipfile.BadZipFile(f"unzip failed with code: {return_code}")
     else:
         with zipfile.ZipFile(zip_file_path, "r") as zipfd:
             zipfd.extractall(output_directory_path)
