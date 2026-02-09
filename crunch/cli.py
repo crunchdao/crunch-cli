@@ -6,9 +6,8 @@ import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
 
 import click
-from crunch.api.domain.competition import CompetitionFormat
 
-from crunch.api import PhaseType, RoundIdentifierType
+from crunch.api import CompetitionFormat, PhaseType, RoundIdentifierType
 from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
