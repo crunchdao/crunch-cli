@@ -7,7 +7,7 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 
 import click
 
-from crunch.api import PhaseType, RoundIdentifierType
+from crunch.api import CompetitionFormat, PhaseType, RoundIdentifierType
 from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
@@ -826,7 +826,7 @@ def cloud_executor(
     competition_format = api.CompetitionFormat[competition_format_raw]
 
     split_key_type = api.SplitKeyType[split_key_type_raw]
-    if split_key_type == api.SplitKeyType.INTEGER:
+    if competition_format != CompetitionFormat.UNSTRUCTURED and split_key_type == api.SplitKeyType.INTEGER:
         loop_key = int(loop_key)
 
     from .runner.cloud_executor import SandboxExecutor
