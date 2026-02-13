@@ -27,7 +27,7 @@ class Library(Model):
         return tuple(self._attrs.get("aliases") or [])
 
 
-class LibraryCollection(Collection):
+class LibraryCollection(Collection[Library]):
 
     model = Library
 

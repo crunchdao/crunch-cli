@@ -39,7 +39,7 @@ class Prediction(Model):
         )
 
 
-class PredictionCollection(Collection):
+class PredictionCollection(Collection[Prediction]):
 
     model = Prediction
 

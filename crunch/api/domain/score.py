@@ -59,7 +59,7 @@ class Score(Model):
         return ScoreDetail.from_dict_array(self._attrs.get("details") or [])
 
 
-class ScoreCollection(Collection):
+class ScoreCollection(Collection[Score]):
 
     model = Score
 

@@ -79,7 +79,7 @@ class Project(Model):
         )
 
 
-class ProjectCollection(Collection):
+class ProjectCollection(Collection[Project]):
 
     model = Project
 
@@ -176,7 +176,7 @@ class ProjectToken(Model):
         return datetime.datetime.fromisoformat(value)
 
 
-class ProjectTokenCollection(Collection):
+class ProjectTokenCollection(Collection[ProjectToken]):
 
     model = ProjectToken
 

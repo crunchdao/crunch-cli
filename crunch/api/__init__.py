@@ -67,12 +67,14 @@ from crunch.api.errors import MissingPhaseDataException as MissingPhaseDataExcep
 from crunch.api.errors import NeverSubmittedException as NeverSubmittedException
 from crunch.api.errors import NextRoundNotFoundException as NextRoundNotFoundException
 from crunch.api.errors import NullPointerException as NullPointerException
+from crunch.api.errors import PhaseNotFoundException as PhaseNotFoundException
 from crunch.api.errors import ProjectNotFoundException as ProjectNotFoundException
 from crunch.api.errors import RestrictedPhaseActionException as RestrictedPhaseActionException
 from crunch.api.errors import RetryableException as RetryableException
 from crunch.api.errors import RoundNotFoundException as RoundNotFoundException
 from crunch.api.errors import RunNotFoundException as RunNotFoundException
 from crunch.api.errors import ValidationFailedException as ValidationFailedException
+from crunch.api.errors import convert_error as convert_error
 from crunch.api.identifiers import CompetitionIdentifierType as CompetitionIdentifierType
 from crunch.api.identifiers import CrunchIdentifierType as CrunchIdentifierType
 from crunch.api.identifiers import PhaseIdentifierType as PhaseIdentifierType

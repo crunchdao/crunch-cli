@@ -1,15 +1,19 @@
-import dataclasses
-import enum
-import types
-import typing
+from dataclasses import dataclass
+from enum import Enum
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Union
 
-import dataclasses_json
+from dataclasses_json import LetterCase, Undefined, dataclass_json
 
-from ..resource import Collection, Model
-from .competition import Competition
+from crunch.api.resource import Collection, Model
+
+if TYPE_CHECKING:
+    from crunch.api.client import Client
+    from crunch.api.domain.competition import Competition
+    from crunch.api.identifiers import CompetitionIdentifierType
 
 
-class DataReleaseTargetResolution(enum.Enum):
+class DataReleaseTargetResolution(Enum):
 
     ALREADY = "ALREADY"
     PENDING = "PENDING"
@@ -19,11 +23,11 @@ class DataReleaseTargetResolution(enum.Enum):
         return self.name
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE,
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,
+    undefined=Undefined.EXCLUDE,
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class DataFile:
 
     name: str
@@ -33,7 +37,7 @@ class DataFile:
     compressed: bool
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class KnownData:
 
     X_TRAIN = "x_train"
@@ -46,11 +50,11 @@ class KnownData:
     EXAMPLE_PREDICTION = "example_prediction"
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,
+    undefined=Undefined.EXCLUDE
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class DataFiles:
 
     x_train: DataFile
@@ -63,26 +67,26 @@ class DataFiles:
         return vars(self).items()
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,
+    undefined=Undefined.EXCLUDE
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class OriginalFiles:
 
     x: DataFile
     y: DataFile
-    y_raw: typing.Optional[DataFile]
+    y_raw: Optional[DataFile]
     example_prediction: DataFile
 
     def items(self):
         return vars(self).items()
 
 
-DataFilesUnion = typing.Union[DataFiles, OriginalFiles, typing.Dict[str, DataFile]]
+DataFilesUnion = Union[DataFiles, OriginalFiles, Dict[str, DataFile]]
 
 
-class DataReleaseSplitGroup(enum.Enum):
+class DataReleaseSplitGroup(Enum):
 
     TRAIN = "TRAIN"
     TEST = "TEST"
@@ -91,7 +95,7 @@ class DataReleaseSplitGroup(enum.Enum):
         return self.name
 
 
-class DataReleaseSplitReduced(enum.Enum):
+class DataReleaseSplitReduced(Enum):
 
     X = "X"
     XY = "XY"
@@ -100,23 +104,23 @@ class DataReleaseSplitReduced(enum.Enum):
         return self.name
 
 
-SplitKeyPythonType = typing.Union[str, int]
+SplitKeyPythonType = Union[str, int]
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE,
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,
+    undefined=Undefined.EXCLUDE,
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class DataReleaseSplit:
 
     key: SplitKeyPythonType
     group: DataReleaseSplitGroup
-    reduced: typing.Optional[DataReleaseSplitReduced] = None
+    reduced: Optional[DataReleaseSplitReduced] = None
 
     @staticmethod
     def from_dict_array(
-        input: typing.List[dict]
+        input: List[Dict[str, Any]]
     ):
         return [
             DataReleaseSplit.from_dict(x)
@@ -124,11 +128,11 @@ class DataReleaseSplit:
         ]
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE,
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,
+    undefined=Undefined.EXCLUDE,
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class DataReleaseFeature:
 
     group: str
@@ -136,7 +140,7 @@ class DataReleaseFeature:
 
     @staticmethod
     def from_dict_array(
-        input: typing.List[dict]
+        input: List[Dict[str, Any]]
     ):
         return [
             DataReleaseFeature.from_dict(x)
@@ -144,7 +148,7 @@ class DataReleaseFeature:
         ]
 
 
-class SizeVariant(enum.Enum):
+class SizeVariant(Enum):
 
     DEFAULT = "DEFAULT"
     SMALL = "SMALL"
@@ -160,22 +164,30 @@ class DataRelease(Model):
 
     def __init__(
         self,
-        competition: Competition,
-        attrs=None,
-        client=None,
-        collection=None
+        competition: "Competition",
+        attrs: Optional[Dict[str, Any]] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["DataReleaseCollection"] = None
     ):
         super().__init__(attrs, client, collection)
 
         self._competition = competition
 
     @property
+    def id(self) -> int:
+        return super().id  # type: ignore
+
+    @property
     def competition(self):
         return self._competition
 
     @property
-    def name(self) -> typing.Optional[str]:
+    def name(self) -> Optional[str]:
         return self._attrs["name"]
+
+    @property
+    def number(self) -> int:
+        return self._attrs["number"]
 
     @property
     def embargo(self) -> int:
@@ -190,7 +202,7 @@ class DataRelease(Model):
         return self._attrs["numberOfFeatures"]
 
     @property
-    def hash(self) -> typing.Optional[str]:
+    def hash(self) -> Optional[str]:
         return self._attrs["hash"]
 
     @property
@@ -210,13 +222,13 @@ class DataRelease(Model):
         if "x" in files and "y" in files:
             return OriginalFiles.from_dict(files)
 
-        return types.MappingProxyType({
+        return MappingProxyType({
             key: DataFile.from_dict(value)
             for key, value in files.items()
         })
 
     @property
-    def splits(self) -> typing.List[DataReleaseSplit]:
+    def splits(self) -> List[DataReleaseSplit]:
         splits = self._attrs.get("splits")
         if splits is None:
             self.reload(include_splits=True)
@@ -229,7 +241,7 @@ class DataRelease(Model):
         return self._attrs["defaultFeatureGroup"]
 
     @property
-    def features(self) -> typing.Tuple[DataReleaseFeature]:
+    def features(self) -> Tuple[DataReleaseFeature]:
         features = self._attrs.get("features")
         if features is None:
             self.reload(include_features=True)
@@ -239,8 +251,8 @@ class DataRelease(Model):
 
     def reload(
         self,
-        include_splits=True,
-        include_features=True,
+        include_splits: bool = True,
+        include_features: bool = True,
     ):
         return super().reload(
             include_splits=include_splits,
@@ -248,34 +260,34 @@ class DataRelease(Model):
         )
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,
+    undefined=Undefined.EXCLUDE
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class TargetColumnNames:
 
     id: int
     name: str
-    side: typing.Optional[str]
-    input: typing.Optional[str]
-    output: typing.Optional[str]
-    file_path: typing.Optional[str]
+    side: Optional[str]
+    input: Optional[str]
+    output: Optional[str]
+    file_path: Optional[str]
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,
+    undefined=Undefined.EXCLUDE
 )
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class ColumnNames:
 
     id: str
     moon: str
-    side: typing.Optional[str]
-    input: typing.Optional[str]
-    output: typing.Optional[str]
-    targets: typing.List[TargetColumnNames]
+    side: Optional[str]
+    input: Optional[str]
+    output: Optional[str]
+    targets: List[TargetColumnNames]
 
     @property
     def first_target(self):
@@ -310,27 +322,27 @@ class ColumnNames:
         return None
 
 
-class DataReleaseCollection(Collection):
+class DataReleaseCollection(Collection[DataRelease]):
 
     model = DataRelease
 
     def __init__(
         self,
-        competition: Competition,
-        client=None
+        competition: "Competition",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.competition = competition
 
-    def __iter__(self) -> typing.Iterator[DataRelease]:
+    def __iter__(self) -> Iterator[DataRelease]:
         return super().__iter__()
 
     def get(
         self,
-        number: typing.Union[int, str],
-        include_splits=True,
-        include_features=True,
+        number: Union[int, str],
+        include_splits: bool = True,
+        include_features: bool = True,
     ) -> DataRelease:
         return self.prepare_model(
             self._client.api.get_data_release(
@@ -343,7 +355,7 @@ class DataReleaseCollection(Collection):
 
     def list(
         self
-    ) -> typing.List[DataRelease]:
+    ) -> List[DataRelease]:
         return self.prepare_models(
             self._client.api.list_data_releases(
                 self.competition.id
@@ -361,7 +373,7 @@ class DataReleaseEndpointMixin:
 
     def list_data_releases(
         self,
-        competition_identifier
+        competition_identifier: "CompetitionIdentifierType",
     ):
         return self._result(
             self.get(
@@ -372,10 +384,10 @@ class DataReleaseEndpointMixin:
 
     def get_data_release(
         self,
-        competition_identifier,
-        number,
-        include_splits=False,
-        include_features=False,
+        competition_identifier: "CompetitionIdentifierType",
+        number: int,
+        include_splits: bool = False,
+        include_features: bool = False,
     ):
         return self._result(
             self.get(

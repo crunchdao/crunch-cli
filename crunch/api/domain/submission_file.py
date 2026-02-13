@@ -40,7 +40,7 @@ class SubmissionFile(Model):
         return self._attrs["mimeType"]
 
 
-class SubmissionFileCollection(Collection):
+class SubmissionFileCollection(Collection[SubmissionFile]):
 
     model = SubmissionFile
 

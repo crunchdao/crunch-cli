@@ -139,7 +139,7 @@ class Competition(Model):
         )
 
 
-class CompetitionCollection(Collection):
+class CompetitionCollection(Collection[Competition]):
 
     model = Competition
 

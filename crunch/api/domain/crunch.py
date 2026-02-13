@@ -21,6 +21,10 @@ class Crunch(Model):
         self._phase = phase
 
     @property
+    def id(self) -> int:
+        return super().id  # type: ignore
+
+    @property
     def phase(self):
         return self._phase
 
@@ -33,7 +37,7 @@ class Crunch(Model):
         return self._attrs["published"]
 
 
-class CrunchCollection(Collection):
+class CrunchCollection(Collection[Crunch]):
 
     model = Crunch
 

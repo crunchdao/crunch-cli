@@ -502,6 +502,25 @@ class RoundNotFoundException(ApiException):
         _print_contact()
 
 
+class PhaseNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        competition_name: str,
+        round_number: int,
+        phase_type: Union[str, PhaseType],
+    ):
+        super().__init__(message)
+
+        if isinstance(phase_type, str):
+            phase_type = PhaseType[phase_type]
+
+        self.competition_name = competition_name
+        self.round_number = round_number
+        self.phase_type = phase_type
+
+
 class SubmissionCustomCheckFailedException(ApiException):
 
     def __init__(

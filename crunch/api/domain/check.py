@@ -63,7 +63,7 @@ class Check(Model):
         return types.MappingProxyType(self._attrs.get("parameters") or {})
 
 
-class CheckCollection(Collection):
+class CheckCollection(Collection[Check]):
 
     model = Check
 

@@ -13,7 +13,7 @@ class User(Model):
         return self._attrs["login"]
 
 
-class UserCollection(Collection):
+class UserCollection(Collection[User]):
 
     model = User
 
@@ -29,6 +29,13 @@ class UserCollection(Collection):
                 id_or_login
             )
         )
+
+    def get_me(self):
+        return self.get("@me")
+
+    @property
+    def me(self):
+        return self.get_me()
 
     def list(
         self

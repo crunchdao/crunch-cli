@@ -58,7 +58,7 @@ class Target(Model):
         return self._attrs["primary"]
 
 
-class TargetCollection(Collection):
+class TargetCollection(Collection[Target]):
 
     model = Target
 

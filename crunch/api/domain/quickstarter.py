@@ -103,7 +103,7 @@ class Quickstarter(Model):
         return QuickstarterFile.from_dict_array(files)
 
 
-class QuickstarterCollection(Collection):
+class QuickstarterCollection(Collection[Quickstarter]):
 
     model = Quickstarter
 

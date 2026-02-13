@@ -54,7 +54,7 @@ class Submission(Model):
         return SubmissionFileCollection(self, self._client)
 
 
-class SubmissionCollection(Collection):
+class SubmissionCollection(Collection[Submission]):
 
     model = Submission
 

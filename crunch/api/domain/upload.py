@@ -212,7 +212,7 @@ class UploadChunk(Model):
         self.confirm(hash)
 
 
-class UploadCollection(Collection):
+class UploadCollection(Collection[Upload]):
 
     model = Upload
 

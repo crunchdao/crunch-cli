@@ -1,12 +1,17 @@
-import enum
-import typing
+from datetime import datetime
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, cast
 
-from ..identifiers import PhaseIdentifierType
-from ..resource import Collection, Model
-from .round import Round
+from crunch.api.domain.round import Round
+from crunch.api.resource import Collection, Model
+
+if TYPE_CHECKING:
+    from crunch.api.client import Client
+    from crunch.api.domain.data_release import SizeVariant
+    from crunch.api.identifiers import CompetitionIdentifierType, PhaseIdentifierType, RoundIdentifierType
 
 
-class PhaseType(enum.Enum):
+class PhaseType(Enum):
 
     SUBMISSION = "SUBMISSION"
     OUT_OF_SAMPLE = "OUT_OF_SAMPLE"
@@ -50,9 +55,9 @@ class Phase(Model):
     def __init__(
         self,
         round: Round,
-        attrs=None,
-        client=None,
-        collection=None
+        attrs: Optional[Dict[str, Any]] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["PhaseCollection"] = None
     ):
         super().__init__(attrs, client, collection)
 
@@ -61,6 +66,14 @@ class Phase(Model):
     @property
     def round(self):
         return self._round
+
+    @property
+    def start(self):
+        return datetime.fromisoformat(self._attrs["start"])
+
+    @property
+    def end(self):
+        return datetime.fromisoformat(self._attrs["end"])
 
     @property
     def type(self):
@@ -77,44 +90,47 @@ class Phase(Model):
 
     def get_data_release(
         self,
-        size_variant: typing.Optional["data_release.SizeVariant"]
+        size_variant: Optional["SizeVariant"] = None,
     ):
-        from .data_release import DataReleaseCollection, DataRelease
+        from crunch.api.domain.data_release import DataRelease, DataReleaseCollection
 
-        attrs = self._client.api.get_submission_phase_data_release(
+        client = self._client
+        assert client is not None
+
+        attrs = cast(Dict[str, Any], client.api.get_submission_phase_data_release(
             self.round.competition.resource_identifier,
             self.round.resource_identifier,
             size_variant.name if size_variant else None,
-        )
+        ))
 
         competition = self.round.competition
         data_release = DataReleaseCollection(
             competition,
-            self._client
+            self._client,
         ).prepare_model(attrs)
 
-        return typing.cast(DataRelease, data_release)
+        return cast(DataRelease, data_release)
 
 
-class PhaseCollection(Collection):
+class PhaseCollection(Collection[Phase]):
 
     model = Phase
 
     def __init__(
         self,
         round: Round,
-        client=None
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.round = round
 
-    def __iter__(self) -> typing.Iterator[Phase]:
+    def __iter__(self) -> Iterator[Phase]:
         return super().__iter__()
 
     def get(
         self,
-        identifier: PhaseIdentifierType
+        identifier: "PhaseIdentifierType"
     ) -> Phase:
         if isinstance(identifier, PhaseType):
             identifier = identifier.name
@@ -150,7 +166,7 @@ class PhaseCollection(Collection):
 
     def list(
         self
-    ) -> typing.List[Round]:
+    ) -> List[Round]:
         return self.prepare_models(
             self._client.api.list_phases(
                 self.round.competition.id,
@@ -169,8 +185,8 @@ class PhaseEndpointMixin:
 
     def list_phases(
         self,
-        competition_identifier,
-        round_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        round_identifier: "RoundIdentifierType",
     ):
         return self._result(
             self.get(
@@ -181,9 +197,9 @@ class PhaseEndpointMixin:
 
     def get_phase(
         self,
-        competition_identifier,
-        round_identifier,
-        phase_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        round_identifier: "RoundIdentifierType",
+        phase_identifier: "PhaseIdentifierType",
     ):
         return self._result(
             self.get(
@@ -194,9 +210,9 @@ class PhaseEndpointMixin:
 
     def get_submission_phase_data_release(
         self,
-        competition_identifier,
-        round_identifier,
-        size_variant,
+        competition_identifier: "CompetitionIdentifierType",
+        round_identifier: "RoundIdentifierType",
+        size_variant: Optional["SizeVariant"] = None,
     ):
         params = {}
         if size_variant:

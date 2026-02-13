@@ -94,7 +94,7 @@ class Leaderboard(Model):
         return pandas.DataFrame(rows)
 
 
-class LeaderboardCollection(Collection):
+class LeaderboardCollection(Collection[Leaderboard]):
 
     model = Leaderboard
 

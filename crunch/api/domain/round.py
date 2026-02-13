@@ -1,8 +1,12 @@
-import typing
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from ..identifiers import RoundIdentifierType
-from ..resource import Collection, Model
-from .competition import Competition
+from crunch.api.resource import Collection, Model
+
+if TYPE_CHECKING:
+    from crunch.api.client import Client
+    from crunch.api.domain.competition import Competition
+    from crunch.api.identifiers import RoundIdentifierType
 
 
 class Round(Model):
@@ -11,10 +15,10 @@ class Round(Model):
 
     def __init__(
         self,
-        competition: Competition,
-        attrs=None,
-        client=None,
-        collection=None
+        competition: "Competition",
+        attrs: Optional[Dict[str, Any]] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["RoundCollection"] = None
     ):
         super().__init__(attrs, client, collection)
 
@@ -29,8 +33,16 @@ class Round(Model):
         return self._attrs["number"]
 
     @property
+    def start(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["start"])
+
+    @property
+    def end(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["end"])
+
+    @property
     def phases(self):
-        from .phase import PhaseCollection
+        from crunch.api.domain.phase import PhaseCollection
 
         return PhaseCollection(
             round=self,
@@ -38,25 +50,22 @@ class Round(Model):
         )
 
 
-class RoundCollection(Collection):
+class RoundCollection(Collection[Round]):
 
     model = Round
 
     def __init__(
         self,
-        competition: Competition,
-        client=None
+        competition: "Competition",
+        client: Optional["Client"] = None,
     ):
         super().__init__(client)
 
         self.competition = competition
 
-    def __iter__(self) -> typing.Iterator[Round]:
-        return super().__iter__()
-
     def get(
         self,
-        identifier: RoundIdentifierType
+        identifier: "RoundIdentifierType",
     ) -> Round:
         return self.prepare_model(
             self._client.api.get_round(
@@ -81,7 +90,7 @@ class RoundCollection(Collection):
 
     def list(
         self
-    ) -> typing.List[Round]:
+    ) -> List[Round]:
         return self.prepare_models(
             self._client.api.list_rounds(
                 self.competition.resource_identifier,

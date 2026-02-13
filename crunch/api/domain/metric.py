@@ -94,7 +94,7 @@ class Metric(Model):
         return ReducerFunction[self._attrs["reducerFunction"]]
 
 
-class MetricCollection(Collection):
+class MetricCollection(Collection[Metric]):
 
     model = Metric
 

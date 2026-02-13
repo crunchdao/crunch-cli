@@ -30,7 +30,7 @@ class Run(Model):
         return self._attrs["error"]
 
 
-class RunCollection(Collection):
+class RunCollection(Collection[Run]):
 
     model = Run
 

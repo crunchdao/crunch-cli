@@ -3,7 +3,7 @@ Heavily inspired (copied) from https://github.com/docker/docker-py/blob/main/doc
 """
 
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, Union
 
 if TYPE_CHECKING:
     from crunch.api.client import Client
@@ -19,7 +19,7 @@ class Model:
         self,
         attrs: Optional[Dict[str, Any]] = None,
         client: Optional["Client"] = None,
-        collection: Optional["Collection"] = None
+        collection: Optional["Collection[Any]"] = None
     ):
         self._attrs: Dict[str, Any] = attrs or {}
         self._client = client
@@ -100,9 +100,9 @@ class Model:
 T = TypeVar('T', Model, Model)
 
 
-class Collection:
+class Collection(Generic[T]):
 
-    model: Type[T] = None
+    model: Type[T]
 
     def __init__(self, client: Optional["Client"] = None):
         self._client = client
