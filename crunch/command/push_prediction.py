@@ -18,7 +18,6 @@ def push_prediction(
     upload = client.uploads.send_from_file(
         path=file_path,
         name=os.path.basename(file_path),
-        size=os.path.getsize(file_path),
     )
 
     try:

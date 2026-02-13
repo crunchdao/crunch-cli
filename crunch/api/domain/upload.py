@@ -1,5 +1,6 @@
 import dataclasses
 import enum
+import os
 import time
 import typing
 from io import BytesIO
@@ -240,11 +241,14 @@ class UploadCollection(Collection):
         *,
         path: str,
         name: str,
-        size: int,
+        size: typing.Optional[int] = None,
         preferred_chunk_size: typing.Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
     ) -> Upload:
+        if size is None:
+            size = os.path.getsize(path)
+
         with open(path, "rb") as file:
             return self.send_from_io(
                 io=file,

@@ -940,7 +940,6 @@ def _upload_files(
         uploads[file_name] = client.uploads.send_from_file(
             path=file_path,
             name=file_name,
-            size=os.path.getsize(file_path),
             max_retry=3
         )
 
