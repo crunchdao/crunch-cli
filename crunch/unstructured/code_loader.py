@@ -5,7 +5,7 @@ from typing import Any, Callable, Literal, Optional
 
 import crunch.store as store
 
-ModuleFileName = Literal["leaderboard", "runner", "scoring", "submission"]
+ModuleFileName = Literal["leaderboard", "reward", "runner", "scoring", "submission"]
 
 
 class NoCodeFoundError(RuntimeError):

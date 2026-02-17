@@ -239,6 +239,100 @@ def leaderboard_compare(
         traceback.print_exc()
 
 
+@organize_test_group.group(name="reward")
+def reward_group():
+    pass
+
+
+@reward_group.command(name="compute-bounties")
+@click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--target-name", required=False, default=None)
+@click.option("--granted-amount", type=float, default=10_000.0)
+@click.option("--shuffle", is_flag=True)
+@click.pass_context
+def reward_compute_bounties(
+    context: click.Context,
+    score_file_path: str,
+    target_name: Optional[str],
+    granted_amount: float,
+    shuffle: bool,
+):
+    from crunch.unstructured import RewardableProject, RewardModule
+
+    competition, loader = _load_code(context, "reward")
+
+    module = RewardModule.load(loader)
+    if module is None:
+        print(f"no custom reward script found")
+        raise click.Abort()
+
+    with open(score_file_path, "r") as fd:
+        root = json.load(fd)
+        if not isinstance(root, list):
+            raise ValueError("root must be a list")
+
+        projects: List[RewardableProject] = []
+        for index, item in enumerate(root):  # type: ignore
+            if not isinstance(item, dict):
+                raise ValueError(f"root[{index}] must be a dict: {item}")
+
+            projects.append(RewardableProject.from_dict(item))  # type: ignore
+
+        if shuffle:
+            random.shuffle(projects)
+
+    if target_name is None:
+        target = next(
+            (
+                target
+                for target in competition.targets.list()
+                if target.primary
+            ),
+            None
+        )
+
+        if target is None:
+            raise ValueError("primary target not found?")
+    else:
+        target = competition.targets.get(target_name)
+
+    metrics = target.metrics.list()
+
+    try:
+        rewarded_projects = module.compute_bounties(
+            target=target,
+            metrics=metrics,
+            projects=projects,
+            granted_amount=granted_amount,
+        )
+
+        distributed_amount = sum(rewarded_project.amount for rewarded_project in rewarded_projects if rewarded_project.amount is not None)
+        print(f"\n\nBounty rewards have been computed (distributed {distributed_amount:.4f} out of {granted_amount:.4f} granted)")
+
+        print(f"\nResults:")
+        _ascii_table(
+            headers=(
+                "Index",
+                "Project ID",
+                "Amount",
+            ),
+            values=[
+                (
+                    str(rank),
+                    str(rewarded_project.id),
+                    f"{rewarded_project.amount:10.4f}" if rewarded_project.amount is not None else "(none)",
+                )
+                for rank, rewarded_project in enumerate(rewarded_projects)
+            ],
+        )
+    except ApiException as error:
+        exit_via(error)
+    except BaseException as error:
+        print(f"\n\nBounty rewards compute function failed: {error}")
+
+        traceback.print_exc()
+
+
 @organize_test_group.group(name="scoring")
 def scoring_group():
     pass
