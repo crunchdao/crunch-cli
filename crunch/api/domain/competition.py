@@ -67,7 +67,7 @@ class Competition(Model):
 
     @property
     def phala_key_url(self) -> Optional[str]:
-        return self._attrs["phala_key_url"]
+        return self._attrs["phalaKeyUrl"]
 
     @property
     def checks(self):
