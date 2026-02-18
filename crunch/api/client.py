@@ -28,7 +28,6 @@ from crunch.api.domain.submission_file import SubmissionFileEndpointMixin
 from crunch.api.domain.target import TargetEndpointMixin
 from crunch.api.domain.upload import UploadCollection, UploadEndpointMixin
 from crunch.api.domain.user import UserCollection, UserEndpointMixin
-from crunch.api.domain.webapp import WebappEndpointMixin
 from crunch.api.errors import convert_error
 from crunch.api.pagination import PageRequest
 from crunch.constants import API_KEY_ENV_VAR
@@ -59,7 +58,6 @@ class EndpointClient(
     TargetEndpointMixin,
     UploadEndpointMixin,
     UserEndpointMixin,
-    WebappEndpointMixin,
 ):
 
     def __init__(
@@ -275,14 +273,6 @@ class Client:
         return ProjectTokenCollection(
             competition=None,
             client=self
-        )
-
-    @property
-    def webapp(self):
-        from .domain.webapp import WebappNamespace
-
-        return WebappNamespace(
-            client=self,
         )
 
     def get_runner_run(self, run_id: int):

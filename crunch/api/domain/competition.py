@@ -66,6 +66,10 @@ class Competition(Model):
         return self._attrs["encryptSubmissions"]
 
     @property
+    def phala_key_url(self) -> Optional[str]:
+        return self._attrs["phala_key_url"]
+
+    @property
     def checks(self):
         from .check import CheckCollection
 
