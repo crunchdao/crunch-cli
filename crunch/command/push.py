@@ -373,12 +373,13 @@ def _get_encryption_info(
     if not competition.encrypt_submissions:
         return None
 
-    configuration = client.webapp.configuration
+    phala_key_url = competition.phala_key_url
+    assert phala_key_url is not None, "phala_key_url must be set if encrypt_submissions is True"
 
     encryption_id = project.submissions.get_next_encryption_id()
     print(f"using encryption id: {encryption_id}")
 
-    phala = requests.get(f"{configuration.phala.key_url}/keypair/{encryption_id}").json()
+    phala = requests.get(f"{phala_key_url}/keypair/{encryption_id}").json()
 
     return EncryptionInfo(
         id=encryption_id,
