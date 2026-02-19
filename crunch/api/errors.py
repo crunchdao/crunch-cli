@@ -581,6 +581,58 @@ class SubmissionTooBigException(ApiException):
         print(f"Submission is too big. ({format_bytes(self.size)}/{format_bytes(self.maximum_size)})")
 
 
+class CannotParticipateException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        has_problem: bool,
+        is_verified: bool,
+        is_restricted: bool,
+        rule_accepted: bool,
+    ):
+        super().__init__(message)
+
+        self.has_problem = has_problem
+        self.is_verified = is_verified
+        self.is_restricted = is_restricted
+        self.rule_accepted = rule_accepted
+
+    def print_helper(
+        self,
+        competition_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        print(f"You cannot participate in the competition yet for the following reason(s):")
+
+        if self.has_problem:
+            print("- Your account has a pending manual verification (check your email)")
+
+        if not self.is_verified:
+            print("- Your account is not verified yet")
+
+        if self.is_restricted:
+            print("- Your account is currently restricted")
+
+        if not self.rule_accepted:
+            print("- You have not accepted the rules of the competition")
+
+            if competition_name is None:
+                competition_name = try_get_competition_name()
+
+            if competition_name is not None:
+                from crunch.api.client import Client
+                client = Client.from_env()
+
+                link = client.format_web_url(f"/competitions/{competition_name}")
+                print(f"  >> Accept the rules: {link}")
+
+        if not any([self.has_problem, not self.is_verified, self.is_restricted, not self.rule_accepted]):
+            print("- Unknown reason")
+
+        _print_contact()
+
+
 # TODO Only use one class like crunch
 CurrentRoundNotFoundException = RoundNotFoundException
 LatestRoundNotFoundException = RoundNotFoundException
