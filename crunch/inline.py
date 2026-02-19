@@ -226,7 +226,7 @@ class _Inline:
 
                 ### >> [https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook](https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook?message={encoded_message})
 
-                <img alt="Download and Submit Notebook" src=https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/{gif_file_name} height="600px" />
+                <img alt="Download and Submit Notebook" src="https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/{gif_file_name}" height="600px" />
 
                 <br />
                 <small>Error preventing submit: <code>{error}</code></small>
@@ -303,7 +303,7 @@ class _Inline:
             click_path = f"runs/create?submissionNumber={submission.number}"
         else:
             gif_file_name = "create-deployment.gif"
-            click_path = f"?submissionNumber={submission.number}&openDeploy=true"
+            click_path = f"submissions/{submission.number}?openDeploy-{submission.id}=true"
 
         project = submission.project
         display(Markdown(dedent(f"""
