@@ -54,6 +54,10 @@ class Competition(Model):
         return CompetitionFormat[self._attrs["format"]]
 
     @property
+    def mode(self):
+        return CompetitionMode[self._attrs["mode"]]
+
+    @property
     def split_key_type(self):
         return SplitKeyType[self._attrs["splitKeyType"]]
 

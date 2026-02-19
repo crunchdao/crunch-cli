@@ -14,7 +14,7 @@ import psutil
 
 import crunch.tester as tester
 from crunch.__version__ import __version__
-from crunch.api import ApiException, Client, CompetitionFormat, CrunchNotFoundException, KnownData, MissingPhaseDataException, RoundIdentifierType
+from crunch.api import ApiException, Client, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, KnownData, MissingPhaseDataException, RoundIdentifierType
 from crunch.command.convert import convert
 from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
@@ -60,9 +60,9 @@ class _Inline:
         print(f"----")
 
     @cached_property
-    def _competition(self):
+    def _competition(self) -> Competition:
         _, project = Client.from_project()
-        competition = project.competition.reload()
+        competition = project.competition.reload()  # pyright: ignore[reportUnknownMemberType]
 
         return competition
 
@@ -212,6 +212,10 @@ class _Inline:
         except (ImportError, NotImplementedError) as error:
             encoded_message = urllib.parse.quote_plus(message)
 
+            gif_file_name = "download-and-submit-notebook.gif"
+            if not self._does_create_run:
+                gif_file_name = "download-and-submit-notebook-deployment.gif"
+
             display(Markdown(dedent(f"""
                 ---
 
@@ -222,7 +226,7 @@ class _Inline:
 
                 ### >> [https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook](https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook?message={encoded_message})
 
-                <img alt="Download and Submit Notebook" src=https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/download-and-submit-notebook.gif height="600px" />
+                <img alt="Download and Submit Notebook" src=https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/{gif_file_name} height="600px" />
 
                 <br />
                 <small>Error preventing submit: <code>{error}</code></small>
@@ -294,16 +298,27 @@ class _Inline:
             error.print_helper()
             return
 
+        if self._does_create_run:
+            gif_file_name = "create-run.gif"
+            click_path = f"runs/create?submissionNumber={submission.number}"
+        else:
+            gif_file_name = "create-deployment.gif"
+            click_path = f"?submissionNumber={submission.number}&openDeploy=true"
+
         project = submission.project
         display(Markdown(dedent(f"""
             ---
 
             Next step is to run your submission in the cloud:
 
-            ### >> https://hub.crunchdao.com/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/runs/create?submissionNumber={submission.number}
+            ### >> https://hub.crunchdao.com/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/{click_path}
 
-            <img alt="Run in the Cloud" src=https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/create-run.gif height="600px" />
+            <img alt="Run in the Cloud" src="https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/{gif_file_name}" height="600px" />
         """)))
+
+    @property
+    def _does_create_run(self) -> bool:
+        return self._competition.mode == CompetitionMode.OFFLINE
 
     @property
     def is_inside_runner(self):
