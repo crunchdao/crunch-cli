@@ -178,6 +178,7 @@ class _Inline:
         include_installed_packages_version: bool = False,
         notebook_file_name: str = "notebook.ipynb",
         main_file_name: str = DEFAULT_MAIN_FILE_PATH,
+        print_convert_logs: bool = False,
     ):
         if message is None:
             message = input("Message: ")
@@ -247,6 +248,7 @@ class _Inline:
                 include_installed_packages_version=include_installed_packages_version,
                 notebook_file_name=notebook_file_name,
                 main_file_name=main_file_name,
+                print_convert_logs=print_convert_logs,
             )
         except click.Abort:
             print("aborted", file=sys.stderr)
@@ -268,6 +270,7 @@ class _Inline:
         include_installed_packages_version: bool,
         notebook_file_name: str,
         main_file_name: str,
+        print_convert_logs: bool,
     ):
         from IPython.display import Markdown, display  # type: ignore
 
@@ -282,6 +285,7 @@ class _Inline:
                 write_embedded_files=True,
                 no_freeze=True,  # will be frozen on push
                 override=True,
+                verbose=print_convert_logs,
             )
         except SystemExit as error:
             if error.code != 0:

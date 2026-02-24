@@ -519,6 +519,7 @@ def download(
 @click.option("--requirements", is_flag=True, help="Also export the `requirements.txt` file.")
 @click.option("--embedded-files", is_flag=True, help="Also export the embedded files.")
 @click.option("--no-freeze", is_flag=True, help="Don't freeze the requirements with locally installed versions.")
+@click.option("--verbose", is_flag=True, help="Enable verbose output.")
 @click.argument("notebook-file-path", required=True)
 @click.argument("python-file-path", default="main.py")
 def convert(
@@ -526,6 +527,7 @@ def convert(
     requirements: bool,
     embedded_files: bool,
     no_freeze: bool,
+    verbose: bool,
     notebook_file_path: str,
     python_file_path: str,
 ):
@@ -537,6 +539,7 @@ def convert(
             write_requirements=requirements,
             write_embedded_files=embedded_files,
             no_freeze=no_freeze,
+            verbose=verbose,
         )
     except api.ApiException as error:
         utils.exit_via(error)
