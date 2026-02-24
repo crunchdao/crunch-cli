@@ -31,7 +31,6 @@ def test(
     train_frequency: int,
     round_number: str,
     has_gpu: bool,
-    checks: bool,
     no_determinism_check: typing.Optional[bool],
 ):
     _, project = api.Client.from_project()
@@ -54,7 +53,6 @@ def test(
         round_number,
         competition,
         has_gpu,
-        checks,
         no_determinism_check,
     )
 

@@ -12,12 +12,11 @@ import typing
 import urllib.parse
 from typing import Callable, Dict, Generator, List, Optional, Tuple
 
-import pandas
 import requests
 
 import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, KnownData, PhaseType, RunnerRun, Upload
+from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, PhaseType, RunnerRun, Upload
 from crunch.api.errors import ModelTooBigException, PredictionTooBigException
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
@@ -52,28 +51,13 @@ CHMOD_RESET = "go=,u=r"
 SIGCONT is the only allowed signal.
 SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
 """
-FUSE_SIGNAL: int = signal.SIGCONT  # type: ignore
+FUSE_SIGNAL: signal.Signals = signal.SIGCONT  # pyright: ignore[reportUnknownVariableType, reportAttributeAccessIssue, reportUnknownMemberType]
 
 
 R_SITE_LIBRARY_PATHS = [
     "/usr/lib/R/site-library",
     "/usr/local/lib/R/site-library"
 ]
-
-
-def link(tmp_directory: str, path: typing.Optional[str], fake: bool = False):
-    if path is None:
-        return None
-
-    tmp_path = os.path.join(tmp_directory, os.path.basename(path))
-
-    if fake:
-        # "append" just in case there is already another file
-        open(tmp_path, "a").close()
-    else:
-        os.link(path, tmp_path)
-
-    return tmp_path
 
 
 class CloudRunner(Runner):
@@ -154,7 +138,6 @@ class CloudRunner(Runner):
 
         self.sandbox_restriction_flag = "--change-network-namespace" if gpu else "--filter-socket-syscalls"
 
-
     def start(self):
         self.report_current("starting")
 
@@ -163,7 +146,10 @@ class CloudRunner(Runner):
         self.report_current("ending")
 
     def initialize(self):
-        if self.competition_format == CompetitionFormat.UNSTRUCTURED and self.log("downloading runner..."):
+        if self.competition_format != CompetitionFormat.UNSTRUCTURED:
+            raise NotImplementedError(f"{self.competition_format.name} format is not supported anymore.")
+
+        if self.log("downloading runner..."):
             self.report_current("download runner")
 
             loader = deduce_code_loader(
@@ -194,7 +180,7 @@ class CloudRunner(Runner):
             _download_files(
                 file_urls=self.run.code,
                 directory_path=self.code_directory,
-                print=self.log, # type: ignore
+                print=self.log,  # type: ignore
             )
 
         if os.path.exists(self.requirements_r_txt_path):
@@ -286,7 +272,6 @@ class CloudRunner(Runner):
             self.prepare_data()
 
             self.initialize_state()
-            self.bash2(["chmod", "a+r", self.state_file])
 
         if self.log("downloading model..."):
             self.report_current("download model")
@@ -313,25 +298,6 @@ class CloudRunner(Runner):
             self.keys,
             self.has_model
         )
-
-    def start_timeseries(self):
-        self.create_trace_file()
-
-        return super().start_timeseries()
-
-    def timeseries_loop(
-        self,
-        moon: int,
-        train: bool
-    ) -> pandas.DataFrame:
-        self.report_current("process loop", moon)
-
-        self.sandbox(
-            train=train,
-            loop_key=moon,
-        )
-
-        return pandas.read_parquet(self.prediction_parquet_file_path)
 
     def start_unstructured(self):
         self.create_trace_file()
@@ -486,23 +452,12 @@ class CloudRunner(Runner):
                 }
                 for split in self.splits
             ],
-            "metrics": [
-                metric._attrs  # type: ignore
-                for metric in self.competition.metrics
-            ],
-            "checks": [
-                check._attrs  # type: ignore
-                for check in self.competition.checks
-            ],
-            "default_feature_group": self.default_feature_group,
-            "features": [
-                feature.to_dict()  # type: ignore
-                for feature in self.features
-            ]
         }
 
         with open(self.state_file, "w") as fd:
             json.dump(state, fd)
+
+        self.bash2(["chmod", "a+r", self.state_file])
 
     def do_bash(
         self,
@@ -602,30 +557,11 @@ class CloudRunner(Runner):
         loop_key: typing.Union[int, str],
         parameters: KwargsLike = {},
     ) -> None:
-        is_regular = not self.competition_format.unstructured
-
         try:
             self._prepare_exit()
 
-            if is_regular:
-                self.bash2(["chmod", "-R", CHMOD_RESET, self.data_directory])
-                self.bash2(["chmod", "o=x", self.data_directory])
-
-                assert self.x_path is not None
-
-                path_options: KwargsLike = {
-                    "x": self.x_path,
-                    "y": self.y_path if train else None,
-                    "y-raw": self.y_raw_path,
-                }
-
-                self._install_permission_fuse()
-            else:
-                self.bash2(["chmod", "-R", "a+r", self.data_directory])
-
-                path_options = {}
-
-                self._install_permission_fuse()
+            self.bash2(["chmod", "-R", "a+r", self.data_directory])
+            self._install_permission_fuse()
 
             options: KwargsLike = {
                 "competition-name": self.competition.name,
@@ -633,13 +569,11 @@ class CloudRunner(Runner):
                 "split-key-type": self.competition.split_key_type.name,
                 # ---
                 "data-directory": self.data_directory,
-                **path_options,
                 # ---
                 "main-file": self.main_file,
                 "code-directory": self.code_directory,
                 "model-directory": self.model_directory_path,
                 "prediction-directory": self.prediction_directory_path,
-                "prediction": self.prediction_parquet_file_path,
                 "trace": self.trace_path,
                 "state-file": self.state_file,
                 "ping-url": [
@@ -656,24 +590,6 @@ class CloudRunner(Runner):
                 "number-of-features": self.number_of_features,
                 "gpu": self.gpu,
                 # ---
-                "id-column-name": self.column_names.id or "",
-                "moon-column-name": self.column_names.moon or "",
-                "side-column-name": self.column_names.side or "",
-                "input-column-name": self.column_names.input or "",
-                "output-column-name": self.column_names.output or "",
-                "target": [
-                    (
-                        target_column_names.name,
-                        target_column_names.side or "",
-                        target_column_names.input or "",
-                        target_column_names.output or "",
-                        target_column_names.file_path or ""
-                    )
-                    for target_column_names in self.column_names.targets
-                ],
-                # ---
-                "write-index": False,
-                # ---
                 "fuse-pid": os.getpid(),
                 "fuse-signal-number": FUSE_SIGNAL.value,
                 "exit-file": self.exit_file_path,
@@ -684,12 +600,12 @@ class CloudRunner(Runner):
             }
 
             # TODO move to a dedicated function
-            args = []
+            args: List[str] = []
 
             def append_value(value: typing.Any):
                 if isinstance(value, tuple):
-                    for x in value:
-                        args.append(str(x))
+                    for x in value:  # pyright: ignore[reportUnknownVariableType]
+                        args.append(str(x))  # pyright: ignore[reportUnknownArgumentType]
                 else:
                     args.append(str(value))
 
@@ -701,7 +617,7 @@ class CloudRunner(Runner):
                     value = str(value).lower()
 
                 if isinstance(value, list):
-                    for item in value:
+                    for item in value:  # pyright: ignore[reportUnknownVariableType]
                         args.append(f"--{key}")
                         append_value(item)
                 else:
@@ -729,7 +645,7 @@ class CloudRunner(Runner):
 
             self._validate_exit()
         except SystemExit:
-            self.report_trace(loop_key)
+            self.report_trace(loop_key)  # pyright: ignore[reportArgumentType]
             raise
 
     def _prepare_exit(self):
@@ -755,9 +671,7 @@ class CloudRunner(Runner):
             self.log(f"[debug] failed exit check - expected=`{expected_content}` got=`{got_content[:len(expected_content) * 2]}`", error=True)
             raise RuntimeError("user code exited prematurely")
 
-    def _install_permission_fuse(
-        self,
-    ):
+    def _install_permission_fuse(self):
         def call_chmod(mode: str):
             self.recursive_bash(
                 self.data_directory,
@@ -791,10 +705,7 @@ class CloudRunner(Runner):
 
         self.embargo = data_release.embargo
         self.number_of_features = data_release.number_of_features
-        self.column_names = data_release.column_names
         self.splits = data_release.splits
-        self.features = data_release.features
-        self.default_feature_group = data_release.default_feature_group
         data_files = data_release.data_files
 
         self.keys = sorted([
@@ -803,19 +714,15 @@ class CloudRunner(Runner):
             if split.group == DataReleaseSplitGroup.TEST
         ])
 
-        file_paths = save_all(
+        save_all(
             prepare_all(
                 self.data_directory,
                 data_files,
             ),
             False,
-            print=self.log, # type: ignore
+            print=self.log,  # type: ignore
             progress_bar=False,
         )
-
-        self.x_path = file_paths.get(KnownData.X)
-        self.y_path = file_paths.get(KnownData.Y)
-        self.y_raw_path = file_paths.get(KnownData.Y_RAW)
 
     def report_current(
         self,
