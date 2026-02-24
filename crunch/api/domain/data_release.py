@@ -282,8 +282,8 @@ class TargetColumnNames:
 @dataclass(frozen=True)
 class ColumnNames:
 
-    id: str
-    moon: str
+    id: Optional[str]
+    moon: Optional[str]
     side: Optional[str]
     input: Optional[str]
     output: Optional[str]
