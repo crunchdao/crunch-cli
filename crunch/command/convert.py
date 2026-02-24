@@ -9,6 +9,7 @@ def convert(
     write_requirements: bool = False,
     write_embedded_files: bool = False,
     no_freeze: bool = False,
+    verbose: bool = False,
 ):
     from crunch_convert.cli import cli
 
@@ -25,6 +26,9 @@ def convert(
 
     if no_freeze:
         options.append("--no-freeze")
+
+    if verbose:
+        options.append("--verbose")
 
     cli.main(args=[
         "notebook",
