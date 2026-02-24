@@ -210,7 +210,11 @@ class _Inline:
             if ipynb.get("cells") is None:  # type: ignore
                 raise NotImplementedError(f"missing cells, available keys are: {list(ipynb.keys())}")  # type: ignore
         except (ImportError, NotImplementedError) as error:
+            client, project = Client.from_project()
+            nice_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook")
+            
             encoded_message = urllib.parse.quote_plus(message)
+            real_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook?projectName={project.name}&message={encoded_message}")
 
             gif_file_name = "download-and-submit-notebook.gif"
             if not self._does_create_run:
@@ -224,7 +228,7 @@ class _Inline:
                 2. Upload it to the platform
                 3. Create a run to validate it
 
-                ### >> [https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook](https://hub.crunchdao.com/competitions/{self._competition.name}/submit/notebook?message={encoded_message})
+                ### >> [{nice_url}]({real_url})
 
                 <img alt="Download and Submit Notebook" src="https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/{gif_file_name}" height="600px" />
 
@@ -305,13 +309,15 @@ class _Inline:
             gif_file_name = "create-deployment.gif"
             click_path = f"submissions/{submission.number}?openDeploy-{submission.id}=true"
 
-        project = submission.project
+        client, project = Client.from_project()
+        run_url = client.format_web_url(f"/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/{click_path}")
+
         display(Markdown(dedent(f"""
             ---
 
             Next step is to run your submission in the cloud:
 
-            ### >> https://hub.crunchdao.com/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/{click_path}
+            ### >> {run_url}
 
             <img alt="Run in the Cloud" src="https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/{gif_file_name}" height="600px" />
         """)))
