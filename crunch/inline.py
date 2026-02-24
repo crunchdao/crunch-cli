@@ -210,15 +210,15 @@ class _Inline:
             if ipynb.get("cells") is None:  # type: ignore
                 raise NotImplementedError(f"missing cells, available keys are: {list(ipynb.keys())}")  # type: ignore
         except (ImportError, NotImplementedError) as error:
+            client, project = Client.from_project()
+            nice_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook")
+            
             encoded_message = urllib.parse.quote_plus(message)
+            real_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook?projectName={project.name}&message={encoded_message}")
 
             gif_file_name = "download-and-submit-notebook.gif"
             if not self._does_create_run:
                 gif_file_name = "download-and-submit-notebook-deployment.gif"
-
-            client, project = Client.from_project()
-            nice_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook")
-            real_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook?projectName={project.name}&message={encoded_message}")
 
             display(Markdown(dedent(f"""
                 ---
