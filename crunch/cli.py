@@ -858,8 +858,8 @@ def cloud_executor(
         gpu,
         # ---
         api.ColumnNames(
-            id_column_name,
-            moon_column_name,
+            id_column_name or None,
+            moon_column_name or None,
             side_column_name or None,
             input_column_name or None,
             output_column_name or None,
