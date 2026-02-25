@@ -656,8 +656,8 @@ class CloudRunner(Runner):
                 "number-of-features": self.number_of_features,
                 "gpu": self.gpu,
                 # ---
-                "id-column-name": self.column_names.id,
-                "moon-column-name": self.column_names.moon,
+                "id-column-name": self.column_names.id or "",
+                "moon-column-name": self.column_names.moon or "",
                 "side-column-name": self.column_names.side or "",
                 "input-column-name": self.column_names.input or "",
                 "output-column-name": self.column_names.output or "",
