@@ -303,7 +303,7 @@ def setup(
     if directory != '.':
         print(f" - To get inside your workspace directory, run: cd {directory}")
 
-    print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
+    print(f" - To see all of the available commands of the Crunch CLI, run: crunch --help")
 
 
 @cli.command(help="Setup a notebook workspace.")
