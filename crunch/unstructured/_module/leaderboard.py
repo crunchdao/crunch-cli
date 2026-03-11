@@ -6,8 +6,8 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from dataclasses_json import DataClassJsonMixin
 
 from crunch.api import Metric, Target
-from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
-from crunch.unstructured.execute import call_function
+from crunch.unstructured._code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
+from crunch.unstructured._execute import call_function
 
 __all__ = [
     "RankableProject",

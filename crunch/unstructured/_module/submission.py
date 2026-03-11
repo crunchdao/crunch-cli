@@ -1,9 +1,9 @@
 from typing import Any, Callable, List, Optional
 
 from crunch.api import SubmissionType
-from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
-from crunch.unstructured.execute import call_function
-from crunch.unstructured.file import File
+from crunch.unstructured._code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
+from crunch.unstructured._execute import call_function
+from crunch.unstructured._file import File
 
 __all__ = [
     "SubmissionModule",

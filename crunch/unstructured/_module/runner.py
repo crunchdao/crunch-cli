@@ -1,8 +1,8 @@
 from logging import Logger
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
-from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
-from crunch.unstructured.execute import call_function
+from crunch.unstructured._code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
+from crunch.unstructured._execute import call_function
 
 if TYPE_CHECKING:
     from crunch.runner.cloud import RunnerContext
