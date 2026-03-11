@@ -13,7 +13,7 @@ import click
 import requests
 from tqdm.auto import tqdm
 
-from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, PROJECT_FILE, TOKEN_FILE
+from crunch.constants import DOT_CRUNCH_DIRECTORY, PROJECT_FILE, TOKEN_FILE
 
 if TYPE_CHECKING:
     from crunch.api import ApiException, SizeVariant
@@ -23,7 +23,7 @@ def change_root():
     while True:
         current = os.getcwd()
 
-        if os.path.exists(DOT_CRUNCHDAO_DIRECTORY):
+        if os.path.exists(DOT_CRUNCH_DIRECTORY):
             print(f"project: found {current}")
             return
 
@@ -35,25 +35,25 @@ def change_root():
 
 if TYPE_CHECKING:
     @overload
-    def _read_crunchdao_file(
+    def _read_crunch_file(
         name: str,
         raise_if_missing: Literal[True] = True,
     ) -> str:
         ...
 
     @overload
-    def _read_crunchdao_file(
+    def _read_crunch_file(
         name: str,
         raise_if_missing: Literal[False] = False,
     ) -> Optional[str]:
         ...
 
 
-def _read_crunchdao_file(
+def _read_crunch_file(
     name: str,
     raise_if_missing: bool = True,
 ):
-    path = os.path.join(DOT_CRUNCHDAO_DIRECTORY, name)
+    path = os.path.join(DOT_CRUNCH_DIRECTORY, name)
 
     if not os.path.exists(path):
         if raise_if_missing:
@@ -68,12 +68,12 @@ def _read_crunchdao_file(
 
 
 def write_token(plain_push_token: str, directory: str = "."):
-    dot_crunchdao_path = os.path.join(
+    dot_crunch_path = os.path.join(
         directory,
-        DOT_CRUNCHDAO_DIRECTORY
+        DOT_CRUNCH_DIRECTORY
     )
 
-    token_file_path = os.path.join(dot_crunchdao_path, TOKEN_FILE)
+    token_file_path = os.path.join(dot_crunch_path, TOKEN_FILE)
     with open(token_file_path, "w") as fd:
         fd.write(plain_push_token)
 
@@ -87,12 +87,12 @@ class ProjectInfo:
 
 
 def write_project_info(info: ProjectInfo, directory: str = "."):
-    dot_crunchdao_path = os.path.join(
+    dot_crunch_path = os.path.join(
         directory,
-        DOT_CRUNCHDAO_DIRECTORY
+        DOT_CRUNCH_DIRECTORY
     )
 
-    path = os.path.join(dot_crunchdao_path, PROJECT_FILE)
+    path = os.path.join(dot_crunch_path, PROJECT_FILE)
     with open(path, "w") as fd:
         json.dump({
             "competitionName": info.competition_name,
@@ -121,7 +121,7 @@ def read_project_info(
 ) -> Optional[ProjectInfo]:
     from crunch.api import SizeVariant
 
-    content = _read_crunchdao_file(PROJECT_FILE, raise_if_missing)
+    content = _read_crunch_file(PROJECT_FILE, raise_if_missing)
     if not raise_if_missing and content is None:
         return None
 
@@ -152,7 +152,7 @@ def try_get_competition_name():
 
 
 def read_token():
-    return _read_crunchdao_file(TOKEN_FILE)
+    return _read_crunch_file(TOKEN_FILE)
 
 
 def get_process_memory() -> int:

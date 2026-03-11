@@ -2,7 +2,7 @@
 crunch
 ~~~~~~
 The crunch package - a Python cli used to submit
-your work to the crunchdao platform easily!
+your work to the crunch hub easily!
 """
 
 import crunch.api as api

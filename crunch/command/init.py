@@ -4,7 +4,7 @@ import shutil
 import click
 
 from crunch.api import Client, SizeVariant
-from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
+from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
 from crunch.utils import ProjectInfo, write_project_info, write_token
 
 
@@ -38,11 +38,11 @@ def init(
     client = Client.from_env()
     project_token = client.project_tokens.upgrade(clone_token)
 
-    dot_crunchdao_path = os.path.join(directory, DOT_CRUNCHDAO_DIRECTORY)
+    dot_crunch_path = os.path.join(directory, DOT_CRUNCH_DIRECTORY)
     if should_delete:
-        _delete_tree_if_exists(dot_crunchdao_path)
+        _delete_tree_if_exists(dot_crunch_path)
 
-    os.makedirs(dot_crunchdao_path, exist_ok=True)
+    os.makedirs(dot_crunch_path, exist_ok=True)
 
     plain = project_token.plain
     project = project_token.project
