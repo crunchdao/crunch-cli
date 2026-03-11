@@ -1,126 +1,6 @@
-import collections
-import datetime
-import types
-import typing
-
-if typing.TYPE_CHECKING:
-    import pandas
-
-    from . import api
-
-STORAGE_PROPERTY = "_storage"
-
-
-def _get_storage(self: "Columns") -> typing.OrderedDict:
-    return object.__getattribute__(self, STORAGE_PROPERTY)
-
-
-def _to_repr(data: dict):
-    items = ', '.join(f"{k}: {v!r}" for k, v in data.items())
-    return "{" + str(items) + "}"
-
-
-def _to_str(object: typing.Any):
-    return f"{object.__class__.__name__}({object.__repr__()})"
-
-
-class Columns:
-
-    def __init__(self, storage: typing.OrderedDict, _copy=True):
-        if _copy:
-            storage = collections.OrderedDict(storage)
-
-        object.__setattr__(self, STORAGE_PROPERTY, storage)
-
-    def __getitem__(self, key):
-        return _get_storage(self)[key]
-
-    def __getattribute__(self, key):
-        if key == STORAGE_PROPERTY:
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
-
-        return object.__getattribute__(self, key)
-
-    def __getattr__(self, key):
-        storage = _get_storage(self)
-        if key in storage:
-            return storage[key]
-
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
-
-    def __setitem__(self, key, _):
-        raise AttributeError(f"Cannot set key '{key}' - object is immutable")
-
-    def __setattr__(self, key, _):
-        raise AttributeError(f"Cannot set attribute '{key}' - object is immutable")
-
-    def __iter__(self):
-        return iter(_get_storage(self).values())
-
-    def __repr__(self):
-        return _to_repr(_get_storage(self))
-
-    def __str__(self):
-        return _to_str(self)
-
-    @staticmethod
-    def from_model(column_names: "api.ColumnNames"):
-        inputs = collections.OrderedDict()
-        outputs = collections.OrderedDict()
-
-        for target_column_names in column_names.targets:
-            key = target_column_names.name
-
-            inputs[key] = target_column_names.input
-            outputs[key] = target_column_names.output
-
-        return (
-            Columns(inputs, _copy=False),
-            Columns(outputs, _copy=False),
-        )
-
-
-class Features:
-
-    def __init__(
-        self,
-        items: typing.List["api.DataReleaseFeature"],
-        default_group_name: str
-    ):
-        storage = collections.defaultdict(list)  # `set` is losing order
-        storage[default_group_name]
-
-        for item in items:
-            values = storage[item.group]
-
-            if item.name not in values:
-                values.append(item.name)
-
-        self.storage = dict(storage)
-        self.default_group_name = default_group_name
-
-    def to_parameter_variants(
-        self,
-        base_name="feature_column_names",
-        separator="_",
-    ):
-        parameters = {
-            base_name: self.storage[self.default_group_name]
-        }
-
-        for group, names in self.storage.items():
-            key = f"{base_name}{separator}{group}"
-
-            parameters[key] = names
-
-        return parameters
-
-    @staticmethod
-    def from_data_release(data_release: "api.DataRelease"):
-        return Features(
-            data_release.features,
-            data_release.default_feature_group
-        )
+from datetime import datetime, timedelta
+from types import GeneratorType
+from typing import Any, Callable, Generator, Iterator, List, Optional
 
 
 class GeneratorWrapper:
@@ -134,11 +14,11 @@ class GeneratorWrapper:
 
     def __init__(
         self,
-        iterator: typing.Iterator,
-        consumer_factory: typing.Callable[[typing.Iterator], typing.Generator],
+        iterator: Iterator,
+        consumer_factory: Callable[[Iterator], Generator],
         *,
-        element_wrapper_factory: typing.Optional[typing.Callable[[typing.Any], typing.Any]] = None,
-        post_processor: typing.Optional[typing.Callable[[typing.Any], typing.Any]] = None,
+        element_wrapper_factory: Optional[Callable[[Any], Any]] = None,
+        post_processor: Optional[Callable[[Any], Any]] = None,
     ):
         self.element_wrapper_factory = element_wrapper_factory or (lambda x: x)
         self.post_processor = post_processor or (lambda x: x)
@@ -162,7 +42,7 @@ class GeneratorWrapper:
         stream = inner()
         consumer = consumer_factory(stream)
 
-        if not isinstance(consumer, types.GeneratorType):
+        if not isinstance(consumer, GeneratorType):
             raise RuntimeError(self.ERROR_YIELD_NOT_CALLED)
 
         if next(consumer) is not None:
@@ -175,20 +55,20 @@ class GeneratorWrapper:
         self,
         expected_size: int
     ):
-        values: typing.List[typing.Any] = []
-        durations: typing.List[datetime.timedelta] = []
+        values: List[Any] = []
+        durations: List[timedelta] = []
 
         sentinel = object()
 
         iterator = self.consumer
         while True:
-            start = datetime.datetime.now()
+            start = datetime.now()
 
             y = next(iterator, sentinel)
             if y is sentinel:
                 break
 
-            took = datetime.datetime.now() - start
+            took = datetime.now() - start
 
             y = self.post_processor(y)
 
@@ -207,80 +87,3 @@ class GeneratorWrapper:
             raise ValueError(f"{self.ERROR_WRONG_YIELD_CALL_COUNT_PREFIX} ({size} / {expected_size})")
 
         return values, durations
-
-
-class CallableIterable(typing.Iterable):
-
-    def __init__(
-        self,
-        getter: typing.Callable[[], typing.Iterator],
-        length: int,
-    ):
-        self._getter = getter
-        self._length = length
-
-    def __iter__(self):
-        return self._getter()
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return f"iterable[{self._length}]"
-
-    def __len__(self):
-        return self._length
-
-    @staticmethod
-    def from_dataframe(
-        dataframe: "pandas.DataFrame",
-        column_name: str,
-        mapper: typing.Optional[typing.Callable[[float], typing.Any]] = None
-    ):
-        if mapper:
-            def getter(): return iter(map(mapper, dataframe[column_name].copy()))
-        else:
-            def getter(): return iter(dataframe[column_name].copy())
-
-        return CallableIterable(
-            getter,
-            len(dataframe)
-        )
-
-
-class StreamMessage:
-
-    x: float
-
-    def __init__(self, x: float):
-        object.__setattr__(self, "x", x)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def __setitem__(self, key, _):
-        raise AttributeError(f"Cannot set key '{key}' - object is immutable")
-
-    def __setattr__(self, key, _):
-        raise AttributeError(f"Cannot set attribute '{key}' - object is immutable")
-
-    def __iter__(self):
-        return iter(vars(self))
-
-    def __repr__(self):
-        return _to_repr(vars(self))
-
-    def __str__(self):
-        return _to_str(self)
-
-    def get(self, key: str, default=None):
-        return getattr(self, key, default)
-
-    def keys(self):
-        return vars(self).keys()
-
-    def values(self):
-        return vars(self).values()
-
-    def items(self):
-        return vars(self).items()
