@@ -441,24 +441,6 @@ def push(
             utils.exit_via(error)
 
 
-@cli.command(help="[DEPRECATED] Send a prediction as your submission.")
-@click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
-@click.argument("file-path", type=click.Path(exists=True, dir_okay=False, readable=True))
-def push_prediction(
-    message: str,
-    file_path: str,
-):
-    utils.change_root()
-
-    try:
-        command.push_prediction(
-            message,
-            file_path,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
-
-
 def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
     options: List[Callable[..., Callable[..., Any]]] = [
         click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
