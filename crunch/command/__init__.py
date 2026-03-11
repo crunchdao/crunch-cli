@@ -3,7 +3,6 @@ from .download import download as download
 from .download import download_no_data_available as download_no_data_available
 from .init import init as init
 from .push import push as push
-from .push_prediction import push_prediction as push_prediction
 from .quickstarter import quickstarter as quickstarter
 from .setup import SetupSubmissionNumber as SetupSubmissionNumber
 from .setup import setup as setup
