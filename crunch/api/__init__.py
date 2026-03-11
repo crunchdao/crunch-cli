@@ -6,7 +6,6 @@ from crunch.api.domain.competition import CompetitionFormat as CompetitionFormat
 from crunch.api.domain.competition import CompetitionMode as CompetitionMode
 from crunch.api.domain.competition import CompetitionStatus as CompetitionStatus
 from crunch.api.domain.crunch import Crunch as Crunch
-from crunch.api.domain.data_release import ColumnNames as ColumnNames
 from crunch.api.domain.data_release import DataFile as DataFile
 from crunch.api.domain.data_release import DataFiles as DataFiles
 from crunch.api.domain.data_release import DataFilesUnion as DataFilesUnion
@@ -19,7 +18,6 @@ from crunch.api.domain.data_release import KnownData as KnownData
 from crunch.api.domain.data_release import OriginalFiles as OriginalFiles
 from crunch.api.domain.data_release import SizeVariant as SizeVariant
 from crunch.api.domain.data_release import SplitKeyPythonType as SplitKeyPythonType
-from crunch.api.domain.data_release import TargetColumnNames as TargetColumnNames
 from crunch.api.domain.enum_ import Language as Language
 from crunch.api.domain.enum_ import SplitKeyType as SplitKeyType
 from crunch.api.domain.leaderboard import Leaderboard as Leaderboard

@@ -174,10 +174,6 @@ class DataRelease(Model):
         return self._attrs["embargo"]
 
     @property
-    def column_names(self) -> "ColumnNames":
-        return ColumnNames.from_dict(self._attrs["columnNames"])
-
-    @property
     def number_of_features(self) -> int:
         return self._attrs["numberOfFeatures"]
 
@@ -223,68 +219,6 @@ class DataRelease(Model):
         return super().reload(
             include_splits=include_splits,
         )
-
-
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE
-)
-@dataclass(frozen=True)
-class TargetColumnNames:
-
-    id: int
-    name: str
-    side: Optional[str]
-    input: Optional[str]
-    output: Optional[str]
-    file_path: Optional[str]
-
-
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE
-)
-@dataclass(frozen=True)
-class ColumnNames:
-
-    id: Optional[str]
-    moon: Optional[str]
-    side: Optional[str]
-    input: Optional[str]
-    output: Optional[str]
-    targets: List[TargetColumnNames]
-
-    @property
-    def first_target(self):
-        return next(iter(self.targets), None)
-
-    @property
-    def inputs(self):
-        return [
-            target_column_names.input
-            for target_column_names in self.targets
-        ]
-
-    @property
-    def outputs(self):
-        return [
-            target_column_names.output
-            for target_column_names in self.targets
-        ]
-
-    @property
-    def target_names(self):
-        return [
-            target_column_names.name
-            for target_column_names in self.targets
-        ]
-
-    def get_target_by_name(self, name: str):
-        for target in self.targets:
-            if target.name == name:
-                return target
-
-        return None
 
 
 class DataReleaseCollection(Collection[DataRelease]):

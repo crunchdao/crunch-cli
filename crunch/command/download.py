@@ -12,14 +12,12 @@ def _get_data_urls(
     int,
     int,
     typing.List[api.SplitKeyPythonType],
-    api.ColumnNames,
     typing.Dict[str, downloader.PreparedDataFile]
 ]:
     data_release = round.phases.get_submission().get_data_release(size_variant=size_variant)
 
     embargo = data_release.embargo
     number_of_features = data_release.number_of_features
-    column_names = data_release.column_names
     data_files = data_release.data_files
     splits = data_release.splits
 
@@ -36,7 +34,6 @@ def _get_data_urls(
         embargo,
         number_of_features,
         split_keys,
-        column_names,
         downloader.prepare_all(data_directory_path, data_files),
     )
 
@@ -84,7 +81,6 @@ def download(
         embargo,
         number_of_features,
         split_keys,
-        column_names,
         prepared_data_files,
     ) = _get_data_urls(
         round,
@@ -107,7 +103,6 @@ def download(
         embargo,
         number_of_features,
         split_keys,
-        column_names,
         data_directory_path,
         file_paths,
     )

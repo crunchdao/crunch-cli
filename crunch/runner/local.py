@@ -90,7 +90,6 @@ class LocalRunner(Runner):
                 self.embargo,
                 self.number_of_features,
                 self.keys,
-                self.column_names,
                 self.data_directory_path,
                 self.data_paths,
             ) = download(
