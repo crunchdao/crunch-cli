@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Union
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
@@ -37,53 +36,7 @@ class DataFile:
     compressed: bool
 
 
-@dataclass(frozen=True)
-class KnownData:
-
-    X_TRAIN = "x_train"
-    Y_TRAIN = "y_train"
-    X_TEST = "x_test"
-    Y_TEST = "y_test"
-    X = "x"
-    Y = "y"
-    Y_RAW = "y_raw"
-    EXAMPLE_PREDICTION = "example_prediction"
-
-
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE
-)
-@dataclass(frozen=True)
-class DataFiles:
-
-    x_train: DataFile
-    x_test: DataFile
-    y_train: DataFile
-    y_test: DataFile
-    example_prediction: DataFile
-
-    def items(self):
-        return vars(self).items()
-
-
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE
-)
-@dataclass(frozen=True)
-class OriginalFiles:
-
-    x: DataFile
-    y: DataFile
-    y_raw: Optional[DataFile]
-    example_prediction: DataFile
-
-    def items(self):
-        return vars(self).items()
-
-
-DataFilesUnion = Union[DataFiles, OriginalFiles, Dict[str, DataFile]]
+DataFiles = Dict[str, DataFile]
 
 
 class DataReleaseSplitGroup(Enum):
@@ -186,22 +139,16 @@ class DataRelease(Model):
         return DataReleaseTargetResolution[self._attrs["target_resolution"]]
 
     @property
-    def data_files(self) -> DataFilesUnion:
+    def data_files(self) -> DataFiles:
         files = self._attrs.get("dataFiles")
         if not files:
             self.reload()
             files = self._attrs["dataFiles"]
 
-        if "xTrain" in files and "yTrain" in files:
-            return DataFiles.from_dict(files)
-
-        if "x" in files and "y" in files:
-            return OriginalFiles.from_dict(files)
-
-        return MappingProxyType({
+        return {
             key: DataFile.from_dict(value)
             for key, value in files.items()
-        })
+        }
 
     @property
     def splits(self) -> List[DataReleaseSplit]:
