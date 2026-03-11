@@ -1,7 +1,6 @@
 from typing import Any, Callable, List, Optional
 
 from crunch.api import SubmissionType
-from crunch.scoring import ScoredMetricDetail as ScoredMetricDetail
 from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured.execute import call_function
 from crunch.unstructured.file import File

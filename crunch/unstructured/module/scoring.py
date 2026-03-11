@@ -1,8 +1,9 @@
-from typing import Any, Callable, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Union
+
+from dataclasses_json import DataClassJsonMixin
 
 from crunch.api import Metric, PhaseType
-from crunch.scoring import ScoredMetric
-from crunch.scoring import ScoredMetricDetail as ScoredMetricDetail
 from crunch.unstructured.code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured.execute import call_function
 from crunch.unstructured.utils import group_metrics_by_target
@@ -12,6 +13,23 @@ __all__ = [
     "ScoredMetric",
     "ScoredMetricDetail",
 ]
+
+
+@dataclass
+class ScoredMetricDetail(DataClassJsonMixin):
+    key: Union[str, int]
+    value: float
+    reduced: bool
+
+
+def _detail_list_factory() -> List[ScoredMetricDetail]:
+    return []
+
+
+@dataclass
+class ScoredMetric(DataClassJsonMixin):
+    value: Optional[float]
+    details: List[ScoredMetricDetail] = field(default_factory=_detail_list_factory)
 
 
 class ScoringModule(ModuleWrapper):
