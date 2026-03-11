@@ -9,11 +9,12 @@ import crunch.monkey_patches as monkey_patches
 import crunch.tester as tester
 from crunch.api import Competition, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
 from crunch.command import download, download_no_data_available
+from crunch.external.humanfriendly import format_size
 from crunch.runner.runner import Runner
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext, RunnerExecutorContext, UserModule
 from crunch.unstructured import RunnerModule
-from crunch.utils import format_bytes, get_process_memory, smart_call
+from crunch.utils import get_process_memory, smart_call
 
 
 class LocalRunner(Runner):
@@ -66,9 +67,9 @@ class LocalRunner(Runner):
 
             self.log(
                 'memory - before="%s" after="%s" consumed=%s' % (
-                    format_bytes(memory_before),
-                    format_bytes(memory_after),
-                    f'"{format_bytes(memory_consumed)}"' if memory_consumed > 0 else "unknown"
+                    format_size(memory_before),
+                    format_size(memory_after),
+                    f'"{format_size(memory_consumed)}"' if memory_consumed > 0 else "unknown"
                 ),
                 important=True,
             )

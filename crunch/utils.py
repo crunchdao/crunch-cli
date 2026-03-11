@@ -1,27 +1,21 @@
 import contextlib
 import dataclasses
 import datetime
-import functools
 import gc
 import inspect
 import json
 import logging
 import os
-import re
 import shutil
-import sys
 import tempfile
 import time
 import typing
 
 import click
-import joblib
-import pandas
 import requests
 from tqdm.auto import tqdm
 
 from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, OLD_PROJECT_FILE, PROJECT_FILE, TOKEN_FILE
-from crunch.runner.types import ArgsLike, KwargsLike
 
 if typing.TYPE_CHECKING:
     from crunch.api import ApiException, SizeVariant
@@ -142,51 +136,11 @@ def read_token():
     return _read_crunchdao_file(TOKEN_FILE)
 
 
-def read(path: str, kwargs: KwargsLike = {}) -> typing.Any:
-    if path.endswith(".parquet"):
-        return pandas.read_parquet(path, **kwargs)
-
-    if path.endswith(".csv"):
-        return pandas.read_csv(path, **kwargs)
-
-    if path.endswith(".pickle"):
-        return pandas.read_pickle(path, **kwargs)
-
-    return joblib.load(path)
-
-
-def write(dataframe: typing.Any, path: str, kwargs: typing.Dict[str, typing.Any] = {}) -> None:
-    if path.endswith(".parquet"):
-        return dataframe.to_parquet(path, **kwargs)
-
-    if path.endswith(".csv"):
-        return dataframe.to_csv(path, **kwargs)
-
-    if path.endswith(".pickle"):
-        return pandas.to_pickle(dataframe, path, **kwargs)
-
-    return joblib.dump(dataframe, path)
-
-
-def strip_python_special_lines(lines: typing.List[str]):
-    return "\n".join(
-        line
-        for line in lines
-        if not re.match(r"^\s*?(!|%|#)", line)
-    )
-
-
 def get_process_memory() -> int:
     import psutil
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     return mem_info.rss
-
-
-def format_bytes(bytes: int):
-    from crunch.external.humanfriendly import format_size  # type: ignore
-
-    return format_size(bytes)
 
 
 class _undefined:
@@ -402,40 +356,9 @@ def exit_via(error: "ApiException", **kwargs: typing.Any) -> typing.NoReturn:
     exit(1)
 
 
-def timeit(params: typing.Optional[typing.List[str]]):
-    def decorator(func: typing.Callable[..., _T]) -> typing.Callable[..., _T]:
-        @functools.wraps(func)
-        def wrapper(*args: ArgsLike, **kwargs: KwargsLike):
-            kwargs.update(zip(
-                func.__code__.co_varnames[:func.__code__.co_argcount],
-                args
-            ))
-
-            start_time = time.perf_counter()
-            try:
-                return func(**kwargs)
-            finally:
-                end_time = time.perf_counter()
-                total_time = end_time - start_time
-
-                if params is not None:
-                    arguments = ", ".join([
-                        str(value) if name in params else "..."
-                        for name, value in kwargs.items()
-                    ])
-
-                    print(f'[debug] {func.__name__}({arguments}) took {total_time:.4f} seconds', file=sys.stderr)
-                else:
-                    print(f'[debug] {func.__name__} took {total_time:.4f} seconds', file=sys.stderr)
-
-        return wrapper
-
-    return decorator
-
-
 class Tracer:
 
-    def __init__(self, printer=print):
+    def __init__(self, printer: typing.Callable[[str], None] = print):
         self._depth = 0
         self._printer = printer
 

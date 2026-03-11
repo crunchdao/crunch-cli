@@ -14,7 +14,7 @@ import psutil
 
 import crunch.tester as tester
 from crunch.__version__ import __version__
-from crunch.api import ApiException, Client, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, KnownData, MissingPhaseDataException, RoundIdentifierType
+from crunch.api import ApiException, Client, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
 from crunch.command.convert import convert
 from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
@@ -22,7 +22,6 @@ from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY, DO
 from crunch.runner import is_inside
 from crunch.runner.types import KwargsLike
 from crunch.unstructured import RunnerModule, deduce_code_loader
-from crunch.utils import read
 
 
 class _Inline:
@@ -81,7 +80,7 @@ class _Inline:
                 _,  # number of features
                 _,  # split keys
                 data_directory_path,
-                data_paths,
+                _,
             ) = download(
                 round_number=round_number,
                 force=force,
@@ -91,18 +90,7 @@ class _Inline:
             raise click.Abort()
 
         competition_format = self._competition.format
-        if competition_format == CompetitionFormat.TIMESERIES:
-            x_train_path = data_paths[KnownData.X_TRAIN]
-            y_train_path = data_paths[KnownData.Y_TRAIN]
-            x_test_path = data_paths[KnownData.X_TEST]
-
-            x_train = read(x_train_path, kwargs=kwargs)
-            y_train = read(y_train_path, kwargs=kwargs)
-            x_test = read(x_test_path, kwargs=kwargs)
-
-            return x_train, y_train, x_test
-
-        elif competition_format == CompetitionFormat.UNSTRUCTURED:
+        if competition_format == CompetitionFormat.UNSTRUCTURED:
             module = self._runner_module
             if module is None or module.get_load_data_function(ensure=False) is None:
                 self.logger.info("Please follow the competition instructions to load the data.")
@@ -205,7 +193,7 @@ class _Inline:
         except (ImportError, NotImplementedError) as error:
             client, project = Client.from_project()
             nice_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook")
-            
+
             encoded_message = urllib.parse.quote_plus(message)
             real_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook?projectName={project.name}&message={encoded_message}")
 
