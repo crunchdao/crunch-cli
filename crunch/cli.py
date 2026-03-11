@@ -3,7 +3,7 @@ import functools
 import json
 import os
 import sys
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Union
 
 import click
 
