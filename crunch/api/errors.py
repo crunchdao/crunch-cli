@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional, Union
 from crunch.api.domain.phase import PhaseType
 from crunch.api.domain.project import ProjectTokenType
 from crunch.external.inflection import camelize, underscore
-from crunch.utils import format_bytes, smart_call, try_get_competition_name
+from crunch.external.humanfriendly import format_size
+from crunch.utils import smart_call, try_get_competition_name
 
 
 def _print_contact(
@@ -343,8 +344,8 @@ class ModelTooBigException(ApiException):
         self,
         **kwargs: Any,
     ) -> None:
-        size = format_bytes(self.size) if self.size is not None else None
-        maximum_size = format_bytes(self.maximum_size)
+        size = format_size(self.size) if self.size is not None else None
+        maximum_size = format_size(self.maximum_size)
 
         sizes = f"{size}/{maximum_size}" if size is not None else f"max. {maximum_size}"
         print(f"The resources directory is too big. ({sizes})")
@@ -406,7 +407,7 @@ class PredictionTooBigException(ApiException):
         self,
         **kwargs: Any,
     ) -> None:
-        print(f"Prediction is too big. ({format_bytes(self.size)}/{format_bytes(self.maximum_size)})")
+        print(f"Prediction is too big. ({format_size(self.size)}/{format_size(self.maximum_size)})")
 
 
 class ProjectNotFoundException(ApiException):
@@ -578,7 +579,7 @@ class SubmissionTooBigException(ApiException):
         self,
         **kwargs: Any,
     ) -> None:
-        print(f"Submission is too big. ({format_bytes(self.size)}/{format_bytes(self.maximum_size)})")
+        print(f"Submission is too big. ({format_size(self.size)}/{format_size(self.maximum_size)})")
 
 
 class CannotParticipateException(ApiException):
