@@ -8,7 +8,6 @@ from urllib3.exceptions import RequestError
 
 import crunch.store as store
 from crunch.api.auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
-from crunch.api.domain.check import CheckEndpointMixin
 from crunch.api.domain.competition import CompetitionCollection, CompetitionEndpointMixin
 from crunch.api.domain.crunch import CrunchEndpointMixin
 from crunch.api.domain.data_release import DataReleaseEndpointMixin
@@ -38,7 +37,6 @@ if TYPE_CHECKING:
 
 class EndpointClient(
     requests.Session,
-    CheckEndpointMixin,
     CompetitionEndpointMixin,
     CrunchEndpointMixin,
     DataReleaseEndpointMixin,

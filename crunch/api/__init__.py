@@ -1,8 +1,5 @@
 import crunch.api.auth as auth  # pyright: ignore[reportUnusedImport]
 from crunch.api.client import Client as Client
-from crunch.api.domain.check import Check as Check
-from crunch.api.domain.check import CheckFunction as CheckFunction
-from crunch.api.domain.check import CheckFunctionScope as CheckFunctionScope
 from crunch.api.domain.common import GpuRequirement as GpuRequirement
 from crunch.api.domain.competition import Competition as Competition
 from crunch.api.domain.competition import CompetitionFormat as CompetitionFormat

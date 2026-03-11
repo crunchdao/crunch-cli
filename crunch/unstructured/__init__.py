@@ -18,5 +18,7 @@ from crunch.unstructured.module.reward import RewardableProject as RewardablePro
 from crunch.unstructured.module.reward import RewardedProject as RewardedProject
 from crunch.unstructured.module.reward import RewardModule as RewardModule
 from crunch.unstructured.module.runner import RunnerModule as RunnerModule
+from crunch.unstructured.module.scoring import ScoredMetric as ScoredMetric
+from crunch.unstructured.module.scoring import ScoredMetricDetail as ScoredMetricDetail
 from crunch.unstructured.module.scoring import ScoringModule as ScoringModule
 from crunch.unstructured.module.submission import SubmissionModule as SubmissionModule
