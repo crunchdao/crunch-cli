@@ -74,15 +74,6 @@ class Competition(Model):
         return self._attrs["phalaKeyUrl"]
 
     @property
-    def checks(self):
-        from .check import CheckCollection
-
-        return CheckCollection(
-            competition=self,
-            client=self._client
-        )
-
-    @property
     def data_releases(self):
         from .data_release import DataReleaseCollection
 
