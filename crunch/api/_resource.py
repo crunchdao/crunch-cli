@@ -6,7 +6,7 @@ from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, Union
 
 if TYPE_CHECKING:
-    from crunch.api.client import Client
+    from crunch.api._client import Client
 
 
 # TODO: add better support for composite key resources
@@ -61,8 +61,8 @@ class Model:
 
     def reload(
         self,
-        *args, # type: ignore
-        **kwargs, # type: ignore
+        *args,  # type: ignore
+        **kwargs,  # type: ignore
     ):
         resource_identifier = self.resource_identifier
         if not isinstance(resource_identifier, (list, tuple)):

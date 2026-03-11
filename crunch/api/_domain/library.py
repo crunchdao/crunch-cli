@@ -1,6 +1,6 @@
 import typing
 
-from ..resource import Collection, Model
+from .._resource import Collection, Model
 from .common import GpuRequirement
 
 if typing.TYPE_CHECKING:

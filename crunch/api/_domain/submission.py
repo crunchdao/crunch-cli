@@ -1,13 +1,13 @@
 from enum import Enum
 from typing import TYPE_CHECKING, Dict, Iterator, List, Optional
 
-from crunch.api.auth import PushTokenAuth
-from crunch.api.resource import Collection, Model
+from crunch.api._auth import PushTokenAuth
+from crunch.api._resource import Collection, Model
 
 if TYPE_CHECKING:
-    from crunch.api.client import Client
-    from crunch.api.domain.project import Project
-    from crunch.api.types import Attrs
+    from crunch.api._client import Client
+    from crunch.api._domain.project import Project
+    from crunch.api._types import Attrs
 
 
 class SubmissionType(Enum):

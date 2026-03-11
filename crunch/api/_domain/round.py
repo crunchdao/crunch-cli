@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from crunch.api.resource import Collection, Model
+from crunch.api._resource import Collection, Model
 
 if TYPE_CHECKING:
-    from crunch.api.client import Client
-    from crunch.api.domain.competition import Competition
-    from crunch.api.identifiers import RoundIdentifierType
+    from crunch.api._client import Client
+    from crunch.api._domain.competition import Competition
+    from crunch.api._identifiers import RoundIdentifierType
 
 
 class Round(Model):
@@ -42,7 +42,7 @@ class Round(Model):
 
     @property
     def phases(self):
-        from crunch.api.domain.phase import PhaseCollection
+        from crunch.api._domain.phase import PhaseCollection
 
         return PhaseCollection(
             round=self,

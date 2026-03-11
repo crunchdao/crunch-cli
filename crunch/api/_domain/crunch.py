@@ -1,7 +1,7 @@
 import typing
 
-from ..identifiers import CrunchIdentifierType
-from ..resource import Collection, Model
+from .._identifiers import CrunchIdentifierType
+from .._resource import Collection, Model
 from .phase import Phase
 
 

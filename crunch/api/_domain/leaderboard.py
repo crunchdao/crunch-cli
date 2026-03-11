@@ -1,8 +1,8 @@
 import typing
 import warnings
 
-from ..identifiers import LeaderboardIdentifierType
-from ..resource import Collection, Model
+from .._identifiers import LeaderboardIdentifierType
+from .._resource import Collection, Model
 from .competition import Competition
 
 if typing.TYPE_CHECKING:

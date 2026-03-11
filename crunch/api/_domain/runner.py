@@ -1,6 +1,6 @@
 import typing
 
-from ..resource import Model
+from .._resource import Model
 
 
 class RunnerRun(Model):

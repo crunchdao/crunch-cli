@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 if typing.TYPE_CHECKING:
     from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
-from ..resource import Collection, Model
+from .._resource import Collection, Model
 
 
 class UploadStatus(enum.Enum):

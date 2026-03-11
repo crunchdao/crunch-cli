@@ -1,7 +1,7 @@
 import enum
 import typing
 
-from ..resource import Collection, Model
+from .._resource import Collection, Model
 from .competition import Competition
 from .target import Target
 

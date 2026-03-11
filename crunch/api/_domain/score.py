@@ -3,7 +3,7 @@ import typing
 
 import dataclasses_json
 
-from ..resource import Collection, Model
+from .._resource import Collection, Model
 from .prediction import Prediction
 
 

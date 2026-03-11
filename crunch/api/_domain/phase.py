@@ -2,13 +2,13 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, cast
 
-from crunch.api.domain.round import Round
-from crunch.api.resource import Collection, Model
+from crunch.api._domain.round import Round
+from crunch.api._resource import Collection, Model
 
 if TYPE_CHECKING:
-    from crunch.api.client import Client
-    from crunch.api.domain.data_release import SizeVariant
-    from crunch.api.identifiers import CompetitionIdentifierType, PhaseIdentifierType, RoundIdentifierType
+    from crunch.api._client import Client
+    from crunch.api._domain.data_release import SizeVariant
+    from crunch.api._identifiers import CompetitionIdentifierType, PhaseIdentifierType, RoundIdentifierType
 
 
 class PhaseType(Enum):
@@ -92,7 +92,7 @@ class Phase(Model):
         self,
         size_variant: Optional["SizeVariant"] = None,
     ):
-        from crunch.api.domain.data_release import DataRelease, DataReleaseCollection
+        from crunch.api._domain.data_release import DataRelease, DataReleaseCollection
 
         client = self._client
         assert client is not None

@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 
 import dataclasses_json
 
-from crunch.api.domain.enum_ import Language
-from crunch.api.resource import Collection, Model
+from crunch.api._domain.enum_ import Language
+from crunch.api._resource import Collection, Model
 
 if TYPE_CHECKING:
-    from crunch.api.client import Client
-    from crunch.api.domain.competition import Competition
-    from crunch.api.types import Attrs
+    from crunch.api._client import Client
+    from crunch.api._domain.competition import Competition
+    from crunch.api._types import Attrs
 
 
 @dataclasses_json.dataclass_json(

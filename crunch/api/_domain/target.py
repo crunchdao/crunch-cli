@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING, Iterator, List, Optional
 
-from crunch.api.resource import Collection, Model
+from crunch.api._resource import Collection, Model
 
 if TYPE_CHECKING:
-    from crunch.api.client import Client
-    from crunch.api.domain.competition import Competition
-    from crunch.api.types import Attrs
+    from crunch.api._client import Client
+    from crunch.api._domain.competition import Competition
+    from crunch.api._types import Attrs
 
 
 class Target(Model):

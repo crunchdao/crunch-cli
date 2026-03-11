@@ -1,8 +1,8 @@
 from enum import Enum
 from typing import Generator, Iterator, Optional
-from crunch.api.identifiers import CompetitionIdentifierType
-from crunch.api.resource import Collection, Model
-from crunch.api.domain.enum_ import SplitKeyType
+from crunch.api._identifiers import CompetitionIdentifierType
+from crunch.api._resource import Collection, Model
+from crunch.api._domain.enum_ import SplitKeyType
 
 
 class CompetitionFormat(Enum):

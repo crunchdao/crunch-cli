@@ -1,7 +1,7 @@
 import typing
 
-from ..identifiers import CompetitionIdentifierType
-from ..resource import Collection, Model
+from .._identifiers import CompetitionIdentifierType
+from .._resource import Collection, Model
 
 
 class User(Model):

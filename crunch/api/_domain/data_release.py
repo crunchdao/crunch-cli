@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Union
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
-from crunch.api.resource import Collection, Model
+from crunch.api._resource import Collection, Model
 
 if TYPE_CHECKING:
-    from crunch.api.client import Client
-    from crunch.api.domain.competition import Competition
-    from crunch.api.identifiers import CompetitionIdentifierType
+    from crunch.api._client import Client
+    from crunch.api._domain.competition import Competition
+    from crunch.api._identifiers import CompetitionIdentifierType
 
 
 class DataReleaseTargetResolution(Enum):

@@ -1,7 +1,7 @@
-import enum
+from enum import Enum
 
 
-class GpuRequirement(enum.Enum):
+class GpuRequirement(Enum):
 
     OPTIONAL = "OPTIONAL"
     RECOMMENDED = "RECOMMENDED"

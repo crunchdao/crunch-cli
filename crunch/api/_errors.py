@@ -2,10 +2,10 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Union
 
-from crunch.api.domain.phase import PhaseType
-from crunch.api.domain.project import ProjectTokenType
-from crunch.external.inflection import camelize, underscore
+from crunch.api._domain.phase import PhaseType
+from crunch.api._domain.project import ProjectTokenType
 from crunch.external.humanfriendly import format_size
+from crunch.external.inflection import camelize, underscore
 from crunch.utils import smart_call, try_get_competition_name
 
 
@@ -235,7 +235,7 @@ class ForbiddenLibraryException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from .client import Client
+        from ._client import Client
 
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
@@ -271,7 +271,7 @@ class InvalidProjectTokenException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from .client import Client
+        from ._client import Client
 
         print("Your token seems to have expired or is invalid.")
 
@@ -427,7 +427,7 @@ class ProjectNotFoundException(ApiException):
         self,
         **kwargs: Any,
     ) -> None:
-        from .client import Client
+        from ._client import Client
 
         print("Project not found.")
 
@@ -622,7 +622,7 @@ class CannotParticipateException(ApiException):
                 competition_name = try_get_competition_name()
 
             if competition_name is not None:
-                from crunch.api.client import Client
+                from crunch.api._client import Client
                 client = Client.from_env()
 
                 link = client.format_web_url(f"/competitions/{competition_name}")

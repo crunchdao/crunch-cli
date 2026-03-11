@@ -7,28 +7,28 @@ from tqdm.auto import tqdm
 from urllib3.exceptions import RequestError
 
 import crunch.store as store
-from crunch.api.auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
-from crunch.api.domain.competition import CompetitionCollection, CompetitionEndpointMixin
-from crunch.api.domain.crunch import CrunchEndpointMixin
-from crunch.api.domain.data_release import DataReleaseEndpointMixin
-from crunch.api.domain.leaderboard import LeaderboardEndpointMixin
-from crunch.api.domain.library import LibraryCollection, LibraryEndpointMixin
-from crunch.api.domain.metric import MetricEndpointMixin
-from crunch.api.domain.phase import PhaseEndpointMixin
-from crunch.api.domain.prediction import PredictionEndpointMixin
-from crunch.api.domain.project import Project, ProjectEndpointMixin, ProjectTokenCollection
-from crunch.api.domain.quickstarter import QuickstarterEndpointMixin
-from crunch.api.domain.round import RoundEndpointMixin
-from crunch.api.domain.run import RunEndpointMixin
-from crunch.api.domain.runner import RunnerRun, RunnerRunEndpointMixin
-from crunch.api.domain.score import ScoreEndpointMixin
-from crunch.api.domain.submission import SubmissionEndpointMixin
-from crunch.api.domain.submission_file import SubmissionFileEndpointMixin
-from crunch.api.domain.target import TargetEndpointMixin
-from crunch.api.domain.upload import UploadCollection, UploadEndpointMixin
-from crunch.api.domain.user import UserCollection, UserEndpointMixin
-from crunch.api.errors import convert_error
-from crunch.api.pagination import PageRequest
+from crunch.api._auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
+from crunch.api._domain.competition import CompetitionCollection, CompetitionEndpointMixin
+from crunch.api._domain.crunch import CrunchEndpointMixin
+from crunch.api._domain.data_release import DataReleaseEndpointMixin
+from crunch.api._domain.leaderboard import LeaderboardEndpointMixin
+from crunch.api._domain.library import LibraryCollection, LibraryEndpointMixin
+from crunch.api._domain.metric import MetricEndpointMixin
+from crunch.api._domain.phase import PhaseEndpointMixin
+from crunch.api._domain.prediction import PredictionEndpointMixin
+from crunch.api._domain.project import Project, ProjectEndpointMixin, ProjectTokenCollection
+from crunch.api._domain.quickstarter import QuickstarterEndpointMixin
+from crunch.api._domain.round import RoundEndpointMixin
+from crunch.api._domain.run import RunEndpointMixin
+from crunch.api._domain.runner import RunnerRun, RunnerRunEndpointMixin
+from crunch.api._domain.score import ScoreEndpointMixin
+from crunch.api._domain.submission import SubmissionEndpointMixin
+from crunch.api._domain.submission_file import SubmissionFileEndpointMixin
+from crunch.api._domain.target import TargetEndpointMixin
+from crunch.api._domain.upload import UploadCollection, UploadEndpointMixin
+from crunch.api._domain.user import UserCollection, UserEndpointMixin
+from crunch.api._errors import convert_error
+from crunch.api._pagination import PageRequest
 from crunch.constants import API_KEY_ENV_VAR
 
 if TYPE_CHECKING:
