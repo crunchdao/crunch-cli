@@ -1,24 +1,23 @@
 import unittest
 
 import crunch.api as api
-import crunch.api.errors as errors
 
 
 class ErrorsTest(unittest.TestCase):
 
     def test_find_error_class(self):
         self.assertEqual(
-            errors.CrunchNotFoundException,
-            errors.find_error_class("CRUNCH_NOT_FOUND")
+            api.CrunchNotFoundException,
+            api.find_error_class("CRUNCH_NOT_FOUND")
         )
 
         self.assertEqual(
-            errors.ApiException,
-            errors.find_error_class("UNKNOWN_ERROR_THAT_HASNT_BEEN_DEFINED")
+            api.ApiException,
+            api.find_error_class("UNKNOWN_ERROR_THAT_HASNT_BEEN_DEFINED")
         )
 
     def test_convert_error(self):
-        error = errors.convert_error({
+        error = api.convert_error({
             "code": "CRUNCH_NOT_FOUND",
             "phaseType": "SUBMISSION",
             "roundNumber": 1,
@@ -26,7 +25,7 @@ class ErrorsTest(unittest.TestCase):
         })
 
         self.assertEqual(
-            errors.CrunchNotFoundException,
+            api.CrunchNotFoundException,
             type(error)
         )
 

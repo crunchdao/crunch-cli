@@ -16,8 +16,7 @@ import requests
 
 import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, PhaseType, RunnerRun, Upload
-from crunch.api.errors import ModelTooBigException, PredictionTooBigException
+from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
 from crunch.runner.types import KwargsLike
