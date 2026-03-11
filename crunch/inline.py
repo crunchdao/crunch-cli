@@ -130,10 +130,7 @@ class _Inline:
         train_frequency: int = 1,
         raise_abort: bool = False,
         round_number: RoundIdentifierType = "@current",
-        no_checks: bool = False,
         no_determinism_check: Optional[bool] = None,
-        read_kwargs: KwargsLike = {},
-        write_kwargs: KwargsLike = {},
     ):
         from . import library, tester
 
@@ -156,10 +153,7 @@ class _Inline:
                 round_number,
                 competition,
                 self.has_gpu,
-                not no_checks,
                 no_determinism_check,
-                read_kwargs,
-                write_kwargs,
             )
         except KeyboardInterrupt:
             self.logger.error(f"Cancelled!")
