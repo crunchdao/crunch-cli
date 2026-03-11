@@ -75,6 +75,7 @@ from crunch.api._errors import SubmissionNotFoundException as SubmissionNotFound
 from crunch.api._errors import SubmissionTooBigException as SubmissionTooBigException
 from crunch.api._errors import ValidationFailedException as ValidationFailedException
 from crunch.api._errors import convert_error as convert_error
+from crunch.api._errors import find_error_class as find_error_class
 from crunch.api._identifiers import CompetitionIdentifierType as CompetitionIdentifierType
 from crunch.api._identifiers import CrunchIdentifierType as CrunchIdentifierType
 from crunch.api._identifiers import PhaseIdentifierType as PhaseIdentifierType
