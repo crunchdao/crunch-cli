@@ -11,7 +11,6 @@ from crunch.api.domain.data_release import DataFile as DataFile
 from crunch.api.domain.data_release import DataFiles as DataFiles
 from crunch.api.domain.data_release import DataFilesUnion as DataFilesUnion
 from crunch.api.domain.data_release import DataRelease as DataRelease
-from crunch.api.domain.data_release import DataReleaseFeature as DataReleaseFeature
 from crunch.api.domain.data_release import DataReleaseSplit as DataReleaseSplit
 from crunch.api.domain.data_release import DataReleaseSplitGroup as DataReleaseSplitGroup
 from crunch.api.domain.data_release import DataReleaseSplitReduced as DataReleaseSplitReduced

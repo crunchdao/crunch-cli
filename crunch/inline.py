@@ -80,7 +80,6 @@ class _Inline:
                 _,  # embargo
                 _,  # number of features
                 _,  # split keys
-                _,  # features
                 _,  # column_names
                 data_directory_path,
                 data_paths,

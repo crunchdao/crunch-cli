@@ -1,7 +1,7 @@
 import os
 import typing
 
-from .. import api, constants, container, downloader, utils
+from .. import api, constants, downloader, utils
 
 
 def _get_data_urls(
@@ -12,7 +12,6 @@ def _get_data_urls(
     int,
     int,
     typing.List[api.SplitKeyPythonType],
-    container.Features,
     api.ColumnNames,
     typing.Dict[str, downloader.PreparedDataFile]
 ]:
@@ -23,7 +22,6 @@ def _get_data_urls(
     column_names = data_release.column_names
     data_files = data_release.data_files
     splits = data_release.splits
-    features = container.Features.from_data_release(data_release)
 
     split_keys = [
         split.key
@@ -38,7 +36,6 @@ def _get_data_urls(
         embargo,
         number_of_features,
         split_keys,
-        features,
         column_names,
         downloader.prepare_all(data_directory_path, data_files),
     )
@@ -87,7 +84,6 @@ def download(
         embargo,
         number_of_features,
         split_keys,
-        features,
         column_names,
         prepared_data_files,
     ) = _get_data_urls(
@@ -111,7 +107,6 @@ def download(
         embargo,
         number_of_features,
         split_keys,
-        features,
         column_names,
         data_directory_path,
         file_paths,

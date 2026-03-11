@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Union
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
@@ -128,26 +128,6 @@ class DataReleaseSplit:
         ]
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE,
-)
-@dataclass(frozen=True)
-class DataReleaseFeature:
-
-    group: str
-    name: str
-
-    @staticmethod
-    def from_dict_array(
-        input: List[Dict[str, Any]]
-    ):
-        return [
-            DataReleaseFeature.from_dict(x)
-            for x in input
-        ]
-
-
 class SizeVariant(Enum):
 
     DEFAULT = "DEFAULT"
@@ -236,27 +216,12 @@ class DataRelease(Model):
 
         return list(DataReleaseSplit.from_dict_array(splits))
 
-    @property
-    def default_feature_group(self) -> str:
-        return self._attrs["defaultFeatureGroup"]
-
-    @property
-    def features(self) -> Tuple[DataReleaseFeature]:
-        features = self._attrs.get("features")
-        if features is None:
-            self.reload(include_features=True)
-            features = self._attrs["features"]
-
-        return tuple(DataReleaseFeature.from_dict_array(features))
-
     def reload(
         self,
         include_splits: bool = True,
-        include_features: bool = True,
     ):
         return super().reload(
             include_splits=include_splits,
-            include_features=include_features,
         )
 
 
@@ -342,14 +307,12 @@ class DataReleaseCollection(Collection[DataRelease]):
         self,
         number: Union[int, str],
         include_splits: bool = True,
-        include_features: bool = True,
     ) -> DataRelease:
         return self.prepare_model(
             self._client.api.get_data_release(
                 self.competition.id,
                 number,
                 include_splits=include_splits,
-                include_features=include_features,
             )
         )
 
@@ -387,14 +350,12 @@ class DataReleaseEndpointMixin:
         competition_identifier: "CompetitionIdentifierType",
         number: int,
         include_splits: bool = False,
-        include_features: bool = False,
     ):
         return self._result(
             self.get(
                 f"/v1/competitions/{competition_identifier}/data-releases/{number}",
                 params={
                     "includeSplits": include_splits,
-                    "includeFeatures": include_features,
                 }
             ),
             json=True
