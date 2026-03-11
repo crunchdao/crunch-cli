@@ -1,23 +1,21 @@
-import contextlib
-import dataclasses
 import datetime
-import gc
-import inspect
 import json
 import logging
 import os
 import shutil
-import tempfile
 import time
-import typing
+from contextlib import contextmanager
+from dataclasses import dataclass
+from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Iterable, Literal, NoReturn, Optional, Set, TypeVar, Union, overload
 
 import click
 import requests
 from tqdm.auto import tqdm
 
-from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, OLD_PROJECT_FILE, PROJECT_FILE, TOKEN_FILE
+from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, PROJECT_FILE, TOKEN_FILE
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from crunch.api import ApiException, SizeVariant
 
 
@@ -33,6 +31,22 @@ def change_root():
         if current == os.getcwd():
             print("project: not found")
             raise click.Abort()
+
+
+if TYPE_CHECKING:
+    @overload
+    def _read_crunchdao_file(
+        name: str,
+        raise_if_missing: Literal[True] = True,
+    ) -> str:
+        ...
+
+    @overload
+    def _read_crunchdao_file(
+        name: str,
+        raise_if_missing: Literal[False] = False,
+    ) -> Optional[str]:
+        ...
 
 
 def _read_crunchdao_file(
@@ -64,7 +78,7 @@ def write_token(plain_push_token: str, directory: str = "."):
         fd.write(plain_push_token)
 
 
-@dataclasses.dataclass()
+@dataclass
 class ProjectInfo:
     competition_name: str
     project_name: str
@@ -78,10 +92,6 @@ def write_project_info(info: ProjectInfo, directory: str = "."):
         DOT_CRUNCHDAO_DIRECTORY
     )
 
-    old_path = os.path.join(dot_crunchdao_path, OLD_PROJECT_FILE)
-    if os.path.exists(old_path):
-        os.remove(old_path)
-
     path = os.path.join(dot_crunchdao_path, PROJECT_FILE)
     with open(path, "w") as fd:
         json.dump({
@@ -92,21 +102,30 @@ def write_project_info(info: ProjectInfo, directory: str = "."):
         }, fd)
 
 
-def read_project_info(raise_if_missing: bool = True) -> ProjectInfo:
-    from crunch.api import SizeVariant
+if TYPE_CHECKING:
+    @overload
+    def read_project_info(
+        raise_if_missing: Literal[True] = True,
+    ) -> ProjectInfo:
+        ...
 
-    old_content = _read_crunchdao_file(OLD_PROJECT_FILE, False)
-    if old_content is not None:
-        return ProjectInfo(
-            "adialab",
-            "default",
-            root["userId"],
-        )
+    @overload
+    def read_project_info(
+        raise_if_missing: Literal[False] = False,
+    ) -> Optional[ProjectInfo]:
+        ...
+
+
+def read_project_info(
+    raise_if_missing: bool = True,
+) -> Optional[ProjectInfo]:
+    from crunch.api import SizeVariant
 
     content = _read_crunchdao_file(PROJECT_FILE, raise_if_missing)
     if not raise_if_missing and content is None:
         return None
 
+    assert content is not None
     root = json.loads(content)
 
     try:
@@ -147,17 +166,19 @@ class _undefined:
     pass
 
 
-_smart_call_ignore: typing.Set[str] = set()
-_T = typing.TypeVar("_T")
+_smart_call_ignore: Set[str] = set()
+_T = TypeVar("_T")
 
 
 def smart_call(
-    function: typing.Callable[..., _T],
-    default_values: typing.Dict[str, typing.Any],
-    specific_values: typing.Dict[str, typing.Any] = {},
+    function: Callable[..., _T],
+    default_values: Dict[str, Any],
+    specific_values: Dict[str, Any] = {},
     log: bool = True,
     logger: logging.Logger = logging.getLogger(),
 ) -> _T:
+    import inspect
+
     values = {
         **default_values,
         **specific_values
@@ -207,31 +228,15 @@ def cut_url(url: str):
     return url
 
 
-def get_extension(url: str):
-    url = cut_url(url)
-
-    if url.endswith(".parquet"):
-        return "parquet"
-
-    if url.endswith(".csv"):
-        return "csv"
-
-    if url.endswith(".pickle"):
-        return "pickle"
-
-    print(f"unknown file extension: {url}")
-    raise click.Abort()
-
-
 def _download_head(
     session: requests.Session,
     url: str,
     path: str,
     log: bool,
-    print: callable,
+    print: Callable[[str], None],
 ):
     logged = False
-    response: requests.Response = None
+    response: Optional[requests.Response] = None
 
     try:
         response = session.get(url, stream=True)
@@ -267,10 +272,10 @@ def download(
     url: str,
     path: str,
     log: bool = True,
-    print: typing.Callable[[typing.Any], typing.Any] = print,
+    print: Callable[[str], None] = print,
     progress_bar: bool = True,
     max_retry: int = 10,
-    session: typing.Optional[requests.Session] = None
+    session: Optional[requests.Session] = None,
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
@@ -288,7 +293,7 @@ def download(
 
     file_name = os.path.basename(path)
 
-    with tempfile.TemporaryDirectory(
+    with TemporaryDirectory(
         prefix=f"{file_name}.",
         dir=os.path.dirname(path),
     ) as temporary_directory_path:
@@ -350,7 +355,7 @@ def download(
         )
 
 
-def exit_via(error: "ApiException", **kwargs: typing.Any) -> typing.NoReturn:
+def exit_via(error: "ApiException", **kwargs: Any) -> NoReturn:
     print("\n---")
     error.print_helper(**kwargs)
     exit(1)
@@ -358,7 +363,7 @@ def exit_via(error: "ApiException", **kwargs: typing.Any) -> typing.NoReturn:
 
 class Tracer:
 
-    def __init__(self, printer: typing.Callable[[str], None] = print):
+    def __init__(self, printer: Callable[[str], None] = print):
         self._depth = 0
         self._printer = printer
 
@@ -368,8 +373,8 @@ class Tracer:
 
     def loop(
         self,
-        iterable: typing.Iterable[_T],
-        action: typing.Union[str, typing.Callable[[_T], str]],
+        iterable: Iterable[_T],
+        action: Union[str, Callable[[_T], str]],
         value_placeholder: str = "{value}",
     ):
         has_value_placeholder = False
@@ -389,7 +394,7 @@ class Tracer:
             with self.log(action_message):
                 yield value
 
-    @contextlib.contextmanager
+    @contextmanager
     def log(
         self,
         action: str,
@@ -404,6 +409,7 @@ class Tracer:
         finally:
             self._depth -= 1
 
+            import gc
             gc.collect()
 
             end = datetime.datetime.now()
@@ -414,9 +420,9 @@ class LimitedSizeIO:
 
     def __init__(
         self,
-        underlying_io: typing.BinaryIO,
+        underlying_io: BinaryIO,
         limit: int,
-        callback: typing.Optional[typing.Callable[[int], None]] = None
+        callback: Optional[Callable[[int], None]] = None
     ):
         self.underlying_io = underlying_io
         self.limit = limit
