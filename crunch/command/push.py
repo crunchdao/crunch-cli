@@ -11,7 +11,7 @@ import requests
 from crunch import store
 from crunch.api import ApiException, Client, ForbiddenLibraryException, Project, Submission, SubmissionType, Upload
 from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, SUBMISSION_MESSAGE_LENGTH
-from crunch.utils import format_bytes
+from crunch.external.humanfriendly import format_size
 
 if TYPE_CHECKING:
     from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
@@ -200,9 +200,9 @@ def _upload_files(
         total_size += size
 
         if log_action:
-            print(f"{log_action}: {name} ({format_bytes(size)})")
+            print(f"{log_action}: {name} ({format_size(size)})")
         else:
-            print(f"found {group_name} file: {name} ({format_bytes(size)})")
+            print(f"found {group_name} file: {name} ({format_size(size)})")
 
         if dry:
             return
@@ -362,7 +362,7 @@ def _upload_files(
             log_action=f"create {group_name} encryption file",
         )
 
-    print(f"total {group_name} size: {format_bytes(total_size)}")
+    print(f"total {group_name} size: {format_size(total_size)}")
 
 
 def _get_encryption_info(

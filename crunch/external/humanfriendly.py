@@ -2,6 +2,7 @@
 
 import collections
 import re
+from typing import Optional
 
 if True:  # from humanfriendly/__init__.py
     SizeUnit = collections.namedtuple('SizeUnit', 'divider, symbol, name')
@@ -41,17 +42,17 @@ if True:  # from humanfriendly/__init__.py
 
 
 if True:  # from humanfriendly/text.py
-    def format(text, *args, **kw):
+    def format(text: str, *args, **kw):
         if args:
             text %= args
         if kw:
             text = text.format(**kw)
         return text
 
-    def pluralize(count, singular, plural=None):
+    def pluralize(count: int, singular: str, plural: Optional[str] = None) -> str:
         return '%s %s' % (count, pluralize_raw(count, singular, plural))
 
-    def format_size(num_bytes, keep_width=False, binary=False):
+    def format_size(num_bytes: int, keep_width: bool = False, binary: bool = False) -> str:
         for unit in reversed(disk_size_units):
             if num_bytes >= unit.binary.divider and binary:
                 number = round_number(float(num_bytes) / unit.binary.divider, keep_width=keep_width)
@@ -61,7 +62,7 @@ if True:  # from humanfriendly/text.py
                 return pluralize(number, unit.decimal.symbol, unit.decimal.symbol)
         return pluralize(num_bytes, 'byte')
 
-    def pluralize_raw(count, singular, plural=None):
+    def pluralize_raw(count: float, singular: str, plural: Optional[str] = None) -> str:
         if not plural:
             plural = singular + 's'
         return singular if float(count) == 1.0 else plural

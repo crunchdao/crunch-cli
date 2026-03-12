@@ -1,28 +1,20 @@
-import dataclasses
 import os
 import shutil
 import subprocess
-import tempfile
-import typing
 import zipfile
+from dataclasses import dataclass
+from tempfile import TemporaryDirectory
+from typing import Any, Callable, Dict, List, Optional, Set
 
 import click
 
-from . import api, constants, utils
-
-# TODO Remove me
-LEGACY_NAME_MAPPING = {
-    "x_train": "X_train",
-    "y_train": "y_train",
-    "x_test": "X_test",
-    "y_test": "y_test",
-    "x": "X",
-    "y": "y",
-    "example_prediction": "example_prediction",
-}
+from crunch.api import DataFile, DataFiles
+from crunch.constants import MACOS_HIDDEN_FILES
+from crunch.utils import cut_url
+from crunch.utils import download as _download
 
 
-@dataclasses.dataclass
+@dataclass
 class PreparedDataFile:
 
     path: str
@@ -48,14 +40,14 @@ class PreparedDataFile:
 
 def delete_other_uncompressed_markers(
     data_directory_path: str,
-    data_files: typing.List[PreparedDataFile],
+    data_files: List[PreparedDataFile],
 ):
     expected_markers = {
         data_file.uncompressed_marker_path
         for data_file in data_files
     }
 
-    found_markers: typing.Set[str] = set()
+    found_markers: Set[str] = set()
     for root, _, files in os.walk(data_directory_path, topdown=False):
         for file in files:
             if file.startswith(".") and file.endswith(".uncompressed"):
@@ -70,24 +62,22 @@ def delete_other_uncompressed_markers(
 
 def prepare_all(
     data_directory_path: str,
-    data_files: api.DataFilesUnion,
+    data_files: DataFiles,
 ):
     return {
-        key: prepare_one(data_directory_path, value, key)
+        key: prepare_one(data_directory_path, value)
         for key, value in data_files.items()
-        if value is not None
     }
 
 
 def prepare_one(
     data_directory_path: str,
-    data_file: api.DataFile,
-    key: str
+    data_file: DataFile,
 ):
     url = data_file.url
     path = os.path.join(
         data_directory_path,
-        data_file.name or (f"{LEGACY_NAME_MAPPING[key]}.{utils.get_extension(url)}")
+        data_file.name
     )
 
     return PreparedDataFile(
@@ -100,9 +90,9 @@ def prepare_one(
 
 
 def save_one(
-    data_file: typing.Optional[PreparedDataFile],
+    data_file: Optional[PreparedDataFile],
     force: bool,
-    print: typing.Callable[[typing.Any], None] = print,
+    print: Callable[[Any], None] = print,
     progress_bar: bool = True,
 ):
     if data_file is None:
@@ -119,7 +109,7 @@ def save_one(
 
     def download():
         file_length_str = f" ({file_size} bytes)" if data_file.has_size else ""
-        print(f"{file_path}: download from {utils.cut_url(data_file.url)}" + file_length_str)
+        print(f"{file_path}: download from {cut_url(data_file.url)}" + file_length_str)
 
         if not data_file.has_size:
             print(f"{file_path}: skip, not given by server")
@@ -133,7 +123,7 @@ def save_one(
             print(f"{file_path}: signature missing, cannot download file without being authenticated")
             raise click.Abort()
 
-        utils.download(data_file.url, file_path, log=False, progress_bar=progress_bar)
+        _download(data_file.url, file_path, log=False, progress_bar=progress_bar)
         return True
 
     has_new_content = download()
@@ -150,7 +140,7 @@ def save_one(
             print(f"{file_path}: already uncompressed, marker is present")
             return
 
-    with tempfile.TemporaryDirectory(
+    with TemporaryDirectory(
         prefix=f"{file_name}.",
         dir=parent_directory_path
     ) as temporary_directory_path:
@@ -158,7 +148,7 @@ def save_one(
         _uncompress(file_path, temporary_directory_path)
 
         for name in os.listdir(temporary_directory_path):
-            if name in constants.MACOS_HIDDEN_FILES:
+            if name in MACOS_HIDDEN_FILES:
                 continue
 
             source_path = os.path.join(temporary_directory_path, name)
@@ -180,9 +170,9 @@ def save_one(
 
 
 def save_all(
-    data_files: typing.Dict[str, PreparedDataFile],
+    data_files: Dict[str, PreparedDataFile],
     force: bool,
-    print: typing.Callable[[str], None] = print,
+    print: Callable[[str], None] = print,
     progress_bar: bool = True,
 ):
     for data_file in data_files.values():

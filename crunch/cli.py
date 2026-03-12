@@ -3,7 +3,7 @@ import functools
 import json
 import os
 import sys
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Union
 
 import click
 
@@ -303,7 +303,7 @@ def setup(
     if directory != '.':
         print(f" - To get inside your workspace directory, run: cd {directory}")
 
-    print(f" - To see all of the available commands of the CrunchDAO CLI, run: crunch --help")
+    print(f" - To see all of the available commands of the Crunch CLI, run: crunch --help")
 
 
 @cli.command(help="Setup a notebook workspace.")
@@ -441,24 +441,6 @@ def push(
             utils.exit_via(error)
 
 
-@cli.command(help="[DEPRECATED] Send a prediction as your submission.")
-@click.option("-m", "--message", prompt=True, default="", help="Specify the change of your code. (like a commit message)")
-@click.argument("file-path", type=click.Path(exists=True, dir_okay=False, readable=True))
-def push_prediction(
-    message: str,
-    file_path: str,
-):
-    utils.change_root()
-
-    try:
-        command.push_prediction(
-            message,
-            file_path,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
-
-
 def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
     options: List[Callable[..., Callable[..., Any]]] = [
         click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
@@ -468,7 +450,6 @@ def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
         click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check."),
         click.option("--round-number", default="@current", help="Change round number to get the data from."),
         click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`."),
-        click.option("--no-checks", is_flag=True, help="Disable final predictions checks."),
         click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check."),
     ]
 
@@ -578,7 +559,6 @@ def local(
     skip_library_check: bool,
     round_number: str,
     has_gpu: bool,
-    no_checks: bool,
     no_determinism_check: Optional[bool],
 ):
     from . import library, tester
@@ -604,7 +584,6 @@ def local(
                 train_frequency,
                 round_number,
                 has_gpu,
-                not no_checks,
                 no_determinism_check,
             )
         except api.ApiException as error:
@@ -740,16 +719,11 @@ def cloud(
 @click.option("--competition-format", "competition_format_raw", required=True)
 @click.option("--split-key-type", "split_key_type_raw", required=True)
 # ---
-@click.option("--x", "x_path", default=None)
-@click.option("--y", "y_path", default=None)
-@click.option("--y-raw", "y_raw_path", default=None)
 @click.option("--data-directory", "data_directory_path", default=None)
-# ---
 @click.option("--main-file", required=True)
 @click.option("--code-directory", required=True)
 @click.option("--model-directory", "model_directory_path", required=True)
 @click.option("--prediction-directory", "prediction_directory_path", required=True)
-@click.option("--prediction", "prediction_path", required=True)
 @click.option("--trace", "trace_path", required=True)
 @click.option("--state-file", "state_file", required=True)
 @click.option("--ping-url", "ping_urls", multiple=True)
@@ -760,37 +734,23 @@ def cloud(
 @click.option("--number-of-features", required=True, type=int)
 @click.option("--gpu", required=True, type=bool)
 # ---
-@click.option("--id-column-name", required=True)
-@click.option("--moon-column-name", required=True)
-@click.option("--side-column-name", required=True)
-@click.option("--input-column-name", required=True)
-@click.option("--output-column-name", required=True)
-@click.option("--target", "targets", required=True, multiple=True, nargs=5)
-# ---
-@click.option("--write-index", required=True, type=bool)
-# ---
 @click.option("--fuse-pid", required=True, type=int)
 @click.option("--fuse-signal-number", required=True, type=int)
 @click.option("--exit-file", "exit_file_path", required=True, type=str)
 @click.option("--exit-content", required=True, type=str)
 # ---
-@click.option("--runner-py-file", "runner_dot_py_file_path", type=str, default=None)
-@click.option("--parameters", "parameters_json_string", type=str, default=None)
+@click.option("--runner-py-file", "runner_dot_py_file_path", type=str, required=True)
+@click.option("--parameters", "parameters_json_string", type=str, required=True)
 def cloud_executor(
     competition_name: str,
     competition_format_raw: str,
     split_key_type_raw: str,
     # ---
-    x_path: str,
-    y_path: str,
-    y_raw_path: str,
     data_directory_path: str,
-    # ---
     main_file: str,
     code_directory: str,
     model_directory_path: str,
     prediction_directory_path: str,
-    prediction_path: str,
     trace_path: str,
     state_file: str,
     ping_urls: List[str],
@@ -801,22 +761,13 @@ def cloud_executor(
     number_of_features: int,
     gpu: bool,
     # ---
-    id_column_name: str,
-    moon_column_name: str,
-    side_column_name: str,
-    input_column_name: str,
-    output_column_name: str,
-    targets: List[Tuple[str, str, str, str, str]],
-    # ---
-    write_index: bool,
-    # ---
     fuse_pid: int,
     fuse_signal_number: int,
     exit_file_path: str,
     exit_content: str,
     # ---
-    runner_dot_py_file_path: Optional[str],
-    parameters_json_string: Optional[str],
+    runner_dot_py_file_path: str,
+    parameters_json_string: str,
 ):
     from .runner import is_inside
     if not is_inside:
@@ -837,16 +788,11 @@ def cloud_executor(
         competition_name,
         competition_format,
         # ---
-        x_path,
-        y_path,
-        y_raw_path,
         data_directory_path,
-        # ---
         main_file,
         code_directory,
         model_directory_path,
         prediction_directory_path,
-        prediction_path,
         trace_path,
         state_file,
         ping_urls,
@@ -856,27 +802,6 @@ def cloud_executor(
         embargo,
         number_of_features,
         gpu,
-        # ---
-        api.ColumnNames(
-            id_column_name or None,
-            moon_column_name or None,
-            side_column_name or None,
-            input_column_name or None,
-            output_column_name or None,
-            [
-                api.TargetColumnNames(
-                    0,
-                    target_name,
-                    side or None,
-                    input or None,
-                    output or None,
-                    file_path or None,
-                )
-                for target_name, side, input, output, file_path in targets
-            ]
-        ),
-        # ---
-        write_index,
         # ---
         fuse_pid,
         fuse_signal_number,

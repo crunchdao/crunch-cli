@@ -1,8 +1,7 @@
-DOT_CRUNCHDAO_DIRECTORY = ".crunchdao"
+DOT_CRUNCH_DIRECTORY = ".crunchdao"
 DOT_DATA_DIRECTORY = "data"
 DOT_PREDICTION_DIRECTORY = "prediction"
 TOKEN_FILE = "token"
-OLD_PROJECT_FILE = "project"
 PROJECT_FILE = "project.json"
 DOT_GITIGNORE_FILE = ".gitignore"
 REQUIREMENTS_TXT = "requirements.txt"
@@ -19,7 +18,7 @@ MACOS_HIDDEN_FILES = [
 
 IGNORED_MODEL_FILES = [
     ".git/",
-    f"{DOT_CRUNCHDAO_DIRECTORY}/",
+    f"{DOT_CRUNCH_DIRECTORY}/",
     "__pycache__/",
     ".ipynb_checkpoints/",
     ".env",

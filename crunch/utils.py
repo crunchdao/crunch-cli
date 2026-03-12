@@ -1,29 +1,21 @@
-import contextlib
-import dataclasses
 import datetime
-import functools
-import gc
-import inspect
 import json
 import logging
 import os
-import re
 import shutil
-import sys
-import tempfile
 import time
-import typing
+from contextlib import contextmanager
+from dataclasses import dataclass
+from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Iterable, Literal, NoReturn, Optional, Set, TypeVar, Union, overload
 
 import click
-import joblib
-import pandas
 import requests
 from tqdm.auto import tqdm
 
-from crunch.constants import DOT_CRUNCHDAO_DIRECTORY, OLD_PROJECT_FILE, PROJECT_FILE, TOKEN_FILE
-from crunch.runner.types import ArgsLike, KwargsLike
+from crunch.constants import DOT_CRUNCH_DIRECTORY, PROJECT_FILE, TOKEN_FILE
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from crunch.api import ApiException, SizeVariant
 
 
@@ -31,7 +23,7 @@ def change_root():
     while True:
         current = os.getcwd()
 
-        if os.path.exists(DOT_CRUNCHDAO_DIRECTORY):
+        if os.path.exists(DOT_CRUNCH_DIRECTORY):
             print(f"project: found {current}")
             return
 
@@ -41,11 +33,27 @@ def change_root():
             raise click.Abort()
 
 
-def _read_crunchdao_file(
+if TYPE_CHECKING:
+    @overload
+    def _read_crunch_file(
+        name: str,
+        raise_if_missing: Literal[True] = True,
+    ) -> str:
+        ...
+
+    @overload
+    def _read_crunch_file(
+        name: str,
+        raise_if_missing: Literal[False] = False,
+    ) -> Optional[str]:
+        ...
+
+
+def _read_crunch_file(
     name: str,
     raise_if_missing: bool = True,
 ):
-    path = os.path.join(DOT_CRUNCHDAO_DIRECTORY, name)
+    path = os.path.join(DOT_CRUNCH_DIRECTORY, name)
 
     if not os.path.exists(path):
         if raise_if_missing:
@@ -60,17 +68,17 @@ def _read_crunchdao_file(
 
 
 def write_token(plain_push_token: str, directory: str = "."):
-    dot_crunchdao_path = os.path.join(
+    dot_crunch_path = os.path.join(
         directory,
-        DOT_CRUNCHDAO_DIRECTORY
+        DOT_CRUNCH_DIRECTORY
     )
 
-    token_file_path = os.path.join(dot_crunchdao_path, TOKEN_FILE)
+    token_file_path = os.path.join(dot_crunch_path, TOKEN_FILE)
     with open(token_file_path, "w") as fd:
         fd.write(plain_push_token)
 
 
-@dataclasses.dataclass()
+@dataclass
 class ProjectInfo:
     competition_name: str
     project_name: str
@@ -79,16 +87,12 @@ class ProjectInfo:
 
 
 def write_project_info(info: ProjectInfo, directory: str = "."):
-    dot_crunchdao_path = os.path.join(
+    dot_crunch_path = os.path.join(
         directory,
-        DOT_CRUNCHDAO_DIRECTORY
+        DOT_CRUNCH_DIRECTORY
     )
 
-    old_path = os.path.join(dot_crunchdao_path, OLD_PROJECT_FILE)
-    if os.path.exists(old_path):
-        os.remove(old_path)
-
-    path = os.path.join(dot_crunchdao_path, PROJECT_FILE)
+    path = os.path.join(dot_crunch_path, PROJECT_FILE)
     with open(path, "w") as fd:
         json.dump({
             "competitionName": info.competition_name,
@@ -98,21 +102,30 @@ def write_project_info(info: ProjectInfo, directory: str = "."):
         }, fd)
 
 
-def read_project_info(raise_if_missing: bool = True) -> ProjectInfo:
+if TYPE_CHECKING:
+    @overload
+    def read_project_info(
+        raise_if_missing: Literal[True] = True,
+    ) -> ProjectInfo:
+        ...
+
+    @overload
+    def read_project_info(
+        raise_if_missing: Literal[False] = False,
+    ) -> Optional[ProjectInfo]:
+        ...
+
+
+def read_project_info(
+    raise_if_missing: bool = True,
+) -> Optional[ProjectInfo]:
     from crunch.api import SizeVariant
 
-    old_content = _read_crunchdao_file(OLD_PROJECT_FILE, False)
-    if old_content is not None:
-        return ProjectInfo(
-            "adialab",
-            "default",
-            root["userId"],
-        )
-
-    content = _read_crunchdao_file(PROJECT_FILE, raise_if_missing)
+    content = _read_crunch_file(PROJECT_FILE, raise_if_missing)
     if not raise_if_missing and content is None:
         return None
 
+    assert content is not None
     root = json.loads(content)
 
     try:
@@ -139,41 +152,7 @@ def try_get_competition_name():
 
 
 def read_token():
-    return _read_crunchdao_file(TOKEN_FILE)
-
-
-def read(path: str, kwargs: KwargsLike = {}) -> typing.Any:
-    if path.endswith(".parquet"):
-        return pandas.read_parquet(path, **kwargs)
-
-    if path.endswith(".csv"):
-        return pandas.read_csv(path, **kwargs)
-
-    if path.endswith(".pickle"):
-        return pandas.read_pickle(path, **kwargs)
-
-    return joblib.load(path)
-
-
-def write(dataframe: typing.Any, path: str, kwargs: typing.Dict[str, typing.Any] = {}) -> None:
-    if path.endswith(".parquet"):
-        return dataframe.to_parquet(path, **kwargs)
-
-    if path.endswith(".csv"):
-        return dataframe.to_csv(path, **kwargs)
-
-    if path.endswith(".pickle"):
-        return pandas.to_pickle(dataframe, path, **kwargs)
-
-    return joblib.dump(dataframe, path)
-
-
-def strip_python_special_lines(lines: typing.List[str]):
-    return "\n".join(
-        line
-        for line in lines
-        if not re.match(r"^\s*?(!|%|#)", line)
-    )
+    return _read_crunch_file(TOKEN_FILE)
 
 
 def get_process_memory() -> int:
@@ -183,27 +162,23 @@ def get_process_memory() -> int:
     return mem_info.rss
 
 
-def format_bytes(bytes: int):
-    from crunch.external.humanfriendly import format_size  # type: ignore
-
-    return format_size(bytes)
-
-
 class _undefined:
     pass
 
 
-_smart_call_ignore: typing.Set[str] = set()
-_T = typing.TypeVar("_T")
+_smart_call_ignore: Set[str] = set()
+_T = TypeVar("_T")
 
 
 def smart_call(
-    function: typing.Callable[..., _T],
-    default_values: typing.Dict[str, typing.Any],
-    specific_values: typing.Dict[str, typing.Any] = {},
+    function: Callable[..., _T],
+    default_values: Dict[str, Any],
+    specific_values: Dict[str, Any] = {},
     log: bool = True,
     logger: logging.Logger = logging.getLogger(),
 ) -> _T:
+    import inspect
+
     values = {
         **default_values,
         **specific_values
@@ -253,31 +228,15 @@ def cut_url(url: str):
     return url
 
 
-def get_extension(url: str):
-    url = cut_url(url)
-
-    if url.endswith(".parquet"):
-        return "parquet"
-
-    if url.endswith(".csv"):
-        return "csv"
-
-    if url.endswith(".pickle"):
-        return "pickle"
-
-    print(f"unknown file extension: {url}")
-    raise click.Abort()
-
-
 def _download_head(
     session: requests.Session,
     url: str,
     path: str,
     log: bool,
-    print: callable,
+    print: Callable[[str], None],
 ):
     logged = False
-    response: requests.Response = None
+    response: Optional[requests.Response] = None
 
     try:
         response = session.get(url, stream=True)
@@ -313,10 +272,10 @@ def download(
     url: str,
     path: str,
     log: bool = True,
-    print: typing.Callable[[typing.Any], typing.Any] = print,
+    print: Callable[[str], None] = print,
     progress_bar: bool = True,
     max_retry: int = 10,
-    session: typing.Optional[requests.Session] = None
+    session: Optional[requests.Session] = None,
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
@@ -334,7 +293,7 @@ def download(
 
     file_name = os.path.basename(path)
 
-    with tempfile.TemporaryDirectory(
+    with TemporaryDirectory(
         prefix=f"{file_name}.",
         dir=os.path.dirname(path),
     ) as temporary_directory_path:
@@ -396,46 +355,15 @@ def download(
         )
 
 
-def exit_via(error: "ApiException", **kwargs: typing.Any) -> typing.NoReturn:
+def exit_via(error: "ApiException", **kwargs: Any) -> NoReturn:
     print("\n---")
     error.print_helper(**kwargs)
     exit(1)
 
 
-def timeit(params: typing.Optional[typing.List[str]]):
-    def decorator(func: typing.Callable[..., _T]) -> typing.Callable[..., _T]:
-        @functools.wraps(func)
-        def wrapper(*args: ArgsLike, **kwargs: KwargsLike):
-            kwargs.update(zip(
-                func.__code__.co_varnames[:func.__code__.co_argcount],
-                args
-            ))
-
-            start_time = time.perf_counter()
-            try:
-                return func(**kwargs)
-            finally:
-                end_time = time.perf_counter()
-                total_time = end_time - start_time
-
-                if params is not None:
-                    arguments = ", ".join([
-                        str(value) if name in params else "..."
-                        for name, value in kwargs.items()
-                    ])
-
-                    print(f'[debug] {func.__name__}({arguments}) took {total_time:.4f} seconds', file=sys.stderr)
-                else:
-                    print(f'[debug] {func.__name__} took {total_time:.4f} seconds', file=sys.stderr)
-
-        return wrapper
-
-    return decorator
-
-
 class Tracer:
 
-    def __init__(self, printer=print):
+    def __init__(self, printer: Callable[[str], None] = print):
         self._depth = 0
         self._printer = printer
 
@@ -445,8 +373,8 @@ class Tracer:
 
     def loop(
         self,
-        iterable: typing.Iterable[_T],
-        action: typing.Union[str, typing.Callable[[_T], str]],
+        iterable: Iterable[_T],
+        action: Union[str, Callable[[_T], str]],
         value_placeholder: str = "{value}",
     ):
         has_value_placeholder = False
@@ -466,7 +394,7 @@ class Tracer:
             with self.log(action_message):
                 yield value
 
-    @contextlib.contextmanager
+    @contextmanager
     def log(
         self,
         action: str,
@@ -481,6 +409,7 @@ class Tracer:
         finally:
             self._depth -= 1
 
+            import gc
             gc.collect()
 
             end = datetime.datetime.now()
@@ -491,9 +420,9 @@ class LimitedSizeIO:
 
     def __init__(
         self,
-        underlying_io: typing.BinaryIO,
+        underlying_io: BinaryIO,
         limit: int,
-        callback: typing.Optional[typing.Callable[[int], None]] = None
+        callback: Optional[Callable[[int], None]] = None
     ):
         self.underlying_io = underlying_io
         self.limit = limit
