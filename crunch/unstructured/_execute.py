@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, Optional, TypeVar
 
-from crunch.utils import smart_call
+from crunch.utils import LazyValue, smart_call
 
 _T = TypeVar("_T")
 
@@ -11,8 +11,9 @@ class ParticipantVisibleError(Exception):
 
 def call_function(
     function: Callable[..., _T],
-    kwargs: Dict[str, Any],
+    kwargs: Dict[str, Any] = {},
     *,
+    lazy_kwargs: Dict[str, Callable[[], Any]] = {},
     print: Optional[Callable[..., None]] = None,
 ) -> _T:
     try:
@@ -22,6 +23,10 @@ def call_function(
         return smart_call(
             function,
             kwargs,
+            {
+                name: LazyValue(factory)
+                for name, factory in lazy_kwargs.items()
+            },
         )
     except Exception as exception:
         if exception.__class__.__name__ == 'ParticipantVisibleError':
