@@ -7,7 +7,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Iterable, Literal, NoReturn, Optional, Set, TypeVar, Union, overload
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Generic, Iterable, Literal, NoReturn, Optional, Set, Type, TypeVar, Union, cast, overload
 
 import click
 import requests
@@ -170,6 +170,20 @@ _smart_call_ignore: Set[str] = set()
 _T = TypeVar("_T")
 
 
+class LazyValue(Generic[_T]):
+
+    def __init__(self, factory: Callable[[], _T]):
+        self._factory = factory
+        self._value: Union[Type[_undefined], _T] = _undefined
+
+    @property
+    def value(self) -> _T:
+        if self._value is _undefined:
+            self._value = self._factory()
+
+        return cast(_T, self._value)
+
+
 def smart_call(
     function: Callable[..., _T],
     default_values: Dict[str, Any],
@@ -210,7 +224,10 @@ def smart_call(
             warn(f"unknown parameter: {name}")
             value = None
 
-        debug(f"set {name}={value.__class__.__name__}")
+        if isinstance(value, LazyValue):
+            value = value.value  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+
+        debug(f"set {name}={value.__class__.__name__}")  # pyright: ignore[reportUnknownMemberType]
         arguments[name] = value
 
     return function(**arguments)

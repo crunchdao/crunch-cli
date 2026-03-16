@@ -1,8 +1,11 @@
 from itertools import groupby
-from typing import TYPE_CHECKING, Any, Iterable, List, Set
+from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Set
 
 if TYPE_CHECKING:
+    from crunch_convert.requirements_txt import NamedRequirement
+
     from crunch.api import Metric
+    from crunch.unstructured._file import File
 
 
 def truncate(
@@ -57,3 +60,25 @@ def group_metrics_by_target(metrics: List["Metric"]):
             lambda x: x.target
         )
     ]
+
+
+def find_requirement_by_name(
+    requirements: List["NamedRequirement"],
+    name: str,
+) -> Optional["NamedRequirement"]:
+    return next((
+        requirement
+        for requirement in requirements
+        if requirement.name.casefold() == name.casefold()
+    ), None)
+
+
+def find_file_by_path(
+    files: List["File"],
+    path: str,
+) -> Optional["File"]:
+    return next((
+        file
+        for file in files
+        if file.path.casefold() == path.casefold()
+    ), None)
