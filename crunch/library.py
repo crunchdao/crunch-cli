@@ -284,6 +284,8 @@ def _log_problems(
     client = Client.from_env()
     query_param = "requestAlias" if is_alias else "requestName"
 
+    show_warning = False
+
     for language, problems in problems_by_language.items():
         forbidden, alias_collisions = problems
 
@@ -294,10 +296,15 @@ def _log_problems(
                 url = client.format_web_url(f"/competitions/{competition_name}/resources/whitelisted-libraries?{query_param}={package}&requestLanguage={language.name}")
                 logger.error(f"  -> request to whitelist: {url}")
 
+            show_warning = True
+
         for alias, names in alias_collisions:
             logger.error(f"alias collision: {alias} ({language.name.lower()}), specify which one you want to fix it:")
 
             for name in names:
                 logger.error(f"  -> import {alias}  # {name} @latest")
 
-    logger.error(f"note: detection is based on the previous execution of the cell; if you have already corrected the issue(s), please restart the kernel and run all cells again")
+            show_warning = True
+
+    if show_warning:
+        logger.error(f"note: detection is based on the previous execution of the cell; if you have already corrected the issue(s), please restart the kernel and run all cells again")
