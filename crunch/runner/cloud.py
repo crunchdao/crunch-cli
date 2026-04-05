@@ -8,9 +8,8 @@ import string
 import subprocess
 import sys
 import time
-import typing
-import urllib.parse
-from typing import Callable, Dict, Generator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Generator, List, Literal, Optional, Tuple, Union, cast
+from urllib.parse import urljoin
 
 import requests
 
@@ -217,7 +216,9 @@ class CloudRunner(Runner):
             if os.path.exists(self.requirements_txt_path):
                 self.report_current("install python requirements")
 
-                priority_packages: typing.List[str] = []
+                constraints_txt_path = self._download_constraints()
+
+                priority_packages: List[str] = []
                 with open(self.requirements_txt_path) as fd:
                     for line in fd:
                         line = line.strip()
@@ -235,8 +236,8 @@ class CloudRunner(Runner):
 
                 self.pip([
                     *(["--no-build-isolation"] if priority_packages else []),
-                    "-r",
-                    self.requirements_txt_path
+                    "-r", self.requirements_txt_path,
+                    *(("-c", constraints_txt_path) if constraints_txt_path else [])
                 ])
             else:
                 self.log("no requirements.txt found")
@@ -297,6 +298,19 @@ class CloudRunner(Runner):
             self.keys,
             self.has_model
         )
+
+    def _download_constraints(self):
+        txt_path = os.path.join(self.context_directory, "constraints.txt")
+
+        response = requests.get(urljoin(store.api_base_url, "/v1/libraries/python/~/constraints"))
+        if not response.ok:
+            self.log(f"failed to download constraints: {response.status_code}: {response.text}", error=True)
+            return
+
+        with open(txt_path, "w") as fd:
+            fd.write(response.text)
+
+        return txt_path
 
     def start_unstructured(self):
         self.create_trace_file()
@@ -460,8 +474,8 @@ class CloudRunner(Runner):
 
     def do_bash(
         self,
-        arguments: typing.List[str],
-        env_vars: typing.Optional[typing.Dict[str, typing.Optional[str]]] = None
+        arguments: List[str],
+        env_vars: Optional[Dict[str, Optional[str]]] = None
     ):
         env = None
         if env_vars:
@@ -487,8 +501,8 @@ class CloudRunner(Runner):
     def bash(
         self,
         prefix: str,
-        arguments: typing.List[str],
-        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = None
+        arguments: List[str],
+        env: Optional[Dict[str, Optional[str]]] = None
     ):
         arguments = [
             "prefix",
@@ -501,13 +515,13 @@ class CloudRunner(Runner):
 
     def bash2(
         self,
-        arguments: typing.List[str],
+        arguments: List[str],
     ):
         self.bash(arguments[0], arguments)
 
     def pip(
         self,
-        arguments: typing.List[str],
+        arguments: List[str],
     ):
         self.bash(
             "pip",
@@ -553,7 +567,7 @@ class CloudRunner(Runner):
     def sandbox(
         self,
         train: bool,
-        loop_key: typing.Union[int, str],
+        loop_key: Union[int, str],
         parameters: KwargsLike = {},
     ) -> None:
         try:
@@ -576,7 +590,7 @@ class CloudRunner(Runner):
                 "trace": self.trace_path,
                 "state-file": self.state_file,
                 "ping-url": [
-                    urllib.parse.urljoin(
+                    urljoin(
                         store.api_base_url,
                         "/v1/runner/ping"
                     ),
@@ -601,7 +615,7 @@ class CloudRunner(Runner):
             # TODO move to a dedicated function
             args: List[str] = []
 
-            def append_value(value: typing.Any):
+            def append_value(value: Any):
                 if isinstance(value, tuple):
                     for x in value:  # pyright: ignore[reportUnknownVariableType]
                         args.append(str(x))  # pyright: ignore[reportUnknownArgumentType]
@@ -660,7 +674,7 @@ class CloudRunner(Runner):
         self.exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
     def _validate_exit(self):
-        expected_content = typing.cast(str, self.exit_content)
+        expected_content = cast(str, self.exit_content)
         self.exit_content = None
 
         with open(self.exit_file_path) as fd:
@@ -679,7 +693,7 @@ class CloudRunner(Runner):
 
         call_chmod("o+r")
 
-        def on_signal(signum: int, stack: typing.Any):
+        def on_signal(signum: int, stack: Any):
             signal.signal(FUSE_SIGNAL, signal.SIG_DFL)
 
             call_chmod(CHMOD_RESET)
@@ -689,7 +703,7 @@ class CloudRunner(Runner):
         signal.signal(FUSE_SIGNAL, on_signal)
 
     @property
-    def venv_env(self) -> typing.Dict[str, typing.Optional[str]]:
+    def venv_env(self) -> Dict[str, Optional[str]]:
         venv_bin = os.path.join(self.venv_directory, "bin")
 
         return {
@@ -726,7 +740,7 @@ class CloudRunner(Runner):
     def report_current(
         self,
         work: str,
-        moon: typing.Optional[int] = None,
+        moon: Optional[int] = None,
     ):
         try:
             self.run.report_current(work, moon)
@@ -738,7 +752,7 @@ class CloudRunner(Runner):
 
     def report_trace(
         self,
-        moon: typing.Optional[int] = None,
+        moon: Optional[int] = None,
     ):
         try:
             content = "<no trace>"
@@ -897,7 +911,7 @@ class CloudRunnerContext(RunnerContext):
         *,
         important: bool = False,
         error: bool = False,
-    ) -> typing.Literal[True]:
+    ) -> Literal[True]:
         return self.runner.log(
             message,
             important=important,
