@@ -15,7 +15,7 @@ import requests
 
 import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
+from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
 from crunch.runner.types import KwargsLike
@@ -216,7 +216,7 @@ class CloudRunner(Runner):
             if os.path.exists(self.requirements_txt_path):
                 self.report_current("install python requirements")
 
-                constraints_txt_path = self._download_constraints()
+                constraints_txt_path = self._download_constraints(Language.PYTHON)
                 constraints_args: Iterable[str] = ("-c", constraints_txt_path) if constraints_txt_path else []
 
                 priority_packages: List[str] = []
@@ -303,10 +303,11 @@ class CloudRunner(Runner):
             self.has_model
         )
 
-    def _download_constraints(self):
-        txt_path = os.path.join(self.context_directory, "constraints.txt")
+    def _download_constraints(self, language: Language) -> Optional[str]:
+        lower = language.name.lower()
+        txt_path = os.path.join(self.context_directory, f"{lower}-constraints.txt")
 
-        response = requests.get(urljoin(store.api_base_url, "/v1/libraries/python/~/constraints"))
+        response = requests.get(urljoin(store.api_base_url, f"/v1/libraries/{lower}/~/constraints"))
         if not response.ok:
             self.log(f"failed to download constraints: {response.status_code}: {response.text}", error=True)
             return
