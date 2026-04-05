@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 import time
-from typing import Any, Callable, Dict, Generator, List, Literal, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple, Union, cast
 from urllib.parse import urljoin
 
 import requests
@@ -217,6 +217,7 @@ class CloudRunner(Runner):
                 self.report_current("install python requirements")
 
                 constraints_txt_path = self._download_constraints()
+                constraints_args: Iterable[str] = ("-c", constraints_txt_path) if constraints_txt_path else []
 
                 priority_packages: List[str] = []
                 with open(self.requirements_txt_path) as fd:
@@ -232,12 +233,15 @@ class CloudRunner(Runner):
                             priority_packages.append(line)
 
                 if priority_packages:
-                    self.pip(priority_packages)
+                    self.pip([
+                        *priority_packages,
+                        *constraints_args
+                    ])
 
                 self.pip([
                     *(["--no-build-isolation"] if priority_packages else []),
                     "-r", self.requirements_txt_path,
-                    *(("-c", constraints_txt_path) if constraints_txt_path else [])
+                    *constraints_args
                 ])
             else:
                 self.log("no requirements.txt found")
