@@ -134,8 +134,6 @@ class CloudRunner(Runner):
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
 
-        self.sandbox_restriction_flag = "--change-network-namespace" if gpu else "--filter-socket-syscalls"
-
     def start(self):
         self.report_current("starting")
 
@@ -647,7 +645,7 @@ class CloudRunner(Runner):
                     "sandbox",
                     "--verbose",
                     "--chown-directory", self.model_directory_path,
-                    self.sandbox_restriction_flag,
+                    "--filter-non-unix-socket-syscall",
                     "--",
                     "prefix", "user-code",
                     "--",
