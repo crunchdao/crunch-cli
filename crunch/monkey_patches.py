@@ -8,6 +8,8 @@ from . import constants
 
 _patchers = []
 
+SHOULD_PRINT_PID_WHEN_POSSIBLE = False
+
 
 def _patcher(f):
     applied = False
@@ -71,7 +73,11 @@ def tqdm_display():
         if not msg:
             msg = str(self).replace("|| ", " - ")
 
-        print(f"[tqdm:{pos}] {msg}")
+        if SHOULD_PRINT_PID_WHEN_POSSIBLE:
+            pid = os.getpid()
+            print(f"[tqdm:{pid}/{pos}] {msg}")
+        else:
+            print(f"[tqdm:{pos}] {msg}")
 
     tqdm.tqdm.__init__ = functools.partialmethod(
         tqdm.tqdm.__init__,
