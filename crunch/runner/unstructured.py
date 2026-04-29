@@ -94,6 +94,8 @@ class RunnerExecutorContext(ABC):
         pass  # pragma: no cover
 
 
+_sentinel = object()
+
 class UserModule(ABC):
 
     def get_function(
@@ -106,6 +108,19 @@ class UserModule(ABC):
             raise ValueError(f"no `{name}` function found")
 
         return function
+
+    def get_value(
+        self,
+        name: str,
+        *,
+        default: Optional[Any] = _sentinel,
+    ) -> Optional[Any]:
+        value = getattr(self.module, name, default)
+
+        if value is _sentinel and default is _sentinel:
+            raise ValueError(f"no `{name}` value found")
+
+        return value
 
     @property
     @abstractmethod
