@@ -147,6 +147,14 @@ class LocalRunnerContext(RunnerContext):
         self.runner = runner
 
     @property
+    def started_at(self):
+        return self.runner.started_at
+
+    @property
+    def timeout(self):
+        return None
+
+    @property
     def train_frequency(self):
         return self.runner.train_frequency
 
