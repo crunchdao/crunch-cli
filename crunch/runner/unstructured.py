@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
+import os
 from types import ModuleType
 from typing import Any, Callable, Literal, Optional
 
@@ -6,6 +8,25 @@ from crunch.runner.types import KwargsLike
 
 
 class RunnerContext(ABC):
+
+    @property
+    @abstractmethod
+    def started_at(self) -> datetime:
+        pass  # pragma: no cover
+
+    @property
+    @abstractmethod
+    def timeout(self) -> Optional[timedelta]:
+        pass  # pragma: no cover
+
+    @property
+    def remaining_duration_before_timeout(self) -> Optional[timedelta]:
+        timeout = self.timeout
+        if timeout is None:
+            return None
+
+        elapsed_time = datetime.now() - self.started_at
+        return timeout - elapsed_time
 
     @property
     @abstractmethod
@@ -30,12 +51,12 @@ class RunnerContext(ABC):
         """
         Whether the runner is running for the Submission Phase.
         """
-    
+
     @property
     def is_first_time(self) -> bool:
         if self.is_submission_phase:
             return True
-        
+
         # 1 is for the submission phase
         return self.chain_height <= 2
 

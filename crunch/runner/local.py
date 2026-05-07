@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from datetime import datetime
 from typing import Any, Literal, Optional
 
 import click
@@ -47,6 +48,8 @@ class LocalRunner(Runner):
         self.round_number: RoundIdentifierType = round_number
         self.has_gpu = has_gpu
         self.logger = logger
+
+        self.started_at = datetime.now()
 
     def start(self):
         memory_before = get_process_memory()
@@ -145,6 +148,14 @@ class LocalRunnerContext(RunnerContext):
 
     def __init__(self, runner: LocalRunner):
         self.runner = runner
+
+    @property
+    def started_at(self) -> datetime:
+        return self.runner.started_at
+
+    @property
+    def timeout(self):
+        return None
 
     @property
     def train_frequency(self):
