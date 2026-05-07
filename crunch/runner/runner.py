@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import List, Literal, Tuple, Union
 
 from crunch.api import CompetitionFormat
@@ -19,6 +20,8 @@ class Runner(ABC):
 
         self.determinism_check_enabled = determinism_check_enabled
         self.deterministic = True if determinism_check_enabled else None
+
+        self.started_at = datetime.now()
 
     def start(self):
         self.setup()

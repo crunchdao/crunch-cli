@@ -8,7 +8,7 @@ import string
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple, Union, cast
 from urllib.parse import urljoin
 
@@ -134,8 +134,6 @@ class CloudRunner(Runner):
 
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
-
-        self.started_at = datetime.now()
 
     def start(self):
         self.report_current("starting")
