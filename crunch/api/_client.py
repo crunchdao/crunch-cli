@@ -72,8 +72,8 @@ class EndpointClient(
         self.page_size = 100
 
     def request(self, method: str, url: str, *args: Any, **kwargs: Any):
-        headers = kwargs.pop("headers", {})
-        params = kwargs.pop("params", {})
+        headers: Dict[str, str] = kwargs.pop("headers", None) or {}
+        params: Dict[str, str] = kwargs.pop("params", None) or {}
         data: Any = kwargs.pop("data", None)
         files: Any = kwargs.pop("files", None)
 
