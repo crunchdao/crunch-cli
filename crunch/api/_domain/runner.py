@@ -1,6 +1,68 @@
-import typing
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
-from .._resource import Model
+from dataclasses_json import LetterCase, Undefined, dataclass_json
+
+from crunch.api._resource import Model
+
+if TYPE_CHECKING:
+    from crunch.api._client import Client
+
+
+class RunnerRunSpanStatus(Enum):
+    STARTED = "started"
+    ENDED = "ended"
+    FAILED = "failed"
+
+
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,  # type: ignore
+    undefined=Undefined.EXCLUDE,
+)
+@dataclass(frozen=True)
+class RunnerRunSpan:
+
+    id: int
+
+
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,  # type: ignore
+    undefined=Undefined.EXCLUDE,
+)
+@dataclass(frozen=True)
+class StartedRunnerRunSpan(RunnerRunSpan):
+
+    parent_id: Optional[int]
+    name: str
+    started_at: datetime
+    attributes: Optional[Dict[str, Any]]
+    status: Literal[RunnerRunSpanStatus.STARTED] = RunnerRunSpanStatus.STARTED
+
+
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,  # type: ignore
+    undefined=Undefined.EXCLUDE,
+)
+@dataclass(frozen=True)
+class EndedRunnerRunSpan(RunnerRunSpan):
+
+    status: Literal[RunnerRunSpanStatus.ENDED, RunnerRunSpanStatus.FAILED]
+    ended_at: datetime
+    error: Optional[str]
+
+
+@dataclass_json(
+    letter_case=LetterCase.CAMEL,  # type: ignore
+    undefined=Undefined.EXCLUDE,
+)
+@dataclass(frozen=True)
+class RunnerRunMetric:
+
+    timestamp: datetime
+    cpu_percentage: float
+    memory_percentage: float
 
 
 class RunnerRun(Model):
@@ -8,20 +70,20 @@ class RunnerRun(Model):
     def __init__(
         self,
         run_id: int,
-        client=None
+        client: Optional["Client"] = None
     ):
         super().__init__({}, client, None)
 
         self._run_id = run_id
 
     @property
-    def code(self) -> typing.Dict[str, str]:
+    def code(self) -> Dict[str, str]:
         return self._client.api.get_runner_run_code(
             self._run_id
         )
 
     @property
-    def model(self) -> typing.Dict[str, str]:
+    def model(self) -> Dict[str, str]:
         return self._client.api.get_runner_run_model(
             self._run_id
         )
@@ -35,36 +97,34 @@ class RunnerRun(Model):
         )
 
         data_release = DataReleaseCollection(None).prepare_model(data_release_attrs)
-        return typing.cast(DataRelease, data_release)
+        return cast(DataRelease, data_release)
 
-    def report_current(
+    def report_error(
         self,
-        work: str,
-        moon: typing.Optional[int]
+        trace: str
     ):
-        self._client.api.report_runner_run_current(
+        self._client.api.report_runner_run_error(
             self._run_id,
-            work,
-            moon
+            trace
         )
 
-    def report_trace(
+    def report_traces(
         self,
-        content: str,
-        moon: typing.Optional[int]
+        spans: List[RunnerRunSpan],
+        metrics: List[RunnerRunMetric],
     ):
-        self._client.api.report_runner_run_trace(
+        self._client.api.report_runner_run_traces(
             self._run_id,
-            content,
-            moon
+            spans=spans,
+            metrics=metrics,
         )
 
     def submit_result(
         self,
         use_initial_model: bool,
-        deterministic: typing.Optional[bool],
-        prediction_files: typing.Dict[str, str],
-        model_files: typing.Dict[str, str],
+        deterministic: Optional[bool],
+        prediction_files: Dict[str, str],
+        model_files: Dict[str, str],
     ):
         self._client.api.submit_runner_run_result(
             self._run_id,
@@ -110,34 +170,32 @@ class RunnerRunEndpointMixin:
             json=True
         )
 
-    def report_runner_run_current(
+    def report_runner_run_traces(
         self,
         run_id,
-        work,
-        moon,
+        spans,
+        metrics,
     ):
         return self._result(
             self.post(
-                f"/v1/runner/runs/{run_id}/current",
+                f"/v1/runner/runs/{run_id}/traces",
                 json={
-                    "work": work,
-                    "moon": moon,
+                    "spans": spans,
+                    "metrics": metrics,
                 }
             )
         )
 
-    def report_runner_run_trace(
+    def report_runner_run_error(
         self,
         run_id,
-        content,
-        moon,
+        trace,
     ):
         return self._result(
-            self.post(
-                f"/v1/runner/runs/{run_id}/trace",
+            self.put(
+                f"/v1/runner/runs/{run_id}/error",
                 json={
-                    "content": content,
-                    "moon": moon,
+                    "trace": trace,
                 }
             )
         )

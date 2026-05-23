@@ -172,7 +172,7 @@ def save_one(
 def save_all(
     data_files: Dict[str, PreparedDataFile],
     force: bool,
-    print: Callable[[str], None] = print,
+    print: Callable[[str], Any] = print,
     progress_bar: bool = True,
 ):
     for data_file in data_files.values():

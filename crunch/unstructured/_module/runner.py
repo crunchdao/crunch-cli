@@ -6,6 +6,7 @@ from crunch.unstructured._execute import call_function
 
 if TYPE_CHECKING:
     from crunch.runner.cloud import RunnerContext
+    from crunch.runner.tracing import RunnerTracer
     from crunch.runner.unstructured import RunnerExecutorContext, UserModule
 
 __all__ = [
@@ -58,6 +59,7 @@ class RunnerModule(ModuleWrapper):
         data_directory_path: str,
         model_directory_path: str,
         prediction_directory_path: str,
+        tracer: "RunnerTracer",
         print: Optional[Callable[[Any], None]] = None,
     ) -> Any:
         return call_function(
@@ -67,6 +69,7 @@ class RunnerModule(ModuleWrapper):
                 "data_directory_path": data_directory_path,
                 "model_directory_path": model_directory_path,
                 "prediction_directory_path": prediction_directory_path,
+                "tracer": tracer,
             },
             print=print,
         )

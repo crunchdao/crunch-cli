@@ -20,6 +20,7 @@ from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
 from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY, DOT_PREDICTION_DIRECTORY
 from crunch.runner import is_inside
+from crunch.runner.tracing import LocalTraceExporter
 from crunch.runner.types import KwargsLike
 from crunch.unstructured import RunnerModule, deduce_code_loader
 
@@ -38,6 +39,8 @@ class _Inline:
         self.model_directory_path = model_directory_path
         self.logger = logger
         self.has_gpu = has_gpu
+
+        self._trace_exporter = LocalTraceExporter()
 
         print(f"loaded inline runner with module: {user_module}")
 
@@ -122,6 +125,8 @@ class _Inline:
 
         competition = self._competition
 
+        self._trace_exporter.reset()
+
         try:
             library.scan(
                 module=self.user_module,
@@ -129,7 +134,7 @@ class _Inline:
             )
             self.logger.warning('')
 
-            return tester.run(
+            tester.run(
                 self.user_module,
                 self._runner_module,
                 self.model_directory_path,
@@ -140,6 +145,7 @@ class _Inline:
                 competition,
                 self.has_gpu,
                 no_determinism_check,
+                self._trace_exporter,
             )
         except KeyboardInterrupt:
             self.logger.error(f"Cancelled!")
@@ -149,7 +155,18 @@ class _Inline:
             if raise_abort:
                 raise abort
 
-        return None
+    def show_usage(self):
+        for metric in self._trace_exporter.metrics:
+            print(f"{metric.timestamp} - cpu: {metric.cpu_percentage:.2f}% memory: {metric.memory_percentage:.2f}%")
+
+    def show_timings(self):
+        spans = self._trace_exporter.span_by_id.values()
+
+        for span in spans:
+            duration = span.ended_at - span.started_at if span.ended_at is not None else None
+            duration_str = f"{duration.total_seconds():.2f}s" if duration is not None else "unknown"
+
+            print(f"{span.name} {json.dumps(span.attributes)} - {span.started_at} - {span.name} - duration: {duration_str}")
 
     def submit(
         self,
