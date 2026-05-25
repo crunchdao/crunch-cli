@@ -5,7 +5,7 @@ coloredlogs
 dataclasses_json
 inquirer
 joblib
-libcst
+nvidia-ml-py
 pandas
 psutil
 pyarrow

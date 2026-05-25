@@ -5,7 +5,7 @@ click
 dataclasses_json
 
 joblib
-
+nvidia-ml-py
 pandas
 psutil
 pyarrow

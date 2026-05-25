@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -49,7 +50,7 @@ class LocalTraceExporter(TraceExporter):
                 self.span_by_id[span.id] = LocalSpan(
                     id=span.id,
                     parent_id=span.parent_id,
-                    name=span.name,
+                    description=span.description,
                     status=span.status,
                     attributes=span.attributes,
                     started_at=span.started_at,
@@ -73,7 +74,7 @@ class LocalSpan:
 
     id: int
     parent_id: Optional[int]
-    name: str
+    description: str
     status: RunnerRunSpanStatus
     attributes: Optional[Dict[str, Any]]
     started_at: datetime
@@ -96,8 +97,10 @@ class RemoteTraceExporter(TraceExporter):
                 spans=spans,
                 metrics=metrics
             )
-        except Exception as e:
-            print(f"Failed to send batch of {len(spans) + len(metrics)} items: {e}")
+        except Exception as error:
+            import traceback
+            traceback.print_exception(error)
+            print(f"Failed to send batch of {len(spans) + len(metrics)} items: {error}")
             return False
 
         return True
@@ -111,9 +114,12 @@ class RunnerTracer:
     def __init__(
         self,
         exporter: TraceExporter,
+        *,
+        batch_delay: int = 5,
         metrics_delay: int = 10,
     ):
         self.exporter = exporter
+        self.batch_delay = batch_delay
         self.metrics_delay = metrics_delay
 
         self._span_counter = 0
@@ -150,7 +156,7 @@ class RunnerTracer:
         return batch
 
     def _worker_loop(self):
-        while not self._stop_event.is_set() or not self._queue.empty():
+        while not self._stop_event.wait(self.batch_delay) or not self._queue.empty():
             batch = self._get_batch()
             if batch is None:
                 continue
@@ -159,22 +165,36 @@ class RunnerTracer:
             metrics = [item for item in batch if isinstance(item, RunnerRunMetric)]
 
             try:
-                self.exporter.push(spans=spans, metrics=metrics)
+                exported = self.exporter.push(spans=spans, metrics=metrics)
+
+                if not exported:
+                    for item in batch:
+                        self._queue.put(item)
+            except Exception as exception:
+                print(f"dropped {len(batch)} items: {exception}")
+            finally:
                 for _ in range(len(batch)):
                     self._queue.task_done()
-            except Exception as e:
-                print(f"Failed to send batch of {len(batch)} items: {e}")
-                for item in batch:
-                    self._queue.put(item)
 
     def _metrics_loop(self):
         import psutil
+        import pynvml  # pyright: ignore[reportMissingTypeStubs]
+
+        try:
+            pynvml.nvmlInit()
+            gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # pyright: ignore[reportUnknownMemberType]
+        except pynvml.NVMLError as error:
+            print(f"failed to initialize NVML: {error}", file=sys.stderr)
+            gpu_handle = None
 
         while not self._stop_event.wait(self.metrics_delay):
             self.emit(RunnerRunMetric(
                 timestamp=datetime.now(),
-                cpu_percentage=psutil.cpu_times_percent().user,
-                memory_percentage=psutil.virtual_memory().percent
+                cpu=psutil.cpu_percent(interval=None),
+                ram=psutil.virtual_memory().used,
+                disk=psutil.disk_usage('/').used,
+                gpu=pynvml.nvmlDeviceGetUtilizationRates(gpu_handle).gpu if gpu_handle else None,  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+                vram=pynvml.nvmlDeviceGetMemoryInfo(gpu_handle).used if gpu_handle else None  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
             ))
 
     def start(self):
@@ -195,25 +215,26 @@ class RunnerTracer:
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb): # pyright: ignore[reportMissingParameterType, reportUnknownParameterType]
+    def __exit__(self, exc_type, exc_val, exc_tb):  # pyright: ignore[reportMissingParameterType, reportUnknownParameterType]
         self.stop()
 
     @contextmanager
     def span(
         self,
-        name: str,
+        description: str,
         attributes: Optional[Attributes] = None,
     ):
         previous_parent_id = self._current_parent_id
 
         span_id = self.next_span_id()
         self._current_parent_id = span_id
+        started_at = datetime.now()
 
         self.emit(StartedRunnerRunSpan(
             id=span_id,
             parent_id=previous_parent_id,
-            name=name,
-            started_at=datetime.now(),
+            description=description,
+            started_at=started_at,
             attributes=attributes,
         ))
 
@@ -231,9 +252,13 @@ class RunnerTracer:
 
             self.emit(EndedRunnerRunSpan(
                 id=span_id,
+                parent_id=previous_parent_id,
+                description=description,
                 status=end_status,
+                started_at=started_at,
                 ended_at=datetime.now(),
-                error=end_error
+                error=end_error,
+                attributes=attributes,
             ))
 
 

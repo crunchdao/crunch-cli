@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
 
-from dataclasses_json import LetterCase, Undefined, dataclass_json
+from dataclasses_json import LetterCase, Undefined, config, dataclass_json
 
 from crunch.api._resource import Model
 
@@ -12,19 +12,34 @@ if TYPE_CHECKING:
 
 
 class RunnerRunSpanStatus(Enum):
-    STARTED = "started"
-    ENDED = "ended"
-    FAILED = "failed"
+    STARTED = "STARTED"
+    ENDED = "ENDED"
+    FAILED = "FAILED"
+
+
+_datetime_config = config(
+    encoder=lambda value: value.isoformat(),
+    decoder=datetime.fromisoformat,
+)
+
+_status_config = config(
+    encoder=lambda value: value.value,
+    decoder=RunnerRunSpanStatus,
+)
 
 
 @dataclass_json(
-    letter_case=LetterCase.CAMEL,  # type: ignore
+    letter_case=LetterCase.CAMEL,
     undefined=Undefined.EXCLUDE,
 )
 @dataclass(frozen=True)
 class RunnerRunSpan:
 
     id: int
+    parent_id: Optional[int]
+    description: str
+    started_at: datetime = field(metadata=_datetime_config)
+    attributes: Optional[Dict[str, Any]]
 
 
 @dataclass_json(
@@ -34,11 +49,10 @@ class RunnerRunSpan:
 @dataclass(frozen=True)
 class StartedRunnerRunSpan(RunnerRunSpan):
 
-    parent_id: Optional[int]
-    name: str
-    started_at: datetime
-    attributes: Optional[Dict[str, Any]]
-    status: Literal[RunnerRunSpanStatus.STARTED] = RunnerRunSpanStatus.STARTED
+    status: Literal[RunnerRunSpanStatus.STARTED] = field(
+        metadata=_status_config,
+        default=RunnerRunSpanStatus.STARTED
+    )
 
 
 @dataclass_json(
@@ -48,8 +62,14 @@ class StartedRunnerRunSpan(RunnerRunSpan):
 @dataclass(frozen=True)
 class EndedRunnerRunSpan(RunnerRunSpan):
 
-    status: Literal[RunnerRunSpanStatus.ENDED, RunnerRunSpanStatus.FAILED]
-    ended_at: datetime
+    status: Literal[RunnerRunSpanStatus.ENDED, RunnerRunSpanStatus.FAILED] = field(
+        metadata=_status_config,
+    )
+
+    ended_at: datetime = field(
+        metadata=_datetime_config,
+    )
+
     error: Optional[str]
 
 
@@ -60,9 +80,15 @@ class EndedRunnerRunSpan(RunnerRunSpan):
 @dataclass(frozen=True)
 class RunnerRunMetric:
 
-    timestamp: datetime
-    cpu_percentage: float
-    memory_percentage: float
+    timestamp: datetime = field(
+        metadata=_datetime_config,
+    )
+
+    cpu: float   # % 0–100
+    ram: int   # bytes used
+    disk: int  # bytes used
+    gpu: float   # % 0–100
+    vram: int  # bytes used
 
 
 class RunnerRun(Model):
@@ -115,8 +141,14 @@ class RunnerRun(Model):
     ):
         self._client.api.report_runner_run_traces(
             self._run_id,
-            spans=spans,
-            metrics=metrics,
+            spans=[
+                span.to_dict()
+                for span in spans
+            ],
+            metrics=[
+                metric.to_dict()
+                for metric in metrics
+            ],
         )
 
     def submit_result(
