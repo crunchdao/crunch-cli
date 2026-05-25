@@ -4,14 +4,13 @@ import time
 from typing import Any, Literal, Optional
 
 import click
-
 import crunch.monkey_patches as monkey_patches
 import crunch.tester as tester
 from crunch.api import Competition, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
 from crunch.command import download, download_no_data_available
 from crunch.external.humanfriendly import format_size
 from crunch.runner.runner import Runner
-from crunch.runner.tracing import LocalTraceExporter, VoidTraceExporter, to_execute_span_attributes
+from crunch.runner.tracing import LocalTraceExporter, RunnerTracer, VoidTraceExporter, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext, RunnerExecutorContext, UserModule
 from crunch.unstructured import RunnerModule
@@ -37,7 +36,10 @@ class LocalRunner(Runner):
     ):
         super().__init__(
             competition_format=competition.format,
-            trace_exporter=trace_exporter or VoidTraceExporter(),
+            tracer=RunnerTracer(
+                trace_exporter or VoidTraceExporter(),
+                metrics_delay=3,
+            ),
             determinism_check_enabled=determinism_check_enabled,
         )
 

@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, Literal, Optional
 
 from crunch.api import CompetitionFormat
-from crunch.runner.tracing import RunnerTracer, TraceExporter
+
+if TYPE_CHECKING:
+    from crunch.runner.tracing import RunnerTracer
 
 
 class Runner(ABC):
@@ -14,11 +16,11 @@ class Runner(ABC):
         self,
         *,
         competition_format: CompetitionFormat,
-        trace_exporter: TraceExporter,
+        tracer: "RunnerTracer",
         determinism_check_enabled: bool = False,
     ):
         self.competition_format = competition_format
-        self.tracer = RunnerTracer(trace_exporter)
+        self.tracer = tracer
 
         self.determinism_check_enabled = determinism_check_enabled
         self.deterministic = True if determinism_check_enabled else None
@@ -76,5 +78,5 @@ class Runner(ABC):
     ) -> Literal[True]:
         ...
 
-    def _span(self, name: str, attributes: Optional[Dict[str, Any]] = None):
-        return self.tracer.span(name, attributes=attributes)
+    def _span(self, description: str, attributes: Optional[Dict[str, Any]] = None):
+        return self.tracer.span(description, attributes=attributes)

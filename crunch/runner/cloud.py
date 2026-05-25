@@ -19,7 +19,7 @@ import requirements as requirements_parser
 from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
-from crunch.runner.tracing import RemoteTraceExporter, to_execute_span_attributes
+from crunch.runner.tracing import RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext
 from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
@@ -99,7 +99,10 @@ class CloudRunner(Runner):
     ):
         super().__init__(
             competition_format=competition.format,
-            trace_exporter=RemoteTraceExporter(run),
+            tracer=RunnerTracer(
+                RemoteTraceExporter(run),
+                metrics_delay=60,
+            ),
             determinism_check_enabled=determinism_check_enabled,
         )
 
@@ -553,7 +556,7 @@ class CloudRunner(Runner):
         commands: List[str],
     ):
         self.bash(
-            f"recursive:{commands[0]}",
+            f"recursive-{commands[0]}",
             [
                 "find",
                 directory_path,

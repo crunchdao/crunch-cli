@@ -6,10 +6,9 @@ import urllib.parse
 from functools import cached_property
 from textwrap import dedent
 from types import ModuleType
-from typing import Any, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
 
 import click
-import pandas
 import psutil
 
 import crunch.tester as tester
@@ -23,6 +22,12 @@ from crunch.runner import is_inside
 from crunch.runner.tracing import LocalTraceExporter
 from crunch.runner.types import KwargsLike
 from crunch.unstructured import RunnerModule, deduce_code_loader
+
+if TYPE_CHECKING:
+    import pandas
+
+    from crunch.api._domain.runner import RunnerRunMetric
+    from crunch.runner.tracing import LocalSpan
 
 
 class _Inline:
@@ -73,7 +78,7 @@ class _Inline:
         round_number: RoundIdentifierType = "@current",
         force: bool = False,
         **kwargs: KwargsLike,
-    ) -> Tuple[Optional[pandas.DataFrame], Optional[pandas.DataFrame], Optional[pandas.DataFrame]]:
+    ) -> Tuple[Optional["pandas.DataFrame"], Optional["pandas.DataFrame"], Optional["pandas.DataFrame"]]:
         if self._competition.format == CompetitionFormat.STREAM:
             self.load_streams()
 
@@ -132,7 +137,7 @@ class _Inline:
                 module=self.user_module,
                 logger=self.logger,
             )
-            self.logger.warning('')
+            self.logger.warning("")
 
             tester.run(
                 self.user_module,
@@ -155,18 +160,31 @@ class _Inline:
             if raise_abort:
                 raise abort
 
+    def _detect_plotly(self) -> bool:
+        try:
+            import plotly
+            return True
+        except ImportError:
+            self.logger.error(f"`plotly` is not installed, please install it to show usage metrics")
+            return False
+
     def show_usage(self):
-        for metric in self._trace_exporter.metrics:
-            print(f"{metric.timestamp} - cpu: {metric.cpu_percentage:.2f}% memory: {metric.memory_percentage:.2f}%")
+        metric_objects = self._trace_exporter.metrics
+        if not len(metric_objects):
+            self.logger.warning("No usage metrics collected, make sure to call this method after calling `.test()`")
+            return
+
+        if self._detect_plotly():
+            return _create_usage_figure(metric_objects)
 
     def show_timings(self):
-        spans = self._trace_exporter.span_by_id.values()
+        span_objects = list(self._trace_exporter.span_by_id.values())
+        if not len(span_objects):
+            self.logger.warning("No spans collected, make sure to call this method after calling `.test()`")
+            return
 
-        for span in spans:
-            duration = span.ended_at - span.started_at if span.ended_at is not None else None
-            duration_str = f"{duration.total_seconds():.2f}s" if duration is not None else "unknown"
-
-            print(f"{span.name} {json.dumps(span.attributes)} - {span.started_at} - {span.name} - duration: {duration_str}")
+        if self._detect_plotly():
+            return _create_timeline_figure(span_objects)
 
     def submit(
         self,
@@ -192,7 +210,7 @@ class _Inline:
 
         try:
             from google.colab import _message  # type: ignore
-            response = _message.blocking_request('get_ipynb', request='', timeout_sec=5)  # type: ignore
+            response = _message.blocking_request("get_ipynb", request="", timeout_sec=5)  # type: ignore
 
             if response is None:
                 raise NotImplementedError(f"google.colab._message.blocking_request did not answered")
@@ -361,3 +379,246 @@ def load(
         model_directory_path=model_directory_path,
         logger=logger,
     )
+
+
+def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
+    import pandas
+    import plotly.graph_objects as go
+
+    has_gpu = metric_objects[0].gpu is not None
+    metrics = pandas.DataFrame([
+        {
+            "timestamp": metric.timestamp,
+            "cpu": metric.cpu,
+            "ram": metric.ram,
+            "disk": metric.disk,
+            "gpu": metric.gpu,
+            "vram": metric.vram,
+        }
+        for metric in metric_objects
+    ])
+
+    LINE_COLORS = {
+        "cpu": "#38bdf8",
+        "ram": "#a855f7",
+        "disk": "#f43f5e",
+        "gpu": "#10b981",
+        "vram": "#f59e0b",
+    }
+
+    metrics["timestamp"] = pandas.to_datetime(metrics["timestamp"])
+    for column in ["ram", "disk", "vram"]:
+        metrics[f"{column}_gb"] = metrics[column] / 1024 ** 3
+
+    figure = go.Figure()
+
+    figure.add_trace(go.Scatter(
+        x=metrics["timestamp"],
+        y=metrics["cpu"],
+        name="CPU",
+        line=dict(color=LINE_COLORS["cpu"], width=2),
+        mode="lines",
+        hovertemplate="CPU: %{y:.2f}%<extra></extra>",
+        yaxis="y",
+    ))
+
+    figure.add_trace(go.Scatter(
+        x=metrics["timestamp"],
+        y=metrics["ram_gb"],
+        name="RAM",
+        line=dict(color=LINE_COLORS["ram"], width=2),
+        mode="lines",
+        hovertemplate="RAM: %{y:.2f} GB<extra></extra>",
+        yaxis="y2",
+    ))
+
+    figure.add_trace(go.Scatter(
+        x=metrics["timestamp"],
+        y=metrics["disk_gb"],
+        name="Disk",
+        line=dict(color=LINE_COLORS["disk"], width=2),
+        mode="lines",
+        hovertemplate="Disk: %{y:.2f} GB<extra></extra>",
+        yaxis="y3",
+    ))
+
+    if has_gpu:
+        figure.add_trace(go.Scatter(
+            x=metrics["timestamp"],
+            y=metrics["gpu"],
+            name="GPU",
+            line=dict(color=LINE_COLORS["gpu"], width=2),
+            mode="lines",
+            hovertemplate="GPU: %{y:.2f}%<extra></extra>",
+            yaxis="y",
+        ))
+
+        figure.add_trace(go.Scatter(
+            x=metrics["timestamp"],
+            y=metrics["vram_gb"],
+            name="VRAM",
+            line=dict(color=LINE_COLORS["vram"], width=2),
+            mode="lines",
+            hovertemplate="VRAM: %{y:.2f} GB<extra></extra>",
+            yaxis="y4",
+        ))
+
+    def axis_color_style(title: str, color: str) -> dict:
+        return dict(
+            linecolor=color,
+            tickcolor=color,
+            tickfont=dict(color=color),
+            title=dict(text=title, font=dict(color=color)),
+        )
+
+    figure.update_layout(
+        height=400,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+        ),
+        hoversubplots="axis",
+        hovermode="x unified",
+        hoverdistance=-1,
+        spikedistance=-1,
+        margin=dict(t=0, l=80, r=0, b=40),
+
+        xaxis=dict(
+            tickformat="%H:%M:%S",
+        ),
+
+        # CPU / GPU (%)
+        yaxis=dict(
+            range=[0, 100],
+            ticksuffix="%",
+            side="left",
+            **axis_color_style("Usage (%)", "#000"),
+        ),
+
+        # RAM (GB)
+        yaxis2=dict(
+            ticksuffix=" GB",
+            overlaying="y",
+            side="right",
+            **axis_color_style("RAM (GB)", LINE_COLORS["ram"]),
+        ),
+
+        # Disk (GB)
+        yaxis3=dict(
+            ticksuffix=" GB",
+            overlaying="y",
+            anchor="free",
+            side="right",
+            autoshift=True,
+            **axis_color_style("Disk (GB)", LINE_COLORS["disk"]),
+        ),
+
+        # VRAM (GB)
+        yaxis4=(
+            dict(
+                ticksuffix=" GB",
+                overlaying="y",
+                anchor="free",
+                side="right",
+                autoshift=True,
+                **axis_color_style("VRAM (GB)", LINE_COLORS["vram"]),
+            )
+            if has_gpu else {}
+        ),
+    )
+
+    return figure
+
+
+def _create_timeline_figure(span_objects: List["LocalSpan"]):
+    import pandas
+    import plotly.graph_objects as go
+
+    from crunch.api._domain.runner import RunnerRunSpanStatus
+
+    STATUS_COLOR = {
+        RunnerRunSpanStatus.STARTED: "#dde843",
+        RunnerRunSpanStatus.ENDED: "#0da54f",
+        RunnerRunSpanStatus.FAILED: "#ef4343",
+    }
+
+    span_dicts = []
+    for span in span_objects:
+        description = span.description
+        attributes = span.attributes
+
+        if attributes is not None:
+            if description == "execute" and span.attributes is not None and span.attributes.get("command") is not None:
+                description = f"{description} [{span.attributes['command']}]"
+
+            attributes = json.dumps(attributes)
+
+        span_dicts.append({
+            "id": str(span.id),
+            "parent_id": str(span.parent_id) if span.parent_id is not None else "",
+            "description": description,
+            "started_at": pandas.to_datetime(span.started_at),
+            "ended_at": pandas.to_datetime(span.ended_at),
+            "duration": -1,
+            "offset": -1,
+            "status": span.status,
+            "attributes": attributes,
+            "error": span.error,
+        })
+
+    spans = pandas.DataFrame(span_dicts)
+    spans["duration"] = (spans["ended_at"] - spans["started_at"]).dt.total_seconds()
+    spans["offset"] = (spans["started_at"] - spans["started_at"].min()).dt.total_seconds()
+
+    figure = go.Figure()
+
+    for _, row in spans.iterrows():
+        hovertemplate = (
+            "%{customdata[0]}<br>"
+            "Duration: %{customdata[1]}<br>"
+        )
+
+        duration = row["duration"]
+        duration_str = f"{duration:.2f} seconds"
+
+        attributes = row["attributes"]
+        if attributes:
+            hovertemplate += "Attributes: %{customdata[2]}<br>"
+
+        error = row["error"]
+        if error:
+            hovertemplate += "Error: %{customdata[3]}<br>"
+
+        figure.add_trace(go.Bar(
+            orientation="h",
+            x=[row["duration"]],
+            y=[row["description"]],
+            base=[row["offset"]],
+            marker_color=STATUS_COLOR.get(row["status"], "#fff"),
+            customdata=[[row["description"], duration_str, attributes, error]],
+            hovertemplate=hovertemplate + "<extra></extra>",
+            showlegend=False,
+        ))
+
+    figure.update_layout(
+        height=max(300, len(spans) * 40),
+        barmode="overlay",
+        xaxis=dict(
+            tickformat="%H:%M:%S",
+        ),
+        yaxis=dict(
+            autorange="reversed",
+            categoryorder="array",
+            categoryarray=spans["description"].tolist(),
+        ),
+        margin=dict(t=20, l=150, r=20, b=0),
+        hoverlabel=dict(
+            bgcolor="white",
+            font=dict(color="black"),
+        ),
+    )
+
+    return figure
