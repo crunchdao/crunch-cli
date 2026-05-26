@@ -144,6 +144,9 @@ class CloudRunner(Runner):
         if self.competition_format != CompetitionFormat.UNSTRUCTURED:
             raise NotImplementedError(f"{self.competition_format.name} format is not supported anymore.")
 
+        os.makedirs(self.scoring_directory, exist_ok=True)
+        os.makedirs(self.code_directory, exist_ok=True)
+
         self._download_runner()
 
         code_file_urls = self.run.code
