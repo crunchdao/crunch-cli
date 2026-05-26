@@ -3,7 +3,7 @@ import sys
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from queue import Empty as QueueEmpty
 from queue import Queue
 from threading import Event, Thread
@@ -116,6 +116,10 @@ class GpuPresence(Enum):
 Attributes = Dict[str, Any]
 
 
+def _now_utc() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
 class RunnerTracer:
 
     def __init__(
@@ -202,7 +206,7 @@ class RunnerTracer:
 
         while not self._stop_event.wait(self.metrics_delay):
             self.emit(RunnerRunMetric(
-                timestamp=datetime.now(),
+                timestamp=_now_utc(),
                 cpu=psutil.cpu_percent(interval=None),
                 ram=psutil.virtual_memory().used,
                 disk=psutil.disk_usage('/').used,
@@ -241,7 +245,7 @@ class RunnerTracer:
 
         span_id = self.next_span_id()
         self._current_parent_id = span_id
-        started_at = datetime.now()
+        started_at = _now_utc()
 
         self.emit(StartedRunnerRunSpan(
             id=span_id,
@@ -269,7 +273,7 @@ class RunnerTracer:
                 description=description,
                 status=end_status,
                 started_at=started_at,
-                ended_at=datetime.now(),
+                ended_at=_now_utc(),
                 error=end_error,
                 attributes=attributes,
             ))
