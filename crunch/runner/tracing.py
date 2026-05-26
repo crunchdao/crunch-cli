@@ -1,13 +1,15 @@
-from enum import Enum
 import sys
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from queue import Empty as QueueEmpty
 from queue import Queue
 from threading import Event, Thread
 from typing import Any, Dict, List, Optional, Union
+
+from retry import retry
 
 from crunch.api import RunnerRun
 from crunch.api._domain.runner import EndedRunnerRunSpan, RunnerRunMetric, RunnerRunSpan, RunnerRunSpanStatus, StartedRunnerRunSpan
@@ -17,18 +19,14 @@ from crunch.runner.types import KwargsLike
 class TraceExporter(ABC):
 
     @abstractmethod
-    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]) -> bool:
+    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
         ...
 
 
 class VoidTraceExporter(TraceExporter):
 
-    def push(
-        self,
-        spans: List[RunnerRunSpan],
-        metrics: List[RunnerRunMetric],
-    ) -> bool:
-        return True
+    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
+        pass
 
 
 class LocalTraceExporter(TraceExporter):
@@ -41,11 +39,7 @@ class LocalTraceExporter(TraceExporter):
         self.span_by_id.clear()
         self.metrics.clear()
 
-    def push(
-        self,
-        spans: List[RunnerRunSpan],
-        metrics: List[RunnerRunMetric],
-    ) -> bool:
+    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
         for span in spans:
             if isinstance(span, StartedRunnerRunSpan):
                 self.span_by_id[span.id] = LocalSpan(
@@ -56,18 +50,17 @@ class LocalTraceExporter(TraceExporter):
                     attributes=span.attributes,
                     started_at=span.started_at,
                     ended_at=None,
-                    error=None
+                    error=None,
                 )
             elif isinstance(span, EndedRunnerRunSpan):
-                existing = self.span_by_id.get(span.id)
-                if existing is not None:
-                    existing.ended_at = span.ended_at
-                    existing.status = span.status
-                    existing.error = span.error
+                local_span = self.span_by_id[span.id]
+                assert local_span is not None, f"ended span {span.id} has no matching started span?"
+
+                local_span.ended_at = span.ended_at
+                local_span.status = span.status
+                local_span.error = span.error
 
         self.metrics.extend(metrics)
-
-        return True
 
 
 @dataclass
@@ -88,23 +81,12 @@ class RemoteTraceExporter(TraceExporter):
     def __init__(self, run: RunnerRun):
         self.run = run
 
-    def push(
-        self,
-        spans: List[RunnerRunSpan],
-        metrics: List[RunnerRunMetric],
-    ) -> bool:
-        try:
-            self.run.report_traces(
-                spans=spans,
-                metrics=metrics
-            )
-        except Exception as error:
-            import traceback
-            traceback.print_exception(error)
-            print(f"Failed to send batch of {len(spans) + len(metrics)} items: {error}")
-            return False
-
-        return True
+    @retry(tries=3, delay=10, backoff=5, jitter=(1, 5), logger=None)
+    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
+        self.run.report_traces(
+            spans=spans,
+            metrics=metrics
+        )
 
 
 class GpuPresence(Enum):
@@ -117,7 +99,7 @@ Attributes = Dict[str, Any]
 
 
 def _now_utc() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=timezone.utc).replace(tzinfo=None)
 
 
 class RunnerTracer:
@@ -178,13 +160,9 @@ class RunnerTracer:
             metrics = [item for item in batch if isinstance(item, RunnerRunMetric)]
 
             try:
-                exported = self.exporter.push(spans=spans, metrics=metrics)
-
-                if not exported:
-                    for item in batch:
-                        self._queue.put(item)
+                self.exporter.push(spans=spans, metrics=metrics)
             except Exception as exception:
-                print(f"dropped {len(batch)} items: {exception}")
+                print(f"dropped {len(spans)} spans and {len(metrics)} metrics: {exception.__class__.__name__}({exception})", file=sys.stderr)
             finally:
                 for _ in range(len(batch)):
                     self._queue.task_done()

@@ -10,6 +10,7 @@ pandas
 psutil
 pyarrow
 python-dotenv
+retry
 requests
 requests-toolbelt
 requirements-parser>=0.11.0
