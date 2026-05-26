@@ -289,7 +289,7 @@ def download(
     url: str,
     path: str,
     log: bool = True,
-    print: Callable[[str], None] = print,
+    print: Callable[[str], Any] = print,
     progress_bar: bool = True,
     max_retry: int = 10,
     session: Optional[requests.Session] = None,

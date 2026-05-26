@@ -4,13 +4,13 @@ import time
 from typing import Any, Literal, Optional
 
 import click
-
 import crunch.monkey_patches as monkey_patches
 import crunch.tester as tester
 from crunch.api import Competition, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
 from crunch.command import download, download_no_data_available
 from crunch.external.humanfriendly import format_size
 from crunch.runner.runner import Runner
+from crunch.runner.tracing import LocalTraceExporter, RunnerTracer, VoidTraceExporter, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext, RunnerExecutorContext, UserModule
 from crunch.unstructured import RunnerModule
@@ -32,16 +32,21 @@ class LocalRunner(Runner):
         has_gpu: bool,
         determinism_check_enabled: bool,
         logger: logging.Logger,
+        trace_exporter: Optional[LocalTraceExporter],
     ):
         super().__init__(
             competition_format=competition.format,
-            prediction_directory_path=prediction_directory_path,
+            tracer=RunnerTracer(
+                trace_exporter or VoidTraceExporter(),
+                metrics_delay=3,
+            ),
             determinism_check_enabled=determinism_check_enabled,
         )
 
         self.user_module = user_module
         self.runner_module = runner_module
         self.model_directory_path = model_directory_path
+        self.prediction_directory_path = prediction_directory_path
         self.force_first_train = force_first_train
         self.train_frequency = train_frequency
         self.round_number: RoundIdentifierType = round_number
@@ -86,6 +91,10 @@ class LocalRunner(Runner):
         os.makedirs(self.model_directory_path, exist_ok=True)
         os.makedirs(self.prediction_directory_path, exist_ok=True)
 
+        with self.tracer.span("download data"):
+             self._download_data()
+
+    def _download_data(self):
         try:
             (
                 self.embargo,
@@ -100,11 +109,6 @@ class LocalRunner(Runner):
             download_no_data_available()
             raise click.Abort()
 
-        return (
-            self.keys,
-            False,
-        )
-
     def start_unstructured(self) -> None:
         if self.runner_module is None:
             self.log("no runner is available for this competition", error=True)
@@ -112,12 +116,14 @@ class LocalRunner(Runner):
 
         context = LocalRunnerContext(self)
 
-        self.runner_module.run(
-            context=context,
-            data_directory_path=self.data_directory_path,
-            model_directory_path=self.model_directory_path,
-            prediction_directory_path=self.prediction_directory_path,
-        )
+        with self.tracer.span("executing runner script"):
+            self.runner_module.run(
+                context=context,
+                data_directory_path=self.data_directory_path,
+                model_directory_path=self.model_directory_path,
+                prediction_directory_path=self.prediction_directory_path,
+                tracer=self.tracer,
+            )
 
         self.log(f"save prediction - path={self.prediction_directory_path}", important=True)
 
@@ -209,24 +215,25 @@ class LocalRunnerContext(RunnerContext):
         user_module = LocalUserModule(self.runner)
         executor_context = LocalRunnerExecutorContext(self.runner)
 
-        assert self.runner.runner_module
-        handlers = self.runner.runner_module.execute(
-            context=executor_context,
-            module=user_module,
-            data_directory_path=self.runner.data_directory_path,
-            model_directory_path=self.runner.model_directory_path,
-            prediction_directory_path=self.runner.prediction_directory_path,
-        )
+        with self.runner.tracer.span(f"execute", attributes=to_execute_span_attributes(command, parameters)):
+            assert self.runner.runner_module
+            handlers = self.runner.runner_module.execute(
+                context=executor_context,
+                module=user_module,
+                data_directory_path=self.runner.data_directory_path,
+                model_directory_path=self.runner.model_directory_path,
+                prediction_directory_path=self.runner.prediction_directory_path,
+            )
 
-        handler = handlers.get(command)
-        if handler is None:
-            self.log(f"command not found: {command}", error=True)
-            return None
+            handler = handlers.get(command)
+            if handler is None:
+                self.log(f"command not found: {command}", error=True)
+                return None
 
-        smart_call(
-            handler,
-            parameters or {},
-        )
+            smart_call(
+                handler,
+                parameters or {},
+            )
 
 
 class LocalRunnerExecutorContext(RunnerExecutorContext):

@@ -19,6 +19,7 @@ import requirements as requirements_parser
 from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
+from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext
 from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
@@ -98,7 +99,11 @@ class CloudRunner(Runner):
     ):
         super().__init__(
             competition_format=competition.format,
-            prediction_directory_path=prediction_directory_path,
+            tracer=RunnerTracer(
+                RemoteTraceExporter(run),
+                gpu_presence=GpuPresence.AVAILABLE if gpu else GpuPresence.UNAVAILABLE,
+                metrics_delay=60,
+            ),
             determinism_check_enabled=determinism_check_enabled,
         )
 
@@ -135,172 +140,185 @@ class CloudRunner(Runner):
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
 
-    def start(self):
-        self.report_current("starting")
-
-        super().start()
-
-        self.report_current("ending")
-
     def initialize(self):
         if self.competition_format != CompetitionFormat.UNSTRUCTURED:
             raise NotImplementedError(f"{self.competition_format.name} format is not supported anymore.")
 
-        if self.log("downloading runner..."):
-            self.report_current("download runner")
+        os.makedirs(self.scoring_directory, exist_ok=True)
+        os.makedirs(self.code_directory, exist_ok=True)
 
-            loader = deduce_code_loader(
-                competition_name=self.competition.name,
-                file_name="runner",
-            )
+        self._download_runner()
 
-            if isinstance(loader, GithubCodeLoader):
-                source = loader.source
+        code_file_urls = self.run.code
+        model_file_urls = self.run.model
 
-                self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
-                with open(self.runner_dot_py_file_path, "w") as fd:
-                    fd.write(source)
+        if "install r requirements":
+            requirements_r_txt_name = os.path.basename(self.requirements_r_txt_path)
+            requirements_r_txt_url = code_file_urls.pop(requirements_r_txt_name, None)
+            if requirements_r_txt_url is not None:
+                download(
+                    requirements_r_txt_url,
+                    self.requirements_r_txt_path,
+                    print=self.log,
+                    progress_bar=False,
+                )
 
-                self.bash2(["chmod", "a+r", self.runner_dot_py_file_path])
+                with self._span("installing r requirements"):
+                    self._install_r_requirements()
 
-                loader = LocalCodeLoader(path=self.runner_dot_py_file_path)
-            elif isinstance(loader, LocalCodeLoader):  # type: ignore
-                self.runner_dot_py_file_path = os.path.realpath(loader.path)
+        if "install python requirements":
+            requirements_txt_name = os.path.basename(self.requirements_txt_path)
+            requirements_txt_url = code_file_urls.pop(requirements_txt_name, None)
+            if requirements_txt_url is not None:
+                download(
+                    requirements_txt_url,
+                    self.requirements_txt_path,
+                    print=self.log,
+                    progress_bar=False,
+                )
 
-            self.runner_module = RunnerModule.load(loader)
-            if self.runner_module is None:
-                raise RuntimeError("no runner is available for this competition")
-
-        if self.log("downloading code..."):
-            self.report_current("download code")
-
-            _download_files(
-                file_urls=self.run.code,
-                directory_path=self.code_directory,
-                print=self.log,  # type: ignore
-            )
-
-        if os.path.exists(self.requirements_r_txt_path):
-            self.report_current("install r requirements")
-
-            self.log("installing r...")
-            self.bash("r-apt", ["apt-get", "-qq", "update"])
-            self.bash("r-apt", ["apt-get", "-qq", "install", "r-base"])
-
-            with open(self.requirements_r_txt_path, "r") as fd:
-                requirements = requirements_parser.parse(fd.read())
-
-            apt_names = [
-                f"r-cran-{requirement.name}"
-                for requirement in requirements
-            ]
-
-            if len(apt_names):
-                self.log("installing r cran packages...")
-                self.bash("r-apt", ["apt-get", "-qq", "install", *apt_names])
-            else:
-                self.log("no r cran packages to install")
-
-            # remove warning about empty directory
-            user_site_library_paths = [
-                path
-                for path in R_SITE_LIBRARY_PATHS
-                if os.path.exists(path) and len(os.listdir(path)) == 0
-            ]
-
-            if len(user_site_library_paths):
-                self.bash2(["rm", "-r", *user_site_library_paths])
-
-        if self.log("installing python requirements..."):
-            if os.path.exists(self.requirements_txt_path):
-                self.report_current("install python requirements")
-
-                constraints_txt_path = self._download_constraints(Language.PYTHON)
-                constraints_args: Iterable[str] = ("-c", constraints_txt_path) if constraints_txt_path else []
-
-                priority_packages: List[str] = []
-                with open(self.requirements_txt_path) as fd:
-                    for line in fd:
-                        line = line.strip()
-
-                        package = re.search(r"^([\w-]+)", line, re.MULTILINE)
-                        if package is None:
-                            continue
-
-                        package = package.group(1)
-                        if package in PACKAGES_WITH_PRIORITY:
-                            priority_packages.append(line)
-
-                if priority_packages:
-                    self.pip([
-                        *priority_packages,
-                        *constraints_args
-                    ])
-
-                self.pip([
-                    *(["--no-build-isolation"] if priority_packages else []),
-                    "-r", self.requirements_txt_path,
-                    *constraints_args
-                ])
+                with self._span("installing python requirements"):
+                    self._install_python_requirements()
             else:
                 self.log("no requirements.txt found")
 
-        if self.log("installing crunch-cli..."):
-            self.report_current("install crunch-cli")
+        with self._span("installing crunch-cli"):
+            self._install_crunch_cli()
 
-            self.pip([
-                "--upgrade",
-                "--force-reinstall",
-                "--no-deps",
-                f"git+https://github.com/crunchdao/crunch-cli@{self.crunch_cli_commit_hash}"
-            ])
+        if self.gpu:
+            with self._span("fixing gpu requirements"):
+                self._fix_gpu_requirements()
 
-        if self.gpu and self.log("fixing gpu requirements..."):
-            self.report_current("fix gpu requirements")
-
-            self.bash("pip", [
-                "pip3", "uninstall",
-                "--root-user-action", "ignore",
-                "--disable-pip-version-check",
-                "--no-input",
-                "--no-color",
-                "--yes",
-                *(["--quiet"] * 2),
-                *CONFLICTING_GPU_PACKAGES
-            ], self.venv_env)
-
-        if self.log("downloading data..."):
-            self.report_current("download data")
-
+        with self._span("downloading data"):
             self.prepare_data()
 
-            self.initialize_state()
+            self._initialize_state()
 
-        if self.log("downloading model..."):
-            self.report_current("download model")
+        with self._span("downloading code"):
+            _download_files(
+                file_urls=code_file_urls,
+                directory_path=self.code_directory,
+                print=self.log,
+            )
 
+        with self._span("downloading model"):
             self.bash2(["mkdir", "-p", self.model_directory_path])
 
-            file_urls = self.run.model
-            self.has_model = len(file_urls) != 0
+            self.has_model = len(model_file_urls) != 0
 
             self.pre_model_files_modification = _download_files(
-                file_urls=file_urls,
+                file_urls=model_file_urls,
                 directory_path=self.model_directory_path,
-                print=self.log,  # type: ignore
+                print=self.log,
             )
 
             self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
 
-        if self.log("prepare prediction directory..."):
+        if "prepare prediction directory...":
             self.bash2(["mkdir", "-p", self.prediction_directory_path])
             self.delete_content(self.prediction_directory_path)
             self.bash2(["chmod", "-R", "o+rw", self.prediction_directory_path])
 
-        return (
-            self.keys,
-            self.has_model
+    def start_unstructured(self):
+        self._create_trace_file()
+
+        if self.runner_module is None:
+            raise RuntimeError("no runner is available for this competition")
+
+        context = CloudRunnerContext(self)
+
+        with self._span("executing runner script"):
+            self.runner_module.run(
+                context=context,
+                data_directory_path=self.data_directory,
+                model_directory_path=self.model_directory_path,
+                prediction_directory_path=self.prediction_directory_path,
+                tracer=self.tracer,
+            )
+
+    def finalize(self):
+        with self._span("uploading result"):
+            self._upload_results()
+
+    def _download_runner(self):
+        loader = deduce_code_loader(
+            competition_name=self.competition.name,
+            file_name="runner",
         )
+
+        if isinstance(loader, GithubCodeLoader):
+            source = loader.source
+
+            self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
+            with open(self.runner_dot_py_file_path, "w") as fd:
+                fd.write(source)
+
+            self.bash2(["chmod", "a+r", self.runner_dot_py_file_path])
+
+            loader = LocalCodeLoader(path=self.runner_dot_py_file_path)
+        elif isinstance(loader, LocalCodeLoader):  # type: ignore
+            self.runner_dot_py_file_path = os.path.realpath(loader.path)
+
+        self.runner_module = RunnerModule.load(loader)
+        if self.runner_module is None:
+            raise RuntimeError("no runner is available for this competition")
+
+    def _install_r_requirements(self):
+        self.bash("r-apt", ["apt-get", "-qq", "update"])
+        self.bash("r-apt", ["apt-get", "-qq", "install", "r-base"])
+
+        with open(self.requirements_r_txt_path, "r") as fd:
+            requirements = requirements_parser.parse(fd.read())
+
+        apt_names = [
+            f"r-cran-{requirement.name}"
+            for requirement in requirements
+        ]
+
+        if len(apt_names):
+            self.log("installing r cran packages...")
+            self.bash("r-apt", ["apt-get", "-qq", "install", *apt_names])
+        else:
+            self.log("no r cran packages to install")
+
+        # remove warning about empty directory
+        user_site_library_paths = [
+            path
+            for path in R_SITE_LIBRARY_PATHS
+            if os.path.exists(path) and len(os.listdir(path)) == 0
+        ]
+
+        if len(user_site_library_paths):
+            self.bash2(["rm", "-r", *user_site_library_paths])
+
+    def _install_python_requirements(self):
+        constraints_txt_path = self._download_constraints(Language.PYTHON)
+        constraints_args: Iterable[str] = ("-c", constraints_txt_path) if constraints_txt_path else []
+
+        priority_packages: List[str] = []
+        with open(self.requirements_txt_path) as fd:
+            for line in fd:
+                line = line.strip()
+
+                package = re.search(r"^([\w-]+)", line, re.MULTILINE)
+                if package is None:
+                    continue
+
+                package = package.group(1)
+                if package in PACKAGES_WITH_PRIORITY:
+                    priority_packages.append(line)
+
+        if priority_packages:
+            self.pip([
+                *priority_packages,
+                *constraints_args
+            ])
+
+        self.pip([
+            *(["--no-build-isolation"] if priority_packages else []),
+            "-r", self.requirements_txt_path,
+            *constraints_args
+        ])
 
     def _download_constraints(self, language: Language) -> Optional[str]:
         lower = language.name.lower()
@@ -316,28 +334,27 @@ class CloudRunner(Runner):
 
         return txt_path
 
-    def start_unstructured(self):
-        self.create_trace_file()
+    def _install_crunch_cli(self):
+        self.pip([
+            "--upgrade",
+            "--force-reinstall",
+            "--no-deps",
+            f"git+https://github.com/crunchdao/crunch-cli@{self.crunch_cli_commit_hash}"
+        ])
 
-        if self.runner_module is None:
-            raise RuntimeError("no runner is available for this competition")
+    def _fix_gpu_requirements(self):
+        self.bash("pip", [
+            "pip3", "uninstall",
+            "--root-user-action", "ignore",
+            "--disable-pip-version-check",
+            "--no-input",
+            "--no-color",
+            "--yes",
+            *(["--quiet"] * 2),
+            *CONFLICTING_GPU_PACKAGES
+        ], self.venv_env)
 
-        context = CloudRunnerContext(self)
-
-        return self.runner_module.run(
-            context=context,
-            data_directory_path=self.data_directory,
-            model_directory_path=self.model_directory_path,
-            prediction_directory_path=self.prediction_directory_path,
-        )
-
-    def finalize(self):
-        self.report_current("upload result")
-        self.log("uploading result...")
-
-        self.upload_results()
-
-    def upload_results(self):
+    def _upload_results(self):
         prediction_uploads: UploadedFiles = {}
         model_uploads: UploadedFiles = {}
 
@@ -347,10 +364,8 @@ class CloudRunner(Runner):
                 if retry != 0:
                     retry_in = self.retry_seconds * retry
 
-                    self.report_current("wait retry")
                     self.log(f"retrying in {retry_in} second(s)")
                     time.sleep(retry_in)
-                    self.report_current(f"upload result try #{retry}")
 
                 try:
                     self._upload_prediction_files(prediction_uploads)
@@ -436,16 +451,13 @@ class CloudRunner(Runner):
             except Exception as exception:
                 self.log(f"[debug] failed to delete upload {upload.id}: {exception}", error=True)
 
-    def teardown(self):
-        self.report_current(f"shutting down")
-
     def log(
         self,
         message: str,
         *,
         important: bool = False,
         error: bool = False,
-    ):
+    ) -> Literal[True]:
         file = sys.stderr if error else sys.stdout
         prefix = f"<runner/{file.name[4:-1]}>"
 
@@ -456,11 +468,11 @@ class CloudRunner(Runner):
 
         return True
 
-    def create_trace_file(self):
+    def _create_trace_file(self):
         self.bash2(["touch", self.trace_path])
         self.bash2(["chmod", "o+w", self.trace_path])
 
-    def initialize_state(self):
+    def _initialize_state(self):
         state: KwargsLike = {
             "splits": [
                 {
@@ -547,13 +559,16 @@ class CloudRunner(Runner):
         directory_path: str,
         commands: List[str],
     ):
-        self.bash2([
-            "find",
-            directory_path,
-            "-mindepth", "1",
-            "-maxdepth", "1",
-            "-exec", *commands, ";"
-        ])
+        self.bash(
+            f"recursive-{commands[0]}",
+            [
+                "find",
+                directory_path,
+                "-mindepth", "1",
+                "-maxdepth", "1",
+                "-exec", *commands, ";"
+            ]
+        )
 
     def delete_content(
         self,
@@ -662,7 +677,7 @@ class CloudRunner(Runner):
 
             self._validate_exit()
         except SystemExit:
-            self.report_trace(loop_key)  # pyright: ignore[reportArgumentType]
+            self.report_error_trace()
             raise
 
     def _prepare_exit(self):
@@ -737,38 +752,22 @@ class CloudRunner(Runner):
                 data_files,
             ),
             False,
-            print=self.log,  # type: ignore
+            print=self.log,
             progress_bar=False,
         )
 
-    def report_current(
-        self,
-        work: str,
-        moon: Optional[int] = None,
-    ):
+    def report_error_trace(self):
         try:
-            self.run.report_current(work, moon)
-        except BaseException as ignored:
-            self.log(
-                f"ignored exception when reporting current: {type(ignored).__name__}({ignored})",
-                error=True,
-            )
-
-    def report_trace(
-        self,
-        moon: Optional[int] = None,
-    ):
-        try:
-            content = "<no trace>"
+            trace = "<no trace>"
             with open(self.trace_path) as fd:
-                content = fd.read()
+                trace = fd.read()
 
-            self.run.report_trace(content, moon)
+            self.run.report_error(trace)
 
-            self.log("trace reported")
+            self.log("error trace reported")
         except BaseException as ignored:
             self.log(
-                f"ignored exception when reporting trace: {type(ignored).__name__}({ignored})",
+                f"ignored exception when reporting error trace: {type(ignored).__name__}({ignored})",
                 error=True
             )
 
@@ -777,7 +776,7 @@ def _download_files(
     *,
     file_urls: Dict[str, str],
     directory_path: str,
-    print: Callable[[str], None],
+    print: Callable[[str], Any],
 ) -> LastModifications:
     pre_modifications: LastModifications = {}
 
@@ -943,8 +942,9 @@ class CloudRunnerContext(RunnerContext):
     ) -> None:
         self.log(f"executing - command={command}")
 
-        self.runner.sandbox(
-            self.runner.force_first_train,
-            command,
-            parameters=parameters or {},
-        )
+        with self.runner._span(f"execute", attributes=to_execute_span_attributes(command, parameters)):  # pyright: ignore[reportPrivateUsage]
+            self.runner.sandbox(
+                self.runner.force_first_train,
+                command,
+                parameters=parameters or {},
+            )

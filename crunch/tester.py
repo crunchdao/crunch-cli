@@ -1,9 +1,12 @@
 import logging
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import crunch.monkey_patches as monkey_patches
 from crunch.api import Competition, RoundIdentifierType
 from crunch.unstructured import RunnerModule
+
+if TYPE_CHECKING:
+    from crunch.runner.tracing import LocalTraceExporter
 
 _logged_installed = False
 
@@ -39,6 +42,7 @@ def run(
     competition: Competition,
     has_gpu: bool = False,
     no_determinism_check: Optional[bool] = True,
+    trace_exporter: Optional["LocalTraceExporter"] = None,
 ):
     monkey_patches.pickle_unpickler_find_class()
     monkey_patches.joblib_parallel_initializer()
@@ -59,6 +63,7 @@ def run(
         has_gpu,
         not no_determinism_check,
         logger,
+        trace_exporter,
     )
 
     return runner.start()

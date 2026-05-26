@@ -54,6 +54,7 @@ def test(
         competition,
         has_gpu,
         no_determinism_check,
+        trace_exporter=None,
     )
 
     if prediction is not None:
