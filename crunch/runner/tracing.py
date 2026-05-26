@@ -1,3 +1,4 @@
+from enum import Enum
 import sys
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -106,6 +107,12 @@ class RemoteTraceExporter(TraceExporter):
         return True
 
 
+class GpuPresence(Enum):
+    AVAILABLE = "AVAILABLE"
+    UNAVAILABLE = "UNAVAILABLE"
+    AUTO_DETECT = "AUTO_DETECT"
+
+
 Attributes = Dict[str, Any]
 
 
@@ -115,10 +122,12 @@ class RunnerTracer:
         self,
         exporter: TraceExporter,
         *,
+        gpu_presence: GpuPresence = GpuPresence.AUTO_DETECT,
         batch_delay: int = 5,
         metrics_delay: int = 10,
     ):
         self.exporter = exporter
+        self.gpu_presence = gpu_presence
         self.batch_delay = batch_delay
         self.metrics_delay = metrics_delay
 
@@ -180,12 +189,16 @@ class RunnerTracer:
         import psutil
         import pynvml  # pyright: ignore[reportMissingTypeStubs]
 
-        try:
-            pynvml.nvmlInit()
-            gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # pyright: ignore[reportUnknownMemberType]
-        except pynvml.NVMLError as error:
-            print(f"failed to initialize NVML: {error}", file=sys.stderr)
-            gpu_handle = None
+        gpu_handle = None
+        if self.gpu_presence != GpuPresence.UNAVAILABLE:
+            try:
+                pynvml.nvmlInit()
+                gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # pyright: ignore[reportUnknownMemberType]
+            except pynvml.NVMLError as error:
+                if self.gpu_presence == GpuPresence.AVAILABLE:
+                    print(f"[pynvml] failed to initialize: {error}", file=sys.stderr)
+
+                gpu_handle = None
 
         while not self._stop_event.wait(self.metrics_delay):
             self.emit(RunnerRunMetric(

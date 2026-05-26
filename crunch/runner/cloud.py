@@ -19,7 +19,7 @@ import requirements as requirements_parser
 from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
-from crunch.runner.tracing import RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
+from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext
 from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
@@ -101,6 +101,7 @@ class CloudRunner(Runner):
             competition_format=competition.format,
             tracer=RunnerTracer(
                 RemoteTraceExporter(run),
+                gpu_presence=GpuPresence.AVAILABLE if gpu else GpuPresence.UNAVAILABLE,
                 metrics_delay=60,
             ),
             determinism_check_enabled=determinism_check_enabled,
