@@ -87,8 +87,8 @@ class RunnerRunMetric:
     cpu: float   # % 0–100
     ram: int   # bytes used
     disk: int  # bytes used
-    gpu: float   # % 0–100
-    vram: int  # bytes used
+    gpu: Optional[float]  # % 0–100
+    vram: Optional[int]  # bytes used
 
 
 class RunnerRun(Model):
