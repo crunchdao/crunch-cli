@@ -144,6 +144,8 @@ class LocalRunner(Runner):
         else:
             self.logger.info(message)
 
+        self.logger.handlers[0].flush()
+
         return True
 
 
