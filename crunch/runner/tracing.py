@@ -260,16 +260,26 @@ class RunnerTracer:
 def to_execute_span_attributes(
     command: str,
     parameters: Optional[KwargsLike],
+    span_hidden_parameters: Optional[List[str]] = None,
+    span_attributes: Optional[KwargsLike] = None,
 ) -> Dict[str, Any]:
     attributes: Dict[str, Any] = {
         "command": command,
     }
 
     if parameters is not None:
-        attributes["parameters"] = {
+        hidden_parameters = set(span_hidden_parameters or [])
+
+        parameters = {
             key: value
             for key, value in parameters.items()
-            if not key.endswith("_path")
+            if not key.endswith("_path") and key not in hidden_parameters
         }
+
+        if len(parameters) > 0:
+            attributes["parameters"] = parameters
+
+    if span_attributes is not None:
+        attributes.update(span_attributes)
 
     return attributes

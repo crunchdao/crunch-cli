@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-import os
 from types import ModuleType
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, List, Literal, Optional
 
 from crunch.runner.types import KwargsLike
 
@@ -99,6 +98,8 @@ class RunnerContext(ABC):
         *,
         command: str,
         parameters: Optional[KwargsLike] = None,
+        span_hidden_parameters: Optional[List[str]] = None,
+        span_attributes: Optional[KwargsLike] = None,
     ) -> None:
         pass  # pragma: no cover
 

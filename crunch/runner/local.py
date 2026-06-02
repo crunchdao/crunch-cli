@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from typing import Any, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 import click
 import crunch.monkey_patches as monkey_patches
@@ -211,13 +211,16 @@ class LocalRunnerContext(RunnerContext):
         *,
         command: str,
         parameters: Optional[KwargsLike] = None,
+        span_hidden_parameters: Optional[List[str]] = None,
+        span_attributes: Optional[KwargsLike] = None,
     ) -> None:
         self.log(f"executing - command={command}")
 
         user_module = LocalUserModule(self.runner)
         executor_context = LocalRunnerExecutorContext(self.runner)
 
-        with self.runner.tracer.span(f"execute", attributes=to_execute_span_attributes(command, parameters)):
+        span_attributes = to_execute_span_attributes(command, parameters, span_hidden_parameters, span_attributes)
+        with self.runner.tracer.span(f"execute", attributes=span_attributes):
             assert self.runner.runner_module
             handlers = self.runner.runner_module.execute(
                 context=executor_context,
