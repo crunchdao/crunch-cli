@@ -162,7 +162,7 @@ class _Inline:
 
     def _detect_plotly(self) -> bool:
         try:
-            import plotly
+            import plotly  # pyright: ignore[reportMissingTypeStubs, reportUnusedImport]
             return True
         except ImportError:
             self.logger.error(f"`plotly` is not installed, please install it to show usage metrics")
