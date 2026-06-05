@@ -100,8 +100,24 @@ class RunnerContext(ABC):
         parameters: Optional[KwargsLike] = None,
         span_hidden_parameters: Optional[List[str]] = None,
         span_attributes: Optional[KwargsLike] = None,
+        install_data_fuse: bool = True,
     ) -> None:
-        pass  # pragma: no cover
+        """
+        Execute a command.
+
+        Parameters:
+            command (str): The command to be executed (e.g., "train", "predict", etc.).
+            parameters (Optional[KwargsLike]): The parameters of the command.
+            span_hidden_parameters (Optional[List[str]]): The parameters to hide from the span (e.g., contain useless information).
+            span_attributes (Optional[KwargsLike]): Additional attributes to merge with the span's attributes.
+            install_data_fuse (bool): Whether to temporarily allow data access, which is only restricted after the data fuse is tripped. If disabled, no data access is ever permitted and triggering the fuse has no effect.
+
+        Returns:
+            None: This function does not return anything.
+
+        Raises:
+            ValueError: If the command fails, the user's code error is re-raised.
+        """
 
 
 class RunnerExecutorContext(ABC):

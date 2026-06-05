@@ -588,12 +588,16 @@ class CloudRunner(Runner):
         train: bool,
         loop_key: Union[int, str],
         parameters: KwargsLike = {},
+        install_data_fuse: bool = True,
     ) -> None:
         try:
             self._prepare_exit()
 
-            self.bash2(["chmod", "-R", "a+r", self.data_directory])
-            self._install_permission_fuse()
+            if install_data_fuse:
+                self.bash2(["chmod", "-R", "a+r", self.data_directory])
+                self._install_permission_fuse()
+            else:
+                self.bash2(["chmod", "-R", "a-r", self.data_directory])
 
             options: KwargsLike = {
                 "competition-name": self.competition.name,
@@ -941,6 +945,7 @@ class CloudRunnerContext(RunnerContext):
         parameters: Optional[KwargsLike] = None,
         span_hidden_parameters: Optional[List[str]] = None,
         span_attributes: Optional[KwargsLike] = None,
+        install_data_fuse: bool = True,
     ) -> None:
         self.log(f"executing - command={command}")
 
@@ -950,4 +955,5 @@ class CloudRunnerContext(RunnerContext):
                 self.runner.force_first_train,
                 command,
                 parameters=parameters or {},
+                install_data_fuse=install_data_fuse,
             )

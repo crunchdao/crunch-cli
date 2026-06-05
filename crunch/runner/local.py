@@ -213,6 +213,7 @@ class LocalRunnerContext(RunnerContext):
         parameters: Optional[KwargsLike] = None,
         span_hidden_parameters: Optional[List[str]] = None,
         span_attributes: Optional[KwargsLike] = None,
+        install_data_fuse: bool = True,
     ) -> None:
         self.log(f"executing - command={command}")
 
