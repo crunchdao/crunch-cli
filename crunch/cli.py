@@ -661,15 +661,7 @@ def cloud(
     venv_directory = venv_directory.replace("{context}", context_directory)
     state_file = state_file.replace("{context}", context_directory)
 
-    requirements_txt_path = os.path.join(code_directory, "requirements.txt")
-    requirements_r_txt_path = os.path.join(code_directory, "requirements.r.txt")
     model_directory_path = os.path.join(code_directory, model_directory)
-
-    trace_file_name = "trace.txt"
-    trace_path = os.path.join(context_directory, trace_file_name)
-
-    exit_file_name = "exit.txt"
-    exit_file_path = os.path.join(context_directory, exit_file_name)
 
     auth = api.auth.RunTokenAuth(run_token)
     client = api.Client.from_env(auth, show_progress=False)
@@ -691,12 +683,8 @@ def cloud(
         code_directory,
         main_file,
         # ---
-        requirements_txt_path,
-        requirements_r_txt_path,
         model_directory_path,
         prediction_directory,
-        trace_path,
-        exit_file_path,
         # ---
         log_secret,
         train_frequency,

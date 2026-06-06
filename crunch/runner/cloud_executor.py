@@ -104,8 +104,6 @@ class SandboxExecutor:
         except BaseException:
             self.write_trace(sys.exc_info())
             raise
-        else:
-            self.write_trace(None)
 
     def _ping(self, urls: List[str]):
         for url in urls:
@@ -153,11 +151,7 @@ class SandboxExecutor:
             self.parameters,
         )
 
-    def write_trace(self, exc_info: Optional[Tuple[Any, ...]]):
-        if exc_info is None:
-            open(self.trace_path, "w").close()
-            return
-
+    def write_trace(self, exc_info: Tuple[Any, ...]):
         try:
             with open(self.trace_path, "w") as fd:
                 traceback.print_exception(*exc_info, file=fd)

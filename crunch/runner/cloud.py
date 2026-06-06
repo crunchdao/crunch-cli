@@ -11,10 +11,10 @@ import time
 from datetime import timedelta
 from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple, Union, cast
 from urllib.parse import urljoin
-
-import requests
+from uuid import uuid4
 
 import crunch.store as store
+import requests
 import requirements as requirements_parser
 from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
@@ -24,6 +24,7 @@ from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext
 from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
 from crunch.utils import download
+from crunch_convert import RequirementLanguage
 
 UploadedFiles = Dict[str, Upload]
 LastModifications = Dict[str, int]
@@ -40,6 +41,16 @@ CONFLICTING_GPU_PACKAGES = [
 Write permissions for current user, current group and others.
 """
 S_IWALL = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+
+"""
+Traverse permissions for current user, current group and others.
+"""
+S_IXALL = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+
+"""
+Write and traverse permissions for current user, current group and others.
+"""
+S_IWXALL = S_IWALL | S_IXALL
 
 """
 group + other  = (null)
@@ -78,12 +89,8 @@ class CloudRunner(Runner):
         code_directory: str,
         main_file: str,
         # ---
-        requirements_txt_path: str,
-        requirements_r_txt_path: str,
         model_directory_path: str,
         prediction_directory_path: str,
-        trace_path: str,
-        exit_file_path: str,
         # ---
         log_secret: str,
         train_frequency: int,
@@ -115,19 +122,18 @@ class CloudRunner(Runner):
         self.scoring_directory = scoring_directory
         self.state_file = state_file
         self.venv_directory = venv_directory
+
+        self.sandboxes_directory_path = os.path.join(context_directory, "sandbox")
+        os.makedirs(self.sandboxes_directory_path, exist_ok=True)
+        os.chmod(self.sandboxes_directory_path, S_IXALL)
+
         self.data_directory = data_directory
         self.code_directory = code_directory
         self.main_file = main_file
         self.runner_dot_py_file_path = None
 
-        self.requirements_txt_path = requirements_txt_path
-        self.requirements_r_txt_path = requirements_r_txt_path
         self.model_directory_path = model_directory_path
         self.prediction_directory_path = prediction_directory_path
-        self.trace_path = trace_path
-
-        self.exit_file_path = exit_file_path
-        self.exit_content = None
 
         self.log_secret = log_secret
         self.train_frequency = train_frequency
@@ -153,32 +159,36 @@ class CloudRunner(Runner):
         model_file_urls = self.run.model
 
         if "install r requirements":
-            requirements_r_txt_name = os.path.basename(self.requirements_r_txt_path)
+            requirements_r_txt_name = RequirementLanguage.R.txt_file_name
             requirements_r_txt_url = code_file_urls.pop(requirements_r_txt_name, None)
             if requirements_r_txt_url is not None:
+                requirements_r_txt_path = os.path.join(self.context_directory, requirements_r_txt_name)
+
                 download(
                     requirements_r_txt_url,
-                    self.requirements_r_txt_path,
+                    requirements_r_txt_path,
                     print=self.log,
                     progress_bar=False,
                 )
 
                 with self._span("installing r requirements"):
-                    self._install_r_requirements()
+                    self._install_r_requirements(requirements_r_txt_path)
 
         if "install python requirements":
-            requirements_txt_name = os.path.basename(self.requirements_txt_path)
+            requirements_txt_name = RequirementLanguage.PYTHON.txt_file_name
             requirements_txt_url = code_file_urls.pop(requirements_txt_name, None)
             if requirements_txt_url is not None:
+                requirements_txt_path = os.path.join(self.context_directory, requirements_txt_name)
+
                 download(
                     requirements_txt_url,
-                    self.requirements_txt_path,
+                    requirements_txt_path,
                     print=self.log,
                     progress_bar=False,
                 )
 
                 with self._span("installing python requirements"):
-                    self._install_python_requirements()
+                    self._install_python_requirements(requirements_txt_path)
             else:
                 self.log("no requirements.txt found")
 
@@ -220,8 +230,6 @@ class CloudRunner(Runner):
             self.bash2(["chmod", "-R", "o+rw", self.prediction_directory_path])
 
     def start_unstructured(self):
-        self._create_trace_file()
-
         if self.runner_module is None:
             raise RuntimeError("no runner is available for this competition")
 
@@ -263,11 +271,11 @@ class CloudRunner(Runner):
         if self.runner_module is None:
             raise RuntimeError("no runner is available for this competition")
 
-    def _install_r_requirements(self):
+    def _install_r_requirements(self, requirements_r_txt_path: str):
         self.bash("r-apt", ["apt-get", "-qq", "update"])
         self.bash("r-apt", ["apt-get", "-qq", "install", "r-base"])
 
-        with open(self.requirements_r_txt_path, "r") as fd:
+        with open(requirements_r_txt_path, "r") as fd:
             requirements = requirements_parser.parse(fd.read())
 
         apt_names = [
@@ -291,12 +299,12 @@ class CloudRunner(Runner):
         if len(user_site_library_paths):
             self.bash2(["rm", "-r", *user_site_library_paths])
 
-    def _install_python_requirements(self):
+    def _install_python_requirements(self, requirements_txt_path: str):
         constraints_txt_path = self._download_constraints(Language.PYTHON)
         constraints_args: Iterable[str] = ("-c", constraints_txt_path) if constraints_txt_path else []
 
         priority_packages: List[str] = []
-        with open(self.requirements_txt_path) as fd:
+        with open(requirements_txt_path) as fd:
             for line in fd:
                 line = line.strip()
 
@@ -316,7 +324,7 @@ class CloudRunner(Runner):
 
         self.pip([
             *(["--no-build-isolation"] if priority_packages else []),
-            "-r", self.requirements_txt_path,
+            "-r", requirements_txt_path,
             *constraints_args
         ])
 
@@ -468,10 +476,6 @@ class CloudRunner(Runner):
 
         return True
 
-    def _create_trace_file(self):
-        self.bash2(["touch", self.trace_path])
-        self.bash2(["chmod", "o+w", self.trace_path])
-
     def _initialize_state(self):
         state: KwargsLike = {
             "splits": [
@@ -590,122 +594,146 @@ class CloudRunner(Runner):
         parameters: KwargsLike = {},
         install_data_fuse: bool = True,
     ) -> None:
-        try:
-            self._prepare_exit()
+        (
+            trace_file_path,
+            exit_file_path,
+            exit_content,
+        ) = self._prepare_sandbox()
 
-            if install_data_fuse:
-                self.bash2(["chmod", "-R", "a+r", self.data_directory])
-                self._install_permission_fuse()
+        if install_data_fuse:
+            self.bash2(["chmod", "-R", "a+r", self.data_directory])
+            self._install_permission_fuse()
+        else:
+            self.bash2(["chmod", "-R", "a-r", self.data_directory])
+
+        options: KwargsLike = {
+            "competition-name": self.competition.name,
+            "competition-format": self.competition.format.name,
+            "split-key-type": self.competition.split_key_type.name,
+            # ---
+            "data-directory": self.data_directory,
+            # ---
+            "main-file": self.main_file,
+            "code-directory": self.code_directory,
+            "model-directory": self.model_directory_path,
+            "prediction-directory": self.prediction_directory_path,
+            "trace": trace_file_path,
+            "state-file": self.state_file,
+            "ping-url": [
+                urljoin(
+                    store.api_base_url,
+                    "/v1/runner/ping"
+                ),
+                "https://1.1.1.1",  # CloudFlare
+            ],
+            # ---
+            "train": train,
+            "loop-key": loop_key,
+            "embargo": self.embargo,
+            "number-of-features": self.number_of_features,
+            "gpu": self.gpu,
+            # ---
+            "fuse-pid": os.getpid(),
+            "fuse-signal-number": FUSE_SIGNAL.value,
+            "exit-file": exit_file_path,
+            "exit-content": exit_content,
+            # ---
+            "runner-py-file": self.runner_dot_py_file_path,
+            "parameters": json.dumps(parameters),
+        }
+
+        # TODO move to a dedicated function
+        args: List[str] = []
+
+        def append_value(value: Any):
+            if isinstance(value, tuple):
+                for x in value:  # pyright: ignore[reportUnknownVariableType]
+                    args.append(str(x))  # pyright: ignore[reportUnknownArgumentType]
             else:
-                self.bash2(["chmod", "-R", "a-r", self.data_directory])
+                args.append(str(value))
 
-            options: KwargsLike = {
-                "competition-name": self.competition.name,
-                "competition-format": self.competition.format.name,
-                "split-key-type": self.competition.split_key_type.name,
-                # ---
-                "data-directory": self.data_directory,
-                # ---
-                "main-file": self.main_file,
-                "code-directory": self.code_directory,
-                "model-directory": self.model_directory_path,
-                "prediction-directory": self.prediction_directory_path,
-                "trace": self.trace_path,
-                "state-file": self.state_file,
-                "ping-url": [
-                    urljoin(
-                        store.api_base_url,
-                        "/v1/runner/ping"
-                    ),
-                    "https://1.1.1.1",  # CloudFlare
-                ],
-                # ---
-                "train": train,
-                "loop-key": loop_key,
-                "embargo": self.embargo,
-                "number-of-features": self.number_of_features,
-                "gpu": self.gpu,
-                # ---
-                "fuse-pid": os.getpid(),
-                "fuse-signal-number": FUSE_SIGNAL.value,
-                "exit-file": self.exit_file_path,
-                "exit-content": self.exit_content,
-                # ---
-                "runner-py-file": self.runner_dot_py_file_path,
-                "parameters": json.dumps(parameters),
-            }
+        for key, value in options.items():
+            if value is None:
+                continue
 
-            # TODO move to a dedicated function
-            args: List[str] = []
+            if isinstance(value, bool):
+                value = str(value).lower()
 
-            def append_value(value: Any):
-                if isinstance(value, tuple):
-                    for x in value:  # pyright: ignore[reportUnknownVariableType]
-                        args.append(str(x))  # pyright: ignore[reportUnknownArgumentType]
-                else:
-                    args.append(str(value))
-
-            for key, value in options.items():
-                if value is None:
-                    continue
-
-                if isinstance(value, bool):
-                    value = str(value).lower()
-
-                if isinstance(value, list):
-                    for item in value:  # pyright: ignore[reportUnknownVariableType]
-                        args.append(f"--{key}")
-                        append_value(item)
-                else:
+            if isinstance(value, list):
+                for item in value:  # pyright: ignore[reportUnknownVariableType]
                     args.append(f"--{key}")
-                    append_value(value)
+                    append_value(item)
+            else:
+                args.append(f"--{key}")
+                append_value(value)
 
-            self.do_bash(
-                [
-                    "sandbox",
-                    "--verbose",
-                    "--chown-directory", self.model_directory_path,
-                    "--filter-non-unix-socket-syscall",
-                    "--",
-                    "prefix", "user-code",
-                    "--",
-                    "python3", "-u",
-                    "-m", "crunch", "runner", "cloud-executor",
-                    *args
-                ],
-                {
-                    **self.venv_env,
-                    "CRUNCH_AUTO_MONKEY_PATCH": "true",
-                }
-            )
+        self.do_bash(
+            [
+                "sandbox",
+                "--chown-directory", self.model_directory_path,
+                # "--filter-non-unix-socket-syscall",
+                "--",
+                "prefix", "user-code",
+                "--",
+                "python3", "-u",
+                "-m", "crunch", "runner", "cloud-executor",
+                *args
+            ],
+            {
+                **self.venv_env,
+                "CRUNCH_AUTO_MONKEY_PATCH": "true",
+            }
+        )
 
-            self._validate_exit()
-        except SystemExit:
-            self.report_error_trace()
-            raise
+        self._validate_sandbox_exit(
+            trace_file_path,
+            exit_file_path,
+            exit_content
+        )
 
-    def _prepare_exit(self):
-        if not os.path.exists(self.exit_file_path):
-            self.bash2(["touch", self.exit_file_path])
+    def _prepare_sandbox(self):
+        sandbox_id = str(uuid4())
 
-        if (os.stat(self.exit_file_path).st_mode & S_IWALL) != S_IWALL:
-            self.bash2(["chmod", "a+w", self.exit_file_path])
+        this_sandbox_directory_path = os.path.join(self.sandboxes_directory_path, sandbox_id)
+        os.makedirs(this_sandbox_directory_path)  # TODO delete?
+        os.chmod(this_sandbox_directory_path, S_IWXALL)
 
-        # truncate
-        open(self.exit_file_path, "w").close()
+        trace_file_path = os.path.join(this_sandbox_directory_path, f"trace.txt")
+        exit_file_path = os.path.join(this_sandbox_directory_path, f"exit.txt")
 
-        self.exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+        exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
-    def _validate_exit(self):
-        expected_content = cast(str, self.exit_content)
-        self.exit_content = None
+        return (
+            trace_file_path,
+            exit_file_path,
+            exit_content,
+        )
 
-        with open(self.exit_file_path) as fd:
-            got_content = fd.read()
+    def _validate_sandbox_exit(
+        self,
+        trace_file_path: str,
+        exit_file_path: str,
+        exit_content: str
+    ):
+        if os.path.exists(trace_file_path):
+            with open(trace_file_path) as fd:
+                trace_content = fd.read()
 
-        if got_content != expected_content:
-            self.log(f"[debug] failed exit check - expected=`{expected_content}` got=`{got_content[:len(expected_content) * 2]}`", error=True)
-            raise RuntimeError("user code exited prematurely")
+            if not len(trace_content):
+                trace_content = "(no trace content)"
+
+            exit(1)
+
+        if os.path.exists(exit_file_path):
+            with open(exit_file_path) as fd:
+                got_content = fd.read()
+        else:
+            got_content = "(missing)"
+
+        if got_content != exit_content:
+            self.log(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content[:len(exit_content) * 2]}`", error=True)
+            self.log("user code ended prematurely, likely running out of memory or silently calling exit", error=True)
+            exit(1)
 
     def _install_permission_fuse(self):
         def call_chmod(mode: str):
@@ -760,13 +788,9 @@ class CloudRunner(Runner):
             progress_bar=False,
         )
 
-    def report_error_trace(self):
+    def report_error_trace(self, trace_content: str):
         try:
-            trace = "<no trace>"
-            with open(self.trace_path) as fd:
-                trace = fd.read()
-
-            self.run.report_error(trace)
+            self.run.report_error(trace_content)
 
             self.log("error trace reported")
         except BaseException as ignored:
