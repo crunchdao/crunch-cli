@@ -3,12 +3,13 @@ import os
 import re
 import sys
 import traceback
+from typing import Optional
 
 from . import constants
 
 _patchers = []
 
-SHOULD_PRINT_PID_WHEN_POSSIBLE = False
+SHOULD_PRINT_PREFIX_WHEN_POSSIBLE: Optional[str] = None
 
 
 def _patcher(f):
@@ -73,9 +74,8 @@ def tqdm_display():
         if not msg:
             msg = str(self).replace("|| ", " - ")
 
-        if SHOULD_PRINT_PID_WHEN_POSSIBLE:
-            pid = os.getpid()
-            print(f"[tqdm:{pid}/{pos}] {msg}")
+        if SHOULD_PRINT_PREFIX_WHEN_POSSIBLE is not None:
+            print(f"[{SHOULD_PRINT_PREFIX_WHEN_POSSIBLE}] [tqdm:{pos}] {msg}")
         else:
             print(f"[tqdm:{pos}] {msg}")
 
