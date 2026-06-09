@@ -15,7 +15,6 @@ from urllib.parse import urljoin
 from uuid import uuid4
 
 import requests
-from crunch_convert import RequirementLanguage
 
 import crunch.store as store
 import requirements as requirements_parser
@@ -163,7 +162,7 @@ class CloudRunner(Runner):
         model_file_urls = self.run.model
 
         if "install r requirements":
-            requirements_r_txt_name = RequirementLanguage.R.txt_file_name
+            requirements_r_txt_name = "requirements.r.txt"
             requirements_r_txt_url = code_file_urls.pop(requirements_r_txt_name, None)
             if requirements_r_txt_url is not None:
                 requirements_r_txt_path = os.path.join(self.context_directory, requirements_r_txt_name)
@@ -179,7 +178,7 @@ class CloudRunner(Runner):
                     self._install_r_requirements(requirements_r_txt_path)
 
         if "install python requirements":
-            requirements_txt_name = RequirementLanguage.PYTHON.txt_file_name
+            requirements_txt_name = "requirements.txt"
             requirements_txt_url = code_file_urls.pop(requirements_txt_name, None)
             if requirements_txt_url is not None:
                 requirements_txt_path = os.path.join(self.context_directory, requirements_txt_name)
