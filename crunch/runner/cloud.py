@@ -674,7 +674,7 @@ class CloudRunner(Runner):
             [
                 "sandbox",
                 "--chown-directory", self.model_directory_path,
-                # "--filter-non-unix-socket-syscall",
+                "--filter-non-unix-socket-syscall",
                 "--",
                 "prefix", "user-code",
                 "--",
