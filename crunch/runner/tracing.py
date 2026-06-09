@@ -218,7 +218,12 @@ class RunnerTracer:
         self,
         description: str,
         attributes: Optional[Attributes] = None,
+        skip: bool = False,
     ):
+        if skip:
+            yield
+            return
+
         previous_parent_id = self._current_parent_id
 
         span_id = self.next_span_id()

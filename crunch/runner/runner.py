@@ -78,5 +78,5 @@ class Runner(ABC):
     ) -> Literal[True]:
         ...
 
-    def _span(self, description: str, attributes: Optional[Dict[str, Any]] = None):
-        return self.tracer.span(description, attributes=attributes)
+    def _span(self, description: str, attributes: Optional[Dict[str, Any]] = None, skip: bool = False):
+        return self.tracer.span(description, attributes=attributes, skip=skip)

@@ -967,6 +967,7 @@ class CloudRunnerContext(RunnerContext):
         *,
         command: str,
         parameters: Optional[KwargsLike] = None,
+        trace: bool = True,
         span_hidden_parameters: Optional[List[str]] = None,
         span_attributes: Optional[KwargsLike] = None,
         install_data_fuse: bool = True,
@@ -974,7 +975,7 @@ class CloudRunnerContext(RunnerContext):
         self.log(f"executing - command={command}")
 
         span_attributes = to_execute_span_attributes(command, parameters, span_hidden_parameters, span_attributes)
-        with self.runner._span(f"execute", attributes=span_attributes):  # pyright: ignore[reportPrivateUsage]
+        with self.runner._span(f"execute", attributes=span_attributes, skip=not trace):  # pyright: ignore[reportPrivateUsage]
             self.runner.sandbox(
                 self.runner.force_first_train,
                 command,
