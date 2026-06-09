@@ -7,14 +7,17 @@ import stat
 import string
 import subprocess
 import sys
-import time
+from time import sleep
 from datetime import timedelta
-from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple, Union, cast
+from multiprocessing import Lock
+from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple, Union
 from urllib.parse import urljoin
 from uuid import uuid4
 
-import crunch.store as store
 import requests
+from crunch_convert import RequirementLanguage
+
+import crunch.store as store
 import requirements as requirements_parser
 from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
@@ -24,7 +27,6 @@ from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext
 from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
 from crunch.utils import download
-from crunch_convert import RequirementLanguage
 
 UploadedFiles = Dict[str, Upload]
 LastModifications = Dict[str, int]
@@ -145,6 +147,8 @@ class CloudRunner(Runner):
 
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
+
+        self._error_reported_fuse = Lock()
 
     def initialize(self):
         if self.competition_format != CompetitionFormat.UNSTRUCTURED:
@@ -373,7 +377,7 @@ class CloudRunner(Runner):
                     retry_in = self.retry_seconds * retry
 
                     self.log(f"retrying in {retry_in} second(s)")
-                    time.sleep(retry_in)
+                    sleep(retry_in)
 
                 try:
                     self._upload_prediction_files(prediction_uploads)
@@ -496,7 +500,7 @@ class CloudRunner(Runner):
         self,
         arguments: List[str],
         env_vars: Optional[Dict[str, Optional[str]]] = None
-    ):
+    ) -> int:
         env = None
         if env_vars:
             env = os.environ.copy()
@@ -513,10 +517,7 @@ class CloudRunner(Runner):
             cwd=self.code_directory,
         )
 
-        code = process.wait()
-        if code != 0:
-            self.log(f"command not exited correctly: {code}", error=True)
-            exit(code)
+        return process.wait()
 
     def bash(
         self,
@@ -531,7 +532,10 @@ class CloudRunner(Runner):
             *arguments
         ]
 
-        self.do_bash(arguments, env)
+        code = self.do_bash(arguments, env)
+        if code != 0:
+            self.log(f"command not exited correctly: {code}", error=True)
+            exit(code)
 
     def bash2(
         self,
@@ -667,7 +671,7 @@ class CloudRunner(Runner):
                 args.append(f"--{key}")
                 append_value(value)
 
-        self.do_bash(
+        exit_code = self.do_bash(
             [
                 "sandbox",
                 "--chown-directory", self.model_directory_path,
@@ -686,6 +690,7 @@ class CloudRunner(Runner):
         )
 
         self._validate_sandbox_exit(
+            exit_code,
             trace_file_path,
             exit_file_path,
             exit_content
@@ -711,9 +716,10 @@ class CloudRunner(Runner):
 
     def _validate_sandbox_exit(
         self,
+        exit_code: int,
         trace_file_path: str,
         exit_file_path: str,
-        exit_content: str
+        exit_content: str,
     ):
         if os.path.exists(trace_file_path):
             with open(trace_file_path) as fd:
@@ -722,7 +728,9 @@ class CloudRunner(Runner):
             if not len(trace_content):
                 trace_content = "(no trace content)"
 
-            exit(1)
+            self.report_error_trace(trace_content)
+
+            exit(exit_code)
 
         if os.path.exists(exit_file_path):
             with open(exit_file_path) as fd:
@@ -733,7 +741,11 @@ class CloudRunner(Runner):
         if got_content != exit_content:
             self.log(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content[:len(exit_content) * 2]}`", error=True)
             self.log("user code ended prematurely, likely running out of memory or silently calling exit", error=True)
-            exit(1)
+            exit(exit_code)
+
+        if exit_code != 0:
+            self.log(f"user code exited with code {exit_code}", error=True)
+            exit(exit_code)
 
     def _install_permission_fuse(self):
         def call_chmod(mode: str):
@@ -789,6 +801,10 @@ class CloudRunner(Runner):
         )
 
     def report_error_trace(self, trace_content: str):
+        if not self._error_reported_fuse.acquire(block=False):
+            self.log("error trace not reported (already reported by another process)")
+            return
+
         try:
             self.run.report_error(trace_content)
 

@@ -4,6 +4,7 @@ import time
 from typing import Any, List, Literal, Optional
 
 import click
+
 import crunch.monkey_patches as monkey_patches
 import crunch.tester as tester
 from crunch.api import Competition, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
@@ -92,7 +93,7 @@ class LocalRunner(Runner):
         os.makedirs(self.prediction_directory_path, exist_ok=True)
 
         with self.tracer.span("download data"):
-             self._download_data()
+            self._download_data()
 
     def _download_data(self):
         try:
