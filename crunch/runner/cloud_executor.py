@@ -69,6 +69,9 @@ class SandboxExecutor:
         self.parameters = parameters
 
     def signal_permission_fuse(self):
+        if self.fuse_pid == 0:
+            return  # fuse not installed
+
         first_file_path = next(iter(os.listdir(self.data_directory_path)), None)
         if not first_file_path:
             return  # no data?

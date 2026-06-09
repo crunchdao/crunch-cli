@@ -637,7 +637,7 @@ class CloudRunner(Runner):
             "number-of-features": self.number_of_features,
             "gpu": self.gpu,
             # ---
-            "fuse-pid": os.getpid(),
+            "fuse-pid": os.getpid() if install_data_fuse else 0,
             "fuse-signal-number": FUSE_SIGNAL.value,
             "exit-file": exit_file_path,
             "exit-content": exit_content,
