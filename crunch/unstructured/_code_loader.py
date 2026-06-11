@@ -3,6 +3,9 @@ from abc import ABC, abstractmethod
 from types import ModuleType
 from typing import Any, Callable, Literal, Optional
 
+import requests
+from retry import retry
+
 import crunch.store as store
 
 ModuleFileName = Literal["leaderboard", "reward", "runner", "scoring", "submission"]
@@ -101,8 +104,10 @@ class GithubCodeLoader(CodeLoader):
 
     @property
     def source(self):
-        import requests
+        return self._fetch()
 
+    @retry(requests.RequestException, tries=3, delay=2, logger=None)
+    def _fetch(self):
         response = requests.get(
             self._url,
             headers={
