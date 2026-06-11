@@ -61,6 +61,8 @@ class LocalRunner(Runner):
         try:
             return super().start()
         finally:
+            self.log("")
+
             self.log(
                 "duration - time=%s" % (
                     time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
