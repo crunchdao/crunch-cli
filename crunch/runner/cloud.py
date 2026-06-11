@@ -801,16 +801,16 @@ class CloudRunner(Runner):
 
     def report_error_trace(self, trace_content: str):
         if not self._error_reported_fuse.acquire(block=False):
-            self.log("error trace not reported (already reported by another process)")
+            self.log("[debug] error trace not reported (already reported by another process)")
             return
 
         try:
             self.run.report_error(trace_content)
 
-            self.log("error trace reported")
+            self.log("[debug] error trace reported")
         except BaseException as ignored:
             self.log(
-                f"ignored exception when reporting error trace: {type(ignored).__name__}({ignored})",
+                f"[debug] ignored exception when reporting error trace: {type(ignored).__name__}({ignored})",
                 error=True
             )
 
