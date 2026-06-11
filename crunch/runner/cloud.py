@@ -10,7 +10,7 @@ import sys
 from datetime import timedelta
 from multiprocessing import Lock
 from time import sleep
-from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -18,7 +18,7 @@ import requests
 
 import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Client, Competition, CompetitionFormat, DataReleaseSplitGroup, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
+from crunch.api import Client, Competition, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
 from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
@@ -123,8 +123,6 @@ class CloudRunner(Runner):
         self.venv_directory = venv_directory
 
         self.sandboxes_directory_path = os.path.join(context_directory, "sandbox")
-        os.makedirs(self.sandboxes_directory_path, exist_ok=True)
-        os.chmod(self.sandboxes_directory_path, S_IXALL)
 
         self.data_directory = data_directory
         self.code_directory = code_directory
@@ -148,11 +146,10 @@ class CloudRunner(Runner):
         self._error_reported_fuse = Lock()
 
     def initialize(self):
-        if self.competition_format != CompetitionFormat.UNSTRUCTURED:
-            raise NotImplementedError(f"{self.competition_format.name} format is not supported anymore.")
-
         os.makedirs(self.scoring_directory, exist_ok=True)
         os.makedirs(self.code_directory, exist_ok=True)
+        os.makedirs(self.sandboxes_directory_path, exist_ok=True)
+        os.chmod(self.sandboxes_directory_path, S_IXALL)
 
         self._download_runner()
 
@@ -211,7 +208,7 @@ class CloudRunner(Runner):
             )
 
         with self._span("downloading model"):
-            self.bash2(["mkdir", "-p", self.model_directory_path])
+            os.makedirs(self.model_directory_path, exist_ok=True)
 
             self.has_model = len(model_file_urls) != 0
 
@@ -224,7 +221,7 @@ class CloudRunner(Runner):
             self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
 
         if "prepare prediction directory...":
-            self.bash2(["mkdir", "-p", self.prediction_directory_path])
+            os.makedirs(self.prediction_directory_path, exist_ok=True)
             self.delete_content(self.prediction_directory_path)
             self.bash2(["chmod", "-R", "o+rw", self.prediction_directory_path])
 
@@ -573,7 +570,7 @@ class CloudRunner(Runner):
     def sandbox(
         self,
         train: bool,
-        loop_key: Union[int, str],
+        command: str,
         parameters: KwargsLike = {},
         install_data_fuse: bool = True,
     ) -> None:
@@ -590,9 +587,7 @@ class CloudRunner(Runner):
             self.bash2(["chmod", "-R", "a-r", self.data_directory])
 
         options: KwargsLike = {
-            "competition-name": self.competition.name,
-            "competition-format": self.competition.format.name,
-            "split-key-type": self.competition.split_key_type.name,
+            "competition": self.competition.name,
             # ---
             "data-directory": self.data_directory,
             # ---
@@ -610,7 +605,6 @@ class CloudRunner(Runner):
             ],
             # ---
             "train": train,
-            "loop-key": loop_key,
             "gpu": self.gpu,
             # ---
             "fuse-pid": os.getpid() if install_data_fuse else 0,
@@ -619,6 +613,7 @@ class CloudRunner(Runner):
             "exit-content": exit_content,
             # ---
             "runner-py-file": self.runner_dot_py_file_path,
+            "command": command,
             "parameters": json.dumps(parameters),
         }
 

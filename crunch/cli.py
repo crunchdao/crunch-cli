@@ -699,9 +699,7 @@ def cloud(
 
 
 @runner_group.command(help="Cloud executor, do not directly run!")
-@click.option("--competition-name", required=True)
-@click.option("--competition-format", "competition_format_raw", required=True)
-@click.option("--split-key-type", "split_key_type_raw", required=True)
+@click.option("--competition", "competition_name", required=True)
 # ---
 @click.option("--data-directory", "data_directory_path", default=None)
 @click.option("--main-file", required=True)
@@ -712,7 +710,6 @@ def cloud(
 @click.option("--ping-url", "ping_urls", multiple=True)
 # ---
 @click.option("--train", required=True, type=bool)
-@click.option("--loop-key", required=True, type=str)
 @click.option("--gpu", required=True, type=bool)
 # ---
 @click.option("--fuse-pid", required=True, type=int)
@@ -721,11 +718,10 @@ def cloud(
 @click.option("--exit-content", required=True, type=str)
 # ---
 @click.option("--runner-py-file", "runner_dot_py_file_path", type=str, required=True)
+@click.option("--command", "command_name", type=str, required=True)
 @click.option("--parameters", "parameters_json_string", type=str, required=True)
 def cloud_executor(
     competition_name: str,
-    competition_format_raw: str,
-    split_key_type_raw: str,
     # ---
     data_directory_path: str,
     main_file: str,
@@ -736,7 +732,6 @@ def cloud_executor(
     ping_urls: List[str],
     # ---
     train: bool,
-    loop_key: Union[str, int],
     gpu: bool,
     # ---
     fuse_pid: int,
@@ -745,6 +740,7 @@ def cloud_executor(
     exit_content: str,
     # ---
     runner_dot_py_file_path: str,
+    command_name: str,
     parameters_json_string: str,
 ):
     from .runner import is_inside
@@ -755,16 +751,9 @@ def cloud_executor(
     from . import monkey_patches
     monkey_patches.apply_all()
 
-    competition_format = api.CompetitionFormat[competition_format_raw]
-
-    split_key_type = api.SplitKeyType[split_key_type_raw]
-    if competition_format != CompetitionFormat.UNSTRUCTURED and split_key_type == api.SplitKeyType.INTEGER:
-        loop_key = int(loop_key)
-
     from .runner.cloud_executor import SandboxExecutor
     executor = SandboxExecutor(
         competition_name,
-        competition_format,
         # ---
         data_directory_path,
         main_file,
@@ -775,13 +764,13 @@ def cloud_executor(
         ping_urls,
         # ---
         train,
-        loop_key,
         gpu,
         # ---
         fuse_pid,
         fuse_signal_number,
         # ---
         runner_dot_py_file_path,
+        command_name,
         json.loads(parameters_json_string) if parameters_json_string else {},
     )
 

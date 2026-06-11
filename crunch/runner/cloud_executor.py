@@ -1,14 +1,13 @@
 import os
 import sys
-import time
 import traceback
 from functools import cached_property
+from time import sleep
 from types import ModuleType
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Tuple
 
 import requests
 
-from crunch.api import CompetitionFormat
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerExecutorContext, UserModule
 from crunch.unstructured import LocalCodeLoader, RunnerModule
@@ -20,7 +19,6 @@ class SandboxExecutor:
     def __init__(
         self,
         competition_name: str,
-        competition_format: CompetitionFormat,
         # ---
         data_directory_path: str,
         main_file: str,
@@ -31,17 +29,16 @@ class SandboxExecutor:
         ping_urls: List[str],
         # ---
         train: bool,
-        loop_key: Union[int, str],
         gpu: bool,
         # ---
         fuse_pid: int,
         fuse_signal_number: int,
         # ---
         runner_dot_py_file_path: str,
+        command: str,
         parameters: KwargsLike,
     ):
         self.competition_name = competition_name
-        self.competition_format = competition_format
 
         self.data_directory_path = data_directory_path
         self.main_file = main_file
@@ -52,13 +49,13 @@ class SandboxExecutor:
         self.ping_urls = ping_urls
 
         self.train = train
-        self.loop_key = loop_key
         self.gpu = gpu
 
         self.fuse_pid = fuse_pid
         self.fuse_signal_number = fuse_signal_number
 
         self.runner_dot_py_file_path = runner_dot_py_file_path
+        self.command = command
         self.parameters = parameters
 
     def signal_permission_fuse(self):
@@ -73,12 +70,12 @@ class SandboxExecutor:
 
         os.kill(self.fuse_pid, self.fuse_signal_number)
 
-        time.sleep(0.1)
+        sleep(0.1)
         for _ in range(10):
             if not os.access(test_path, os.R_OK):
                 break
 
-            time.sleep(1)
+            sleep(1)
             print(f"[debug] fuse not yet triggered - test_path=`{test_path}`", file=sys.stderr)
         else:
             print("fuse never triggered", file=sys.stderr)
@@ -88,9 +85,6 @@ class SandboxExecutor:
         self._ping(self.ping_urls)
 
         try:
-            if self.competition_format != CompetitionFormat.UNSTRUCTURED:
-                raise NotImplementedError(f"{self.competition_format.name} format is not supported anymore.")
-
             self._process_unstructured()
         except BaseException:
             self.write_trace(sys.exc_info())
@@ -114,8 +108,6 @@ class SandboxExecutor:
         return load_user_code(main_file_path)
 
     def _process_unstructured(self) -> None:
-        assert self.runner_dot_py_file_path is not None
-
         loader = LocalCodeLoader(path=self.runner_dot_py_file_path)
         runner_module = RunnerModule.load(loader)
         assert runner_module is not None
@@ -131,11 +123,9 @@ class SandboxExecutor:
             prediction_directory_path=self.prediction_directory_path,
         )
 
-        command = str(self.loop_key)  # TODO Don't repurpose loop-key and use a dedicated property
-
-        handler = handlers.get(command)
+        handler = handlers.get(self.command)
         if handler is None:
-            raise ValueError(f"command `{command}` not found")
+            raise ValueError(f"command `{self.command}` not found")
 
         smart_call(
             handler,
