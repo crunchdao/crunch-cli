@@ -39,19 +39,29 @@ CONFLICTING_GPU_PACKAGES = [
 ]
 
 """
+Read permissions for current user, current group and others.
+"""
+MODE_READ_ALL = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+
+"""
 Write permissions for current user, current group and others.
 """
-S_IWALL = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+MODE_WRITE_ALL = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
 
 """
-Traverse permissions for current user, current group and others.
+Execute/traverse permissions for current user, current group and others.
 """
-S_IXALL = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+MODE_EXECUTE_ALL = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
 
 """
-Write and traverse permissions for current user, current group and others.
+Write and execute/traverse permissions for current user, current group and others.
 """
-S_IWXALL = S_IWALL | S_IXALL
+MODE_WRITE_AND_EXECUTE_ALL = MODE_WRITE_ALL | MODE_EXECUTE_ALL
+
+"""
+Read and execute/traverse permissions for current user, current group and others.
+"""
+MODE_READ_AND_EXECUTE_ALL = MODE_READ_ALL | MODE_EXECUTE_ALL
 
 """
 group + other  = (null)
@@ -146,10 +156,13 @@ class CloudRunner(Runner):
         self._error_reported_fuse = Lock()
 
     def initialize(self):
+        os.makedirs(self.data_directory, exist_ok=True)
         os.makedirs(self.scoring_directory, exist_ok=True)
         os.makedirs(self.code_directory, exist_ok=True)
         os.makedirs(self.sandboxes_directory_path, exist_ok=True)
-        os.chmod(self.sandboxes_directory_path, S_IXALL)
+
+        os.chmod(self.data_directory, MODE_READ_AND_EXECUTE_ALL)
+        os.chmod(self.sandboxes_directory_path, MODE_WRITE_AND_EXECUTE_ALL)
 
         self._download_runner()
 
@@ -257,7 +270,7 @@ class CloudRunner(Runner):
             with open(self.runner_dot_py_file_path, "w") as fd:
                 fd.write(source)
 
-            self.bash2(["chmod", "a+r", self.runner_dot_py_file_path])
+            os.chmod(self.runner_dot_py_file_path, MODE_READ_ALL)
 
             loader = LocalCodeLoader(path=self.runner_dot_py_file_path)
         elif isinstance(loader, LocalCodeLoader):  # type: ignore
@@ -564,7 +577,15 @@ class CloudRunner(Runner):
 
         self.recursive_bash(
             directory_path,
-            ["rm", "-rf", "{}"]
+            ["rm", "-rf", "{}"],
+        )
+
+    def change_data_permissions(self, *, can_access: bool):
+        mode = "a+r" if can_access else CHMOD_RESET
+
+        self.recursive_bash(
+            self.data_directory,
+            ["chmod", mode, "-R", "{}"],
         )
 
     def sandbox(
@@ -581,10 +602,9 @@ class CloudRunner(Runner):
         ) = self._prepare_sandbox()
 
         if install_data_fuse:
-            self.bash2(["chmod", "-R", "a+r", self.data_directory])
             self._install_permission_fuse()
         else:
-            self.bash2(["chmod", "-R", "a-r", self.data_directory])
+            self.change_data_permissions(can_access=False)
 
         options: KwargsLike = {
             "competition": self.competition.name,
@@ -672,7 +692,7 @@ class CloudRunner(Runner):
 
         this_sandbox_directory_path = os.path.join(self.sandboxes_directory_path, sandbox_id)
         os.makedirs(this_sandbox_directory_path)  # TODO delete?
-        os.chmod(this_sandbox_directory_path, S_IWXALL)
+        os.chmod(this_sandbox_directory_path, MODE_WRITE_AND_EXECUTE_ALL)
 
         trace_file_path = os.path.join(this_sandbox_directory_path, f"trace.txt")
         exit_file_path = os.path.join(this_sandbox_directory_path, f"exit.txt")
@@ -719,18 +739,12 @@ class CloudRunner(Runner):
             exit(exit_code)
 
     def _install_permission_fuse(self):
-        def call_chmod(mode: str):
-            self.recursive_bash(
-                self.data_directory,
-                ["chmod", mode, "-R", "{}"],
-            )
-
-        call_chmod("o+r")
+        self.change_data_permissions(can_access=True)
 
         def on_signal(signum: int, stack: Any):
             signal.signal(FUSE_SIGNAL, signal.SIG_DFL)
 
-            call_chmod(CHMOD_RESET)
+            self.change_data_permissions(can_access=False)
 
             self.log("[debug] fuse triggered")
 
