@@ -8,34 +8,11 @@ def _get_data_urls(
     round: api.Round,
     data_directory_path: str,
     size_variant: api.SizeVariant,
-) -> typing.Tuple[
-    int,
-    int,
-    typing.List[api.SplitKeyPythonType],
-    typing.Dict[str, downloader.PreparedDataFile]
-]:
+) -> typing.Dict[str, downloader.PreparedDataFile]:
     data_release = round.phases.get_submission().get_data_release(size_variant=size_variant)
-
-    embargo = data_release.embargo
-    number_of_features = data_release.number_of_features
     data_files = data_release.data_files
-    splits = data_release.splits
 
-    split_keys = [
-        split.key
-        for split in splits
-        if (
-            split.group == api.DataReleaseSplitGroup.TEST
-            and split.reduced is not None
-        )
-    ]
-
-    return (
-        embargo,
-        number_of_features,
-        split_keys,
-        downloader.prepare_all(data_directory_path, data_files),
-    )
+    return downloader.prepare_all(data_directory_path, data_files)
 
 
 def download(
@@ -77,12 +54,7 @@ def download(
     data_directory_path = constants.DOT_DATA_DIRECTORY
     os.makedirs(data_directory_path, exist_ok=True)
 
-    (
-        embargo,
-        number_of_features,
-        split_keys,
-        prepared_data_files,
-    ) = _get_data_urls(
+    prepared_data_files = _get_data_urls(
         round,
         data_directory_path,
         size_variant,
@@ -100,9 +72,6 @@ def download(
     )
 
     return (
-        embargo,
-        number_of_features,
-        split_keys,
         data_directory_path,
         file_paths,
     )

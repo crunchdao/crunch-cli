@@ -713,8 +713,6 @@ def cloud(
 # ---
 @click.option("--train", required=True, type=bool)
 @click.option("--loop-key", required=True, type=str)
-@click.option("--embargo", required=True, type=int)
-@click.option("--number-of-features", required=True, type=int)
 @click.option("--gpu", required=True, type=bool)
 # ---
 @click.option("--fuse-pid", required=True, type=int)
@@ -739,8 +737,6 @@ def cloud_executor(
     # ---
     train: bool,
     loop_key: Union[str, int],
-    embargo: int,
-    number_of_features: int,
     gpu: bool,
     # ---
     fuse_pid: int,
@@ -780,8 +776,6 @@ def cloud_executor(
         # ---
         train,
         loop_key,
-        embargo,
-        number_of_features,
         gpu,
         # ---
         fuse_pid,

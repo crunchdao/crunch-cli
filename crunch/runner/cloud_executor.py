@@ -32,8 +32,6 @@ class SandboxExecutor:
         # ---
         train: bool,
         loop_key: Union[int, str],
-        embargo: int,
-        number_of_features: int,
         gpu: bool,
         # ---
         fuse_pid: int,
@@ -55,8 +53,6 @@ class SandboxExecutor:
 
         self.train = train
         self.loop_key = loop_key
-        self.embargo = embargo
-        self.number_of_features = number_of_features
         self.gpu = gpu
 
         self.fuse_pid = fuse_pid

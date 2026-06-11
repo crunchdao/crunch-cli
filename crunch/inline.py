@@ -84,9 +84,6 @@ class _Inline:
 
         try:
             (
-                _,  # embargo
-                _,  # number of features
-                _,  # split keys
                 data_directory_path,
                 _,
             ) = download(

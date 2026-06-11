@@ -98,9 +98,6 @@ class LocalRunner(Runner):
     def _download_data(self):
         try:
             (
-                self.embargo,
-                self.number_of_features,
-                self.keys,
                 self.data_directory_path,
                 self.data_paths,
             ) = download(

@@ -611,8 +611,6 @@ class CloudRunner(Runner):
             # ---
             "train": train,
             "loop-key": loop_key,
-            "embargo": self.embargo,
-            "number-of-features": self.number_of_features,
             "gpu": self.gpu,
             # ---
             "fuse-pid": os.getpid() if install_data_fuse else 0,
@@ -757,16 +755,7 @@ class CloudRunner(Runner):
     def prepare_data(self):
         data_release = self.run.data
 
-        self.embargo = data_release.embargo
-        self.number_of_features = data_release.number_of_features
-        self.splits = data_release.splits
         data_files = data_release.data_files
-
-        self.keys = sorted([
-            split.key
-            for split in self.splits
-            if split.group == DataReleaseSplitGroup.TEST
-        ])
 
         save_all(
             prepare_all(
