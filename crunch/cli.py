@@ -595,7 +595,6 @@ def local(
 # ---
 @click.option("--context-directory", envvar="CONTEXT_DIRECTORY", default="/context")
 @click.option("--scoring-directory", envvar="SCORING_DIRECTORY", default="{context}/scoring")
-@click.option("--state-file", envvar="STATE_FILE", default="{context}/state.json")
 @click.option("--venv-directory", envvar="VENV_DIRECTORY", default="{context}/venv")
 @click.option("--data-directory", envvar="DATA_DIRECTORY", default="{context}/data")
 @click.option("--code-directory", envvar="CODE_DIRECTORY", default="{context}/code")
@@ -621,7 +620,6 @@ def cloud(
     # ---
     context_directory: str,
     scoring_directory: str,
-    state_file: str,
     venv_directory: str,
     data_directory: str,
     code_directory: str,
@@ -659,7 +657,6 @@ def cloud(
     scoring_directory = scoring_directory.replace("{context}", context_directory)
     data_directory = data_directory.replace("{context}", context_directory)
     venv_directory = venv_directory.replace("{context}", context_directory)
-    state_file = state_file.replace("{context}", context_directory)
 
     model_directory_path = os.path.join(code_directory, model_directory)
 
@@ -677,7 +674,6 @@ def cloud(
         # ---
         context_directory,
         scoring_directory,
-        state_file,
         venv_directory,
         data_directory,
         code_directory,
@@ -713,7 +709,6 @@ def cloud(
 @click.option("--model-directory", "model_directory_path", required=True)
 @click.option("--prediction-directory", "prediction_directory_path", required=True)
 @click.option("--trace", "trace_path", required=True)
-@click.option("--state-file", "state_file", required=True)
 @click.option("--ping-url", "ping_urls", multiple=True)
 # ---
 @click.option("--train", required=True, type=bool)
@@ -740,7 +735,6 @@ def cloud_executor(
     model_directory_path: str,
     prediction_directory_path: str,
     trace_path: str,
-    state_file: str,
     ping_urls: List[str],
     # ---
     train: bool,
@@ -782,7 +776,6 @@ def cloud_executor(
         model_directory_path,
         prediction_directory_path,
         trace_path,
-        state_file,
         ping_urls,
         # ---
         train,

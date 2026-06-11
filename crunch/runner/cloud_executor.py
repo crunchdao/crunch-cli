@@ -1,15 +1,14 @@
-import json
 import os
 import sys
 import time
 import traceback
 from functools import cached_property
 from types import ModuleType
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Tuple, Union
 
 import requests
 
-from crunch.api import CompetitionFormat, DataReleaseSplit
+from crunch.api import CompetitionFormat
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerExecutorContext, UserModule
 from crunch.unstructured import LocalCodeLoader, RunnerModule
@@ -29,7 +28,6 @@ class SandboxExecutor:
         model_directory_path: str,
         prediction_directory_path: str,
         trace_path: str,
-        state_file: str,
         ping_urls: List[str],
         # ---
         train: bool,
@@ -53,7 +51,6 @@ class SandboxExecutor:
         self.model_directory_path = model_directory_path
         self.prediction_directory_path = prediction_directory_path
         self.trace_path = trace_path
-        self.state_file = state_file
         self.ping_urls = ping_urls
 
         self.train = train
@@ -93,11 +90,6 @@ class SandboxExecutor:
 
     def start(self):
         self._ping(self.ping_urls)
-
-        with open(self.state_file, "r") as fd:
-            self.state = json.load(fd)
-
-        self.splits: List[DataReleaseSplit] = DataReleaseSplit.from_dict_array(self.state["splits"])
 
         try:
             if self.competition_format != CompetitionFormat.UNSTRUCTURED:

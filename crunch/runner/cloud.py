@@ -7,9 +7,9 @@ import stat
 import string
 import subprocess
 import sys
-from time import sleep
 from datetime import timedelta
 from multiprocessing import Lock
+from time import sleep
 from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple, Union
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -84,7 +84,6 @@ class CloudRunner(Runner):
         # ---
         context_directory: str,
         scoring_directory: str,
-        state_file: str,
         venv_directory: str,
         data_directory: str,
         code_directory: str,
@@ -121,7 +120,6 @@ class CloudRunner(Runner):
 
         self.context_directory = context_directory
         self.scoring_directory = scoring_directory
-        self.state_file = state_file
         self.venv_directory = venv_directory
 
         self.sandboxes_directory_path = os.path.join(context_directory, "sandbox")
@@ -204,8 +202,6 @@ class CloudRunner(Runner):
 
         with self._span("downloading data"):
             self.prepare_data()
-
-            self._initialize_state()
 
         with self._span("downloading code"):
             _download_files(
@@ -479,22 +475,6 @@ class CloudRunner(Runner):
 
         return True
 
-    def _initialize_state(self):
-        state: KwargsLike = {
-            "splits": [
-                {
-                    "key": split.key,
-                    "group": split.group.name,
-                }
-                for split in self.splits
-            ],
-        }
-
-        with open(self.state_file, "w") as fd:
-            json.dump(state, fd)
-
-        self.bash2(["chmod", "a+r", self.state_file])
-
     def do_bash(
         self,
         arguments: List[str],
@@ -621,7 +601,6 @@ class CloudRunner(Runner):
             "model-directory": self.model_directory_path,
             "prediction-directory": self.prediction_directory_path,
             "trace": trace_file_path,
-            "state-file": self.state_file,
             "ping-url": [
                 urljoin(
                     store.api_base_url,
