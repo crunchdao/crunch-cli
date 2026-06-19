@@ -634,6 +634,64 @@ class CannotParticipateException(ApiException):
         _print_contact()
 
 
+class MissingMainFileException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        main_file_path: str,
+    ):
+        super().__init__(message)
+
+        self.main_file_path = main_file_path
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"The main file `{self.main_file_path}` is missing in the submission.")
+
+
+class InvalidMainFileException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        main_file_path: str,
+        main_file_media_type: str,
+    ):
+        super().__init__(message)
+
+        self.main_file_path = main_file_path
+        self.main_file_media_type = main_file_media_type
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"The file `{self.main_file_path}` is invalid in the submission: {self.message} (detected as {self.main_file_media_type}).")
+
+
+class ConflictingModelDirectoryException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        model_directory_path: str,
+        conflicting_file_path: str,
+    ):
+        super().__init__(message)
+
+        self.model_directory_path = model_directory_path
+        self.conflicting_file_path = conflicting_file_path
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"The file `{self.conflicting_file_path}` is conflicting with the model directory `{self.model_directory_path}` in the submission.")
+
+
 # TODO Only use one class like crunch
 CurrentRoundNotFoundException = RoundNotFoundException
 LatestRoundNotFoundException = RoundNotFoundException
