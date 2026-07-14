@@ -92,11 +92,15 @@ def prepare_one(
 def save_one(
     data_file: Optional[PreparedDataFile],
     force: bool,
+    log: bool = True,
     print: Callable[[Any], None] = print,
     progress_bar: bool = True,
 ):
     if data_file is None:
         return
+
+    if not log:
+        print = lambda x: None
 
     file_size = data_file.size
     file_path = data_file.path
@@ -171,12 +175,14 @@ def save_one(
 
 def save_all(
     data_files: Dict[str, PreparedDataFile],
+    *,
     force: bool,
+    log: bool = True,
     print: Callable[[str], Any] = print,
     progress_bar: bool = True,
 ):
     for data_file in data_files.values():
-        save_one(data_file, force, print, progress_bar)
+        save_one(data_file, force, log, print, progress_bar)
 
     return {
         key: value.path

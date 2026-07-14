@@ -77,10 +77,11 @@ class _Inline:
         self,
         round_number: RoundIdentifierType = "@current",
         force: bool = False,
+        verbose: bool = False,
         **kwargs: KwargsLike,
     ) -> Tuple[Optional["pandas.DataFrame"], Optional["pandas.DataFrame"], Optional["pandas.DataFrame"]]:
         if self._competition.format == CompetitionFormat.STREAM:
-            self.load_streams()
+            return self.load_streams()  # pyright: ignore[reportReturnType]
 
         try:
             (
@@ -89,25 +90,25 @@ class _Inline:
             ) = download(
                 round_number=round_number,
                 force=force,
+                verbose=verbose,
             )
         except (CrunchNotFoundException, MissingPhaseDataException):
             download_no_data_available()
             raise click.Abort()
 
         competition_format = self._competition.format
-        if competition_format == CompetitionFormat.UNSTRUCTURED:
-            module = self._runner_module
-            if module is None or module.get_load_data_function(ensure=False) is None:
-                self.logger.info("Please follow the competition instructions to load the data.")
-                return None, None, None
-
-            return module.load_data(
-                data_directory_path=data_directory_path,
-                logger=self.logger,
-            )
-
-        else:
+        if competition_format != CompetitionFormat.UNSTRUCTURED:
             raise NotImplementedError(f"{competition_format.name} competition format is not supported anymore")
+
+        module = self._runner_module
+        if module is None or module.get_load_data_function(ensure=False) is None:
+            self.logger.info("Please follow the competition instructions to load the data.")
+            return None, None, None
+
+        return module.load_data(
+            data_directory_path=data_directory_path,
+            logger=self.logger,
+        )
 
     def load_streams(
         self,

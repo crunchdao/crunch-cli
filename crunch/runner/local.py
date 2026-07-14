@@ -22,6 +22,7 @@ class LocalRunner(Runner):
 
     def __init__(
         self,
+        *,
         user_module: Any,
         runner_module: Optional[RunnerModule],
         model_directory_path: str,
@@ -32,6 +33,7 @@ class LocalRunner(Runner):
         competition: Competition,
         has_gpu: bool,
         determinism_check_enabled: bool,
+        verbose: bool,
         logger: logging.Logger,
         trace_exporter: Optional[LocalTraceExporter],
     ):
@@ -52,6 +54,7 @@ class LocalRunner(Runner):
         self.train_frequency = train_frequency
         self.round_number: RoundIdentifierType = round_number
         self.has_gpu = has_gpu
+        self.verbose = verbose
         self.logger = logger
 
     def start(self):
@@ -59,7 +62,7 @@ class LocalRunner(Runner):
         start = time.time()
 
         try:
-            return super().start()
+            super().start()
         finally:
             self.log("")
 
@@ -104,6 +107,7 @@ class LocalRunner(Runner):
                 self.data_paths,
             ) = download(
                 round_number=self.round_number,
+                verbose=self.verbose,
             )
         except (CrunchNotFoundException, MissingPhaseDataException):
             download_no_data_available()

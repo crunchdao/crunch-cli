@@ -771,7 +771,7 @@ class CloudRunner(Runner):
                 self.data_directory,
                 data_files,
             ),
-            False,
+            force=False,
             print=self.log,
             progress_bar=False,
         )

@@ -177,6 +177,7 @@ def list_competitions(
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output.")
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
@@ -184,10 +185,11 @@ def init(
     clone_token: str,
     no_data: bool,
     force: bool,
+    model_directory_path: str,
+    verbose: bool,
     competition_name: str,
     project_name: str,
     directory: str,
-    model_directory_path: str,
 ):
     directory = _format_directory(directory, competition_name, project_name)
 
@@ -200,7 +202,10 @@ def init(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(
+                force=True,
+                verbose=verbose,
+            )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
@@ -225,6 +230,7 @@ def init(
 @click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
 @click.option("--notebook", is_flag=True, help="Setup everything for a notebook environment.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output.")
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
@@ -234,15 +240,16 @@ def setup(
     no_data: bool,
     no_model: bool,
     force: bool,
-    competition_name: str,
-    project_name: str,
-    directory: str,
     model_directory_path: str,
     no_quickstarter: bool,
     quickstarter_name: Optional[str],
     show_notebook_quickstarters: bool,
     notebook: bool,
     data_size_variant_raw: str,
+    verbose: bool,
+    competition_name: str,
+    project_name: str,
+    directory: str,
 ):
     _echo_version()
 
@@ -287,7 +294,10 @@ def setup(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(
+                force=True,
+                verbose=verbose,
+            )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
@@ -312,6 +322,7 @@ def setup(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output.")
 @click.argument("competition-name", required=True)
 @click.argument("clone-token")
 def setup_notebook(
@@ -320,6 +331,7 @@ def setup_notebook(
     no_model: bool,
     model_directory_path: str,
     data_size_variant_raw: str,
+    verbose: bool,
     competition_name: str,
     clone_token: str,
 ):
@@ -340,7 +352,10 @@ def setup_notebook(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(
+                force=True,
+                verbose=verbose,
+            )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
@@ -451,6 +466,7 @@ def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
         click.option("--round-number", default="@current", help="Change round number to get the data from."),
         click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`."),
         click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check."),
+        click.option("--verbose", "-v", is_flag=True, help="Enable verbose output."),
     ]
 
     return functools.reduce(lambda f, option: option(f), options, f)
@@ -469,10 +485,12 @@ def test(
 @cli.command(help="Download the data locally.")
 @click.option("--round-number", default="@current")
 @click.option("--force", is_flag=True, help="Force the download of the data.")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
 def download(
     round_number: RoundIdentifierType,
     force: bool,
+    verbose: bool,
     size_variant_raw: Optional[str],
 ):
     utils.change_root()
@@ -486,8 +504,9 @@ def download(
     try:
         command.download(
             round_number,
-            force,
-            size_variant,
+            force=force,
+            verbose=verbose,
+            size_variant=size_variant,
         )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
@@ -560,6 +579,7 @@ def local(
     round_number: str,
     has_gpu: bool,
     no_determinism_check: Optional[bool],
+    verbose: bool,
 ):
     from . import library, tester
 
@@ -577,14 +597,15 @@ def local(
     with convert_if_necessary(main_file_path):
         try:
             command.test(
-                main_file_path,
-                model_directory_path,
-                constants.DOT_PREDICTION_DIRECTORY,
-                not no_force_first_train,
-                train_frequency,
-                round_number,
-                has_gpu,
-                no_determinism_check,
+                main_file_path=main_file_path,
+                model_directory_path=model_directory_path,
+                prediction_directory_path=constants.DOT_PREDICTION_DIRECTORY,
+                force_first_train=not no_force_first_train,
+                train_frequency=train_frequency,
+                round_number=round_number,
+                has_gpu=has_gpu,
+                no_determinism_check=no_determinism_check,
+                verbose=verbose,
             )
         except api.ApiException as error:
             utils.exit_via(error)

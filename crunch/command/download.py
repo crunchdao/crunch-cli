@@ -18,6 +18,7 @@ def _get_data_urls(
 def download(
     round_number: api.RoundIdentifierType = "@current",
     force: bool = False,
+    verbose: bool = False,
     size_variant: typing.Optional[api.SizeVariant] = None,
 ):
     client, project = api.Client.from_project()
@@ -68,7 +69,8 @@ def download(
 
     file_paths = downloader.save_all(
         prepared_data_files,
-        force,
+        force=force,
+        log=verbose,
     )
 
     return (

@@ -32,6 +32,7 @@ def install_logger():
 
 
 def run(
+    *,
     user_module: Any,
     runner_module: Optional[RunnerModule],
     model_directory_path: str,
@@ -42,6 +43,7 @@ def run(
     competition: Competition,
     has_gpu: bool = False,
     no_determinism_check: Optional[bool] = True,
+    verbose: bool = False,
     trace_exporter: Optional["LocalTraceExporter"] = None,
 ):
     monkey_patches.pickle_unpickler_find_class()
@@ -52,18 +54,19 @@ def run(
 
     from .runner.local import LocalRunner
     runner = LocalRunner(
-        user_module,
-        runner_module,
-        model_directory_path,
-        prediction_directory_path,
-        force_first_train,
-        train_frequency,
-        round_number,
-        competition,
-        has_gpu,
-        not no_determinism_check,
-        logger,
-        trace_exporter,
+        user_module=user_module,
+        runner_module=runner_module,
+        model_directory_path=model_directory_path,
+        prediction_directory_path=prediction_directory_path,
+        force_first_train=force_first_train,
+        train_frequency=train_frequency,
+        round_number=round_number,
+        competition=competition,
+        has_gpu=has_gpu,
+        determinism_check_enabled=not no_determinism_check,
+        verbose=verbose,
+        logger=logger,
+        trace_exporter=trace_exporter,
     )
 
-    return runner.start()
+    runner.start()
