@@ -591,6 +591,7 @@ class CannotParticipateException(ApiException):
         is_verified: bool,
         is_restricted: bool,
         rule_accepted: bool,
+        has_accepted_legal: bool,
     ):
         super().__init__(message)
 
@@ -598,6 +599,7 @@ class CannotParticipateException(ApiException):
         self.is_verified = is_verified
         self.is_restricted = is_restricted
         self.rule_accepted = rule_accepted
+        self.has_accepted_legal = has_accepted_legal
 
     def print_helper(
         self,
@@ -622,16 +624,23 @@ class CannotParticipateException(ApiException):
                 competition_name = try_get_competition_name()
 
             if competition_name is not None:
-                from crunch.api._client import Client
-                client = Client.from_env()
+                self._show_url("Accept the rules", f"/competitions/{competition_name}")
 
-                link = client.format_web_url(f"/competitions/{competition_name}")
-                print(f"  >> Accept the rules: {link}")
+        if not self.has_accepted_legal:
+            print("- You have not accepted the new Terms of Use and Privacy Policy.")
+            self._show_url("Accept them (you should see a dialog)", "/account")
 
-        if not any([self.has_problem, not self.is_verified, self.is_restricted, not self.rule_accepted]):
+        if not any([self.has_problem, not self.is_verified, self.is_restricted, not self.rule_accepted, not self.has_accepted_legal]):
             print("- Unknown reason")
 
         _print_contact()
+
+    def _show_url(self, action_text: str, path: str):
+        from crunch.api._client import Client
+        client = Client.from_env()
+
+        link = client.format_web_url(path)
+        print(f"  >> {action_text}: {link}")
 
 
 class MissingMainFileException(ApiException):
