@@ -51,7 +51,7 @@ class _Inline:
 
         from . import is_inside_runner
         if is_inside_runner:
-            print(f"[warning] loading the inliner in the cloud runner is not supported, this will raise an error soon", file=sys.stderr)
+            print(f"[warning] doing `crunch.load_notebook()` in the cloud environment is not supported, see: https://crnch.me/cloud-load-notebook", file=sys.stderr)
 
         print()
 
