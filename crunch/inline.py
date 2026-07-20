@@ -48,7 +48,7 @@ class _Inline:
 
         self._trace_exporter = LocalTraceExporter()
 
-        print(f"loaded inline runner with module: {user_module}")
+        print(f"loaded crunch tools for module: {user_module}")
 
         from . import is_inside_runner
         if is_inside_runner:
