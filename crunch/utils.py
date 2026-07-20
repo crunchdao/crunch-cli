@@ -470,3 +470,11 @@ class LimitedSizeIO:
 
     def __len__(self):
         return self.limit
+
+
+def is_running_inside_notebook():
+    try:
+        get_ipython()  # pyright: ignore[reportUndefinedVariable]
+        return True
+    except NameError:
+        return False

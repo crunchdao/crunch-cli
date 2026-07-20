@@ -22,6 +22,7 @@ from crunch.runner import is_inside
 from crunch.runner.tracing import LocalTraceExporter
 from crunch.runner.types import KwargsLike
 from crunch.unstructured import RunnerModule, deduce_code_loader
+from crunch.utils import is_running_inside_notebook
 
 if TYPE_CHECKING:
     import pandas
@@ -52,6 +53,8 @@ class _Inline:
         from . import is_inside_runner
         if is_inside_runner:
             print(f"[warning] doing `crunch.load_notebook()` in the cloud environment is not supported, see: https://crnch.me/cloud-load-notebook", file=sys.stderr)
+        elif not is_running_inside_notebook():
+            print(f"[warning] doing `crunch.load_notebook()` outside a notebook is not the intended usage, see: https://crnch.me/python-load-notebook", file=sys.stderr)
 
         print()
 
