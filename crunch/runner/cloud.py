@@ -341,7 +341,7 @@ class CloudRunner(Runner):
         lower = language.name.lower()
         txt_path = os.path.join(self.context_directory, f"{lower}-constraints.txt")
 
-        response = requests.get(urljoin(store.api_base_url, f"/v1/libraries/{lower}/~/constraints"))
+        response = self.client.api.get(urljoin(store.api_base_url, f"/v1/libraries/{lower}/~/constraints"))
         if not response.ok:
             self.log(f"failed to download constraints: {response.status_code}: {response.text}", error=True)
             return
