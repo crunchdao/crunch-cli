@@ -27,7 +27,7 @@ from crunch.api._domain.submission_file import SubmissionFileEndpointMixin
 from crunch.api._domain.target import TargetEndpointMixin
 from crunch.api._domain.upload import UploadCollection, UploadEndpointMixin
 from crunch.api._domain.user import UserCollection, UserEndpointMixin
-from crunch.api._errors import convert_error
+from crunch.api._errors import ApiException, convert_error
 from crunch.api._pagination import PageRequest
 from crunch.constants import API_KEY_ENV_VAR
 
@@ -147,16 +147,29 @@ class EndpointClient(
     def _raise_for_status(
         self,
         response: requests.Response,
+        *,
+        expect_json: bool = True,
     ):
+        content_type = response.headers.get("Content-Type", "")
+        is_json = content_type.startswith("application/json")
+
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as error:
             self._strip_secrets(error)
 
+            if expect_json and not is_json:
+                raise ApiException(f"received {response.status_code}: {response.text or '<no content>'}") from error
+
             content = error.response.json()
             converted = convert_error(content)
 
             raise converted
+
+        return (
+            content_type,
+            is_json,
+        )
 
     def _strip_secrets(self, error: BaseException):
         if not self.auth_:
@@ -193,12 +206,14 @@ class EndpointClient(
         binary: bool = False,
     ):
         assert not (json and binary)
-        self._raise_for_status(response)
 
-        content_type = response.headers.get("content-type")
+        (
+            content_type,
+            is_json,
+        ) = self._raise_for_status(response, expect_json=json)
 
         if json:
-            if content_type != "application/json":
+            if not is_json:
                 raise ValueError(f"server did not return json: `{content_type}`: `{response.text}`")
 
             try:
