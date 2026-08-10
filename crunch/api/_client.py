@@ -71,6 +71,10 @@ class EndpointClient(
         self.show_progress = show_progress
         self.page_size = 100
 
+        self.headers.update({
+            "User-Agent": _build_user_agent(),
+        })
+
     def request(self, method: str, url: str, *args: Any, **kwargs: Any):
         headers: Dict[str, str] = kwargs.pop("headers", None) or {}
         params: Dict[str, str] = kwargs.pop("params", None) or {}
@@ -331,3 +335,15 @@ class Client:
         project = competition.projects.get_reference(None, (project_info.user_id, project_info.project_name))
 
         return client, project
+
+
+def _build_user_agent() -> str:
+    import platform
+    import sys
+
+    from crunch.__version__ import __version__ as crunch_version
+
+    python_version = ".".join(map(str, sys.version_info[:3]))
+    os_name = platform.system()  # "Linux", "Darwin", "Windows"
+
+    return f"crunch-cli/{crunch_version} (Python/{python_version}; {os_name})"
