@@ -19,12 +19,15 @@ def load_user_code(
     getpid = os.getpid  # avoid swap
     initial_pid = getpid()
 
-    spec.loader.exec_module(module)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except:
+        sys.modules.pop(module_name, None)
+        raise
 
     if getpid() != initial_pid:
         raise RuntimeError("fork detected while loading user code")
-
-    sys.modules[module_name] = module
 
     return module
 
