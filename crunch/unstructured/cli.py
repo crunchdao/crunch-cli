@@ -1,33 +1,16 @@
 import json
 import random
 import traceback
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, cast
 
 import click
 
-from crunch.api import ApiException, Competition, PhaseType, SubmissionType
+from crunch.api import ApiException, Competition, PhaseType, SubmissionType, Target
 from crunch.constants import DEFAULT_MODEL_DIRECTORY
 from crunch.utils import exit_via
 
 if TYPE_CHECKING:
     from . import CodeLoader, ModuleFileName
-
-
-def _load_code(context: click.Context, file_name: "ModuleFileName") -> Tuple[Competition, "CodeLoader"]:
-    from . import CodeLoader
-
-    competition, load_code = cast(
-        Tuple[
-            Competition,
-            Callable[["ModuleFileName"], CodeLoader],
-        ],
-        context.obj
-    )
-
-    loader = load_code(file_name)
-    print(f"organizer: loaded {file_name} code from {loader.location}")
-
-    return competition, loader
 
 
 @click.group(name="test")
@@ -54,60 +37,36 @@ def leaderboard_group():
 
 
 @leaderboard_group.command(name="rank")
-@click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False), required=False)
+@click.option("--scores-from-api", is_flag=True, required=False)
 @click.option("--rank-pass", "rank_pass_string", type=click.Choice(["PRE_DUPLICATE", "FINAL"]), default="FINAL")
 @click.option("--target-name", required=False, default=None)
 @click.option("--shuffle", is_flag=True)
 @click.pass_context
 def leaderboard_rank(
     context: click.Context,
-    score_file_path: str,
+    score_file_path: Optional[str],
+    scores_from_api: bool,
     rank_pass_string: str,
     target_name: Optional[str],
     shuffle: bool,
 ):
     from crunch.unstructured import LeaderboardModule, RankableProject, RankPass
 
-    competition, loader = _load_code(context, "leaderboard")
-
-    module = LeaderboardModule.load(loader)
-    if module is None:
-        print(f"no custom leaderboard script found")
-        raise click.Abort()
-
     rank_pass = RankPass[rank_pass_string]
 
-    with open(score_file_path, "r") as fd:
-        root = json.load(fd)
-        if not isinstance(root, list):
-            raise ValueError("root must be a list")
+    competition, module = _load_code(context, "leaderboard", LeaderboardModule.load)
 
-        projects: List[RankableProject] = []
-        for index, item in enumerate(root):  # type: ignore
-            if not isinstance(item, dict):
-                raise ValueError(f"root[{index}] must be a dict: {item}")
+    target, metrics = _find_target(competition, target_name)
 
-            projects.append(RankableProject.from_dict(item))  # type: ignore
+    projects: List[RankableProject] = (
+        _load_projects_from_api(competition, target, RankableProject.from_dict)  # type: ignore
+        if scores_from_api else
+        _load_projects_from_file(score_file_path, RankableProject.from_dict)  # type: ignore
+    )
 
-        if shuffle:
-            random.shuffle(projects)
-
-    if target_name is None:
-        target = next(
-            (
-                target
-                for target in competition.targets.list()
-                if target.primary
-            ),
-            None
-        )
-
-        if target is None:
-            raise ValueError("primary target not found?")
-    else:
-        target = competition.targets.get(target_name)
-
-    metrics = target.metrics.list()
+    if shuffle:
+        random.shuffle(projects)
 
     try:
         ranked_projects = module.rank(
@@ -182,12 +141,7 @@ def leaderboard_compare(
 ):
     from crunch.unstructured import LeaderboardModule
 
-    competition, loader = _load_code(context, "leaderboard")
-
-    module = LeaderboardModule.load(loader)
-    if module is None:
-        print(f"no custom leaderboard script found")
-        raise click.Abort()
+    competition, module = _load_code(context, "leaderboard", LeaderboardModule.load)
 
     prediction_directory_path_by_id: Dict[int, str] = {}
     for prediction_id, prediction_file_path in prediction_directory_paths:
@@ -245,58 +199,34 @@ def reward_group():
 
 
 @reward_group.command(name="compute-bounties")
-@click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--scores-file", "score_file_path", type=click.Path(exists=True, dir_okay=False), required=False)
+@click.option("--scores-from-api", is_flag=True, required=False)
 @click.option("--target-name", required=False, default=None)
 @click.option("--granted-amount", type=float, default=10_000.0)
 @click.option("--shuffle", is_flag=True)
 @click.pass_context
 def reward_compute_bounties(
     context: click.Context,
-    score_file_path: str,
+    score_file_path: Optional[str],
+    scores_from_api: bool,
     target_name: Optional[str],
     granted_amount: float,
     shuffle: bool,
 ):
     from crunch.unstructured import RewardableProject, RewardModule
 
-    competition, loader = _load_code(context, "reward")
+    competition, module = _load_code(context, "reward", RewardModule.load)
 
-    module = RewardModule.load(loader)
-    if module is None:
-        print(f"no custom reward script found")
-        raise click.Abort()
+    target, metrics = _find_target(competition, target_name)
 
-    with open(score_file_path, "r") as fd:
-        root = json.load(fd)
-        if not isinstance(root, list):
-            raise ValueError("root must be a list")
+    projects: List[RewardableProject] = (
+        _load_projects_from_api(competition, target, RewardableProject.from_dict)  # type: ignore
+        if scores_from_api else
+        _load_projects_from_file(score_file_path, RewardableProject.from_dict)  # type: ignore
+    )
 
-        projects: List[RewardableProject] = []
-        for index, item in enumerate(root):  # type: ignore
-            if not isinstance(item, dict):
-                raise ValueError(f"root[{index}] must be a dict: {item}")
-
-            projects.append(RewardableProject.from_dict(item))  # type: ignore
-
-        if shuffle:
-            random.shuffle(projects)
-
-    if target_name is None:
-        target = next(
-            (
-                target
-                for target in competition.targets.list()
-                if target.primary
-            ),
-            None
-        )
-
-        if target is None:
-            raise ValueError("primary target not found?")
-    else:
-        target = competition.targets.get(target_name)
-
-    metrics = target.metrics.list()
+    if shuffle:
+        random.shuffle(projects)
 
     try:
         rewarded_projects = module.compute_bounties(
@@ -359,15 +289,9 @@ def scoring_check(
 ):
     from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
-    competition, loader = _load_code(context, "scoring")
-
-    module = ScoringModule.load(loader)
-    if module is None:
-        print(f"no custom scoring check found")
-        raise click.Abort()
+    competition, module = _load_code(context, "scoring", ScoringModule.load)
 
     phase_type = PhaseType[phase_type_string]
-
     if chain_height is None:
         chain_height = phase_type.first_chain_height()
 
@@ -406,14 +330,9 @@ def scoring_score(
 ):
     from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
-    competition, loader = _load_code(context, "scoring")
-
-    module = ScoringModule.load(loader)
-    if module is None:
-        print(f"no custom scoring score found")
-        raise click.Abort()
-
     phase_type = PhaseType[phase_type_string]
+
+    competition, module = _load_code(context, "scoring", ScoringModule.load)
 
     try:
         metrics = competition.metrics.list()
@@ -488,14 +407,9 @@ def submission_check(
     from crunch.command.push import list_code_files, list_model_files
     from crunch.unstructured import File, ParticipantVisibleError, SubmissionModule
 
-    _, loader = _load_code(context, "submission")
-
-    module = SubmissionModule.load(loader)
-    if module is None:
-        print(f"no custom submission check found")
-        raise click.Abort()
-
     submission_type = SubmissionType[submission_type_string]
+
+    _, module = _load_code(context, "submission", SubmissionModule.load)
 
     submission_files = [
         File.from_local(path, name)
@@ -523,6 +437,126 @@ def submission_check(
         print(f"\n\nSubmission check function failed: {error}")
 
         traceback.print_exc()
+
+
+T = TypeVar("T")
+
+
+def _load_code(context: click.Context, file_name: "ModuleFileName", module_loader: Callable[["CodeLoader"], Optional[T]]) -> Tuple[Competition, T]:
+    from . import CodeLoader
+
+    competition, load_code = cast(
+        Tuple[
+            Competition,
+            Callable[["ModuleFileName"], CodeLoader],
+        ],
+        context.obj
+    )
+
+    loader = load_code(file_name)
+    print(f"organizer: loading {file_name} code from {loader.location}")
+
+    module = module_loader(loader)
+    if module is None:
+        print(f"organizer: no custom {file_name} script found")
+        raise click.Abort()
+
+    return competition, module
+
+
+def _find_target(competition: Competition, name_candidate: Optional[str]):
+    if name_candidate is None:
+        target = next(
+            (
+                target
+                for target in competition.targets.list()
+                if target.primary
+            ),
+            None
+        )
+
+        if target is None:
+            raise ValueError("primary target not found?")
+    else:
+        target = competition.targets.get(name_candidate)
+
+    metrics = target.metrics.list()
+
+    return (
+        target,
+        metrics,
+    )
+
+
+def _load_projects_from_file(
+    score_file_path: Optional[str],
+    project_type: Callable[..., T],
+) -> List[T]:
+    if score_file_path is None:
+        raise ValueError("score file path must be specified")
+
+    with open(score_file_path, "r") as fd:
+        root = json.load(fd)
+        if not isinstance(root, list):
+            raise ValueError("root must be a list")
+
+        projects: List[T] = []
+        for index, item in enumerate(root):  # type: ignore
+            if not isinstance(item, dict):
+                raise ValueError(f"root[{index}] must be a dict: {item}")
+
+            projects.append(project_type.from_dict(item))  # type: ignore
+
+    return projects
+
+
+def _load_projects_from_api(
+    competition: Competition,
+    target: Target,
+    mapper: Callable[..., T],
+) -> List[T]:
+    default_leaderboard = competition.leaderboards.default
+
+    for target_leaderboard in default_leaderboard._attrs.get("targets") or []:  # type: ignore
+        if target_leaderboard.get("id") != target.id:  # type: ignore
+            continue
+
+        positions = target_leaderboard.get("positions") or []  # type: ignore
+        break
+
+    else:
+        print(f"leaderboard: target {target.name} not found, returning empty list")
+        return []
+
+    projects: List[T] = []
+    for position in positions:  # type: ignore
+        user = position["user"]  # type: ignore
+        project = position["project"]  # type: ignore
+
+        team = position.get("team")  # type: ignore
+        group = f"team-{team.get('name')}" if team else f"user-{user['login']}"  # type: ignore
+
+        item = {  # type: ignore
+            "id": project["id"],
+            "group": group,
+            "rewardable": all([  # TODO Should be moved to backend instead
+                position["duplicate"] is False,
+                position["deterministic"] is not False,
+                position["outOfRange"] is False,
+                position["disqualification"] is None,
+            ]),
+            "metrics": [
+                {
+                    "id": metric["metricId"],
+                    "score": metric["score"],
+                }
+                for metric in position["metrics"]  # type: ignore
+            ],
+        }
+
+        projects.append(mapper(item))  # type: ignore
+
+    return projects
 
 
 def _ascii_table(
