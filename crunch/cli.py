@@ -3,11 +3,11 @@ import functools
 import json
 import os
 import sys
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Literal, Optional, Union
 
 import click
 
-from crunch.api import CompetitionFormat, PhaseType, RoundIdentifierType
+from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
 from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
@@ -44,7 +44,7 @@ DATA_SIZE_VARIANTS = [
 ]
 
 
-class SubmissionNumberType(click.ParamType):
+class SubmissionNumberType(click.ParamType[Union[int, Literal["latest", "scratch"]]]):
     name = "number"
 
     def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
@@ -124,9 +124,9 @@ def ping():
 
 
 @cli.command(name="list", help="List all available competitions.")
-@click.option("--format", "format_raw", required=False, type=click.Choice([x.name for x in api.CompetitionFormat], case_sensitive=False), help="Filter competitions by their format.")
-@click.option("--mode", "mode_raw", required=False, type=click.Choice([x.name for x in api.CompetitionMode], case_sensitive=False), help="Filter competitions by their mode.")
-@click.option("--status", "status_raw", required=False, type=click.Choice([x.name for x in api.CompetitionStatus], case_sensitive=False), help="Filter competitions by their status.")
+@click.option("--format", "format_raw", required=False, type=click.Choice([x.name for x in CompetitionFormat], case_sensitive=False), help="Filter competitions by their format.")
+@click.option("--mode", "mode_raw", required=False, type=click.Choice([x.name for x in CompetitionMode], case_sensitive=False), help="Filter competitions by their mode.")
+@click.option("--status", "status_raw", required=False, type=click.Choice([x.name for x in CompetitionStatus], case_sensitive=False), help="Filter competitions by their status.")
 @click.option("--continuous", required=False, type=bool, help="Filter continuous competitions.")
 @click.option("--external", required=False, type=bool, help="Filter external competitions.")
 @click.option("--featured", required=False, type=bool, help="Filter featured competitions.")
@@ -142,9 +142,9 @@ def list_competitions(
     organizer_name: Optional[str],
     team_based: Optional[bool],
 ):
-    format = api.CompetitionFormat[format_raw.upper()] if format_raw else None
-    mode = api.CompetitionMode[mode_raw.upper()] if mode_raw else None
-    status = api.CompetitionStatus[status_raw.upper()] if status_raw else None
+    format = CompetitionFormat[format_raw.upper()] if format_raw else None
+    mode = CompetitionMode[mode_raw.upper()] if mode_raw else None
+    status = CompetitionStatus[status_raw.upper()] if status_raw else None
 
     client = api.Client.from_env()
 
