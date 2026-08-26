@@ -155,7 +155,7 @@ class EndpointClient(
 
         try:
             response.raise_for_status()
-        except requests.exceptions.HTTPError as error:
+        except requests.HTTPError as error:
             self._strip_secrets(error)
 
             if expect_json and not is_json:
