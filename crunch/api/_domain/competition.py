@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Generator, Iterator, Optional
+from datetime import datetime
 from crunch.api._identifiers import CompetitionIdentifierType
 from crunch.api._resource import Collection, Model
 from crunch.api._domain.enum_ import SplitKeyType
@@ -48,6 +49,19 @@ class Competition(Model):
     @property
     def name(self) -> str:
         return self._attrs["name"]
+
+    @property
+    def start(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["start"])
+
+    @property
+    def end(self) -> Optional[datetime]:
+        end_string = self._attrs["end"]
+        return datetime.fromisoformat(end_string) if end_string else None
+
+    @property
+    def status(self):
+        return CompetitionStatus[self._attrs["status"]]
 
     @property
     def format(self):
