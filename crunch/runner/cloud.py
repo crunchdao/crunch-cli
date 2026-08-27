@@ -24,7 +24,7 @@ from crunch.runner.runner import Runner
 from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext
-from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
+from crunch.unstructured import HttpCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
 from crunch.utils import download
 
 UploadedFiles = Dict[str, Upload]
@@ -263,7 +263,7 @@ class CloudRunner(Runner):
             file_name="runner",
         )
 
-        if isinstance(loader, GithubCodeLoader):
+        if isinstance(loader, HttpCodeLoader):
             source = loader.source
 
             self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")

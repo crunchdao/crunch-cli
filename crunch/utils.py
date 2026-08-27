@@ -513,3 +513,15 @@ def is_running_inside_notebook():
         return True
     except NameError:
         return False
+
+
+def build_user_agent() -> str:
+    import platform
+    import sys
+
+    from crunch.__version__ import __version__ as crunch_version
+
+    python_version = ".".join(map(str, sys.version_info[:3]))
+    os_name = platform.system()  # "Linux", "Darwin", "Windows"
+
+    return f"crunch-cli/{crunch_version} (Python/{python_version}; {os_name})"
