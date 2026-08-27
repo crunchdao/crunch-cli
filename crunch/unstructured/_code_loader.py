@@ -1,12 +1,16 @@
 import os
+import re
 from abc import ABC, abstractmethod
 from types import ModuleType
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional
+from urllib.parse import parse_qs, urlencode
 
 import requests
 from retry import retry
 
 import crunch.store as store
+from crunch import constants
+from crunch.utils import build_user_agent
 
 ModuleFileName = Literal["leaderboard", "reward", "runner", "scoring", "submission"]
 
@@ -81,22 +85,19 @@ class CodeLoader(ABC):
         pass
 
 
-class GithubCodeLoader(CodeLoader):
+class HttpCodeLoader(CodeLoader):
+
+    _url: str
+    _user_agent: str
 
     def __init__(
         self,
         *,
-        competition_name: str,
-        file_name: ModuleFileName,
-        repository: Optional[str] = None,
-        branch: Optional[str] = None,
-        user_agent: str = "curl/7.88.1"
+        url: str,
+        user_agent: Optional[str] = None,
     ):
-        repository = repository or store.competitions_repository
-        branch = branch or store.competitions_branch
-
-        self._url = f"https://github.com/{repository}/raw/refs/heads/{branch}/{_format_relative_module_path(competition_name, file_name)}"
-        self._user_agent = user_agent
+        self._url = url
+        self._user_agent = user_agent or build_user_agent()
 
     @property
     def location(self):
@@ -111,7 +112,7 @@ class GithubCodeLoader(CodeLoader):
         response = requests.get(
             self._url,
             headers={
-                "User-Agent": self._user_agent
+                "User-Agent": self._user_agent,
             }
         )
 
@@ -124,6 +125,53 @@ class GithubCodeLoader(CodeLoader):
             raise
 
         return response.text
+
+    @staticmethod
+    def new_github(
+        *,
+        competition_name: str,
+        file_name: ModuleFileName,
+        repository: str,
+        reference: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> "HttpCodeLoader":
+        url = format_github_url(
+            repository=repository,
+            reference=reference or "master",
+            competition_name=competition_name,
+            file_name=file_name,
+        )
+
+        return HttpCodeLoader(
+            url=url,
+            user_agent=user_agent,
+        )
+
+    @staticmethod
+    def new_cache(
+        *,
+        competition_name: str,
+        file_name: ModuleFileName,
+        base_url: str,
+        schema: Optional[str] = None,
+        reference: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> "HttpCodeLoader":
+        if schema is None:
+            schema = "https"
+        elif schema not in ("http", "https"):
+            raise ValueError(f"unsupported schema: {schema}")
+
+        url = f"{schema}://{base_url.rstrip('/')}/{format_relative_module_path(competition_name, file_name)}"
+
+        if reference:
+            query = urlencode({"reference": reference})
+            url += f"?{query}"
+
+        return HttpCodeLoader(
+            url=url,
+            user_agent=user_agent,
+        )
 
 
 class LocalCodeLoader(CodeLoader):
@@ -147,8 +195,24 @@ class LocalCodeLoader(CodeLoader):
         except FileNotFoundError as error:
             raise NoCodeFoundError(f"no code found at path: {self.path}") from error
 
+    @staticmethod
+    def new_directory(
+        *,
+        competition_name: str,
+        file_name: ModuleFileName,
+        competitions_path: str,
+    ):
+        path = os.path.join(
+            competitions_path,
+            format_relative_module_path(competition_name, file_name)
+        )
 
-def _format_relative_module_path(
+        return LocalCodeLoader(
+            path=path,
+        )
+
+
+def format_relative_module_path(
     competition_name: str,
     file_name: ModuleFileName,
 ):
@@ -160,30 +224,75 @@ def _format_relative_module_path(
     ).replace("\\", "/")
 
 
+def format_github_url(
+    repository: str,
+    reference: str,
+    competition_name: str,
+    file_name: ModuleFileName,
+):
+    return f"https://github.com/{repository}/raw/refs/heads/{reference}/{format_relative_module_path(competition_name, file_name)}"
+
+
 def deduce(
     *,
     competition_name: str,
     file_name: ModuleFileName,
-    github_repository: Optional[str] = None,
-    github_branch: Optional[str] = None,
-    directory_path: Optional[str] = None,
+    source: Optional[str] = None,
 ):
-    if not directory_path:
-        directory_path = store.competitions_directory_path
+    if source is None:
+        source = store.competitions_source or constants.COMPETITIONS_SOURCE_CACHE_DEFAULT
 
-    if directory_path:
-        path = os.path.join(
-            directory_path,
-            _format_relative_module_path(competition_name, file_name)
-        )
+    if "://" not in source:
+        raise ValueError(f"invalid source: {source}")
 
-        return LocalCodeLoader(
-            path=path,
-        )
+    schema, source = source.split("://", 1)
+
+    if "?" in source:
+        source, params_string = source.split("?", 1)
+        params = parse_qs(params_string)
     else:
-        return GithubCodeLoader(
+        params = {}
+
+    if "+" in schema:
+        schema, schema2 = schema.split("+", 1)
+    else:
+        schema2 = None
+
+    if schema == "local":
+        directory_path = source
+        return LocalCodeLoader.new_directory(
+            competition_name=competition_name,
+            file_name=file_name,
+            competitions_path=directory_path,
+        )
+
+    elif schema == "github":
+        github_repository = source
+        if not re.match(r"^[\w-]+/[\w-]+$", github_repository):
+            raise ValueError(f"invalid github repository: {github_repository}")
+
+        return HttpCodeLoader.new_github(
             competition_name=competition_name,
             file_name=file_name,
             repository=github_repository,
-            branch=github_branch,
+            reference=_get_reference(params),
         )
+
+    elif schema == "cache":
+        base_url = source
+
+        return HttpCodeLoader.new_cache(
+            competition_name=competition_name,
+            file_name=file_name,
+            base_url=base_url,
+            schema=schema2,
+            reference=_get_reference(params),
+        )
+
+    else:
+        raise ValueError(f"unsupported schema: {schema}")
+
+
+def _get_reference(params: Dict[str, List[str]]) -> Optional[str]:
+    reference, = params.get("reference") or [None]
+    return reference

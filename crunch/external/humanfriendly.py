@@ -20,7 +20,7 @@ if True:  # from humanfriendly/__init__.py
         CombinedUnit(SizeUnit(1000**8, 'YB', 'yottabyte'), SizeUnit(1024**8, 'YiB', 'yobibyte')),
     )
 
-    def coerce_boolean(value):
+    def coerce_boolean(value: Optional[str]) -> bool:
         if isinstance(value, str):
             normalized = value.strip().lower()
             if normalized in ('1', 'yes', 'true', 'on'):
