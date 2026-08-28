@@ -3,6 +3,7 @@ from crunch.unstructured._code_loader import CodeLoader as CodeLoader
 from crunch.unstructured._code_loader import CodeLoadError as CodeLoadError
 from crunch.unstructured._code_loader import HttpCodeLoader as HttpCodeLoader
 from crunch.unstructured._code_loader import LocalCodeLoader as LocalCodeLoader
+from crunch.unstructured._code_loader import FallbackCodeLoader as FallbackCodeLoader
 from crunch.unstructured._code_loader import ModuleFileName as ModuleFileName
 from crunch.unstructured._code_loader import NoCodeFoundError as NoCodeFoundError
 from crunch.unstructured._code_loader import deduce as deduce_code_loader  # pyright: ignore[reportUnusedImport]

@@ -1,6 +1,7 @@
 import os
 import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Literal, Optional
 from urllib.parse import parse_qs, urlencode
@@ -52,36 +53,32 @@ class ModuleWrapper:
         return function
 
 
-class CodeLoader(ABC):
+@dataclass(frozen=True)
+class ModuleSourceCode:
+    location: str
+    content: str
 
-    def load(self):
-        location = self.location
-        name = os.path.basename(location)
-
+    def execute(self) -> ModuleType:
         try:
+            name = os.path.basename(self.location)
+
             module = ModuleType(name)
-            module.__loader__ = self  # type: ignore
-            module.__file__ = location
-            module.__path__ = [os.path.dirname(location)]
+            module.__file__ = self.location
+            module.__path__ = [os.path.dirname(self.location)]
             module.__package__ = name.rpartition('.')[0]
 
-            code = compile(self.source, location, 'exec')
+            code = compile(self.content, self.location, 'exec')
             exec(code, module.__dict__)
-        except NoCodeFoundError:
-            raise
+
+            return module
         except BaseException as exception:
-            raise CodeLoadError(f"could not load {location}") from exception
+            raise CodeLoadError(f"could not load {self.location}") from exception
 
-        return module
 
-    @property
+class CodeLoader(ABC):
+
     @abstractmethod
-    def location(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def source(self) -> str:
+    def load(self) -> ModuleSourceCode:
         pass
 
 
@@ -99,32 +96,39 @@ class HttpCodeLoader(CodeLoader):
         self._url = url
         self._user_agent = user_agent or build_user_agent()
 
-    @property
-    def location(self):
-        return self._url
-
-    @property
-    def source(self):
-        return self._fetch()
+    def load(self):
+        return ModuleSourceCode(
+            location=self._url,
+            content=self._fetch(),
+        )
 
     @retry(requests.RequestException, tries=3, delay=2, logger=None)
     def _fetch(self):
-        response = requests.get(
-            self._url,
-            headers={
-                "User-Agent": self._user_agent,
-            }
-        )
-
         try:
+            response = requests.get(
+                self._url,
+                headers={
+                    "User-Agent": self._user_agent,
+                }
+            )
+
             response.raise_for_status()
-        except requests.exceptions.HTTPError as error:
+        except requests.RequestException as error:
             if error.response is not None and error.response.status_code == 404:
                 raise NoCodeFoundError(f"no code found at url: {self._url}") from error
 
             raise
 
         return response.text
+
+    def __str__(self) -> str:
+        return f'HttpCodeLoader(url="{self._url}")'
+
+    __repr__ = __str__
+
+    @property
+    def url(self) -> str:
+        return self._url
 
     @staticmethod
     def new_github(
@@ -181,19 +185,28 @@ class LocalCodeLoader(CodeLoader):
         *,
         path: str
     ):
-        self.path = path
+        self._path = path
 
-    @property
-    def location(self):
-        return self.path
-
-    @property
-    def source(self):
+    def load(self):
         try:
-            with open(self.path, "r") as fd:
-                return fd.read()
+            with open(self._path, "r") as fd:
+                source = fd.read()
         except FileNotFoundError as error:
-            raise NoCodeFoundError(f"no code found at path: {self.path}") from error
+            raise NoCodeFoundError(f"no code found at path: {self._path}") from error
+
+        return ModuleSourceCode(
+            location=self._path,
+            content=source,
+        )
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    def __str__(self) -> str:
+        return f'LocalCodeLoader(path="{self._path}")'
+
+    __repr__ = __str__
 
     @staticmethod
     def new_directory(
@@ -210,6 +223,35 @@ class LocalCodeLoader(CodeLoader):
         return LocalCodeLoader(
             path=path,
         )
+
+
+class FallbackCodeLoader(CodeLoader):
+
+    def __init__(
+        self,
+        *,
+        loaders: List[CodeLoader],
+    ):
+        self.loaders = loaders
+
+    def load(self):
+        suppressed: List[str] = []
+        for loader in self.loaders:
+            try:
+                return loader.load()
+            except NoCodeFoundError:
+                raise
+            except Exception as error:
+                suppressed.append(str(error))
+                continue
+
+        detail = ", ".join(suppressed)
+        raise NoCodeFoundError(f"all loaders failed: {detail}")
+
+    def __str__(self) -> str:
+        return f"FallbackCodeLoader(loaders={self.loaders})"
+
+    __repr__ = __str__
 
 
 def format_relative_module_path(
@@ -239,9 +281,35 @@ def deduce(
     file_name: ModuleFileName,
     source: Optional[str] = None,
 ):
-    if source is None:
-        source = store.competitions_source or constants.COMPETITIONS_SOURCE_CACHE_DEFAULT
+    if source is not None:
+        source = source.strip()
 
+    if not source:
+        source = (store.competitions_source or "").strip()
+
+    if not source:
+        source = constants.COMPETITIONS_SOURCE_CACHE_DEFAULT
+
+    loaders = [
+        _deduce_one(
+            competition_name=competition_name,
+            file_name=file_name,
+            source=source_line,
+        )
+        for source_line in source.split(",")
+    ]
+
+    if len(loaders) == 1:
+        return loaders[0]
+
+    return FallbackCodeLoader(loaders=loaders)
+
+
+def _deduce_one(
+    competition_name: str,
+    file_name: ModuleFileName,
+    source: str,
+) -> CodeLoader:
     if "://" not in source:
         raise ValueError(f"invalid source: {source}")
 

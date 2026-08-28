@@ -97,7 +97,7 @@ class RewardModule(ModuleWrapper):
     @staticmethod
     def load(loader: CodeLoader):
         try:
-            module = loader.load()
+            module = loader.load().execute()
             return RewardModule(module)
         except NoCodeFoundError:
             return None

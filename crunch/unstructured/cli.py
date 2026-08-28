@@ -454,7 +454,7 @@ def _load_code(context: click.Context, file_name: "ModuleFileName", module_loade
     )
 
     loader = load_code(file_name)
-    print(f"organizer: loading {file_name} code from {loader.location}")
+    print(f"organizer: loading {file_name} code from {loader}")
 
     module = module_loader(loader)
     if module is None:

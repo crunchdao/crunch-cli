@@ -179,7 +179,7 @@ class LeaderboardModule(ModuleWrapper):
     @staticmethod
     def load(loader: CodeLoader):
         try:
-            module = loader.load()
+            module = loader.load().execute()
             return LeaderboardModule(module)
         except NoCodeFoundError:
             return None
