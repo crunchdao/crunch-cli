@@ -150,7 +150,7 @@ class ScoringModule(ModuleWrapper):
     @staticmethod
     def load(loader: CodeLoader):
         try:
-            module = loader.load()
+            module = loader.load().execute()
             return ScoringModule(module)
         except NoCodeFoundError:
             return None

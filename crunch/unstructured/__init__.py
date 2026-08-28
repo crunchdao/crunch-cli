@@ -1,11 +1,14 @@
 import crunch.unstructured.utils as utils  # pyright: ignore[reportUnusedImport]
 from crunch.unstructured._code_loader import CodeLoader as CodeLoader
 from crunch.unstructured._code_loader import CodeLoadError as CodeLoadError
-from crunch.unstructured._code_loader import GithubCodeLoader as GithubCodeLoader
+from crunch.unstructured._code_loader import HttpCodeLoader as HttpCodeLoader
 from crunch.unstructured._code_loader import LocalCodeLoader as LocalCodeLoader
+from crunch.unstructured._code_loader import FallbackCodeLoader as FallbackCodeLoader
 from crunch.unstructured._code_loader import ModuleFileName as ModuleFileName
 from crunch.unstructured._code_loader import NoCodeFoundError as NoCodeFoundError
 from crunch.unstructured._code_loader import deduce as deduce_code_loader  # pyright: ignore[reportUnusedImport]
+from crunch.unstructured._code_loader import format_github_url as format_github_url
+from crunch.unstructured._code_loader import format_relative_module_path as format_relative_module_path
 from crunch.unstructured._execute import ParticipantVisibleError as ParticipantVisibleError
 from crunch.unstructured._file import File as File
 from crunch.unstructured._module.leaderboard import ComparedSimilarity as ComparedSimilarity

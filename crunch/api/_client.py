@@ -30,6 +30,7 @@ from crunch.api._domain.user import UserCollection, UserEndpointMixin
 from crunch.api._errors import ApiException, convert_error
 from crunch.api._pagination import PageRequest
 from crunch.constants import API_KEY_ENV_VAR
+from crunch.utils import build_user_agent
 
 if TYPE_CHECKING:
     from crunch.utils import ProjectInfo
@@ -72,7 +73,7 @@ class EndpointClient(
         self.page_size = 100
 
         self.headers.update({
-            "User-Agent": _build_user_agent(),
+            "User-Agent": build_user_agent(),
         })
 
     def request(self, method: str, url: str, *args: Any, **kwargs: Any):
@@ -350,15 +351,3 @@ class Client:
         project = competition.projects.get_reference(None, (project_info.user_id, project_info.project_name))
 
         return client, project
-
-
-def _build_user_agent() -> str:
-    import platform
-    import sys
-
-    from crunch.__version__ import __version__ as crunch_version
-
-    python_version = ".".join(map(str, sys.version_info[:3]))
-    os_name = platform.system()  # "Linux", "Darwin", "Windows"
-
-    return f"crunch-cli/{crunch_version} (Python/{python_version}; {os_name})"

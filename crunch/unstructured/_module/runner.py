@@ -109,7 +109,7 @@ class RunnerModule(ModuleWrapper):
     @staticmethod
     def load(loader: CodeLoader):
         try:
-            module = loader.load()
+            module = loader.load().execute()
             return RunnerModule(module)
         except NoCodeFoundError:
             return None

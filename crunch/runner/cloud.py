@@ -24,7 +24,7 @@ from crunch.runner.runner import Runner
 from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import RunnerContext
-from crunch.unstructured import GithubCodeLoader, LocalCodeLoader, RunnerModule, deduce_code_loader
+from crunch.unstructured import LocalCodeLoader, RunnerModule, deduce_code_loader
 from crunch.utils import download
 
 UploadedFiles = Dict[str, Upload]
@@ -263,18 +263,21 @@ class CloudRunner(Runner):
             file_name="runner",
         )
 
-        if isinstance(loader, GithubCodeLoader):
-            source = loader.source
+        if isinstance(loader, LocalCodeLoader):
+            self.runner_dot_py_file_path = os.path.realpath(loader.path)
+            self.log(f"loading runner script from: {self.runner_dot_py_file_path}")
+        else:
+            source_code = loader.load()
 
             self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
+            self.log(f"loading runner script from: {self.runner_dot_py_file_path} (downloaded from {source_code.location})")
+
             with open(self.runner_dot_py_file_path, "w") as fd:
-                fd.write(source)
+                fd.write(source_code.content)
 
             os.chmod(self.runner_dot_py_file_path, MODE_READ_ALL)
 
             loader = LocalCodeLoader(path=self.runner_dot_py_file_path)
-        elif isinstance(loader, LocalCodeLoader):  # type: ignore
-            self.runner_dot_py_file_path = os.path.realpath(loader.path)
 
         self.runner_module = RunnerModule.load(loader)
         if self.runner_module is None:

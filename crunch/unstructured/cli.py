@@ -105,7 +105,7 @@ def leaderboard_rank(
                 "Reward Rank",
                 "Project ID",
                 *[
-                    f"Metric: {metric_name_by_id[id]}"
+                    f"Metric\n{metric_name_by_id[id]}"
                     for id in used_metric_ids
                 ]
             ),
@@ -454,7 +454,7 @@ def _load_code(context: click.Context, file_name: "ModuleFileName", module_loade
     )
 
     loader = load_code(file_name)
-    print(f"organizer: loading {file_name} code from {loader.location}")
+    print(f"organizer: loading {file_name} code from {loader}")
 
     module = module_loader(loader)
     if module is None:
@@ -563,24 +563,43 @@ def _ascii_table(
     *,
     headers: Sequence[str],
     values: List[Sequence[Sequence[str]]],
+    spacing: int = 3,
 ):
     rows: List[Sequence[str]] = [
         list(map(str, row))
         for row in values
     ]
 
-    rows.insert(0, headers)
+    header_liness: List[Sequence[str]] = [
+        header.split("\n")
+        for header in headers
+    ]
+
+    max_header_lines_count = max(len(header_lines) for header_lines in header_liness)
+    for _ in range(max_header_lines_count):
+        rows.insert(0, [""] * len(headers))
+
+    for index, header_lines in enumerate(header_liness):
+        for line_index, line in enumerate(header_lines):
+            # Headers are lists, so they are indexable and mutable.
+            rows[line_index][index] = line  # pyright: ignore[reportIndexIssue]
 
     max_length_per_columns = [
         max((len(row[index]) for row in rows))
         for index in range(len(rows[0]))
     ]
 
-    for row in rows:
+    separators = [
+        "-" * (max_length_per_columns[index])
+        for index in range(len(max_length_per_columns))
+    ]
+    rows.insert(max_header_lines_count, separators)
+
+    for index, row in enumerate(rows):
         print("  ", end="")
 
         for column_index, value in enumerate(row):
-            width = max_length_per_columns[column_index] + 3
+            width = max_length_per_columns[column_index] + spacing
             print(value.ljust(width), end="")
 
         print()
