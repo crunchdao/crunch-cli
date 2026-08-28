@@ -265,10 +265,13 @@ class CloudRunner(Runner):
 
         if isinstance(loader, LocalCodeLoader):
             self.runner_dot_py_file_path = os.path.realpath(loader.path)
+            self.log(f"loading runner script from: {self.runner_dot_py_file_path}")
         else:
             source_code = loader.load()
 
             self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
+            self.log(f"loading runner script from: {self.runner_dot_py_file_path} (downloaded from {source_code.location})")
+
             with open(self.runner_dot_py_file_path, "w") as fd:
                 fd.write(source_code.content)
 
