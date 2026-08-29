@@ -44,7 +44,7 @@ DATA_SIZE_VARIANTS = [
 ]
 
 
-class SubmissionNumberType(click.ParamType[Union[int, Literal["latest", "scratch"]]]):
+class SubmissionNumberType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "number"
 
     def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
