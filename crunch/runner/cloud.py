@@ -359,7 +359,7 @@ class CloudRunner(Runner):
             "--upgrade",
             "--force-reinstall",
             "--no-deps",
-            f"git+https://github.com/crunchdao/crunch-cli@{self.crunch_cli_commit_hash}"
+            f"https://codeload.github.com/crunchdao/crunch-cli/zip/{self.crunch_cli_commit_hash}"
         ])
 
     def _fix_gpu_requirements(self):
