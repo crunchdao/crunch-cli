@@ -255,6 +255,18 @@ class ForbiddenLibraryException(ApiException):
         _print_contact("the package should be allowed")
 
 
+class RequirementParseError(ApiException):
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print("There was an error while trying to parse your requirements file:")
+
+        for line in str(self.message).splitlines():
+            print(f"  {line}")
+
+
 class InvalidProjectTokenException(ApiException):
 
     def __init__(
