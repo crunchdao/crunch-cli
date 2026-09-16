@@ -41,9 +41,6 @@ class ApiException(Exception):
 
 class InternalServerException(ApiException):
 
-    def __init__(self, message: str):
-        super().__init__(message)
-
     def print_helper(
         self,
         **kwargs: Any,
@@ -99,9 +96,6 @@ class ValidationFailedException(ApiException):
 ##
 
 class CheckException(ApiException):
-
-    def __init__(self, message: str):
-        super().__init__(message)
 
     def print_helper(
         self,
@@ -182,12 +176,6 @@ class CrunchNotPublishedException(ApiException):
 
 
 class CurrentPhaseNotFoundException(ApiException):
-
-    def __init__(
-        self,
-        message: str
-    ):
-        super().__init__(message)
 
     def print_helper(
         self,
@@ -378,9 +366,6 @@ class ModelTooBigException(ApiException):
 
 class NeverSubmittedException(ApiException):
 
-    def __init__(self, message: str):
-        super().__init__(message)
-
     def print_helper(
         self,
         **kwargs: Any,
@@ -390,9 +375,6 @@ class NeverSubmittedException(ApiException):
 
 class EncryptedSubmissionException(ApiException):
 
-    def __init__(self, message: str):
-        super().__init__(message)
-
     def print_helper(
         self,
         **kwargs: Any,
@@ -401,12 +383,6 @@ class EncryptedSubmissionException(ApiException):
 
 
 class PredictionSubmissionNotAllowedException(ApiException):
-
-    def __init__(
-        self,
-        message: str,
-    ):
-        super().__init__(message)
 
     def print_helper(
         self,
