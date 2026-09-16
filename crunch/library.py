@@ -5,9 +5,10 @@ from collections import defaultdict
 from types import ModuleType
 from typing import Any, Dict, List, NamedTuple, Optional, Set, overload
 
+import click
 from crunch_convert import RequirementLanguage
 from crunch_convert.notebook import BadCellHandling, extract_from_cells
-from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist, MultipleLibraryAliasCandidateException, Whitelist, parse_from_file
+from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist, MultipleLibraryAliasCandidateException, RequirementParseError, Whitelist, parse_from_file
 
 import crunch.store as store
 from crunch.api import Client
@@ -37,16 +38,22 @@ def extract_from_requirements(
         return set()
 
     with open(file_path, "r") as fd:
+        file_content = fd.read()
+
+    try:
         requirements = parse_from_file(
             language=language,
-            file_content=fd.read(),
+            file_content=file_content,
         )
+    except RequirementParseError as error:
+        print(f"{language.txt_file_name}: {error}")
+        raise click.Abort()
 
-        return {
-            requirement.name
-            for requirement in requirements
-            if requirement.language == language
-        }
+    return {
+        requirement.name
+        for requirement in requirements
+        if requirement.language == language
+    }
 
 
 def extract_from_notebook_modules(
