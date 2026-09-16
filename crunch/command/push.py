@@ -245,10 +245,14 @@ def _upload_files(
         with open(path, "r") as fd:
             original_requirements_file = fd.read()
 
-        requirements = requirements_txt.parse_from_file(
-            language=language,
-            file_content=original_requirements_file,
-        )
+        try:
+            requirements = requirements_txt.parse_from_file(
+                language=language,
+                file_content=original_requirements_file,
+            )
+        except requirements_txt.RequirementParseError as error:
+            print(f"{language.txt_file_name}: {error}")
+            raise click.Abort()
 
         whitelist = requirements_txt.CachedWhitelist(
             requirements_txt.CrunchHubWhitelist(
