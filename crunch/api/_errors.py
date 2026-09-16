@@ -1,6 +1,9 @@
 import json
 import sys
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
+
+from dataclasses_json import DataClassJsonMixin
 
 from crunch.api._domain.phase import PhaseType
 from crunch.api._domain.project import ProjectTokenType
@@ -219,16 +222,25 @@ class DailySubmissionLimitExceededException(ApiException):
         _print_contact("you should get more")
 
 
+@dataclass
+class ForbiddenRequirement(DataClassJsonMixin):
+    name: str
+    language: str
+
+
 class ForbiddenLibraryException(ApiException):
 
     def __init__(
         self,
         message: str,
-        packages: List[str]
+        requirements: List[dict[str, Any]]
     ):
         super().__init__(message)
 
-        self.packages = packages
+        self.requirements = [
+            ForbiddenRequirement.from_dict(item)  # pyright: ignore[reportUnknownMemberType]
+            for item in requirements
+        ]
 
     def print_helper(
         self,
@@ -245,11 +257,12 @@ class ForbiddenLibraryException(ApiException):
         client = Client.from_env()
 
         print("\nProblematic packages:")
-        for package in self.packages:
-            print(f"- {package}")
+        for requirement in self.requirements:
+            print(f"- {requirement.name}")
 
             if competition_name is not None:
-                url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?requestName={package}')
+                request_language_param = "&requestLanguage={requirement.language}" if requirement.language != "PYTHON" else ""
+                url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?requestName={requirement.name}{request_language_param}')
                 print(f"  >> Request to whitelist: {url}")
 
         _print_contact("the package should be allowed")
