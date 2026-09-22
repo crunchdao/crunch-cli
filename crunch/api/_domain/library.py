@@ -1,14 +1,15 @@
-import typing
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple, Union
 
-from .._resource import Collection, Model
-from .common import GpuRequirement
+from crunch.api._domain.common import GpuRequirement
+from crunch.api._resource import Collection, EndpointMixin, Model
 
-if typing.TYPE_CHECKING:
-    from ...convert import ImportedRequirement, ImportedRequirementLanguage
-    from .enum_ import Language
+if TYPE_CHECKING:
+    from crunch_convert.notebook import ImportedRequirementLanguage
+
+    from crunch.api._domain.enum_ import Language
 
 
-class Library(Model):
+class Library(Model[int]):
 
     @property
     def name(self) -> str:
@@ -23,7 +24,7 @@ class Library(Model):
         return GpuRequirement[self._attrs["gpuRequirement"]]
 
     @property
-    def aliases(self) -> typing.Tuple[str]:
+    def aliases(self) -> Tuple[str]:
         return tuple(self._attrs.get("aliases") or [])
 
 
@@ -31,19 +32,16 @@ class LibraryCollection(Collection[Library]):
 
     model = Library
 
-    def __iter__(self) -> typing.Iterator[Library]:
-        return super().__iter__()
-
     def list(
         self,
         *,
-        name: typing.Optional[str] = None,
-        gpu_requirement: typing.Optional[GpuRequirement] = None,
-        standard: typing.Optional[bool] = None,
-        language: typing.Optional[typing.Union["Language", "ImportedRequirementLanguage"]] = None,
-    ) -> typing.List[Library]:
+        name: Optional[str] = None,
+        gpu_requirement: Optional[GpuRequirement] = None,
+        standard: Optional[bool] = None,
+        language: Optional[Union["Language", "ImportedRequirementLanguage"]] = None,
+    ) -> Iterable[Library]:
         return self.prepare_models(
-            self._client.api.list_libraries_v2(
+            self._checked_client.api.list_libraries_v2(
                 name=name,
                 gpu_requirement=gpu_requirement,
                 standard=standard,
@@ -52,22 +50,22 @@ class LibraryCollection(Collection[Library]):
         )
 
 
-class LibraryEndpointMixin:
+class LibraryEndpointMixin(EndpointMixin):
 
     def list_libraries_v2(
         self,
-        name,
-        gpu_requirement,
-        standard,
-        language,
+        name: Optional[str],
+        gpu_requirement: Optional[GpuRequirement],
+        standard: Optional[bool],
+        language: Optional[Union["Language", "ImportedRequirementLanguage"]],
     ):
-        params = {}
+        params: Dict[str, Any] = {}
 
         if name is not None:
             params["name"] = name
 
         if gpu_requirement is not None:
-            params["gpuRequirement"] = gpu_requirement.name()
+            params["gpuRequirement"] = gpu_requirement.name
 
         if standard is not None:
             params["standard"] = str(standard).lower()

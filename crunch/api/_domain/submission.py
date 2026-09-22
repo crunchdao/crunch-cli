@@ -1,12 +1,17 @@
+from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterator, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from crunch.api._auth import PushTokenAuth
-from crunch.api._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin
+from crunch.api._resource import Model as BaseModel
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
+    from crunch.api._domain.model import Model
     from crunch.api._domain.project import Project
+    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
+    from crunch.api._resource import JsonValue
     from crunch.api._types import Attrs
 
 
@@ -20,9 +25,7 @@ class SubmissionType(Enum):
         return self.name
 
 
-class Submission(Model):
-
-    resource_identifier_attribute = "number"
+class Submission(BaseModel[int]):
 
     def __init__(
         self,
@@ -31,9 +34,13 @@ class Submission(Model):
         client: Optional["Client"] = None,
         collection: Optional["SubmissionCollection"] = None,
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._project = project
+
+    @property
+    def resource_identifier(self) -> int:
+        return self.number
 
     @property
     def project(self):
@@ -48,10 +55,46 @@ class Submission(Model):
         return self._attrs["number"]
 
     @property
+    def message(self) -> str:
+        return self._attrs["message"]
+
+    @property
+    def main_file_path(self) -> str:
+        return self._attrs["mainFilePath"]
+
+    @property
+    def model_directory_path(self) -> str:
+        return self._attrs["modelDirectoryPath"]
+
+    @property
+    def total_size(self) -> int:
+        return self._attrs["totalSize"]
+
+    @property
+    def model(self) -> Optional["Model"]:
+        from crunch.api._domain.model import Model
+
+        model_attrs = self._attrs.get("model")
+        if model_attrs is None:
+            return None
+
+        return Model(self.project, model_attrs, self._client)
+
+    @property
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["createdAt"])
+
+    @property
     def files(self):
-        from .submission_file import SubmissionFileCollection
+        from crunch.api._domain.submission_file import SubmissionFileCollection
 
         return SubmissionFileCollection(self, self._client)
+
+    @property
+    def runtime_options(self):
+        from crunch.api._domain.runtime import RuntimeOptionCollection
+
+        return RuntimeOptionCollection(self, self._client)
 
 
 class SubmissionCollection(Collection[Submission]):
@@ -67,15 +110,12 @@ class SubmissionCollection(Collection[Submission]):
 
         self.project = project
 
-    def __iter__(self) -> Iterator[Submission]:
-        return super().__iter__()
-
     def get(
         self,
         number: int,
     ) -> Submission:
         return self.prepare_model(
-            self._client.api.get_submission(
+            self._checked_client.api.get_submission(
                 self.project.competition.id,
                 self.project.user_id,
                 self.project.name,
@@ -87,7 +127,7 @@ class SubmissionCollection(Collection[Submission]):
         self
     ) -> List[Submission]:
         return self.prepare_models(
-            self._client.api.list_submissions(
+            self._checked_client.api.list_submissions(
                 self.project.competition.id,
                 self.project.user_id,
                 self.project.name,
@@ -105,7 +145,7 @@ class SubmissionCollection(Collection[Submission]):
         model_files: Dict[str, str],
     ) -> Submission:
         return self.prepare_model(
-            self._client.api.create_submission(
+            self._checked_client.api.create_submission(
                 self.project.competition.id,
                 self.project.user_id,
                 self.project.name,
@@ -119,26 +159,27 @@ class SubmissionCollection(Collection[Submission]):
         )
 
     def get_next_encryption_id(self) -> str:
-        return self._client.api.get_submission_next_encryption_id(
+        return self._checked_client.api.get_submission_next_encryption_id(
             self.project.competition.id,
             self.project.user_id,
             self.project.name,
         )
 
-    def prepare_model(self, attrs: "Attrs"):
+    def prepare_model(self, attrs: Union["JsonValue", Submission], *args: Any) -> Submission:
         return super().prepare_model(
             attrs,
             self.project,
+            *args
         )
 
 
-class SubmissionEndpointMixin:
+class SubmissionEndpointMixin(EndpointMixin):
 
     def list_submissions(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType"
     ):
         return self._result(
             self.get(
@@ -149,10 +190,10 @@ class SubmissionEndpointMixin:
 
     def get_submission(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier,
-        submission_number
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+        submission_number: int
     ):
         return self._result(
             self.get(
@@ -163,15 +204,15 @@ class SubmissionEndpointMixin:
 
     def create_submission(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier,
-        message,
-        main_file_path,
-        model_directory_path,
-        type,
-        code_files,
-        model_files,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+        message: str,
+        main_file_path: str,
+        model_directory_path: str,
+        type: str,
+        code_files: Dict[str, str],
+        model_files: Dict[str, str],
     ):
         return self._result(
             self.post(
@@ -192,9 +233,9 @@ class SubmissionEndpointMixin:
 
     def get_submission_next_encryption_id(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType"
     ):
         return self._result(
             self.get(

@@ -1,6 +1,8 @@
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, List, Optional, Union
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._resource import Collection, EndpointMixin
+from crunch.api._resource import Model as BaseModel
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -10,14 +12,14 @@ if TYPE_CHECKING:
     from crunch.api._types import Attrs
 
 
-class Prediction(Model[int]):
+class Model(BaseModel[int]):
 
     def __init__(
         self,
         project: "Project",
         attrs: Optional["Attrs"] = None,
         client: Optional["Client"] = None,
-        collection: Optional["PredictionCollection"] = None,
+        collection: Optional["ModelCollection"] = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -28,42 +30,23 @@ class Prediction(Model[int]):
         return self._project
 
     @property
-    def name(self):
-        return self._attrs["name"]
+    def total_size(self) -> int:
+        return self._attrs["totalSize"]
 
     @property
-    def valid(self) -> Optional[bool]:
-        return self._attrs["valid"]
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["createdAt"])
 
     @property
-    def success(self) -> Optional[bool]:
-        return self._attrs["success"]
+    def files(self):
+        from crunch.api._domain.model_file import ModelFileCollection
 
-    @property
-    def error_message(self) -> Optional[str]:
-        return self._attrs["error"]
-
-    @property
-    def managed(self) -> bool:
-        return self._attrs["managed"]
-
-    @property
-    def deterministic(self) -> bool:
-        return self._attrs["deterministic"]
-
-    @property
-    def scores(self):
-        from crunch.api._domain.score import ScoreCollection
-
-        return ScoreCollection(
-            prediction=self,
-            client=self._client
-        )
+        return ModelFileCollection(self, self._client)
 
 
-class PredictionCollection(Collection[Prediction]):
+class ModelCollection(Collection[Model]):
 
-    model = Prediction
+    model = Model
 
     def __init__(
         self,
@@ -76,10 +59,10 @@ class PredictionCollection(Collection[Prediction]):
 
     def get(
         self,
-        id: int
-    ) -> Prediction:
+        id: int,
+    ) -> Model:
         return self.prepare_model(
-            self._checked_client.api.get_prediction(
+            self._checked_client.api.get_model(
                 self.project.competition.id,
                 self.project.user_id,
                 self.project.name,
@@ -89,16 +72,16 @@ class PredictionCollection(Collection[Prediction]):
 
     def list(
         self
-    ) -> List[Prediction]:
+    ) -> List[Model]:
         return self.prepare_models(
-            self._checked_client.api.list_predictions(
+            self._checked_client.api.list_models(
                 self.project.competition.id,
                 self.project.user_id,
                 self.project.name,
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Prediction], *args: Any) -> Prediction:
+    def prepare_model(self, attrs: Union["JsonValue", Model], *args: Any) -> Model:
         return super().prepare_model(
             attrs,
             self.project,
@@ -106,9 +89,9 @@ class PredictionCollection(Collection[Prediction]):
         )
 
 
-class PredictionEndpointMixin(EndpointMixin):
+class ModelEndpointMixin(EndpointMixin):
 
-    def list_predictions(
+    def list_models(
         self,
         competition_identifier: "CompetitionIdentifierType",
         user_identifier: "UserIdentifierType",
@@ -116,21 +99,21 @@ class PredictionEndpointMixin(EndpointMixin):
     ):
         return self._result(
             self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/predictions"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/models"
             ),
             json=True
         )
 
-    def get_prediction(
+    def get_model(
         self,
         competition_identifier: "CompetitionIdentifierType",
         user_identifier: "UserIdentifierType",
         project_identifier: "ProjectIdentifierType",
-        prediction_id: int
+        model_id: int
     ):
         return self._result(
             self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/predictions/{prediction_id}"
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/models/{model_id}"
             ),
             json=True
         )

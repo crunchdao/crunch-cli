@@ -1,14 +1,15 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from crunch.api._domain.round import Round
-from crunch.api._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
     from crunch.api._domain.data_release import SizeVariant
+    from crunch.api._domain.round import Round
     from crunch.api._identifiers import CompetitionIdentifierType, PhaseIdentifierType, RoundIdentifierType
+    from crunch.api._resource import JsonValue
 
 
 class PhaseType(Enum):
@@ -47,21 +48,22 @@ class PhaseType(Enum):
         return str(self).lower().replace("_", "-")
 
 
-
-class Phase(Model):
-
-    resource_identifier_attribute = "type"
+class Phase(Model[int]):
 
     def __init__(
         self,
-        round: Round,
+        round: "Round",
         attrs: Optional[Dict[str, Any]] = None,
         client: Optional["Client"] = None,
         collection: Optional["PhaseCollection"] = None
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._round = round
+
+    @property
+    def resource_identifier(self) -> str:
+        return self._attrs["type"]
 
     @property
     def round(self):
@@ -81,7 +83,7 @@ class Phase(Model):
 
     @property
     def crunches(self):
-        from .crunch import CrunchCollection
+        from crunch.api._domain.crunch import CrunchCollection
 
         return CrunchCollection(
             phase=self,
@@ -92,24 +94,22 @@ class Phase(Model):
         self,
         size_variant: Optional["SizeVariant"] = None,
     ):
-        from crunch.api._domain.data_release import DataRelease, DataReleaseCollection
+        from crunch.api._domain.data_release import DataReleaseCollection
 
         client = self._client
         assert client is not None
 
-        attrs = cast(Dict[str, Any], client.api.get_submission_phase_data_release(
+        attrs = client.api.get_submission_phase_data_release(
             self.round.competition.resource_identifier,
             self.round.resource_identifier,
-            size_variant.name if size_variant else None,
-        ))
+            size_variant,
+        )
 
         competition = self.round.competition
-        data_release = DataReleaseCollection(
+        return DataReleaseCollection(
             competition,
             self._client,
         ).prepare_model(attrs)
-
-        return cast(DataRelease, data_release)
 
 
 class PhaseCollection(Collection[Phase]):
@@ -118,15 +118,12 @@ class PhaseCollection(Collection[Phase]):
 
     def __init__(
         self,
-        round: Round,
+        round: "Round",
         client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.round = round
-
-    def __iter__(self) -> Iterator[Phase]:
-        return super().__iter__()
 
     def get(
         self,
@@ -136,7 +133,7 @@ class PhaseCollection(Collection[Phase]):
             identifier = identifier.name
 
         return self.prepare_model(
-            self._client.api.get_phase(
+            self._checked_client.api.get_phase(
                 self.round.competition.resource_identifier,
                 self.round.resource_identifier,
                 identifier
@@ -166,22 +163,23 @@ class PhaseCollection(Collection[Phase]):
 
     def list(
         self
-    ) -> List[Round]:
+    ) -> List[Phase]:
         return self.prepare_models(
-            self._client.api.list_phases(
+            self._checked_client.api.list_phases(
                 self.round.competition.id,
                 self.round.number
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", Phase], *args: Any) -> Phase:
         return super().prepare_model(
             attrs,
-            self.round
+            self.round,
+            *args
         )
 
 
-class PhaseEndpointMixin:
+class PhaseEndpointMixin(EndpointMixin):
 
     def list_phases(
         self,
@@ -214,9 +212,9 @@ class PhaseEndpointMixin:
         round_identifier: "RoundIdentifierType",
         size_variant: Optional["SizeVariant"] = None,
     ):
-        params = {}
+        params: Dict[str, Any] = {}
         if size_variant:
-            params["sizeVariant"] = size_variant
+            params["sizeVariant"] = size_variant.name
 
         return self._result(
             self.get(

@@ -31,6 +31,7 @@ CrunchIdentifierType = Union[
     Literal[
         "@current",
         "@next",
+        "@last",
         "@published",
     ]
 ]

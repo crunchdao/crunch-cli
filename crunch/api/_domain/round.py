@@ -1,17 +1,16 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from crunch.api._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
-    from crunch.api._identifiers import RoundIdentifierType
+    from crunch.api._identifiers import CompetitionIdentifierType, RoundIdentifierType
+    from crunch.api._resource import JsonValue
 
 
-class Round(Model):
-
-    resource_identifier_attribute = "number"
+class Round(Model[int]):
 
     def __init__(
         self,
@@ -20,9 +19,13 @@ class Round(Model):
         client: Optional["Client"] = None,
         collection: Optional["RoundCollection"] = None
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
+
+    @property
+    def resource_identifier(self) -> int:
+        return self.number
 
     @property
     def competition(self):
@@ -68,7 +71,7 @@ class RoundCollection(Collection[Round]):
         identifier: "RoundIdentifierType",
     ) -> Round:
         return self.prepare_model(
-            self._client.api.get_round(
+            self._checked_client.api.get_round(
                 self.competition.resource_identifier,
                 identifier
             )
@@ -92,23 +95,24 @@ class RoundCollection(Collection[Round]):
         self
     ) -> List[Round]:
         return self.prepare_models(
-            self._client.api.list_rounds(
+            self._checked_client.api.list_rounds(
                 self.competition.resource_identifier,
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", Round], *args: Any) -> Round:
         return super().prepare_model(
             attrs,
-            self.competition
+            self.competition,
+            *args
         )
 
 
-class RoundEndpointMixin:
+class RoundEndpointMixin(EndpointMixin):
 
     def list_rounds(
         self,
-        competition_identifier
+        competition_identifier: "CompetitionIdentifierType"
     ):
         return self._result(
             self.get(
@@ -119,8 +123,8 @@ class RoundEndpointMixin:
 
     def get_round(
         self,
-        competition_identifier,
-        round_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        round_identifier: "RoundIdentifierType"
     ):
         return self._result(
             self.get(

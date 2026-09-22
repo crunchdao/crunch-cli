@@ -1,21 +1,20 @@
 import dataclasses
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-import dataclasses_json
+from dataclasses_json import dataclass_json, LetterCase, Undefined
 
 from crunch.api._domain.enum_ import Language
-from crunch.api._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
+    from crunch.api._identifiers import CompetitionIdentifierType
+    from crunch.api._resource import JsonValue
     from crunch.api._types import Attrs
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,  # type: ignore
-    undefined=dataclasses_json.Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclasses.dataclass(frozen=True)
 class QuickstarterAuthor:
 
@@ -32,10 +31,7 @@ class QuickstarterAuthor:
         ]
 
 
-@dataclasses_json.dataclass_json(
-    letter_case=dataclasses_json.LetterCase.CAMEL,  # type: ignore
-    undefined=dataclasses_json.Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclasses.dataclass(frozen=True)
 class QuickstarterFile:
 
@@ -54,9 +50,7 @@ class QuickstarterFile:
         ]
 
 
-class Quickstarter(Model):
-
-    resource_identifier_attribute = "name"
+class Quickstarter(Model[int]):
 
     def __init__(
         self,
@@ -65,9 +59,13 @@ class Quickstarter(Model):
         client: Optional["Client"] = None,
         collection: Optional["QuickstarterCollection"] = None,
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
+
+    @property
+    def resource_identifier(self) -> str:
+        return self.name
 
     @property
     def competition(self):
@@ -116,15 +114,12 @@ class QuickstarterCollection(Collection[Quickstarter]):
 
         self.competition = competition
 
-    def __iter__(self) -> Iterator[Quickstarter]:
-        return super().__iter__()  # type: ignore
-
     def get(
         self,
         quickstarter_name: str
     ) -> Quickstarter:
         return self.prepare_model(
-            self._client.api.get_quickstarter(
+            self._checked_client.api.get_quickstarter(
                 self.competition.resource_identifier,
                 quickstarter_name
             )
@@ -134,23 +129,24 @@ class QuickstarterCollection(Collection[Quickstarter]):
         self
     ) -> List[Quickstarter]:
         return self.prepare_models(
-            self._client.api.list_quickstarters(
+            self._checked_client.api.list_quickstarters(
                 self.competition.resource_identifier
             )
         )
 
-    def prepare_model(self, attrs: "Attrs"):
+    def prepare_model(self, attrs: Union["JsonValue", Quickstarter], *args: Any) -> Quickstarter:
         return super().prepare_model(
             attrs,
             self.competition,
+            *args
         )
 
 
-class QuickstarterEndpointMixin:
+class QuickstarterEndpointMixin(EndpointMixin):
 
     def list_quickstarters(
         self,
-        competition_identifier
+        competition_identifier: "CompetitionIdentifierType"
     ):
         return self._result(
             self.get(
@@ -161,8 +157,8 @@ class QuickstarterEndpointMixin:
 
     def get_quickstarter(
         self,
-        competition_identifier,
-        quickstarter_name
+        competition_identifier: "CompetitionIdentifierType",
+        quickstarter_name: str
     ):
         return self._result(
             self.get(

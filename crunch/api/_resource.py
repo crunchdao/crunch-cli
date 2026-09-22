@@ -2,21 +2,27 @@
 Heavily inspired (copied) from https://github.com/docker/docker-py/blob/main/docker/models/resource.py.
 """
 
+from abc import ABC, abstractmethod
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Iterable, Iterator, List, Literal, Optional, Type, TypeVar, Union, cast, overload
+
+import requests
+
 
 if TYPE_CHECKING:
+    from crunch.api._auth import Auth
     from crunch.api._client import Client
+    from crunch.api._pagination import PageRequest
+
+ID = TypeVar('ID')
+M = TypeVar('M', bound="Model[Any]")
 
 
-# TODO: add better support for composite key resources
-class Model:
-
-    id_attribute = 'id'
-    resource_identifier_attribute = 'id'
+class Model(Generic[ID]):
 
     def __init__(
         self,
+        *,
         attrs: Optional[Dict[str, Any]] = None,
         client: Optional["Client"] = None,
         collection: Optional["Collection[Any]"] = None
@@ -25,19 +31,26 @@ class Model:
         self._client = client
         self._collection = collection
 
+    @property
+    def _checked_client(self) -> "Client":
+        if self._client is None:
+            raise Exception("client unavailable")
+
+        return self._client
+
+    @property
+    def _checked_collection(self) -> "Collection[Any]":
+        if self._collection is None:
+            raise Exception("collection unavailable")
+
+        return self._collection
+
     def __repr__(self):
-        repr = f"{self.__class__.__name__}(id={self.id}"
+        resource_identifier = self.resource_identifier
+        if resource_identifier == self.id:
+            return f"{self.__class__.__name__}(id={self.id})"
 
-        if self.id_attribute != self.resource_identifier_attribute:
-            if isinstance(self.resource_identifier_attribute, (list, tuple)):
-                repr += f", " + ", ".join([
-                    f"{key}={value}"
-                    for key, value in zip(self.resource_identifier_attribute, self.resource_identifier)
-                ])
-            else:
-                repr += f", {self.resource_identifier_attribute}={self.resource_identifier}"
-
-        return f"{repr})"
+        return f"{self.__class__.__name__}(id={self.id}, resource_identifier={resource_identifier})"
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, self.__class__) and self.id == other.id
@@ -46,29 +59,23 @@ class Model:
         return hash(f"{self.__class__.__name__}:{self.id}")
 
     @property
-    def id(self) -> Union[int, str]:
-        return self._attrs.get(self.id_attribute)
+    def id(self) -> ID:
+        return cast(ID, self._attrs.get('id'))
 
     @property
-    def resource_identifier(self):
-        if isinstance(self.resource_identifier_attribute, (list, tuple)):
-            return [
-                getattr(self, key, None) or self._attrs.get(key)
-                for key in self.resource_identifier_attribute
-            ]
-
-        return self._attrs.get(self.resource_identifier_attribute)
+    def resource_identifier(self) -> Any:
+        return self.id
 
     def reload(
-        self,
-        *args,  # type: ignore
-        **kwargs,  # type: ignore
-    ):
+        self: "M",
+        *args: Any,
+        **kwargs: Any,
+    ) -> "M":
         resource_identifier = self.resource_identifier
         if not isinstance(resource_identifier, (list, tuple)):
             resource_identifier = [resource_identifier]
 
-        new_model = self._collection.get(
+        new_model = self._checked_collection.get(
             *resource_identifier,
             *args,
             **kwargs
@@ -97,7 +104,7 @@ class Model:
         ]
 
 
-T = TypeVar('T', Model, Model)
+T = TypeVar('T', bound=Model)
 
 
 class Collection(Generic[T]):
@@ -107,71 +114,35 @@ class Collection(Generic[T]):
     def __init__(self, client: Optional["Client"] = None):
         self._client = client
 
+    @property
+    def _checked_client(self) -> "Client":
+        if self._client is None:
+            raise Exception("client unavailable")
+
+        return self._client
+
+    def list(self) -> Iterable[T]:
+        raise NotImplementedError
+
     def __iter__(self) -> Iterator[T]:
         return iter(self.list())
 
-    def __getitem__(self, key) -> T:
-        if isinstance(key, slice):
-            return self.__getslice__(key.start, key.stop, key.step)
-
-        collection = self.list()
-
-        if isinstance(collection, GeneratorType):
-            for _ in range(key):
-                next(collection)
-
-            return next(collection)
-
-        return collection[key]
-
-    def __getslice__(self, start, stop, step):
-        collection = self.list()
-
-        if isinstance(collection, GeneratorType):
-            if start:
-                for _ in range(start):
-                    next(collection)
-
-            arguments = list(filter(bool, (start, stop, step)))
-            for _ in range(*arguments):
-                yield next(collection)
-
-            return GeneratorExit
-
-        return collection[start:stop]
-
-    def list(self) -> List[T]:
-        raise NotImplementedError
-
-    def get(self, key) -> T:
-        raise NotImplementedError
-
-    def get_reference(
-        self,
-        id,
-        resource_identifier=None
-    ) -> T:
-        id_attribute = self.model.id_attribute
-        attrs = {
-            id_attribute: id
-        }
-
-        resource_identifier_attribute = self.model.resource_identifier_attribute
-        if (
-            resource_identifier_attribute != id_attribute
-            and resource_identifier is not None
-        ):
-            if isinstance(resource_identifier_attribute, (list, tuple)):
-                attrs.update(dict(zip(resource_identifier_attribute, resource_identifier)))
-            else:
-                attrs[resource_identifier_attribute] = resource_identifier
+    def get_reference(self, id: Optional[Any] = None, **attrs: Any) -> T:
+        """
+        Builds a lazy, unfetched model from just enough attrs to compute its
+        `resource_identifier` (e.g. `id=123`, or `user_id=1, name="foo"` for
+        a `Project`) — useful to avoid a round-trip when the caller already
+        knows how to address the resource. Call `.reload()` to fetch the rest.
+        """
+        if id is not None:
+            attrs = {"id": id, **attrs}
 
         return self.prepare_model(attrs)
 
-    def prepare_model(self, attrs, *args) -> T:
+    def prepare_model(self, attrs: Union["JsonValue", T], *args: Any) -> T:
         if isinstance(attrs, self.model):
-            attrs._client = self._client
-            attrs._collection = self
+            attrs._client = self._client  # pyright: ignore[reportPrivateUsage]
+            attrs._collection = self  # pyright: ignore[reportPrivateUsage]
             return attrs
 
         if isinstance(attrs, dict):
@@ -184,17 +155,84 @@ class Collection(Generic[T]):
 
         raise Exception(f"can't create {self.model.__name__} from {attrs}")
 
-    def prepare_models(self, attrs_list, *args) -> List[T]:
+    @overload
+    def prepare_models(self, attrs_list: Union["JsonValue", T], *args: Any) -> List[T]:
+        ...
+
+    @overload
+    def prepare_models(self, attrs_list: Iterator[Union["JsonValue", T]], *args: Any) -> Iterator[T]:
+        ...
+
+    def prepare_models(self, attrs_list: Union["JsonValue", T, Iterator[Union["JsonValue", T]]], *args: Any) -> Union[List[T], Iterator[T]]:
         if isinstance(attrs_list, GeneratorType):
             return self._prepare_models_with_yield(attrs_list, args)
 
-        return [
-            self.prepare_model(attrs, *args)
-            for attrs in attrs_list
-        ]
+        if isinstance(attrs_list, list):
+            return [
+                self.prepare_model(attrs, *args)
+                for attrs in attrs_list
+            ]
 
-    def _prepare_models_with_yield(self, attrs_list, args):
+        raise Exception(f"can't create {self.model.__name__} list from {attrs_list}")
+
+    def _prepare_models_with_yield(self, attrs_list: GeneratorType[T], args: Any):
         for attrs in attrs_list:
             yield self.prepare_model(attrs, *args)
 
         return GeneratorExit
+
+
+JsonValue = Union[str, int, float, bool, None, dict[str, "JsonValue"], list["JsonValue"]]
+
+
+class EndpointMixin(ABC):
+
+    if TYPE_CHECKING:
+        get: Callable[..., requests.Response]
+        post: Callable[..., requests.Response]
+        put: Callable[..., requests.Response]
+        delete: Callable[..., requests.Response]
+        page_size: int
+        auth_: "Auth"
+
+        def _paginated(
+            self,
+            requester: Callable[["PageRequest"], requests.Response],
+            page_size: Optional[int] = None,
+        ) -> Iterator[JsonValue]:
+            ...
+
+    @overload
+    def _result(
+        self,
+        response: requests.Response,
+        json: Literal[True],
+        binary: Literal[False] = False,
+    ) -> JsonValue:
+        ...
+
+    @overload
+    def _result(
+        self,
+        response: requests.Response,
+        json: Literal[False] = False,
+        binary: Literal[True] = True,
+    ) -> bytes:
+        ...
+
+    @overload
+    def _result(
+        self,
+        response: requests.Response,
+        json: Literal[False] = False,
+        binary: Literal[False] = False,
+    ) -> str:
+        ...
+
+    def _result(
+        self,
+        response: requests.Response,
+        json: bool = False,
+        binary: bool = False,
+    ) -> Union[JsonValue, bytes, str]:
+        ...

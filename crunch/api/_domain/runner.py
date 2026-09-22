@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
 from dataclasses_json import LetterCase, Undefined, config, dataclass_json
 
-from crunch.api._resource import Model
+from crunch.api._resource import EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -28,10 +28,7 @@ _status_config = config(
 )
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class RunnerRunSpan:
 
@@ -42,10 +39,7 @@ class RunnerRunSpan:
     attributes: Optional[Dict[str, Any]]
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,  # type: ignore
-    undefined=Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class StartedRunnerRunSpan(RunnerRunSpan):
 
@@ -55,10 +49,7 @@ class StartedRunnerRunSpan(RunnerRunSpan):
     )
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,  # type: ignore
-    undefined=Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class EndedRunnerRunSpan(RunnerRunSpan):
 
@@ -73,10 +64,7 @@ class EndedRunnerRunSpan(RunnerRunSpan):
     error: Optional[str]
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,  # type: ignore
-    undefined=Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class RunnerRunMetric:
 
@@ -91,45 +79,44 @@ class RunnerRunMetric:
     vram: Optional[int]  # bytes used
 
 
-class RunnerRun(Model):
+class RunnerRun(Model[int]):
 
     def __init__(
         self,
         run_id: int,
         client: Optional["Client"] = None
     ):
-        super().__init__({}, client, None)
+        super().__init__(attrs={}, client=client, collection=None)
 
         self._run_id = run_id
 
     @property
     def code(self) -> Dict[str, str]:
-        return self._client.api.get_runner_run_code(
+        return self._checked_client.api.get_runner_run_code(
             self._run_id
         )
 
     @property
     def model(self) -> Dict[str, str]:
-        return self._client.api.get_runner_run_model(
+        return self._checked_client.api.get_runner_run_model(
             self._run_id
         )
 
     @property
     def data(self):
-        from .data_release import DataRelease, DataReleaseCollection
+        from crunch.api._domain.data_release import DataReleaseCollection
 
-        data_release_attrs = self._client.api.get_runner_run_data(
+        data_release_attrs = self._checked_client.api.get_runner_run_data(
             self._run_id
         )
 
-        data_release = DataReleaseCollection(None).prepare_model(data_release_attrs)
-        return cast(DataRelease, data_release)
+        return DataReleaseCollection(None).prepare_model(data_release_attrs)
 
     def report_error(
         self,
         trace: str
     ):
-        self._client.api.report_runner_run_error(
+        self._checked_client.api.report_runner_run_error(
             self._run_id,
             trace
         )
@@ -139,14 +126,14 @@ class RunnerRun(Model):
         spans: List[RunnerRunSpan],
         metrics: List[RunnerRunMetric],
     ):
-        self._client.api.report_runner_run_traces(
+        self._checked_client.api.report_runner_run_traces(
             self._run_id,
             spans=[
-                span.to_dict()
+                span.to_dict()  # type: ignore[attr-defined]
                 for span in spans
             ],
             metrics=[
-                metric.to_dict()
+                metric.to_dict()  # type: ignore[attr-defined]
                 for metric in metrics
             ],
         )
@@ -158,7 +145,7 @@ class RunnerRun(Model):
         prediction_files: Dict[str, str],
         model_files: Dict[str, str],
     ):
-        self._client.api.submit_runner_run_result(
+        self._checked_client.api.submit_runner_run_result(
             self._run_id,
             use_initial_model,
             deterministic,
@@ -167,11 +154,11 @@ class RunnerRun(Model):
         )
 
 
-class RunnerRunEndpointMixin:
+class RunnerRunEndpointMixin(EndpointMixin):
 
     def get_runner_run_code(
         self,
-        run_id,
+        run_id: int,
     ):
         return self._result(
             self.get(
@@ -182,7 +169,7 @@ class RunnerRunEndpointMixin:
 
     def get_runner_run_data(
         self,
-        run_id,
+        run_id: int,
     ):
         return self._result(
             self.get(
@@ -193,7 +180,7 @@ class RunnerRunEndpointMixin:
 
     def get_runner_run_model(
         self,
-        run_id,
+        run_id: int,
     ):
         return self._result(
             self.get(
@@ -204,9 +191,9 @@ class RunnerRunEndpointMixin:
 
     def report_runner_run_traces(
         self,
-        run_id,
-        spans,
-        metrics,
+        run_id: int,
+        spans: List[Dict[str, Any]],
+        metrics: List[Dict[str, Any]],
     ):
         return self._result(
             self.post(
@@ -220,8 +207,8 @@ class RunnerRunEndpointMixin:
 
     def report_runner_run_error(
         self,
-        run_id,
-        trace,
+        run_id: int,
+        trace: str,
     ):
         return self._result(
             self.put(
@@ -234,11 +221,11 @@ class RunnerRunEndpointMixin:
 
     def submit_runner_run_result(
         self,
-        run_id,
-        use_initial_model,
-        deterministic,
-        prediction_files,
-        model_files,
+        run_id: int,
+        use_initial_model: bool,
+        deterministic: Optional[bool],
+        prediction_files: Dict[str, str],
+        model_files: Dict[str, str],
     ):
         return self._result(
             self.post(

@@ -1,12 +1,21 @@
-import enum
-import typing
+from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
-from .._resource import Collection, Model
-from .competition import Competition
-from .target import Target
+from dataclasses_json import Undefined, dataclass_json
+
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
+    from crunch.api._client import Client
+    from crunch.api._domain.competition import Competition
+    from crunch.api._domain.target import Target
+    from crunch.api._identifiers import CompetitionIdentifierType
+    from crunch.api._resource import JsonValue
+    from crunch.api._types import Attrs
 
 
-class ScorerFunction(enum.Enum):
+class ScorerFunction(Enum):
 
     BALANCED_ACCURACY = "BALANCED_ACCURACY"
     DOT_PRODUCT = "DOT_PRODUCT"
@@ -29,7 +38,7 @@ class ScorerFunction(enum.Enum):
         return self.name
 
 
-class ReducerFunction(enum.Enum):
+class ReducerFunction(Enum):
 
     NONE = "NONE"
     SUM = "SUM"
@@ -40,22 +49,35 @@ class ReducerFunction(enum.Enum):
         return self.name
 
 
-class Metric(Model):
+@dataclass_json(undefined=Undefined.EXCLUDE)
+@dataclass(frozen=True)
+class Unit:
 
-    resource_identifier_attribute = "name"
+    prefix: Optional[str]
+    scale: int
+    suffix: Optional[str]
+
+
+class Metric(Model[int]):
 
     def __init__(
         self,
-        competition: Competition,
-        target: Target = None,
-        attrs=None,
-        client=None,
-        collection=None
+        competition: "Competition",
+        target: Optional["Target"] = None,
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["MetricCollection"] = None,
     ):
-        super().__init__(attrs, client, collection)
+        from crunch.api._domain.target import Target
+
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
-        self._target = target or Target(competition, attrs["target"], client)
+        self._target = target or Target(competition, (attrs or {})["target"], client)
+
+    @property
+    def resource_identifier(self) -> str:
+        return self.name
 
     @property
     def competition(self):
@@ -93,6 +115,10 @@ class Metric(Model):
     def reducer_function(self):
         return ReducerFunction[self._attrs["reducerFunction"]]
 
+    @property
+    def unit(self) -> Unit:
+        return Unit.from_dict(self._attrs["unit"])  # type: ignore[attr-defined]
+
 
 class MetricCollection(Collection[Metric]):
 
@@ -100,24 +126,22 @@ class MetricCollection(Collection[Metric]):
 
     def __init__(
         self,
-        competition: Competition,
-        target: Target,
-        client=None
+        competition: "Competition",
+        target: "Target",
+        client: Optional["Client"] = None,
     ):
         super().__init__(client)
 
         self.competition = competition
         self.target = target
 
-    def __iter__(self) -> typing.Iterator[Metric]:
-        return super().__iter__()
 
     def get(
         self,
         name: str
     ) -> Metric:
         return self.prepare_model(
-            self._client.api.get_metric(
+            self._checked_client.api.get_metric(
                 self.competition.id,
                 self.target.name,
                 name
@@ -126,29 +150,30 @@ class MetricCollection(Collection[Metric]):
 
     def list(
         self
-    ) -> typing.List[Metric]:
+    ) -> List[Metric]:
         return self.prepare_models(
-            self._client.api.list_metrics(
+            self._checked_client.api.list_metrics(
                 self.competition.id,
                 self.target.name if self.target else None,
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", Metric], *args: Any) -> Metric:
         return super().prepare_model(
             attrs,
             self.competition,
-            self.target
+            self.target,
+            *args
         )
 
 
-class MetricEndpointMixin:
+class MetricEndpointMixin(EndpointMixin):
 
     def get_metric(
         self,
-        competition_identifier,
-        target_name,
-        metric_name
+        competition_identifier: "CompetitionIdentifierType",
+        target_name: Optional[str],
+        metric_name: str
     ):
         return self._result(
             self.get(
@@ -159,9 +184,9 @@ class MetricEndpointMixin:
 
     def list_metrics(
         self,
-        competition_identifier,
-        target_name,
-    ):
+        competition_identifier: "CompetitionIdentifierType",
+        target_name: Optional[str],
+    ) -> "JsonValue":
         url = (
             f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics"
             if target_name is not None else

@@ -235,7 +235,7 @@ class ForbiddenLibraryException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from ._client import Client
+        from crunch.api._client import Client
 
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
@@ -284,7 +284,7 @@ class InvalidProjectTokenException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from ._client import Client
+        from crunch.api._client import Client
 
         print("Your token seems to have expired or is invalid.")
 
@@ -428,7 +428,7 @@ class ProjectNotFoundException(ApiException):
         self,
         **kwargs: Any,
     ) -> None:
-        from ._client import Client
+        from crunch.api._client import Client
 
         print("Project not found.")
 
@@ -706,6 +706,24 @@ class ConflictingModelDirectoryException(ApiException):
 CurrentRoundNotFoundException = RoundNotFoundException
 LatestRoundNotFoundException = RoundNotFoundException
 NextRoundNotFoundException = RoundNotFoundException
+
+
+class QuickstarterNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        quickstarter_name: str,
+    ):
+        super().__init__(message)
+
+        self.quickstarter_name = quickstarter_name
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"The quickstarter `{self.quickstarter_name}` was not found.")
 
 
 def convert_error(

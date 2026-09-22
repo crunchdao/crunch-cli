@@ -2,17 +2,20 @@ import dataclasses
 import enum
 import os
 import time
-import typing
 from io import BytesIO
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, Union, overload
 
 import dataclasses_json
 import requests
 from tqdm.auto import tqdm
 
-if typing.TYPE_CHECKING:
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
     from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
-from .._resource import Collection, Model
+    from crunch.api._client import Client
+    from crunch.api._types import Attrs
 
 
 class UploadStatus(enum.Enum):
@@ -27,7 +30,7 @@ class UploadProvider(enum.Enum):
     AWS_S3 = "AWS_S3"
 
 
-@dataclasses_json.dataclass_json(
+@dataclasses_json.dataclass_json(  # type: ignore[call-overload]
     letter_case=dataclasses_json.LetterCase.CAMEL,
     undefined=dataclasses_json.Undefined.EXCLUDE,
 )
@@ -36,12 +39,10 @@ class PresignedUploadRequest:
 
     method: str
     url: str
-    headers: typing.Dict[str, str]
+    headers: Dict[str, str]
 
 
-class Upload(Model):
-
-    resource_identifier_attribute = "id"
+class Upload(Model[str]):
 
     @property
     def id(self) -> str:
@@ -72,7 +73,7 @@ class Upload(Model):
         return UploadProvider[self._attrs["provider"]]
 
     @property
-    def chunks(self) -> typing.List["UploadChunk"]:
+    def chunks(self) -> List["UploadChunk"]:
         return [
             UploadChunk(self, chunk_attrs, self._client)
             for chunk_attrs in self._attrs["chunks"]
@@ -80,41 +81,42 @@ class Upload(Model):
 
     def complete(self):
         self._attrs.update(
-            self._client.api.complete_upload(
+            self._checked_client.api.complete_upload(
                 self.id,
             )
         )
 
     def abort(self):
         self._attrs.update(
-            self._client.api.abort_upload(
+            self._checked_client.api.abort_upload(
                 self.id,
             )
         )
 
     def delete(self):
         self._attrs.update(
-            self._client.api.delete_upload(
+            self._checked_client.api.delete_upload(
                 self.id,
             )
         )
 
 
-class UploadChunk(Model):
-
-    id_attribute = None
-    resource_identifier_attribute = "number"
+class UploadChunk(Model[int]):
 
     def __init__(
         self,
         upload: Upload,
-        attrs=None,
-        client=None,
-        collection=None
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["Collection[UploadChunk]"] = None
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._upload = upload
+
+    @property
+    def resource_identifier(self) -> int:
+        return self.number
 
     @property
     def upload(self):
@@ -142,8 +144,8 @@ class UploadChunk(Model):
 
     @property
     def request(self) -> PresignedUploadRequest:
-        return PresignedUploadRequest.from_dict(
-            self._client.api.get_upload_chunk_request(
+        return PresignedUploadRequest.from_dict(  # type: ignore[attr-defined]
+            self._checked_client.api.get_upload_chunk_request(
                 self.upload.id,
                 self.number,
             )
@@ -151,7 +153,7 @@ class UploadChunk(Model):
 
     def confirm(self, hash: str):
         self._attrs.update(
-            self._client.api.confirm_upload_chunk(
+            self._checked_client.api.confirm_upload_chunk(
                 self.upload.id,
                 self.number,
                 hash,
@@ -160,12 +162,12 @@ class UploadChunk(Model):
 
     def send(
         self,
-        fd: typing.BinaryIO,
+        fd: BinaryIO,
         max_retry: int = 10,
-        byte_callback: typing.Optional[typing.Callable[[int], None]] = None,
-        retry_callback: typing.Optional[typing.Callable[[], None]] = None,
+        byte_callback: Optional[Callable[[int], None]] = None,
+        retry_callback: Optional[Callable[[], None]] = None,
     ):
-        from ...utils import LimitedSizeIO
+        from crunch.utils import LimitedSizeIO
 
         seek_back_to = self.offset
         if not fd.seekable():
@@ -216,33 +218,30 @@ class UploadCollection(Collection[Upload]):
 
     model = Upload
 
-    def __iter__(self) -> typing.Iterator[Upload]:
-        return super().__iter__()
-
     def create(
         self,
         *,
         name: str,
         size: int,
         encrypted: bool = False,
-        preferred_chunk_size: typing.Optional[int] = None
+        preferred_chunk_size: Optional[int] = None
     ) -> Upload:
         return self.prepare_model(
-            self._client.api.create_upload(
+            self._checked_client.api.create_upload(
                 name,
                 size,
                 encrypted,
                 preferred_chunk_size,
             )
         )
-    
+
     def send_from_file(
         self,
         *,
         path: str,
         name: str,
-        size: typing.Optional[int] = None,
-        preferred_chunk_size: typing.Optional[int] = None,
+        size: Optional[int] = None,
+        preferred_chunk_size: Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
     ) -> Upload:
@@ -260,58 +259,58 @@ class UploadCollection(Collection[Upload]):
                 max_retry=max_retry,
             )
 
-    @typing.overload
+    @overload
     def send_from_io(
         self,
         *,
-        io: typing.BinaryIO,
+        io: BinaryIO,
         name: str,
         size: int,
-        public_key_pem: typing.Literal[None],
-        preferred_chunk_size: typing.Optional[int],
+        public_key_pem: Literal[None],
+        preferred_chunk_size: Optional[int],
         progress_bar: bool,
         max_retry: int = 10,
     ) -> Upload:
         pass
 
-    @typing.overload
+    @overload
     def send_from_io(
         self,
         *,
-        io: typing.BinaryIO,
+        io: BinaryIO,
         name: str,
         size: int,
         public_key_pem: "PublicKeyPem",
-        preferred_chunk_size: typing.Optional[int],
+        preferred_chunk_size: Optional[int],
         progress_bar: bool,
         max_retry: int = 10,
-    ) -> typing.Tuple[Upload, "EphemeralPublicKeyPem"]:
+    ) -> Tuple[Upload, "EphemeralPublicKeyPem"]:
         pass
 
     def send_from_io(
         self,
         *,
-        io: typing.BinaryIO,
+        io: BinaryIO,
         name: str,
         size: int,
-        public_key_pem: typing.Optional["PublicKeyPem"],
-        preferred_chunk_size: typing.Optional[int] = None,
+        public_key_pem: Optional["PublicKeyPem"],
+        preferred_chunk_size: Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
-    ) -> typing.Union[Upload, typing.Tuple[Upload, "EphemeralPublicKeyPem"]]:
-        ephemeral_public_key_pem: typing.Optional[str] = None
+    ) -> Union[Upload, Tuple[Upload, "EphemeralPublicKeyPem"]]:
+        ephemeral_public_key_pem: Optional[str] = None
 
         encrypted = public_key_pem is not None
         if encrypted:
-            from crunch_encrypt.ecies import (OVERHEAD_BYTES_COUNT,
-                                              ECIESEncryptIO)
+            from crunch_encrypt.ecies import OVERHEAD_BYTES_COUNT, ECIESEncryptIO
 
-            io = ECIESEncryptIO(
+            encrypt_io = ECIESEncryptIO(
                 io,
                 public_key_pem=public_key_pem,
             )
+            io = encrypt_io
 
-            ephemeral_public_key_pem = io.ephemeral_public_key_pem
+            ephemeral_public_key_pem = encrypt_io.ephemeral_public_key_pem
             size += OVERHEAD_BYTES_COUNT
 
         upload = self.create(
@@ -373,20 +372,20 @@ class UploadCollection(Collection[Upload]):
         id: str
     ) -> Upload:
         return self.prepare_model(
-            self._client.api.get_upload(
+            self._checked_client.api.get_upload(
                 id,
             )
         )
 
 
-class UploadEndpointMixin:
+class UploadEndpointMixin(EndpointMixin):
 
     def create_upload(
         self,
-        name,
-        size,
-        encrypted,
-        preferred_chunk_size
+        name: str,
+        size: int,
+        encrypted: bool,
+        preferred_chunk_size: Optional[int]
     ):
         return self._result(
             self.post(
@@ -403,7 +402,7 @@ class UploadEndpointMixin:
 
     def get_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.get(
@@ -414,8 +413,8 @@ class UploadEndpointMixin:
 
     def get_upload_chunk_request(
         self,
-        id,
-        chunk_number
+        id: str,
+        chunk_number: int
     ):
         return self._result(
             self.get(
@@ -426,9 +425,9 @@ class UploadEndpointMixin:
 
     def confirm_upload_chunk(
         self,
-        id,
-        chunk_number,
-        hash
+        id: str,
+        chunk_number: int,
+        hash: str
     ):
         return self._result(
             self.post(
@@ -442,7 +441,7 @@ class UploadEndpointMixin:
 
     def abort_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.post(
@@ -454,7 +453,7 @@ class UploadEndpointMixin:
 
     def complete_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.post(
@@ -466,7 +465,7 @@ class UploadEndpointMixin:
 
     def delete_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.delete(
