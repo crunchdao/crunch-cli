@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from dataclasses_json import Undefined, dataclass_json
+from dataclasses_json import LetterCase, Undefined, dataclass_json
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
