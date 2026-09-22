@@ -1,13 +1,114 @@
 from datetime import datetime
 from time import sleep
 from time import time as current_time
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Literal, Optional, Sequence, Union
 
 import click
 
-from crunch.api import Prediction, Run, RunLog, RunNotFoundException, RunStatus, Score
+from crunch.api import Prediction, Run, RunLog, RunNotFoundException, RunStatus, RuntimeOptionStatus, Score
 from crunch.command._common import get_project, reformat_datetime
 from crunch.utils import ascii_table
+
+CreateRunSubmissionNumber = Union[int, Literal["latest"]]
+
+
+class CreateRunSubmissionNumberClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
+    name = "number"
+
+    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
+        if "latest" == value:
+            return "latest"
+
+        if isinstance(value, int) or value.isdigit():
+            return int(value)
+
+        self.fail(
+            f"'{value}' is not a valid integer.",
+            param,
+            ctx
+        )
+
+
+def run_create(
+    submission_number: CreateRunSubmissionNumber,
+    train_frequency: Optional[int],
+    force_first_train: Optional[bool],
+    runtime_definition_name: Optional[str],
+):
+    project = get_project()
+
+    submission = project.submissions.get("@last" if submission_number == "latest" else submission_number)
+
+    runtime_options = list(submission.runtime_options.list())
+
+    runtime_option = next((x for x in runtime_options if x.definition.name == runtime_definition_name), None)
+    if runtime_option is None:
+        print(f"run: runtime option not found: {runtime_definition_name}")
+        print(f"run: available options are:", (', '.join(x.definition.name for x in runtime_options if x.status == RuntimeOptionStatus.AVAILABLE)))
+        print()
+        print("Tips")
+        print(f"  List available in `crunch runtime list --submission {submission.number}`")
+        raise click.Abort()
+
+    if runtime_option.status != RuntimeOptionStatus.AVAILABLE:
+        print(f"run: runtime option not available: {runtime_definition_name}")
+        print(f"run: available options are: {', '.join(x.definition.name for x in runtime_options if x.status == RuntimeOptionStatus.AVAILABLE)}")
+        print()
+        print("Tips")
+        print(f"  List available in `crunch runtime list --submission {submission.number}`")
+        raise click.Abort()
+
+    if runtime_option.quota == 0:
+        print(f"run: you are out of quota, you must wait until the next refresh cycle")
+        print()
+        print("Tips")
+        print(f"  See your remaining quota using `crunch quota`")
+        raise click.Abort()
+
+    competition = project.competition
+    hide_train_frequency = competition.hide_train_frequency
+    hide_force_first_train = competition.hide_force_first_train
+
+    if hide_train_frequency:
+        if train_frequency is not None:
+            print(f"run: train frequency is not usable in this competition")
+            raise click.Abort()
+
+        train_frequency = 0
+    else:
+        if train_frequency is None:
+            train_frequency = 0
+            print(f"run: train frequency has been set to {train_frequency} as a default, change it using `--train-frequency <n>`")
+
+    if hide_force_first_train:
+        if force_first_train is not None:
+            print(f"run: force first train is not usable in this competition")
+            raise click.Abort()
+    else:
+        has_no_model = submission.model is None
+
+        if force_first_train is None:
+            force_first_train = has_no_model
+            print(f"run: force first train has been set to {force_first_train} as a default, change it using `--force-first-train`")
+        elif force_first_train is False and has_no_model:
+            force_first_train = True
+            print(f"run: force first train has been forced to {force_first_train} as submission without a `resources/` directory must always train")
+
+    print(f"run: creating run with submission #{submission.number}, train_frequency={train_frequency}, force_first_train={force_first_train} and runtime_definition_name={runtime_definition_name}")
+
+    run = project.runs.create(
+        submission=submission,
+        train_frequency=train_frequency,
+        force_first_train=force_first_train,
+        runtime_definition_name=runtime_definition_name,
+    )
+
+    print(f"run: created: {run.id}")
+
+    print()
+    print("Tips")
+    print(f"  View the run details using `crunch run show {run.id}`")
+    print(f"  Watch the run logs using `crunch run logs {run.id} --follow`")
 
 
 def run_list(
@@ -15,7 +116,7 @@ def run_list(
 ):
     project = get_project()
     runs = project.runs.list()
-    selected_run = None # TODO project.selection.run
+    selected_run = None  # TODO project.selection.run
 
     reached_limit = limit is not None and len(runs) > limit
 
@@ -68,6 +169,7 @@ def run_show(run_id: int):
         lines = error_trace.split("\n")
         print(f"  Error Trace:")
         for line in lines:
+
             print(f"    > {line}")
 
     submission = run.submission
@@ -139,7 +241,6 @@ def run_logs(
         while tries > 0:
             new_logs = run.logs
             new_last_id = max((line["id"] for line in new_logs), default=None)
-            print(last_id, new_last_id)
 
             if new_last_id != last_id:
                 for line in new_logs:

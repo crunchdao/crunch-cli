@@ -14,9 +14,13 @@ from crunch.command.run import run_logs as run_logs
 from crunch.command.run import run_show as run_show
 from crunch.command.run import run_terminate as run_terminate
 from crunch.command.run import run_wait as run_wait
+from crunch.command.run import CreateRunSubmissionNumber as CreateRunSubmissionNumber
+from crunch.command.run import CreateRunSubmissionNumberClickType as CreateRunSubmissionNumberClickType
+from crunch.command.run import run_create as run_create
 from crunch.command.runtime import runtime_list as runtime_list
 from crunch.command.runtime import runtime_request as runtime_request
 from crunch.command.setup import SetupSubmissionNumber as SetupSubmissionNumber
+from crunch.command.setup import SetupSubmissionNumberClickType as SetupSubmissionNumberClickType
 from crunch.command.setup import setup as setup
 from crunch.command.setup import setup_notebook as setup_notebook
 from crunch.command.submission import submission_list as submission_list

@@ -180,6 +180,26 @@ class RunCollection(Collection[Run]):
             )
         )
 
+    def create(
+        self,
+        *,
+        submission: "Submission",
+        train_frequency: Optional[int] = None,
+        force_first_train: Optional[bool] = None,
+        runtime_definition_name: Optional[str] = None,
+    ) -> Run:
+        return self.prepare_model(
+            self._checked_client.api.create_run(
+                self.project.competition.id,
+                self.project.user_id,
+                self.project.name,
+                submission.id,
+                train_frequency,
+                force_first_train,
+                runtime_definition_name,
+            )
+        )
+
     def list(
         self,
         managed: Optional[bool] = None,
@@ -207,6 +227,29 @@ class RunCollection(Collection[Run]):
 
 
 class RunEndpointMixin(EndpointMixin):
+
+    def create_run(
+        self,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+        submission_id: int,
+        train_frequency: Optional[int] = None,
+        force_first_train: Optional[bool] = None,
+        runtime_definition_name: Optional[str] = None,
+    ):
+        return self._result(
+            self.post(
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs",
+                json={
+                    "submissionId": submission_id,
+                    "trainFrequency": train_frequency,
+                    "forceFirstTrain": force_first_train,
+                    "runtimeDefinitionName": runtime_definition_name,
+                }
+            ),
+            json=True,
+        )
 
     def list_runs(
         self,

@@ -1,8 +1,9 @@
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional
-from datetime import datetime
-from crunch.api._resource import Collection, EndpointMixin, Model
+
 from crunch.api._domain.enum_ import SplitKeyType
+from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._identifiers import CompetitionIdentifierType
@@ -130,6 +131,14 @@ class Competition(Model[int]):
     @property
     def phala_key_url(self) -> Optional[str]:
         return self._attrs["phalaKeyUrl"]
+
+    @property
+    def hide_train_frequency(self) -> bool:
+        return self._attrs["hideTrainFrequency"]
+
+    @property
+    def hide_force_first_train(self) -> bool:
+        return self._attrs["hideForceFirstTrain"]
 
     @property
     def data_releases(self):

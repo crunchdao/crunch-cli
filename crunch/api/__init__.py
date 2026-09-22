@@ -37,6 +37,7 @@ from crunch.api._domain.run import RunLog as RunLog
 from crunch.api._domain.run import RunStatus as RunStatus
 from crunch.api._domain.runner import RunnerRun as RunnerRun
 from crunch.api._domain.runtime import RuntimeOption as RuntimeOption
+from crunch.api._domain.runtime import RuntimeOptionStatus as RuntimeOptionStatus
 from crunch.api._domain.score import Score as Score
 from crunch.api._domain.submission import Submission as Submission
 from crunch.api._domain.submission import SubmissionType as SubmissionType

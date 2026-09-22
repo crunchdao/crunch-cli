@@ -8,6 +8,7 @@ from typing import Any, Callable, List, Optional, Union
 import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
+from crunch.command.run import CreateRunSubmissionNumber
 from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
@@ -42,26 +43,6 @@ DATA_SIZE_VARIANTS = [
     api.SizeVariant.SMALL.name.lower(),
     api.SizeVariant.LARGE.name.lower(),
 ]
-
-
-class SubmissionNumberType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
-    name = "number"
-
-    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
-        if "latest" == value:
-            return "latest"
-
-        if "scratch" == value:
-            return "scratch"
-
-        if isinstance(value, int) or value.isdigit():
-            return int(value)
-
-        self.fail(
-            f"'{value}' is not a valid integer.",
-            param,
-            ctx
-        )
 
 
 def _format_directory(directory: str, competition_name: str, project_name: str):
@@ -209,7 +190,7 @@ def init(
 
 @cli.command(help="Setup a workspace directory.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
-@click.option("--submission", "submission_number", required=False, type=SubmissionNumberType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=command.SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
@@ -301,7 +282,7 @@ def setup(
 
 
 @cli.command(help="Setup a notebook workspace.")
-@click.option("--submission", "submission_number", required=False, type=SubmissionNumberType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=command.SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
@@ -612,6 +593,26 @@ def runtime_request(runtime_option_name: str, submission: Optional[int], justifi
 @cli.group(name="run", help="Manage runs.")
 def run_group():
     pass
+
+
+@run_group.command(name="create", help="Create a run.")
+@click.option("--submission", "submission_number", default="latest", type=command.CreateRunSubmissionNumberClickType(), help='Submission number to use. (default to "latest")')
+@click.option("--train-frequency", type=int, required=False)
+@click.option("--force-first-train", type=bool, required=False)
+@click.option("--runtime", "runtime_definition_name", type=str, required=True)
+@wrap_root_and_api
+def run_create(
+    submission_number: command.CreateRunSubmissionNumber,
+    train_frequency: Optional[int],
+    force_first_train: Optional[bool],
+    runtime_definition_name: Optional[str],
+):
+    command.run_create(
+        submission_number=submission_number,
+        train_frequency=train_frequency,
+        force_first_train=force_first_train,
+        runtime_definition_name=runtime_definition_name,
+    )
 
 
 @run_group.command(name="list", help="List runs.")

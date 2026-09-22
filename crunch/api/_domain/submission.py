@@ -2,7 +2,6 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from crunch.api._auth import PushTokenAuth
 from crunch.api._resource import Collection, EndpointMixin
 from crunch.api._resource import Model as BaseModel
 
@@ -10,7 +9,7 @@ if TYPE_CHECKING:
     from crunch.api._client import Client
     from crunch.api._domain.model import Model
     from crunch.api._domain.project import Project
-    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
+    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, SubmissionIdentifierType, UserIdentifierType
     from crunch.api._resource import JsonValue
     from crunch.api._types import Attrs
 
@@ -112,7 +111,7 @@ class SubmissionCollection(Collection[Submission]):
 
     def get(
         self,
-        number: int,
+        number: "SubmissionIdentifierType",
     ) -> Submission:
         return self.prepare_model(
             self._checked_client.api.get_submission(
@@ -193,7 +192,7 @@ class SubmissionEndpointMixin(EndpointMixin):
         competition_identifier: "CompetitionIdentifierType",
         user_identifier: "UserIdentifierType",
         project_identifier: "ProjectIdentifierType",
-        submission_number: int
+        submission_number: "SubmissionIdentifierType"
     ):
         return self._result(
             self.get(
@@ -214,6 +213,8 @@ class SubmissionEndpointMixin(EndpointMixin):
         code_files: Dict[str, str],
         model_files: Dict[str, str],
     ):
+        from crunch.api._auth import PushTokenAuth
+
         return self._result(
             self.post(
                 f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",

@@ -10,7 +10,6 @@ def quota():
     submit = project.submit_quota
     compute = project.compute_quota
 
-    print("")
     print("Submit Quota:")
     print(f"  Code Files: {format_size(submit.code_files.total_size, binary=True)}")
     print(f"  Model Files: {format_size(submit.model_files.total_size, binary=True)}")

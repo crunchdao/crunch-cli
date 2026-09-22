@@ -1,8 +1,30 @@
-import typing
+from typing import Any, Literal, Optional, Union
+
+import click
 
 from .. import api, command, utils
 
-SetupSubmissionNumber = typing.Union[int, typing.Literal["latest", "scratch"]]
+SetupSubmissionNumber = Union[int, Literal["latest", "scratch"]]
+
+
+class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
+    name = "number"
+
+    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
+        if "latest" == value:
+            return "latest"
+
+        if "scratch" == value:
+            return "scratch"
+
+        if isinstance(value, int) or value.isdigit():
+            return int(value)
+
+        self.fail(
+            f"'{value}' is not a valid integer.",
+            param,
+            ctx
+        )
 
 
 def setup(
@@ -13,7 +35,7 @@ def setup(
     force: bool,
     no_model: bool,
     show_quickstarters: bool,
-    quickstarter_name: typing.Optional[str],
+    quickstarter_name: Optional[str],
     show_notebook_quickstarters: bool,
     data_size_variant: api.SizeVariant,
 ):

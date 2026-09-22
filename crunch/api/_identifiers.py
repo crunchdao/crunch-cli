@@ -53,3 +53,10 @@ ProjectIdentifierType = Union[
     int,
     str,
 ]
+
+SubmissionIdentifierType = Union[
+    int,
+    Literal[
+        "@last",
+    ],
+]

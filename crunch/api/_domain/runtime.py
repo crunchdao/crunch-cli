@@ -101,6 +101,10 @@ class RuntimeOption(Model[int]):
         self._submission = submission
 
     @property
+    def id(self) -> int:
+        return self._attrs["definition"]["id"]
+
+    @property
     def submission(self):
         return self._submission
 
