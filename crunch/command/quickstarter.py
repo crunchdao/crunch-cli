@@ -1,101 +1,91 @@
 import os
-from typing import Optional
+from typing import Any, List, Sequence
 
 import click
 
-from crunch.api import Client, Quickstarter
-from crunch.utils import download
+from crunch.api import Quickstarter, QuickstarterNotFoundException
+from crunch.command._common import get_project
+from crunch.utils import ascii_table, download
 
 
-def _select(
-    client: Client,
-    competition_name: str,
-    quickstarter_name: Optional[str],
-    show_notebook_quickstarters: bool,
-) -> Optional[Quickstarter]:
-    import inquirer
+def quickstarter_list():
+    project = get_project()
+    quickstarters = project.competition.quickstarters.list()
 
-    competition = client.competitions.get(competition_name)
-    quickstarters = competition.quickstarters.list()
-
-    if quickstarter_name is not None:
-        for quickstarter in quickstarters:
-            if quickstarter_name in [quickstarter.name, quickstarter.title]:
-                return quickstarter
-
-            print(f"{competition_name}: no quickstarter named `{quickstarter_name}`")
-            raise click.Abort()
-
-    if not show_notebook_quickstarters:
-        quickstarters = list(filter(lambda x: not x.notebook, quickstarters))
-
-    quickstarters_length = len(quickstarters)
-    if quickstarters_length == 0:
-        return None
-    elif quickstarters_length == 1:
-        return quickstarters[0]
-
-    mapping = {}
+    rows: List[Sequence[Any]] = []
     for quickstarter in quickstarters:
-        key = f"{quickstarter.title} ({quickstarter.id})"
+        rows.append(
+            (
+                quickstarter.name,
+                quickstarter.title,
+                _to_type(quickstarter),
+                quickstarter.language.name,
+            )
+        )
 
-        if show_notebook_quickstarters:
-            type = "Notebook" if quickstarter.notebook else "Code"
-            key = f"[{type}] {key}"
-
-        mapping[key] = quickstarter
-
-    questions = [
-        inquirer.List(
-            'quickstarter',
-            message="What quickstarter to use?",
-            choices=mapping.keys(),
-        ),
-    ]
-
-    answers = inquirer.prompt(questions, raise_keyboard_interrupt=True)  # type: ignore
-    return mapping[answers["quickstarter"]]  # type: ignore
-
-
-def quickstarter(
-    name: Optional[str],
-    show_notebook: bool,
-    overwrite: bool,
-):
-    client, project = Client.from_project()
-    competition = project.competition
-
-    quickstarter = _select(
-        client,
-        competition.name,
-        name,
-        show_notebook
+    ascii_table(
+        headers=["Name", "Title", "Type", "Language"],
+        values=rows,
     )
 
-    if quickstarter is None:
-        print("no quickstarter available, leaving directory empty")
-        return
+
+def quickstarter_show(
+    quickstarter_name: str,
+):
+    quickstarter = _get_quickstarter(quickstarter_name)
+
+    print("Quickstarter Details:")
+    print(f"  Name: {quickstarter.name}")
+    print(f"  Title: {quickstarter.title}")
+    print(f"  Type: {_to_type(quickstarter)}")
+    print(f"  Language: {quickstarter.language.name}")
+    print(f"  Authors:")
+    for author in quickstarter.authors:
+        print(f"    - {author.name}", f"({author.link})" if author.link else "")
+    print(f"  Files:")
+    for file in quickstarter.files:
+        print(f"    - {file.name}")
+
+    print("")
+    print("Tips:")
+    print(f"  To apply/download locally, use `crunch quickstarter apply {quickstarter.name}`")
+
+
+def quickstarter_apply(
+    quickstarter_name: str,
+    overwrite: bool = False,
+):
+    quickstarter = _get_quickstarter(quickstarter_name)
 
     files = quickstarter.files
-    conflicts = [
-        file.name
-        for file in files
-        if os.path.exists(file.name)
-    ]
 
-    if len(conflicts) and not overwrite:
-        print("")
-        print("---")
-        print("Conflicting files that will be overwritten:")
-        for name in conflicts:
-            print(f"- {name}")
-
-        print("")
-        if not click.confirm("continue?"):
+    for file in files:
+        if os.path.exists(file.name) and not overwrite:
+            print(f"apply: file already exists: {file.name}")
+            print("apply: `--overwrite` to overwrite them.")
             raise click.Abort()
-
-    print(f"quickstarter {quickstarter.name} from competitions/{quickstarter.competition.name}")
 
     for file in files:
         path = os.path.join(".", file.name)  # useful?
         download(file.url, path)
+
+    if quickstarter.notebook:
+        print("")
+        print("Tips:")
+        print(f"  This quickstarter is a notebook, to convert to a main.py, you can do `crunch convert {files[0].name}`")
+        print(f"  Only useful for people that want to work with Python files. The documentation will be excluded.")
+
+
+def _get_quickstarter(name: str):
+    try:
+        return get_project().competition.quickstarters.get(name)
+    except QuickstarterNotFoundException:
+        print(f"quickstarter: not found: {name}")
+        raise click.Abort()
+
+
+def _to_type(quickstarter: Quickstarter):
+    if quickstarter.notebook:
+        return "Notebook"
+
+    return "Code"

@@ -1,9 +1,9 @@
-import contextlib
 import functools
 import json
 import os
 import sys
-from typing import Any, Callable, List, Literal, Optional, Union
+from contextlib import contextmanager
+from typing import Any, Callable, List, Optional, Union
 
 import click
 
@@ -352,30 +352,23 @@ def setup_notebook(
     print(f"4. Download and submit your code to the platform!")
 
 
-@cli.command(help="Setup a workspace directory with the latest submission of you code.")
-@click.option("--name", type=str, help="Pre-select a quickstarter.")
-@click.option("--show-notebook", is_flag=True, help="Show quickstarters notebook in selection.")
-@click.option("--overwrite", is_flag=True, help="Overwrite any files that are conflicting.")
-def quickstarter(
-    name: str,
-    show_notebook: bool,
-    overwrite: bool,
-):
-    utils.change_root()
+def wrap_root_and_api(function: Callable[..., Any]):
+    def wrapped(*args: Any, **kwargs: Any):
+        utils.change_root()
 
-    try:
-        command.quickstarter(
-            name=name,
-            show_notebook=show_notebook,
-            overwrite=overwrite,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+        try:
+            return function(*args, **kwargs)
+        except api.ApiException as error:
+            utils.exit_via(error)
 
-    print(f"quickstarter deployed")
+    wrapped.__name__ = function.__name__
+    wrapped.__doc__ = function.__doc__
+    wrapped.__annotations__ = function.__annotations__
+
+    return wrapped
 
 
-@contextlib.contextmanager
+@contextmanager
 def convert_if_necessary(
     main_file_path: str
 ):
@@ -407,6 +400,7 @@ def convert_if_necessary(
 @click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
 @click.option("--dry", is_flag=True, help="Prepare file but do not really create the submission.")
+@wrap_root_and_api
 def push(
     message: str,
     main_file_path: str,
@@ -415,24 +409,19 @@ def push(
     no_pip_freeze: bool,
     dry: bool,
 ):
-    utils.change_root()
-
     if export_path is not None:
         print("--export is not supported anymore", file=sys.stderr)
         raise click.Abort()
 
     with convert_if_necessary(main_file_path):
-        try:
-            command.push(
-                message=message,
-                main_file_path=main_file_path,
-                model_directory_relative_path=model_directory_path,
-                include_installed_packages_version=not no_pip_freeze,
-                no_afterword=False,
-                dry=dry,
-            )
-        except api.ApiException as error:
-            utils.exit_via(error)
+        command.push(
+            message=message,
+            main_file_path=main_file_path,
+            model_directory_relative_path=model_directory_path,
+            include_installed_packages_version=not no_pip_freeze,
+            no_afterword=False,
+            dry=dry,
+        )
 
 
 def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
@@ -464,13 +453,12 @@ def test(
 @click.option("--round-number", default="@current")
 @click.option("--force", is_flag=True, help="Force the download of the data.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
+@wrap_root_and_api
 def download(
     round_number: RoundIdentifierType,
     force: bool,
     size_variant_raw: Optional[str],
 ):
-    utils.change_root()
-
     size_variant = (
         api.SizeVariant[size_variant_raw.upper()]
         if size_variant_raw is not None
@@ -485,12 +473,10 @@ def download(
         )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(error)
 
 
 @cli.command(help="Convert a notebook to a python script.")
-@click.option("--override", is_flag=True, help="Force overwrite of the python file.")
+@click.option("--overwrite", is_flag=True, help="Force overwrite of the python file.")
 @click.option("--requirements", is_flag=True, help="Also export the `requirements.txt` file.")
 @click.option("--embedded-files", is_flag=True, help="Also export the embedded files.")
 @click.option("--no-freeze", is_flag=True, help="Don't freeze the requirements with locally installed versions.")
@@ -498,7 +484,7 @@ def download(
 @click.argument("notebook-file-path", required=True)
 @click.argument("python-file-path", default="main.py")
 def convert(
-    override: bool,
+    overwrite: bool,
     requirements: bool,
     embedded_files: bool,
     no_freeze: bool,
@@ -510,7 +496,7 @@ def convert(
         command.convert(
             notebook_file_path=notebook_file_path,
             python_file_path=python_file_path,
-            override=override,
+            overwrite=overwrite,
             write_requirements=requirements,
             write_embedded_files=embedded_files,
             no_freeze=no_freeze,
@@ -522,20 +508,139 @@ def convert(
 
 @cli.command(help="Update a project token.")
 @click.argument("clone-token", required=False)
+@wrap_root_and_api
 def update_token(
     clone_token: str,
 ):
     if not clone_token:
         clone_token = click.prompt("Clone Token", hide_input=True)
 
-    utils.change_root()
+    command.update_token(
+        clone_token=clone_token
+    )
 
-    try:
-        command.update_token(
-            clone_token=clone_token
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+
+@cli.command(help="Show the project's quota.")
+@wrap_root_and_api
+def quota():
+    command.quota()
+
+
+@cli.group(name="quickstarter", help="Manage quickstarters.")
+def quickstarter_group():
+    pass
+
+
+@quickstarter_group.command(name="list", help="List available quickstarters.")
+@wrap_root_and_api
+def quickstarter_list():
+    command.quickstarter_list()
+
+
+@quickstarter_group.command(name="show", help="Show a quickstarter.")
+@click.argument("quickstarter_name", required=True)
+@wrap_root_and_api
+def quickstarter_show(quickstarter_name: str):
+    command.quickstarter_show(quickstarter_name)
+
+
+@quickstarter_group.command(name="apply", help="Download a quickstarter locally.")
+@click.argument("quickstarter_name", required=True)
+@click.option("--overwrite", is_flag=True)
+@wrap_root_and_api
+def quickstarter_apply(quickstarter_name: str, overwrite: bool):
+    command.quickstarter_apply(quickstarter_name, overwrite=overwrite)
+
+
+@cli.group(name="submission", help="Manage submissions.")
+def submission_group():
+    pass
+
+
+@submission_group.command(name="list", help="List submissions.")
+@click.option("--limit", type=int, default=10)
+@click.option("--all", is_flag=True)
+@wrap_root_and_api
+def submission_list(limit: int, all: bool):
+    command.submission_list(limit=limit if not all else None)
+
+
+@submission_group.command(name="show", help="Show a submission.")
+@click.argument("submission_number", type=int, required=True)
+@wrap_root_and_api
+def submission_show(submission_number: int):
+    command.submission_show(submission_number)
+
+
+@cli.group(name="runtime", help="Manage runtimes.")
+def runtime_group():
+    pass
+
+
+@runtime_group.command(name="list", help="List runtimes.")
+@click.option("--submission", type=int, default=None)
+@wrap_root_and_api
+def runtime_list(submission: Optional[int]):
+    command.runtime_list(submission_number=submission)
+
+
+@runtime_group.command(name="request", help="Request a runtime option.")
+@click.argument("runtime_option_name", type=str, required=True)
+@click.option("--submission", type=int, default=None)
+@click.option("--justification", type=str, required=True)
+@wrap_root_and_api
+def runtime_request(runtime_option_name: str, submission: Optional[int], justification: str):
+    command.runtime_request(
+        runtime_option_name=runtime_option_name,
+        submission_number=submission,
+        justification=justification
+    )
+
+
+@cli.group(name="run", help="Manage runs.")
+def run_group():
+    pass
+
+
+@run_group.command(name="list", help="List runs.")
+@click.option("--limit", type=int, default=10)
+@click.option("--all", is_flag=True)
+@wrap_root_and_api
+def run_list(limit: int, all: bool):
+    command.run_list(limit=limit if not all else None)
+
+
+@run_group.command(name="show", help="Show a run.")
+@click.argument("run_id", type=int, required=True)
+@wrap_root_and_api
+def run_show(run_id: int):
+    command.run_show(run_id)
+
+
+@run_group.command(name="logs", help="Show the logs of a run.")
+@click.option("-t", "--tail", type=int, required=False)
+@click.option("--follow", is_flag=True)
+@click.option("--debug", is_flag=True)
+@click.argument("run_id", type=int, required=True)
+@wrap_root_and_api
+def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
+    command.run_logs(run_id, tail=tail, follow=follow, debug=debug)
+
+
+@run_group.command(name="wait", help="Wait for a run to complete.")
+@click.option("--timeout", type=int, required=False)
+@click.option("--poll-interval", type=int, default=10)
+@click.argument("run_id", type=int, required=True)
+@wrap_root_and_api
+def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
+    command.run_wait(run_id, timeout=timeout, poll_interval=poll_interval)
+
+
+@run_group.command(name="terminate", help="Terminate a run.")
+@click.argument("run_id", type=int, required=True)
+@wrap_root_and_api
+def run_terminate(run_id: int):
+    command.run_terminate(run_id)
 
 
 @cli.group(name="runner")
@@ -545,6 +650,7 @@ def runner_group():
 
 @runner_group.command(help="Run your code locally.")
 @local_options
+@wrap_root_and_api
 def local(
     main_file_path: str,
     model_directory_path: str,
@@ -557,7 +663,6 @@ def local(
 ):
     from . import library, tester
 
-    utils.change_root()
     tester.install_logger()
 
     if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
@@ -569,19 +674,16 @@ def local(
         no_determinism_check = None
 
     with convert_if_necessary(main_file_path):
-        try:
-            command.test(
-                main_file_path,
-                model_directory_path,
-                constants.DOT_PREDICTION_DIRECTORY,
-                not no_force_first_train,
-                train_frequency,
-                round_number,
-                has_gpu,
-                no_determinism_check,
-            )
-        except api.ApiException as error:
-            utils.exit_via(error)
+        command.test(
+            main_file_path,
+            model_directory_path,
+            constants.DOT_PREDICTION_DIRECTORY,
+            not no_force_first_train,
+            train_frequency,
+            round_number,
+            has_gpu,
+            no_determinism_check,
+        )
 
 
 @runner_group.command(help="Cloud runner, do not directly run!")

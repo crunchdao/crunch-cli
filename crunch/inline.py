@@ -299,7 +299,7 @@ class _Inline:
                 write_requirements=True,
                 write_embedded_files=True,
                 no_freeze=True,  # will be frozen on push
-                override=True,
+                overwrite=True,
                 verbose=print_convert_logs,
             )
         except SystemExit as error:

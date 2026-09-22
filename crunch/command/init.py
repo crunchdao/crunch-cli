@@ -15,7 +15,7 @@ def _check_if_already_exists(directory: str, force: bool):
     if force:
         return True
     elif len(os.listdir(directory)):
-        print(f"{directory}: directory not empty (use --force to override)")
+        print(f"{directory}: directory not empty (use --force to overwrite)")
         raise click.Abort()
 
 
