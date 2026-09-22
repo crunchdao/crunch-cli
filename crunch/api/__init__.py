@@ -22,6 +22,7 @@ from crunch.api._domain.library import Library as Library
 from crunch.api._domain.metric import Metric as Metric
 from crunch.api._domain.metric import ReducerFunction as ReducerFunction
 from crunch.api._domain.metric import ScorerFunction as ScorerFunction
+from crunch.api._domain.metric import Unit as Unit
 from crunch.api._domain.phase import Phase as Phase
 from crunch.api._domain.phase import PhaseType as PhaseType
 from crunch.api._domain.prediction import Prediction as Prediction

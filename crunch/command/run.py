@@ -209,11 +209,7 @@ def _format_score_value(score: Score) -> str:
     assert metric is not None
 
     unit = metric.unit
-    prefix = unit.prefix or ''
-    rounded_value = round(score.value, unit.scale)
-    suffix = unit.suffix or ''
-
-    return f"{metric.display_name}: {prefix}{rounded_value}{suffix}"
+    return f"{metric.display_name}: {unit.format_value(score.value)}"
 
 
 def _get_run(id: int):

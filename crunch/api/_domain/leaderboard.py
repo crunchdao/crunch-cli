@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
+from crunch.api._identifiers import ProjectIdentifierType, UserIdentifierType
 from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
@@ -97,6 +98,20 @@ class Leaderboard(Model[int]):
         import pandas
         return pandas.DataFrame(rows)
 
+    def get_changes(
+        self,
+        user_identifier: "UserIdentifierType",
+        project_identifier: Optional["ProjectIdentifierType"] = None,
+        crunch: Optional["Crunch"] = None,
+    ) -> List[Dict[str, Any]]:  # TODO properly type!
+        return self._checked_client.api.get_leaderboard_changes(
+            self._competition.resource_identifier,
+            self.resource_identifier,
+            user_identifier,
+            project_identifier=project_identifier,
+            crunch_id=crunch.id if crunch else None
+        )
+
 
 class LeaderboardCollection(Collection[Leaderboard]):
 
@@ -179,6 +194,25 @@ class LeaderboardEndpointMixin(EndpointMixin):
             self.get(
                 f"/v2/competitions/{competition_identifier}/leaderboards/{leaderboard_identifier}",
                 params={
+                    "crunchId": crunch_id
+                }
+            ),
+            json=True
+        )
+
+    def get_leaderboard_changes(
+        self,
+        competition_identifier: "CompetitionIdentifierType",
+        leaderboard_identifier: "LeaderboardIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: Optional["ProjectIdentifierType"] = None,
+        crunch_id: Optional[int] = None,
+    ):
+        return self._result(
+            self.get(
+                f"/v3/competitions/{competition_identifier}/leaderboards/{leaderboard_identifier}/changes/users/{user_identifier}",
+                params={
+                    "projectIdentifier": project_identifier,
                     "crunchId": crunch_id
                 }
             ),

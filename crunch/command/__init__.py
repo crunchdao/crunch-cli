@@ -2,6 +2,7 @@ from crunch.command.convert import convert as convert
 from crunch.command.download import download as download
 from crunch.command.download import download_no_data_available as download_no_data_available
 from crunch.command.init import init as init
+from crunch.command.leaderboard import leaderboard as leaderboard
 from crunch.command.push import push as push
 from crunch.command.quickstarter import quickstarter_apply as quickstarter_apply
 from crunch.command.quickstarter import quickstarter_list as quickstarter_list

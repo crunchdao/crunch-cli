@@ -520,6 +520,12 @@ def update_token(
     )
 
 
+@cli.command(help="Show the project's rank on the leaderboard.")
+@wrap_root_and_api
+def leaderboard():
+    command.leaderboard()
+
+
 @cli.command(help="Show the project's quota.")
 @wrap_root_and_api
 def quota():

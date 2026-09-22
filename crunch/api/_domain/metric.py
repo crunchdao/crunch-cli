@@ -57,6 +57,13 @@ class Unit:
     scale: int
     suffix: Optional[str]
 
+    def format_value(self, value: float) -> str:
+        prefix = self.prefix or ''
+        rounded_value = round(value, self.scale) if self.scale else int(value)
+        suffix = self.suffix or ''
+
+        return f"{prefix}{rounded_value}{suffix}"
+
 
 class Metric(Model[int]):
 
