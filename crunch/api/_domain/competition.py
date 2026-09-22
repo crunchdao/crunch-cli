@@ -55,6 +55,14 @@ class Competition(Model[int]):
         return self._attrs["name"]
 
     @property
+    def display_name(self) -> str:
+        return self._attrs["displayName"]
+
+    @property
+    def short_description(self) -> str:
+        return self._attrs["shortDescription"]
+
+    @property
     def start(self) -> datetime:
         return datetime.fromisoformat(self._attrs["start"])
 
@@ -82,6 +90,38 @@ class Competition(Model[int]):
     @property
     def external(self) -> bool:
         return self._attrs["external"]
+
+    @property
+    def documentation_url(self) -> str:
+        return self._attrs["documentationUrl"]
+
+    @property
+    def notebook_url(self) -> Optional[str]:
+        return self._attrs["notebookUrl"]
+
+    @property
+    def hosted_by_name(self) -> str:
+        return self._attrs["hostedByName"]
+
+    @property
+    def prize_pool_short_text(self) -> str:
+        return self._attrs["prizePoolShortText"]
+
+    @property
+    def team_based(self) -> bool:
+        return self._attrs["teamBased"]
+
+    @property
+    def only_team_leader(self) -> bool:
+        return self._attrs["onlyTeamLeader"]
+
+    @property
+    def max_team_size(self) -> int:
+        return self._attrs["maxTeamSize"]
+
+    @property
+    def project_creation_limit(self) -> int:
+        return self._attrs["projectCreationLimit"]
 
     @property
     def encrypt_submissions(self) -> bool:
@@ -170,7 +210,7 @@ class CompetitionCollection(Collection[Competition]):
             )
         )
 
-    def list(  # type: ignore[override]
+    def list(
         self,
         *,
         format: Optional[CompetitionFormat] = None,

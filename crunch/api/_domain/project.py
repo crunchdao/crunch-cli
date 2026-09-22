@@ -83,6 +83,10 @@ class Project(Model[int]):
         return self._checked_client.users.get(self.user_id)
 
     @property
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["createdAt"])
+
+    @property
     def submissions(self):
         from crunch.api._domain.submission import SubmissionCollection
 

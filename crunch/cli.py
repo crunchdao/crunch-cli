@@ -520,6 +520,12 @@ def update_token(
     )
 
 
+@cli.command(help="Show information on the competition.")
+@wrap_root_and_api
+def status():
+    command.status()
+
+
 @cli.command(help="Show the project's rank on the leaderboard.")
 @wrap_root_and_api
 def leaderboard():

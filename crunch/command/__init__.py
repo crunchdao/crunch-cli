@@ -1,3 +1,4 @@
+from crunch.command.status import status as status
 from crunch.command.convert import convert as convert
 from crunch.command.download import download as download
 from crunch.command.download import download_no_data_available as download_no_data_available
