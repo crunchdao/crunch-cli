@@ -44,8 +44,9 @@ def init(
 
     os.makedirs(dot_crunch_path, exist_ok=True)
 
-    plain = project_token.plain
     project = project_token.project
+    plain = project_token.plain
+    assert plain is not None
 
     project_info = ProjectInfo(
         project.competition.name,

@@ -274,7 +274,10 @@ def _upload_files(
             if forbidden_names:
                 raise ForbiddenLibraryException(
                     "forbidden packages has been found",
-                    packages=forbidden_names
+                    requirements=[
+                        {"name": name, "language": language.name}
+                        for name in forbidden_names
+                    ]
                 )
 
         frozen_requirements = requirements_txt.freeze(

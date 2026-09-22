@@ -34,9 +34,6 @@ def setup(
     model_directory: str,
     force: bool,
     no_model: bool,
-    show_quickstarters: bool,
-    quickstarter_name: Optional[str],
-    show_notebook_quickstarters: bool,
     data_size_variant: api.SizeVariant,
 ):
     command.init(
@@ -67,14 +64,7 @@ def setup(
             utils.download(url, path)
 
     except api.NeverSubmittedException:
-        if show_quickstarters:
-            command.quickstarter(
-                quickstarter_name,
-                show_notebook_quickstarters,
-                True,
-            )
-        else:
-            print(f"you appear to have never submitted code before")
+        print(f"you appear to have never submitted code before")
 
     except api.EncryptedSubmissionException:
         print(f"you appear to have submitted an encrypted submission")
@@ -95,8 +85,5 @@ def setup_notebook(
         model_directory,
         True,
         no_model,
-        False,
-        None,
-        False,
         data_size_variant,
     )
