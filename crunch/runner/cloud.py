@@ -542,7 +542,7 @@ class CloudRunner(Runner):
         self.bash(
             "pip",
             [
-                "echo", "pip3", "install",
+                "pip3", "install",
                 "--root-user-action", "ignore",
                 "--disable-pip-version-check",
                 "--no-input",
@@ -669,7 +669,7 @@ class CloudRunner(Runner):
             [
                 "sandbox",
                 "--chown-directory", self.model_directory_path,
-                # "--filter-non-unix-socket-syscall",
+                "--filter-non-unix-socket-syscall",
                 "--",
                 "prefix", "user-code",
                 "--",
