@@ -75,30 +75,6 @@ def submission_show(submission_number: int):
     else:
         print("  (no model)")
 
-    print("")
-    print("Runtime Options:")
-
-    rows: List[Sequence[Any]] = []
-    for option in submission.runtime_options:
-        definition = option.definition
-        gpu = definition.specification.gpu
-
-        rows.append(
-            (
-                definition.name,
-                definition.display_name,
-                f"{definition.specification.memory.size} GB",
-                f"{definition.specification.cpu.core_count} cores",
-                f"{gpu.model} ({gpu.driver})" if gpu.model is not None else "(none)",
-                f"{option.status.name}",
-            )
-        )
-
-    ascii_table(
-        headers=["Name", "Display Name", "RAM", "CPU", "GPU", "Status"],
-        values=rows
-    )
-
 
 def _get_submission(number: int):
     try:
