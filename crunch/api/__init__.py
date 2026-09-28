@@ -55,6 +55,7 @@ from crunch.api._errors import EncryptedSubmissionException as EncryptedSubmissi
 from crunch.api._errors import ForbiddenLibraryException as ForbiddenLibraryException
 from crunch.api._errors import InternalServerException as InternalServerException
 from crunch.api._errors import InvalidProjectTokenException as InvalidProjectTokenException
+from crunch.api._errors import InvalidRunTokenException as InvalidRunTokenException
 from crunch.api._errors import LatestRoundNotFoundException as LatestRoundNotFoundException
 from crunch.api._errors import LeaderboardNotFoundException as LeaderboardNotFoundException
 from crunch.api._errors import MissingPhaseDataException as MissingPhaseDataException

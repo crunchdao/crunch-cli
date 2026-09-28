@@ -18,7 +18,7 @@ import requests
 
 import crunch.store as store
 import requirements as requirements_parser
-from crunch.api import Client, Competition, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
+from crunch.api import Client, Competition, InvalidRunTokenException, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
 from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
@@ -166,8 +166,12 @@ class CloudRunner(Runner):
 
         self._download_runner()
 
-        code_file_urls = self.run.code
-        model_file_urls = self.run.model
+        try:
+            code_file_urls = self.run.code
+            model_file_urls = self.run.model
+        except InvalidRunTokenException:
+            self.log("invalid run token", error=True)
+            exit(1)
 
         if "install r requirements":
             requirements_r_txt_name = "requirements.r.txt"
