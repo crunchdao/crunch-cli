@@ -23,7 +23,7 @@ from crunch.downloader import prepare_all, save_all
 from crunch.runner.runner import Runner
 from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
-from crunch.runner.unstructured import RunnerContext
+from crunch.runner.unstructured import DEFAULT_LOG_LIMITS, RunnerContext
 from crunch.unstructured import LocalCodeLoader, RunnerModule, deduce_code_loader
 from crunch.utils import download
 
@@ -597,6 +597,8 @@ class CloudRunner(Runner):
         command: str,
         parameters: KwargsLike = {},
         install_data_fuse: bool = True,
+        prefix_head: int = DEFAULT_LOG_LIMITS[0],
+        prefix_tail: int = DEFAULT_LOG_LIMITS[1],
     ) -> None:
         (
             trace_file_path,
@@ -671,7 +673,7 @@ class CloudRunner(Runner):
                 "--chown-directory", self.model_directory_path,
                 "--filter-non-unix-socket-syscall",
                 "--",
-                "prefix", "user-code",
+                "prefix", f"--head={prefix_head}", f"--tail={prefix_tail}", "user-code",
                 "--",
                 "python3", "-u",
                 "-m", "crunch", "runner", "cloud-executor",
@@ -966,6 +968,7 @@ class CloudRunnerContext(RunnerContext):
         span_hidden_parameters: Optional[List[str]] = None,
         span_attributes: Optional[KwargsLike] = None,
         install_data_fuse: bool = True,
+        log_limits: Tuple[int, int] = DEFAULT_LOG_LIMITS,
     ) -> None:
         self.log(f"executing - command={command}")
 
@@ -976,4 +979,6 @@ class CloudRunnerContext(RunnerContext):
                 command,
                 parameters=parameters or {},
                 install_data_fuse=install_data_fuse,
+                prefix_head=log_limits[0],
+                prefix_tail=log_limits[1],
             )
