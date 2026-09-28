@@ -217,7 +217,7 @@ def run_logs(
 
             if current_in_package_installer != in_package_installer:
                 if current_in_package_installer:
-                    print(f"{created_at} [{emitter}] running package installer")
+                    print(f"{created_at} [{emitter}] running package installer (show more with --debug)")
 
                 in_package_installer = current_in_package_installer
 
@@ -356,7 +356,7 @@ def _to_enriched_status(run: Run):
     elif status == RunStatus.COMPLETED:
         prediction = run.prediction
 
-        if prediction is not None and not prediction.valid:
+        if prediction is not None and prediction.valid == False:
             return "Bad prediction"
 
         if run.success:
