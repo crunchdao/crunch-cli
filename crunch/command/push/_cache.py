@@ -5,7 +5,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Callable, List, NewType, Optional, Tuple, cast
+from typing import Any, Callable, List, NewType, Optional, Tuple, cast
 
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
@@ -13,9 +13,6 @@ from mashumaro.mixins.dict import DataClassDictMixin
 
 from crunch.api import ApiException, Client, Upload, UploadStatus
 from crunch.constants import DOT_CRUNCH_DIRECTORY, UPLOAD_CACHE_FILE, UPLOAD_CACHE_VERSION
-
-if TYPE_CHECKING:
-    from .__init__ import LocalFile
 
 _INITIAL_TIME_TO_LIVE = 3
 _EARLY_DELETE_THRESHOLD = timedelta(hours=3)
@@ -55,6 +52,11 @@ class UploadCacheEntry(DataClassDictMixin):
         metadata=field_options(serialize="omit"),
     )
 
+    def find_known_location(self, relative_path: str) -> Optional[KnownLocation]:
+        for location in self.known_locations:
+            if location.path == relative_path:
+                return location
+
     class Config(BaseConfig):
         lazy_compilation = True
         serialize_by_alias = True
@@ -69,19 +71,19 @@ class UploadCacheEntry(DataClassDictMixin):
 class UploadCache(ABC):
 
     @abstractmethod
-    def try_reuse_file(self, local_file: "LocalFile") -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> Tuple[Checksum, Optional[Upload]]:
         ...
 
     @abstractmethod
-    def try_reuse_bytes(self, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_bytes(self, *, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
         ...
 
     @abstractmethod
-    def register_file(self, checksum: Checksum, upload: Upload, path: str, size: int, modification_time: datetime) -> None:
+    def register_file(self, *, checksum: Checksum, upload: Upload, relative_path: str, size: int, modification_time: datetime) -> None:
         ...
 
     @abstractmethod
-    def register_bytes(self, checksum: Checksum, upload: Upload) -> None:
+    def register_bytes(self, *, checksum: Checksum, upload: Upload) -> None:
         ...
 
     @abstractmethod
@@ -91,16 +93,16 @@ class UploadCache(ABC):
 
 class NoUploadCache(UploadCache):
 
-    def try_reuse_file(self, local_file: "LocalFile") -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> Tuple[Checksum, Optional[Upload]]:
         return (Checksum("none"), None)
 
-    def try_reuse_bytes(self, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_bytes(self, *, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
         return (Checksum("none"), None)
 
-    def register_file(self, checksum: Checksum, upload: Upload, path: str, size: int, modification_time: datetime) -> None:
+    def register_file(self, *, checksum: Checksum, upload: Upload, relative_path: str, size: int, modification_time: datetime) -> None:
         pass
 
-    def register_bytes(self, checksum: Checksum, upload: Upload) -> None:
+    def register_bytes(self, *, checksum: Checksum, upload: Upload) -> None:
         pass
 
     def persist(self) -> None:
@@ -117,8 +119,8 @@ class FileUploadCache(UploadCache):
         self._directory = directory
         self._entries = entries
 
-    def try_reuse_file(self, local_file: "LocalFile") -> Tuple[Checksum, Optional[Upload]]:
-        checksum, stat = self._compute_checksum(local_file)
+    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> Tuple[Checksum, Optional[Upload]]:
+        checksum, stat = self._compute_checksum(relative_path, absolute_path)
 
         entry = self._find_entry_by_checksum(checksum)
         if entry is None:
@@ -127,11 +129,11 @@ class FileUploadCache(UploadCache):
         assert entry.upload is not None, "a cache entry must always carry a validated upload"
         entry.time_to_live = _INITIAL_TIME_TO_LIVE
 
-        self._touch(entry, local_file, stat)
+        self._touch(entry, relative_path, stat)
 
         return (checksum, entry.upload)
 
-    def try_reuse_bytes(self, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_bytes(self, *, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
         checksum = sha256_bytes(data)
 
         entry = self._find_entry_by_checksum(checksum)
@@ -143,15 +145,15 @@ class FileUploadCache(UploadCache):
 
         return (checksum, entry.upload)
 
-    def register_file(self, checksum: Checksum, upload: Upload, path: str, size: int, modification_time: datetime) -> None:
+    def register_file(self, *, checksum: Checksum, upload: Upload, relative_path: str, size: int, modification_time: datetime) -> None:
         entry = self._register_checksum(checksum, upload)
         entry.known_locations.append(KnownLocation(
-            path=path,
+            path=relative_path,
             size=size,
             modification_time=modification_time,
         ))
 
-    def register_bytes(self, checksum: Checksum, upload: Upload) -> None:
+    def register_bytes(self, *, checksum: Checksum, upload: Upload) -> None:
         self._register_checksum(checksum, upload)
 
     def persist(self) -> None:
@@ -190,21 +192,21 @@ class FileUploadCache(UploadCache):
             None,
         )
 
-    def _compute_checksum(self, local_file: "LocalFile") -> Tuple[Checksum, os.stat_result]:
-        stat = os.stat(local_file.absolute_path)
+    def _compute_checksum(self, relative_path: str, absolute_path: str) -> Tuple[Checksum, os.stat_result]:
+        stat = os.stat(absolute_path)
         modification_time = to_modification_time(stat)
 
         for entry in self._entries:
-            for known_location in list(entry.known_locations):
-                if known_location.path != local_file.name:
-                    continue
+            existing = entry.find_known_location(relative_path)
+            if existing is None:
+                continue
 
-                if known_location.fast_check(stat.st_size, modification_time):
-                    return entry.checksum, stat
+            if existing.fast_check(stat.st_size, modification_time):
+                return entry.checksum, stat
 
-                entry.known_locations.remove(known_location)
+            entry.known_locations.remove(existing)  # will be added back by _touch later
 
-        return sha256_file(local_file.absolute_path), stat
+        return sha256_file(absolute_path), stat
 
     def _register_checksum(self, checksum: Checksum, upload: Upload) -> UploadCacheEntry:
         entry = self._find_entry_by_checksum(checksum)
@@ -226,16 +228,15 @@ class FileUploadCache(UploadCache):
 
         return entry
 
-    def _touch(self, entry: UploadCacheEntry, local_file: "LocalFile", stat: os.stat_result) -> None:
-        for known_location in entry.known_locations:
-            if known_location.path == local_file.name:
-                known_location.size = stat.st_size
-                known_location.modification_time = to_modification_time(stat)
-                break
+    def _touch(self, entry: UploadCacheEntry, relative_path: str, stat: os.stat_result) -> None:
+        existing = entry.find_known_location(relative_path)
+        if existing is not None:
+            existing.size = stat.st_size
+            existing.modification_time = to_modification_time(stat)
 
         else:
             entry.known_locations.append(KnownLocation(
-                path=local_file.name,
+                path=relative_path,
                 size=stat.st_size,
                 modification_time=to_modification_time(stat),
             ))

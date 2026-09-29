@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Literal, NamedTuple, Optional, Tuple, overload
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, overload
 
 import click
 import requests
@@ -19,11 +19,6 @@ from ._cache import FileUploadCache, NoUploadCache, UploadCache, to_modification
 
 if TYPE_CHECKING:
     from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
-
-
-class LocalFile(NamedTuple):
-    absolute_path: str
-    name: str
 
 
 class RequirementsMode(Enum):
@@ -199,7 +194,7 @@ def _upload_files(
 
     encrypted_files_storage: List[EncryptedFileInfo] = []
 
-    total_size = 0
+    total_size: int = 0
 
     now = datetime.now()
 
@@ -213,7 +208,7 @@ def _upload_files(
         encrypt_if_possible: bool = True,
         log_action: Optional[str] = None,
     ):
-        checksum, reused_upload = upload_cache.try_reuse_bytes(data)
+        checksum, reused_upload = upload_cache.try_reuse_bytes(data=data)
         if reused_upload is not None:
             size = reused_upload.size
 
@@ -232,7 +227,7 @@ def _upload_files(
             )
 
             if upload is not None:
-                upload_cache.register_bytes(checksum, upload)
+                upload_cache.register_bytes(checksum=checksum, upload=upload)
 
         nonlocal total_size
         total_size += size
@@ -242,7 +237,7 @@ def _upload_files(
         name: str,
         absolute_path: str,
     ):
-        checksum, reused_upload = upload_cache.try_reuse_file(LocalFile(absolute_path=absolute_path, name=name))
+        checksum, reused_upload = upload_cache.try_reuse_file(relative_path=name, absolute_path=absolute_path)
         if reused_upload is not None:
             size = reused_upload.size
 
@@ -261,7 +256,7 @@ def _upload_files(
                 )
 
             if upload is not None:
-                upload_cache.register_file(checksum, upload, name, stat.st_size, to_modification_time(stat))
+                upload_cache.register_file(checksum=checksum, upload=upload, relative_path=name, size=stat.st_size, modification_time=to_modification_time(stat))
 
         nonlocal total_size
         total_size += size
