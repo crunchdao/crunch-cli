@@ -412,13 +412,13 @@ def submission_check(
     _, module = _load_code(context, "submission", SubmissionModule.load)
 
     submission_files = [
-        File.from_local(path, name)
-        for path, name in list_code_files(root_directory_path, model_directory_path)
+        File.from_local(absolute_path, name)
+        for name, absolute_path in list_code_files(root_directory_path, model_directory_path).items()
     ]
 
     model_files = [
-        File.from_local(path, name)
-        for path, name in list_model_files(root_directory_path, model_directory_path)
+        File.from_local(absolute_path, name)
+        for name, absolute_path in list_model_files(root_directory_path, model_directory_path).items()
     ]
 
     try:

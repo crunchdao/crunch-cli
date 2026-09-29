@@ -3,6 +3,7 @@ import enum
 import os
 import time
 import typing
+from datetime import datetime
 from io import BytesIO
 
 import dataclasses_json
@@ -12,7 +13,10 @@ from tqdm.auto import tqdm
 if typing.TYPE_CHECKING:
     from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
+from ...utils import split_into_chunks
 from .._resource import Collection, Model
+
+_MAXIMUM_BATCH_SIZE = 100
 
 
 class UploadStatus(enum.Enum):
@@ -27,6 +31,11 @@ class UploadProvider(enum.Enum):
     AWS_S3 = "AWS_S3"
 
 
+class DeleteUploadResult(enum.Enum):
+    DELETED = "DELETED"
+    NOT_FOUND = "NOT_FOUND"
+
+
 @dataclasses_json.dataclass_json(
     letter_case=dataclasses_json.LetterCase.CAMEL,
     undefined=dataclasses_json.Undefined.EXCLUDE,
@@ -37,6 +46,19 @@ class PresignedUploadRequest:
     method: str
     url: str
     headers: typing.Dict[str, str]
+
+
+@dataclasses_json.dataclass_json(
+    letter_case=dataclasses_json.LetterCase.CAMEL,
+    undefined=dataclasses_json.Undefined.EXCLUDE,
+)
+@dataclasses.dataclass(frozen=True)
+class CreateUploadRequest:
+
+    name: str
+    size: int
+    encrypted: bool = False
+    preferred_chunk_size: typing.Optional[int] = None
 
 
 class Upload(Model):
@@ -70,6 +92,14 @@ class Upload(Model):
     @property
     def provider(self):
         return UploadProvider[self._attrs["provider"]]
+
+    @property
+    def expires_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["expiresAt"])
+
+    @property
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["createdAt"])
 
     @property
     def chunks(self) -> typing.List["UploadChunk"]:
@@ -378,6 +408,73 @@ class UploadCollection(Collection[Upload]):
             )
         )
 
+    def batch_create(
+        self,
+        upload_requests: typing.List["CreateUploadRequest"],
+    ) -> typing.List[Upload]:
+        if not upload_requests:
+            return []
+
+        created_uploads: typing.List[Upload] = []
+
+        try:
+            for upload_requests_chunk in split_into_chunks(upload_requests, _MAXIMUM_BATCH_SIZE):
+                response = self._client.api.create_upload_batch(
+                    [upload_request.to_dict() for upload_request in upload_requests_chunk]
+                )
+
+                created_uploads.extend(self.prepare_models(response["uploads"]))
+        except Exception as exception:
+            if created_uploads:
+                try:
+                    self.batch_delete([upload.id for upload in created_uploads])
+                except Exception as cleanup_exception:
+                    raise exception from cleanup_exception
+
+            raise
+
+        return created_uploads
+
+    def batch_list(
+        self,
+        upload_ids: typing.List[str],
+    ) -> typing.Dict[str, typing.Optional[Upload]]:
+        if not upload_ids:
+            return {}
+
+        results: typing.Dict[str, typing.Optional[Upload]] = {}
+
+        for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
+            response = self._client.api.get_upload_batch(upload_ids_chunk)["uploads"]
+
+            for upload_id in upload_ids_chunk:
+                upload_data = response.get(upload_id)
+                
+                results[upload_id] = (
+                    self.prepare_model(upload_data)
+                    if upload_data is not None
+                    else None
+                )
+
+        return results
+
+    def batch_delete(
+        self,
+        upload_ids: typing.List[str],
+    ) -> typing.Dict[str, DeleteUploadResult]:
+        if not upload_ids:
+            return {}
+
+        results: typing.Dict[str, DeleteUploadResult] = {}
+
+        for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
+            response = self._client.api.delete_upload_batch(upload_ids_chunk)["uploads"]
+
+            for upload_id in upload_ids_chunk:
+                results[upload_id] = DeleteUploadResult[response[upload_id]]
+
+        return results
+
 
 class UploadEndpointMixin:
 
@@ -473,4 +570,46 @@ class UploadEndpointMixin:
                 f"/v1/uploads/{id}",
                 json={},
             )
+        )
+
+    def create_upload_batch(
+        self,
+        uploads
+    ):
+        return self._result(
+            self.post(
+                "/v1/uploads/~/create",
+                json={
+                    "uploads": uploads,
+                }
+            ),
+            json=True
+        )
+
+    def get_upload_batch(
+        self,
+        upload_ids
+    ):
+        return self._result(
+            self.post(
+                "/v1/uploads/~/list",
+                json={
+                    "uploadIds": upload_ids,
+                }
+            ),
+            json=True
+        )
+
+    def delete_upload_batch(
+        self,
+        upload_ids
+    ):
+        return self._result(
+            self.post(
+                "/v1/uploads/~/delete",
+                json={
+                    "uploadIds": upload_ids,
+                }
+            ),
+            json=True
         )

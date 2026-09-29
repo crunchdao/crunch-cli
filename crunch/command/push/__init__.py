@@ -2,19 +2,34 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum, auto
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List, Literal, Optional, Tuple, overload
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, overload
 
 import click
 import requests
 
 from crunch import store
-from crunch.api import ApiException, Client, ForbiddenLibraryException, Project, Submission, SubmissionType, Upload
+from crunch.api import Client, ForbiddenLibraryException, Project, Submission, SubmissionType, Upload, UploadStatus
 from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, SUBMISSION_MESSAGE_LENGTH
-from crunch.external.humanfriendly import format_size
+from crunch.external.humanfriendly import format_size, format_timespan
+
+from ._cache import FileUploadCache, NoUploadCache, UploadCache, to_modification_time
 
 if TYPE_CHECKING:
     from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
+
+
+class RequirementsMode(Enum):
+    # ignore while processing the resources/ directory
+    IGNORE = auto()
+
+    # include the raw file, just try to validate it locally
+    INCLUDE = auto()
+
+    # try to freeze it and include both files if different
+    FREEZE = auto()
 
 
 @dataclass
@@ -68,7 +83,7 @@ def _build_gitignore(
     ignored_paths: List[str],
     use_parent_gitignore: bool,
 ) -> Callable[[str], Tuple[bool, bool]]:
-    from ..external import gitignorefile
+    from ...external import gitignorefile
 
     rules: List[gitignorefile._IgnoreRule] = []  # type: ignore
     for line in ignored_paths:
@@ -99,7 +114,7 @@ def _list_files(
     ignored_paths: List[str],
     *,
     use_parent_gitignore: bool = False,
-):
+) -> Dict[str, str]:
     directory_path = _to_unix_path(directory_path)
     directory_path_prefix = (
         len(directory_path)
@@ -107,6 +122,7 @@ def _list_files(
     )
 
     is_ignored = _build_gitignore(directory_path, ignored_paths, use_parent_gitignore)
+    found_files: Dict[str, str] = {}
 
     for root, _, files in os.walk(directory_path, topdown=False):
         root = _to_unix_path(root)
@@ -123,7 +139,9 @@ def _list_files(
             if any(is_ignored(relative_path)):
                 continue
 
-            yield absolute_path, relative_path
+            found_files[relative_path] = absolute_path
+
+    return found_files
 
 
 def list_code_files(
@@ -162,31 +180,86 @@ def _upload_files(
     *,
     group_name: str,
     storage: Dict[str, Upload],
-    file_iterator: Iterable[Tuple[str, str]],
+    found_files: Dict[str, str],
     dry: bool,
     client: Client,
     preferred_chunk_size: int,
     encryption_info: Optional[EncryptionInfo],
-    encrypted_files_storage: List[EncryptedFileInfo],
-    freeze_requirements: bool,
+    requirements_mode: RequirementsMode,
+    upload_cache: UploadCache,
 ):
     from crunch_convert import RequirementLanguage, requirements_txt
 
-    total_size = 0
+    assert not isinstance(upload_cache, FileUploadCache) or encryption_info is None, "caching is not supported for encrypted submissions"
+
+    encrypted_files_storage: List[EncryptedFileInfo] = []
+
+    total_size: int = 0
+
+    now = datetime.now()
+
+    def format_age(created_at: datetime) -> str:
+        return format_timespan(now - created_at, max_units=1)
 
     def handle_bytes(
+        *,
         data: bytes,
         name: str,
         encrypt_if_possible: bool = True,
         log_action: Optional[str] = None,
     ):
-        handle(
-            io=BytesIO(data),
-            name=name,
-            size=len(data),
-            encrypt_if_possible=encrypt_if_possible,
-            log_action=log_action,
-        )
+        checksum, reused_upload = upload_cache.try_reuse_bytes(data=data)
+        if reused_upload is not None:
+            size = reused_upload.size
+
+            print(f"reused cached {group_name} file: {name} ({format_size(size)}, {format_age(reused_upload.created_at)} old)")
+            storage[name] = reused_upload
+
+        else:
+            size = len(data)
+
+            upload = handle(
+                io=BytesIO(data),
+                name=name,
+                size=size,
+                encrypt_if_possible=encrypt_if_possible,
+                log_action=log_action,
+            )
+
+            if upload is not None:
+                upload_cache.register_bytes(checksum=checksum, upload=upload)
+
+        nonlocal total_size
+        total_size += size
+
+    def handle_file(
+        *,
+        name: str,
+        absolute_path: str,
+    ):
+        checksum, reused_upload = upload_cache.try_reuse_file(relative_path=name, absolute_path=absolute_path)
+        if reused_upload is not None:
+            size = reused_upload.size
+
+            print(f"reused cached {group_name} file: {name} ({format_size(size)}, {format_age(reused_upload.created_at)} old)")
+            storage[name] = reused_upload
+
+        else:
+            with open(absolute_path, "rb") as fd:
+                stat = os.fstat(fd.fileno())
+                size = stat.st_size
+
+                upload = handle(
+                    io=fd,
+                    name=name,
+                    size=size,
+                )
+
+            if upload is not None:
+                upload_cache.register_file(checksum=checksum, upload=upload, relative_path=name, size=stat.st_size, modification_time=to_modification_time(stat))
+
+        nonlocal total_size
+        total_size += size
 
     def handle(
         io: BinaryIO,
@@ -194,11 +267,7 @@ def _upload_files(
         size: int,
         encrypt_if_possible: bool = True,
         log_action: Optional[str] = None,
-    ):
-        nonlocal total_size
-
-        total_size += size
-
+    ) -> Optional[Upload]:
         if log_action:
             print(f"{log_action}: {name} ({format_size(size)})")
         else:
@@ -235,12 +304,13 @@ def _upload_files(
             )
 
         storage[name] = upload
+        return upload
 
     def handle_requirements(
         *,
         path: str,
         language: RequirementLanguage,
-        validate_locally: bool,
+        skip_freezing: bool = False,
     ):
         with open(path, "r") as fd:
             original_requirements_file = fd.read()
@@ -260,28 +330,35 @@ def _upload_files(
             )
         )
 
-        if validate_locally:
-            forbidden_names: List[str] = []
-            for requirement in requirements:
-                library = whitelist.find_library(
-                    language=requirement.language,
-                    name=requirement.name,
-                )
+        forbidden_names: List[str] = []
+        for requirement in requirements:
+            library = whitelist.find_library(
+                language=requirement.language,
+                name=requirement.name,
+            )
 
-                if library is None:
-                    forbidden_names.append(requirement.name)
+            if library is None:
+                forbidden_names.append(requirement.name)
 
-            if forbidden_names:
-                raise ForbiddenLibraryException(
-                    "forbidden packages has been found",
-                    packages=forbidden_names
-                )
+        if forbidden_names:
+            raise ForbiddenLibraryException(
+                "forbidden packages has been found",
 
-        frozen_requirements = requirements_txt.freeze(
-            requirements=requirements,
-            freeze_only_if_required=False,
-            version_finder=requirements_txt.LocalSitePackageVersionFinder(),
-        )
+                # TODO Find a better way!
+                requirements=[
+                    {"name": name, "language": language.name}
+                    for name in forbidden_names
+                ]
+            )
+
+        if skip_freezing:
+            frozen_requirements = requirements
+        else:
+            frozen_requirements = requirements_txt.freeze(
+                requirements=requirements,
+                freeze_only_if_required=False,
+                version_finder=requirements_txt.LocalSitePackageVersionFinder(),
+            )
 
         if requirements == frozen_requirements:
             handle_bytes(
@@ -290,6 +367,7 @@ def _upload_files(
                 log_action="using original file",
             )
 
+            return False
         else:
             frozen_requirements_files = requirements_txt.format_files_from_named(
                 frozen_requirements,
@@ -311,48 +389,28 @@ def _upload_files(
                 log_action="rename original file",
             )
 
-    original_requirements_txts = (
-        RequirementLanguage.PYTHON.original_txt_file_name,
-        RequirementLanguage.R.original_txt_file_name,
-    )
+            return True
 
-    python_requirements_txt = RequirementLanguage.PYTHON.txt_file_name
-    r_requirements_txt = RequirementLanguage.R.txt_file_name
-
-    # TODO Should this even be a question? Always doing it locally would save on bandwidth.
-    # The backend would validate it a second time, but that is still better.
-    # Also, requirements files should be processed first.
-    validate_requirements_locally = encryption_info is not None
-
-    for path, name in file_iterator:
-        if freeze_requirements:
-            if name in original_requirements_txts:
+    if requirements_mode != RequirementsMode.IGNORE:
+        for language in RequirementLanguage:
+            text_file_absolute_path = found_files.pop(language.txt_file_name, None)
+            if text_file_absolute_path is None:
                 continue
 
-            elif name == python_requirements_txt:
-                handle_requirements(
-                    path=path,
-                    language=RequirementLanguage.PYTHON,
-                    validate_locally=validate_requirements_locally,
-                )
+            has_frozen = handle_requirements(
+                path=text_file_absolute_path,
+                language=language,
+                skip_freezing=requirements_mode != RequirementsMode.FREEZE,
+            )
 
-                continue
+            if has_frozen:
+                found_files.pop(language.original_txt_file_name, None)
 
-            elif name == r_requirements_txt:
-                handle_requirements(
-                    path=path,
-                    language=RequirementLanguage.R,
-                    validate_locally=validate_requirements_locally,
-                )
-
-                continue
-
-        with open(path, "rb") as fd:
-            size = os.fstat(fd.fileno()).st_size
-            handle(fd, name, size)
-
-    if dry:
-        return
+    for name, absolute_path in found_files.items():
+        handle_file(
+            name=name,
+            absolute_path=absolute_path,
+        )
 
     if len(storage) and encryption_info:
         json_data = encryption_info.format_json(
@@ -441,35 +499,39 @@ def push(
 
     encryption_info = _get_encryption_info(client, project)
 
-    code_uploads: Dict[str, Upload] = {}
-    encrypted_code_files: List[EncryptedFileInfo] = []
+    keep_cached = not dry and encryption_info is None
+    upload_cache: UploadCache = (
+        FileUploadCache.load(submission_directory_path, client)
+        if keep_cached
+        else NoUploadCache()
+    )
 
-    model_uploads: Dict[str, Upload] = {}
-    encrypted_model_files: List[EncryptedFileInfo] = []
+    code_files: Dict[str, Upload] = {}
+    model_files: Dict[str, Upload] = {}
 
     try:
         _upload_files(
             group_name="code",
-            storage=code_uploads,
-            file_iterator=list_code_files(submission_directory_path, model_directory_relative_path),
+            storage=code_files,
+            found_files=list_code_files(submission_directory_path, model_directory_relative_path),
             dry=dry,
             client=client,
             preferred_chunk_size=preferred_chunk_size,
             encryption_info=encryption_info,
-            encrypted_files_storage=encrypted_code_files,
-            freeze_requirements=include_installed_packages_version,
+            requirements_mode=RequirementsMode.FREEZE if include_installed_packages_version else RequirementsMode.INCLUDE,
+            upload_cache=upload_cache,
         )
 
         _upload_files(
             group_name="model",
-            storage=model_uploads,
-            file_iterator=list_model_files(submission_directory_path, model_directory_relative_path),
+            storage=model_files,
+            found_files=list_model_files(submission_directory_path, model_directory_relative_path),
             dry=dry,
             client=client,
             preferred_chunk_size=preferred_chunk_size,
             encryption_info=encryption_info,
-            encrypted_files_storage=encrypted_model_files,
-            freeze_requirements=False,
+            requirements_mode=RequirementsMode.IGNORE,
+            upload_cache=upload_cache,
         )
 
         if dry:
@@ -482,14 +544,8 @@ def push(
             main_file_path=main_file_path,
             model_directory_path=model_directory_relative_path,
             type=SubmissionType.CODE,
-            code_files={
-                path: upload.id
-                for path, upload in code_uploads.items()
-            },
-            model_files={
-                path: upload.id
-                for path, upload in model_uploads.items()
-            },
+            code_files=_to_upload_ids(code_files),
+            model_files=_to_upload_ids(model_files),
         )
 
         if not no_afterword:
@@ -497,25 +553,34 @@ def push(
 
         return submission
     finally:
-        if not dry:
-            _cleanup(code_uploads, model_uploads)
+        upload_cache.persist()
+
+        _cleanup(client, code_files, keep_cached)
+        _cleanup(client, model_files, keep_cached)
+
+
+def _to_upload_ids(uploads: Optional[Dict[str, Upload]]) -> Dict[str, str]:
+    if uploads is None:
+        return {}
+
+    return {
+        path: upload.id
+        for path, upload in uploads.items()
+    }
 
 
 def _cleanup(
-    code_uploads: dict[str, Upload],
-    model_uploads: dict[str, Upload]
+    client: Client,
+    files: Dict[str, Upload],
+    keep_cached: bool,
 ):
-    for upload in code_uploads.values():
-        try:
-            upload.delete()
-        except ApiException as exception:
-            print(f"cleanup error {exception}")
+    upload_ids_to_delete = [
+        upload.id
+        for upload in files.values()
+        if not keep_cached or upload.status != UploadStatus.SUCCEEDED
+    ]
 
-    for upload in model_uploads.values():
-        try:
-            upload.delete()
-        except ApiException as exception:
-            print(f"cleanup error {exception}")
+    client.uploads.batch_delete(upload_ids_to_delete)
 
 
 def _print_success(
