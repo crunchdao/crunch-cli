@@ -363,6 +363,5 @@ def sha256_file(path: str, buffer_size: int = 4 * 1024 * 1024) -> Checksum:
     return Checksum(f"sha256:{hasher.hexdigest()}")
 
 
-@staticmethod
 def sha256_bytes(data: bytes) -> Checksum:
     return Checksum(f"sha256:{hashlib.sha256(data).hexdigest()}")

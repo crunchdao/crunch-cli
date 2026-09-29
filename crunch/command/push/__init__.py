@@ -539,7 +539,6 @@ def push(
             return None
 
         print(f"export {competition.name}:project/{project.user_id}/{project.name}")
-        exit(0)
         submission = project.submissions.create(
             message=message,
             main_file_path=main_file_path,
@@ -578,7 +577,7 @@ def _cleanup(
     upload_ids_to_delete = [
         upload.id
         for upload in files.values()
-        if not keep_cached and upload.status != UploadStatus.SUCCEEDED
+        if not keep_cached or upload.status != UploadStatus.SUCCEEDED
     ]
 
     client.uploads.batch_delete(upload_ids_to_delete)
