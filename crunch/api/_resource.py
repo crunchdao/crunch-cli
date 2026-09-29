@@ -97,7 +97,7 @@ class Model:
         ]
 
 
-T = TypeVar('T', Model, Model)
+T = TypeVar('T', bound=Model)
 
 
 class Collection(Generic[T]):

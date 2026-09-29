@@ -5,6 +5,7 @@ click
 dataclasses_json
 
 joblib
+mashumaro
 nvidia-ml-py
 pandas
 psutil

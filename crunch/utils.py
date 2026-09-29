@@ -8,7 +8,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Generic, Iterable, Literal, NoReturn, Optional, Set, Type, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Generic, Iterable, List, Literal, NoReturn, Optional, Set, Type, TypeVar, Union, cast, overload
 
 import click
 import requests
@@ -232,6 +232,11 @@ def smart_call(
         arguments[name] = value
 
     return function(**arguments)
+
+
+def split_into_chunks(items: List[_T], chunk_size: int) -> Iterable[List[_T]]:
+    for start_index in range(0, len(items), chunk_size):
+        yield items[start_index:start_index + chunk_size]
 
 
 def cut_url(url: str):

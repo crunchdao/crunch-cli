@@ -38,7 +38,10 @@ from crunch.api._domain.submission import Submission as Submission
 from crunch.api._domain.submission import SubmissionType as SubmissionType
 from crunch.api._domain.submission_file import SubmissionFile as SubmissionFile
 from crunch.api._domain.target import Target as Target
+from crunch.api._domain.upload import CreateUploadRequest as CreateUploadRequest
+from crunch.api._domain.upload import DeleteUploadResult as DeleteUploadResult
 from crunch.api._domain.upload import Upload as Upload
+from crunch.api._domain.upload import UploadStatus as UploadStatus
 from crunch.api._domain.user import User as User
 from crunch.api._errors import AnnotatedConnectException as AnnotatedConnectException
 from crunch.api._errors import ApiException as ApiException

@@ -5,6 +5,7 @@ coloredlogs
 dataclasses_json
 inquirer
 joblib
+mashumaro
 nvidia-ml-py
 pandas
 psutil
