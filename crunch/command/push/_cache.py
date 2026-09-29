@@ -46,7 +46,7 @@ class UploadCacheEntry(DataClassDictMixin):
     time_to_live: int
     known_locations: list[KnownLocation] = field(default_factory=cast(Callable[[], List[KnownLocation]], list),)
 
-    upload: Upload | None = field(
+    upload: Optional[Upload] = field(
         default=None,
         init=False,
         metadata=field_options(serialize="omit"),
