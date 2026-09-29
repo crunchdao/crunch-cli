@@ -1,24 +1,18 @@
-import json
 import os
 import sys
-from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, overload
+from typing import BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, overload
 
 import click
-import requests
 
 from crunch import store
-from crunch.api import Client, ForbiddenLibraryException, Project, Submission, SubmissionType, Upload, UploadStatus
-from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, ENCRYPTION_JSON, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, SUBMISSION_MESSAGE_LENGTH
+from crunch.api import Client, ForbiddenLibraryException, Submission, SubmissionType, Upload, UploadStatus
+from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size, format_timespan
 
 from ._cache import FileUploadCache, NoUploadCache, UploadCache, to_modification_time
-
-if TYPE_CHECKING:
-    from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
 
 
 class RequirementsMode(Enum):
@@ -30,36 +24,6 @@ class RequirementsMode(Enum):
 
     # try to freeze it and include both files if different
     FREEZE = auto()
-
-
-@dataclass
-class EncryptedFileInfo:
-
-    name: str
-    public_key_pem: "EphemeralPublicKeyPem"
-
-
-@dataclass
-class EncryptionInfo:
-
-    id: str
-    public_key_pem: "PublicKeyPem"
-    certificate_chain: str
-
-    def format_json(self, files: List[EncryptedFileInfo]) -> str:
-        return json.dumps({
-            "version": "1.0",
-            "submission_id": self.id,
-            "public_key": self.public_key_pem,
-            "certificate_chain": self.certificate_chain,
-            "files": [
-                {
-                    "name": file.name,
-                    "pubkey": file.public_key_pem,
-                }
-                for file in files
-            ],
-        }, indent=4)
 
 
 def _to_unix_path(input: str):
@@ -184,15 +148,10 @@ def _upload_files(
     dry: bool,
     client: Client,
     preferred_chunk_size: int,
-    encryption_info: Optional[EncryptionInfo],
     requirements_mode: RequirementsMode,
     upload_cache: UploadCache,
 ):
     from crunch_convert import RequirementLanguage, requirements_txt
-
-    assert not isinstance(upload_cache, FileUploadCache) or encryption_info is None, "caching is not supported for encrypted submissions"
-
-    encrypted_files_storage: List[EncryptedFileInfo] = []
 
     total_size: int = 0
 
@@ -205,7 +164,6 @@ def _upload_files(
         *,
         data: bytes,
         name: str,
-        encrypt_if_possible: bool = True,
         log_action: Optional[str] = None,
     ):
         checksum, reused_upload = upload_cache.try_reuse_bytes(data=data)
@@ -222,7 +180,6 @@ def _upload_files(
                 io=BytesIO(data),
                 name=name,
                 size=size,
-                encrypt_if_possible=encrypt_if_possible,
                 log_action=log_action,
             )
 
@@ -265,7 +222,6 @@ def _upload_files(
         io: BinaryIO,
         name: str,
         size: int,
-        encrypt_if_possible: bool = True,
         log_action: Optional[str] = None,
     ) -> Optional[Upload]:
         if log_action:
@@ -276,34 +232,14 @@ def _upload_files(
         if dry:
             return
 
-        if encrypt_if_possible and encryption_info:
-            (
-                upload,
-                ephemeral_public_key_pem,
-            ) = client.uploads.send_from_io(
-                io=io,
-                name=name,
-                size=size,
-                public_key_pem=encryption_info.public_key_pem,
-                preferred_chunk_size=preferred_chunk_size,
-                progress_bar=True,
-            )
+        upload = storage[name] = client.uploads.send_from_io(
+            io=io,
+            name=name,
+            size=size,
+            preferred_chunk_size=preferred_chunk_size,
+            progress_bar=True,
+        )
 
-            encrypted_files_storage.append(EncryptedFileInfo(
-                name=name,
-                public_key_pem=ephemeral_public_key_pem,
-            ))
-        else:
-            upload = client.uploads.send_from_io(
-                io=io,
-                name=name,
-                size=size,
-                public_key_pem=None,
-                preferred_chunk_size=preferred_chunk_size,
-                progress_bar=True,
-            )
-
-        storage[name] = upload
         return upload
 
     def handle_requirements(
@@ -412,42 +348,7 @@ def _upload_files(
             absolute_path=absolute_path,
         )
 
-    if len(storage) and encryption_info:
-        json_data = encryption_info.format_json(
-            files=encrypted_files_storage,
-        ).encode("utf-8")
-
-        handle_bytes(
-            data=json_data,
-            name=ENCRYPTION_JSON,
-            encrypt_if_possible=False,
-            log_action=f"create {group_name} encryption file",
-        )
-
     print(f"total {group_name} size: {format_size(total_size)}")
-
-
-def _get_encryption_info(
-    client: Client,
-    project: Project,
-) -> Optional[EncryptionInfo]:
-    competition = project.competition
-    if not competition.encrypt_submissions:
-        return None
-
-    phala_key_url = competition.phala_key_url
-    assert phala_key_url is not None, "phala_key_url must be set if encrypt_submissions is True"
-
-    encryption_id = project.submissions.get_next_encryption_id()
-    print(f"using encryption id: {encryption_id}")
-
-    phala = requests.get(f"{phala_key_url}/keypair/{encryption_id}").json()
-
-    return EncryptionInfo(
-        id=encryption_id,
-        public_key_pem=phala["public_key"],  # type: ignore
-        certificate_chain=phala["certificate_chain"],  # type: ignore
-    )
 
 
 @overload
@@ -497,9 +398,7 @@ def push(
 
     preferred_chunk_size = 50_000_000
 
-    encryption_info = _get_encryption_info(client, project)
-
-    keep_cached = not dry and encryption_info is None
+    keep_cached = not dry
     upload_cache: UploadCache = (
         FileUploadCache.load(submission_directory_path, client)
         if keep_cached
@@ -517,7 +416,6 @@ def push(
             dry=dry,
             client=client,
             preferred_chunk_size=preferred_chunk_size,
-            encryption_info=encryption_info,
             requirements_mode=RequirementsMode.FREEZE if include_installed_packages_version else RequirementsMode.INCLUDE,
             upload_cache=upload_cache,
         )
@@ -529,7 +427,6 @@ def push(
             dry=dry,
             client=client,
             preferred_chunk_size=preferred_chunk_size,
-            encryption_info=encryption_info,
             requirements_mode=RequirementsMode.IGNORE,
             upload_cache=upload_cache,
         )

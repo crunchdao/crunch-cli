@@ -118,13 +118,6 @@ class SubmissionCollection(Collection[Submission]):
             )
         )
 
-    def get_next_encryption_id(self) -> str:
-        return self._client.api.get_submission_next_encryption_id(
-            self.project.competition.id,
-            self.project.user_id,
-            self.project.name,
-        )
-
     def prepare_model(self, attrs: "Attrs"):
         return super().prepare_model(
             attrs,
@@ -188,19 +181,4 @@ class SubmissionEndpointMixin:
                 },
             ),
             json=True,
-        )
-
-    def get_submission_next_encryption_id(
-        self,
-        competition_identifier,
-        user_identifier,
-        project_identifier
-    ):
-        return self._result(
-            self.get(
-                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions/next-encryption-id",
-                params={
-                    "pushToken": self.auth_._token if isinstance(self.auth_, PushTokenAuth) else None,
-                },
-            ),
         )

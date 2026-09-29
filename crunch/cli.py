@@ -3,12 +3,11 @@ import functools
 import json
 import os
 import sys
-from typing import Any, Callable, List, Literal, Optional, Union
+from typing import Any, Callable, List, Optional
 
 import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
-from crunch.dev.cli import group as dev_group
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
 
@@ -795,5 +794,3 @@ def organize_group(
 
 
 organize_group.add_command(organize_test_group)
-
-cli.add_command(dev_group)

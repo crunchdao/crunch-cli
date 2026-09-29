@@ -10,9 +10,6 @@ import dataclasses_json
 import requests
 from tqdm.auto import tqdm
 
-if typing.TYPE_CHECKING:
-    from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
-
 from ...utils import split_into_chunks
 from .._resource import Collection, Model
 
@@ -284,70 +281,25 @@ class UploadCollection(Collection[Upload]):
                 io=file,
                 name=name,
                 size=size,
-                public_key_pem=None,
                 preferred_chunk_size=preferred_chunk_size,
                 progress_bar=progress_bar,
                 max_retry=max_retry,
             )
 
-    @typing.overload
     def send_from_io(
         self,
         *,
         io: typing.BinaryIO,
         name: str,
         size: int,
-        public_key_pem: typing.Literal[None],
-        preferred_chunk_size: typing.Optional[int],
-        progress_bar: bool,
-        max_retry: int = 10,
-    ) -> Upload:
-        pass
-
-    @typing.overload
-    def send_from_io(
-        self,
-        *,
-        io: typing.BinaryIO,
-        name: str,
-        size: int,
-        public_key_pem: "PublicKeyPem",
-        preferred_chunk_size: typing.Optional[int],
-        progress_bar: bool,
-        max_retry: int = 10,
-    ) -> typing.Tuple[Upload, "EphemeralPublicKeyPem"]:
-        pass
-
-    def send_from_io(
-        self,
-        *,
-        io: typing.BinaryIO,
-        name: str,
-        size: int,
-        public_key_pem: typing.Optional["PublicKeyPem"],
         preferred_chunk_size: typing.Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
-    ) -> typing.Union[Upload, typing.Tuple[Upload, "EphemeralPublicKeyPem"]]:
-        ephemeral_public_key_pem: typing.Optional[str] = None
-
-        encrypted = public_key_pem is not None
-        if encrypted:
-            from crunch_encrypt.ecies import (OVERHEAD_BYTES_COUNT,
-                                              ECIESEncryptIO)
-
-            io = ECIESEncryptIO(
-                io,
-                public_key_pem=public_key_pem,
-            )
-
-            ephemeral_public_key_pem = io.ephemeral_public_key_pem
-            size += OVERHEAD_BYTES_COUNT
-
+    ) -> Upload:
         upload = self.create(
             name=name,
             size=size,
-            encrypted=encrypted,
+            encrypted=False,
             preferred_chunk_size=preferred_chunk_size,
         )
 
@@ -391,10 +343,6 @@ class UploadCollection(Collection[Upload]):
             progress.close()
 
         upload.complete()
-
-        if public_key_pem is not None:
-            assert ephemeral_public_key_pem is not None
-            return upload, ephemeral_public_key_pem
 
         return upload
 
