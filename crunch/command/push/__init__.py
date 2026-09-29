@@ -3,8 +3,9 @@ import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum, auto
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, Iterable, List, Literal, NamedTuple, Optional, Tuple, overload
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Literal, NamedTuple, Optional, Tuple, overload
 
 import click
 import requests
@@ -23,6 +24,17 @@ if TYPE_CHECKING:
 class LocalFile(NamedTuple):
     absolute_path: str
     name: str
+
+
+class RequirementsMode(Enum):
+    # ignore while processing the resources/ directory
+    IGNORE = auto()
+
+    # include the raw file, just try to validate it locally
+    INCLUDE = auto()
+
+    # try to freeze it and include both files if different
+    FREEZE = auto()
 
 
 @dataclass
@@ -107,7 +119,7 @@ def _list_files(
     ignored_paths: List[str],
     *,
     use_parent_gitignore: bool = False,
-) -> Iterable[LocalFile]:
+) -> Dict[str, str]:
     directory_path = _to_unix_path(directory_path)
     directory_path_prefix = (
         len(directory_path)
@@ -115,6 +127,7 @@ def _list_files(
     )
 
     is_ignored = _build_gitignore(directory_path, ignored_paths, use_parent_gitignore)
+    found_files: Dict[str, str] = {}
 
     for root, _, files in os.walk(directory_path, topdown=False):
         root = _to_unix_path(root)
@@ -131,7 +144,9 @@ def _list_files(
             if any(is_ignored(relative_path)):
                 continue
 
-            yield LocalFile(absolute_path=absolute_path, name=relative_path)
+            found_files[relative_path] = absolute_path
+
+    return found_files
 
 
 def list_code_files(
@@ -170,12 +185,12 @@ def _upload_files(
     *,
     group_name: str,
     storage: Dict[str, Upload],
-    file_iterator: Iterable[LocalFile],
+    found_files: Dict[str, str],
     dry: bool,
     client: Client,
     preferred_chunk_size: int,
     encryption_info: Optional[EncryptionInfo],
-    freeze_requirements: bool,
+    requirements_mode: RequirementsMode,
     upload_cache: UploadCache,
 ):
     from crunch_convert import RequirementLanguage, requirements_txt
@@ -224,28 +239,29 @@ def _upload_files(
 
     def handle_file(
         *,
-        local_file: LocalFile,
+        name: str,
+        absolute_path: str,
     ):
-        checksum, reused_upload = upload_cache.try_reuse_file(local_file)
+        checksum, reused_upload = upload_cache.try_reuse_file(LocalFile(absolute_path=absolute_path, name=name))
         if reused_upload is not None:
             size = reused_upload.size
 
-            print(f"reused cached {group_name} file: {local_file.name} ({format_size(size)}, {format_age(reused_upload.created_at)} old)")
-            storage[local_file.name] = reused_upload
+            print(f"reused cached {group_name} file: {name} ({format_size(size)}, {format_age(reused_upload.created_at)} old)")
+            storage[name] = reused_upload
 
         else:
-            with open(local_file.absolute_path, "rb") as fd:
+            with open(absolute_path, "rb") as fd:
                 stat = os.fstat(fd.fileno())
                 size = stat.st_size
 
                 upload = handle(
                     io=fd,
-                    name=local_file.name,
+                    name=name,
                     size=size,
                 )
 
             if upload is not None:
-                upload_cache.register_file(checksum, upload, local_file.name, stat.st_size, to_modification_time(stat))
+                upload_cache.register_file(checksum, upload, name, stat.st_size, to_modification_time(stat))
 
         nonlocal total_size
         total_size += size
@@ -299,7 +315,7 @@ def _upload_files(
         *,
         path: str,
         language: RequirementLanguage,
-        validate_locally: bool,
+        skip_freezing: bool = False,
     ):
         with open(path, "r") as fd:
             original_requirements_file = fd.read()
@@ -319,28 +335,35 @@ def _upload_files(
             )
         )
 
-        if validate_locally:
-            forbidden_names: List[str] = []
-            for requirement in requirements:
-                library = whitelist.find_library(
-                    language=requirement.language,
-                    name=requirement.name,
-                )
+        forbidden_names: List[str] = []
+        for requirement in requirements:
+            library = whitelist.find_library(
+                language=requirement.language,
+                name=requirement.name,
+            )
 
-                if library is None:
-                    forbidden_names.append(requirement.name)
+            if library is None:
+                forbidden_names.append(requirement.name)
 
-            if forbidden_names:
-                raise ForbiddenLibraryException(
-                    "forbidden packages has been found",
-                    packages=forbidden_names
-                )
+        if forbidden_names:
+            raise ForbiddenLibraryException(
+                "forbidden packages has been found",
 
-        frozen_requirements = requirements_txt.freeze(
-            requirements=requirements,
-            freeze_only_if_required=False,
-            version_finder=requirements_txt.LocalSitePackageVersionFinder(),
-        )
+                # TODO Find a better way!
+                requirements=[
+                    {"name": name, "language": language.name}
+                    for name in forbidden_names
+                ]
+            )
+
+        if skip_freezing:
+            frozen_requirements = requirements
+        else:
+            frozen_requirements = requirements_txt.freeze(
+                requirements=requirements,
+                freeze_only_if_required=False,
+                version_finder=requirements_txt.LocalSitePackageVersionFinder(),
+            )
 
         if requirements == frozen_requirements:
             handle_bytes(
@@ -349,6 +372,7 @@ def _upload_files(
                 log_action="using original file",
             )
 
+            return False
         else:
             frozen_requirements_files = requirements_txt.format_files_from_named(
                 frozen_requirements,
@@ -370,44 +394,27 @@ def _upload_files(
                 log_action="rename original file",
             )
 
-    original_requirements_txts = (
-        RequirementLanguage.PYTHON.original_txt_file_name,
-        RequirementLanguage.R.original_txt_file_name,
-    )
+            return True
 
-    python_requirements_txt = RequirementLanguage.PYTHON.txt_file_name
-    r_requirements_txt = RequirementLanguage.R.txt_file_name
-
-    # TODO Should this even be a question? Always doing it locally would save on bandwidth.
-    # The backend would validate it a second time, but that is still better.
-    # Also, requirements files should be processed first.
-    validate_requirements_locally = encryption_info is not None
-
-    for local_file in file_iterator:
-        if freeze_requirements:
-            if local_file.name in original_requirements_txts:
+    if requirements_mode != RequirementsMode.IGNORE:
+        for language in RequirementLanguage:
+            text_file_absolute_path = found_files.pop(language.txt_file_name, None)
+            if text_file_absolute_path is None:
                 continue
 
-            elif local_file.name == python_requirements_txt:
-                handle_requirements(
-                    path=local_file.absolute_path,
-                    language=RequirementLanguage.PYTHON,
-                    validate_locally=validate_requirements_locally,
-                )
+            has_frozen = handle_requirements(
+                path=text_file_absolute_path,
+                language=language,
+                skip_freezing=requirements_mode != RequirementsMode.FREEZE,
+            )
 
-                continue
+            if has_frozen:
+                found_files.pop(language.original_txt_file_name, None)
 
-            elif local_file.name == r_requirements_txt:
-                handle_requirements(
-                    path=local_file.absolute_path,
-                    language=RequirementLanguage.R,
-                    validate_locally=validate_requirements_locally,
-                )
-
-                continue
-
+    for name, absolute_path in found_files.items():
         handle_file(
-            local_file=local_file,
+            name=name,
+            absolute_path=absolute_path,
         )
 
     if len(storage) and encryption_info:
@@ -511,24 +518,24 @@ def push(
         _upload_files(
             group_name="code",
             storage=code_files,
-            file_iterator=list_code_files(submission_directory_path, model_directory_relative_path),
+            found_files=list_code_files(submission_directory_path, model_directory_relative_path),
             dry=dry,
             client=client,
             preferred_chunk_size=preferred_chunk_size,
             encryption_info=encryption_info,
-            freeze_requirements=include_installed_packages_version,
+            requirements_mode=RequirementsMode.FREEZE if include_installed_packages_version else RequirementsMode.INCLUDE,
             upload_cache=upload_cache,
         )
 
         _upload_files(
             group_name="model",
             storage=model_files,
-            file_iterator=list_model_files(submission_directory_path, model_directory_relative_path),
+            found_files=list_model_files(submission_directory_path, model_directory_relative_path),
             dry=dry,
             client=client,
             preferred_chunk_size=preferred_chunk_size,
             encryption_info=encryption_info,
-            freeze_requirements=False,
+            requirements_mode=RequirementsMode.IGNORE,
             upload_cache=upload_cache,
         )
 
@@ -537,6 +544,7 @@ def push(
             return None
 
         print(f"export {competition.name}:project/{project.user_id}/{project.name}")
+        exit(0)
         submission = project.submissions.create(
             message=message,
             main_file_path=main_file_path,
