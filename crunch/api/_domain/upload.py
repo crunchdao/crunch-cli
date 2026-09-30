@@ -49,19 +49,6 @@ class PresignedUploadRequest:
     headers: Dict[str, str]
 
 
-@dataclasses_json.dataclass_json(  # type: ignore[call-overload]
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE,
-)
-@dataclasses.dataclass(frozen=True)
-class CreateUploadRequest:
-
-    name: str
-    size: int
-    encrypted: bool = False
-    preferred_chunk_size: Optional[int] = None
-
-
 class Upload(Model[str]):
 
     @property
@@ -356,33 +343,6 @@ class UploadCollection(Collection[Upload]):
             )
         )
 
-    def batch_create(
-        self,
-        upload_requests: List["CreateUploadRequest"],
-    ) -> List[Upload]:
-        if not upload_requests:
-            return []
-
-        created_uploads: List[Upload] = []
-
-        try:
-            for upload_requests_chunk in split_into_chunks(upload_requests, _MAXIMUM_BATCH_SIZE):
-                response = self._client.api.create_upload_batch(
-                    [upload_request.to_dict() for upload_request in upload_requests_chunk]
-                )
-
-                created_uploads.extend(self.prepare_models(response["uploads"]))
-        except Exception as exception:
-            if created_uploads:
-                try:
-                    self.batch_delete([upload.id for upload in created_uploads])
-                except Exception as cleanup_exception:
-                    raise exception from cleanup_exception
-
-            raise
-
-        return created_uploads
-
     def batch_list(
         self,
         upload_ids: List[str],
@@ -518,20 +478,6 @@ class UploadEndpointMixin(EndpointMixin):
                 f"/v1/uploads/{id}",
                 json={},
             )
-        )
-
-    def create_upload_batch(
-        self,
-        uploads
-    ):
-        return self._result(
-            self.post(
-                "/v1/uploads/~/create",
-                json={
-                    "uploads": uploads,
-                }
-            ),
-            json=True
         )
 
     def get_upload_batch(
