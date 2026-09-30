@@ -5,6 +5,7 @@ from crunch.external.humanfriendly import format_size
 
 
 def quota(
+    *,
     show_tips: bool = False,
 ):
     project = get_project()

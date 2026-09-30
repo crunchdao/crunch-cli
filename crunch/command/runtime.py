@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 
 def runtime_list(
+    *,
     submission_identifier: "SubmissionIdentifierType",
     show_tips: bool = False,
 ):
@@ -50,6 +51,7 @@ def runtime_list(
 
 
 def runtime_request(
+    *,
     runtime_option_name: str,
     submission_identifier: "SubmissionIdentifierType",
     justification: str,

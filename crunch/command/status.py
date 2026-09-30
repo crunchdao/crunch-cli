@@ -2,6 +2,7 @@ from crunch.command._common import get_project, reformat_datetime
 
 
 def status(
+    *,
     show_tips: bool = True,
 ):
     project = get_project()
