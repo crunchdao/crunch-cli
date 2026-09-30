@@ -125,6 +125,7 @@ class _Inline:
         raise_abort: bool = False,
         round_number: RoundIdentifierType = "@current",
         no_determinism_check: Optional[bool] = None,
+        skip_whitelisted_library_scan: bool = False,
     ):
         from . import library, tester
 
@@ -133,11 +134,12 @@ class _Inline:
         self._trace_exporter.reset()
 
         try:
-            library.scan(
-                module=self.user_module,
-                logger=self.logger,
-            )
-            self.logger.warning("")
+            if not skip_whitelisted_library_scan:
+                library.scan(
+                    module=self.user_module,
+                    logger=self.logger,
+                )
+                self.logger.warning("")
 
             tester.run(
                 self.user_module,
