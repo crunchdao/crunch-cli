@@ -1,16 +1,16 @@
-from typing import TYPE_CHECKING, Iterator, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
-from crunch.api._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
+    from crunch.api._identifiers import CompetitionIdentifierType
+    from crunch.api._resource import JsonValue
     from crunch.api._types import Attrs
 
 
-class Target(Model):
-
-    resource_identifier_attribute = "name"
+class Target(Model[int]):
 
     def __init__(
         self,
@@ -19,7 +19,7 @@ class Target(Model):
         client: Optional["Client"] = None,
         collection: Optional["TargetCollection"] = None,
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
 
@@ -28,12 +28,16 @@ class Target(Model):
         return self._attrs["id"]
 
     @property
+    def resource_identifier(self) -> str:
+        return self.name
+
+    @property
     def competition(self):
         return self._competition
 
     @property
     def metrics(self):
-        from .metric import MetricCollection
+        from crunch.api._domain.metric import MetricCollection
 
         return MetricCollection(
             competition=self._competition,
@@ -71,15 +75,12 @@ class TargetCollection(Collection[Target]):
 
         self.competition = competition
 
-    def __iter__(self) -> Iterator[Target]:
-        return super().__iter__()  # type: ignore
-
     def get(
         self,
         name: str,
     ) -> Target:
         return self.prepare_model(
-            self._client.api.get_target(
+            self._checked_client.api.get_target(
                 self.competition.id,
                 name
             )
@@ -91,26 +92,27 @@ class TargetCollection(Collection[Target]):
         virtual: Optional[bool] = None,
     ) -> List[Target]:
         return self.prepare_models(
-            self._client.api.list_targets(
+            self._checked_client.api.list_targets(
                 self.competition.id,
                 name,
                 virtual,
             )
         )
 
-    def prepare_model(self, attrs: "Attrs"):
+    def prepare_model(self, attrs: Union["JsonValue", Target], *args: Any) -> Target:
         return super().prepare_model(
             attrs,
             self.competition,
+            *args
         )
 
 
-class TargetEndpointMixin:
+class TargetEndpointMixin(EndpointMixin):
 
     def get_target(
         self,
-        competition_identifier,
-        name
+        competition_identifier: "CompetitionIdentifierType",
+        name: str
     ):
         return self._result(
             self.get(
@@ -121,9 +123,9 @@ class TargetEndpointMixin:
 
     def list_targets(
         self,
-        competition_identifier,
-        name,
-        virtual,
+        competition_identifier: "CompetitionIdentifierType",
+        name: Optional[str],
+        virtual: Optional[bool],
     ):
         return self._result(
             self.get(

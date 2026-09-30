@@ -30,7 +30,7 @@ def download(
     elif project_info.size_variant != size_variant:
         project_info.size_variant = size_variant
         utils.write_project_info(project_info)
-        print(f"project: set default size variant: {size_variant.name.lower()}")
+        print(f"download: set default size variant: {size_variant.name.lower()}")
 
         changed_variant = True
     else:

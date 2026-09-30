@@ -20,7 +20,7 @@ def _print_contact(
         message += " and " + and_
     message += ", please contact an administrator."
 
-    print("")
+    print()
     print(message)
 
 
@@ -147,7 +147,7 @@ class CrunchNotFoundException(ApiException):
         **kwargs: Any,
     ) -> None:
         print("Crunch not found.")
-        print("")
+        print()
         print("The competition may be over or the server is not correctly configured.")
 
         _print_contact()
@@ -169,7 +169,7 @@ class CrunchNotPublishedException(ApiException):
         **kwargs: Any,
     ) -> None:
         print("Crunch not published.")
-        print("")
+        print()
         print("The leaderboard should be published soon.")
 
         _print_contact()
@@ -182,7 +182,7 @@ class CurrentPhaseNotFoundException(ApiException):
         **kwargs: Any,
     ) -> None:
         print("Current phase not found.")
-        print("")
+        print()
         print("The competition may be over or the server is not correctly configured.")
 
         _print_contact()
@@ -235,7 +235,7 @@ class ForbiddenLibraryException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from ._client import Client
+        from crunch.api._client import Client
 
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
@@ -284,7 +284,7 @@ class InvalidProjectTokenException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from ._client import Client
+        from crunch.api._client import Client
 
         print("Your token seems to have expired or is invalid.")
 
@@ -428,7 +428,7 @@ class ProjectNotFoundException(ApiException):
         self,
         **kwargs: Any,
     ) -> None:
-        from ._client import Client
+        from crunch.api._client import Client
 
         print("Project not found.")
 
@@ -456,7 +456,7 @@ class RunNotFoundException(ApiException):
         **kwargs: Any,
     ) -> None:
         print("Run not found.")
-        print("")
+        print()
         print("The run may have been removed or the project is not the owner.")
 
         _print_contact()
@@ -498,7 +498,7 @@ class RoundNotFoundException(ApiException):
         **kwargs: Any,
     ) -> None:
         print("Round not found.")
-        print("")
+        print()
         print("The competition may be over or the server is not correctly configured.")
 
         _print_contact()
@@ -539,7 +539,7 @@ class SubmissionCustomCheckFailedException(ApiException):
         **kwargs: Any,
     ) -> None:
         print("Competition specific checks did not pass.")
-        print("")
+        print()
         print(f"Reason: {self.check_message}")
 
         _print_contact()
@@ -706,6 +706,24 @@ class ConflictingModelDirectoryException(ApiException):
 CurrentRoundNotFoundException = RoundNotFoundException
 LatestRoundNotFoundException = RoundNotFoundException
 NextRoundNotFoundException = RoundNotFoundException
+
+
+class QuickstarterNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        quickstarter_name: str,
+    ):
+        super().__init__(message)
+
+        self.quickstarter_name = quickstarter_name
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"The quickstarter `{self.quickstarter_name}` was not found.")
 
 
 class InvalidRunTokenException(ApiException):

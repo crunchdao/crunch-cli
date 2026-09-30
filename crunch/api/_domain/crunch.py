@@ -1,28 +1,31 @@
-import typing
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
-from .._identifiers import CrunchIdentifierType
-from .._resource import Collection, Model
-from .phase import Phase
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
+    from crunch.api._client import Client
+    from crunch.api._domain.phase import Phase
+    from crunch.api._identifiers import CompetitionIdentifierType, CrunchIdentifierType, PhaseIdentifierType, RoundIdentifierType
+    from crunch.api._resource import JsonValue
+    from crunch.api._types import Attrs
 
 
-class Crunch(Model):
-
-    resource_identifier_attribute = "number"
+class Crunch(Model[int]):
 
     def __init__(
         self,
-        phase: Phase,
-        attrs=None,
-        client=None,
-        collection=None
+        phase: "Phase",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["CrunchCollection"] = None
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._phase = phase
 
     @property
-    def id(self) -> int:
-        return super().id  # type: ignore
+    def resource_identifier(self) -> int:
+        return self.number
 
     @property
     def phase(self):
@@ -43,22 +46,20 @@ class CrunchCollection(Collection[Crunch]):
 
     def __init__(
         self,
-        phase: Phase,
-        client=None
+        phase: "Phase",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.phase = phase
 
-    def __iter__(self) -> typing.Iterator[Crunch]:
-        return super().__iter__()
 
     def get(
         self,
-        identifier: CrunchIdentifierType
+        identifier: "CrunchIdentifierType"
     ) -> Crunch:
         return self.prepare_model(
-            self._client.api.get_crunch(
+            self._checked_client.api.get_crunch(
                 self.phase.round.competition.resource_identifier,
                 self.phase.round.resource_identifier,
                 self.phase.resource_identifier,
@@ -77,29 +78,30 @@ class CrunchCollection(Collection[Crunch]):
 
     def list(
         self
-    ) -> typing.List[Crunch]:
+    ) -> List[Crunch]:
         return self.prepare_models(
-            self._client.api.list_crunches(
+            self._checked_client.api.list_crunches(
                 self.phase.round.competition.resource_identifier,
                 self.phase.round.resource_identifier,
                 self.phase.resource_identifier,
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", Crunch], *args: Any) -> Crunch:
         return super().prepare_model(
             attrs,
-            self.phase
+            self.phase,
+            *args
         )
 
 
-class CrunchEndpointMixin:
+class CrunchEndpointMixin(EndpointMixin):
 
     def list_crunches(
         self,
-        competition_identifier,
-        round_identifier,
-        phase_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        round_identifier: "RoundIdentifierType",
+        phase_identifier: "PhaseIdentifierType"
     ):
         return self._result(
             self.get(
@@ -110,10 +112,10 @@ class CrunchEndpointMixin:
 
     def get_crunch(
         self,
-        competition_identifier,
-        round_identifier,
-        phase_identifier,
-        crunch_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        round_identifier: "RoundIdentifierType",
+        phase_identifier: "PhaseIdentifierType",
+        crunch_identifier: "CrunchIdentifierType"
     ):
         return self._result(
             self.get(

@@ -1,9 +1,13 @@
-from enum import Enum
-from typing import Generator, Iterator, Optional
 from datetime import datetime
-from crunch.api._identifiers import CompetitionIdentifierType
-from crunch.api._resource import Collection, Model
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional
+
 from crunch.api._domain.enum_ import SplitKeyType
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
+    from crunch.api._identifiers import CompetitionIdentifierType
+    from crunch.api._resource import JsonValue
 
 
 class CompetitionFormat(Enum):
@@ -31,7 +35,6 @@ class CompetitionMode(Enum):
         return self.name
 
 
-
 class CompetitionStatus(Enum):
 
     PENDING = "PENDING"
@@ -42,13 +45,23 @@ class CompetitionStatus(Enum):
         return self.name
 
 
-class Competition(Model):
+class Competition(Model[int]):
 
-    resource_identifier_attribute = "name"
+    @property
+    def resource_identifier(self) -> str:
+        return self.name
 
     @property
     def name(self) -> str:
         return self._attrs["name"]
+
+    @property
+    def display_name(self) -> str:
+        return self._attrs["displayName"]
+
+    @property
+    def short_description(self) -> str:
+        return self._attrs["shortDescription"]
 
     @property
     def start(self) -> datetime:
@@ -80,6 +93,38 @@ class Competition(Model):
         return self._attrs["external"]
 
     @property
+    def documentation_url(self) -> str:
+        return self._attrs["documentationUrl"]
+
+    @property
+    def notebook_url(self) -> Optional[str]:
+        return self._attrs["notebookUrl"]
+
+    @property
+    def hosted_by_name(self) -> str:
+        return self._attrs["hostedByName"]
+
+    @property
+    def prize_pool_short_text(self) -> str:
+        return self._attrs["prizePoolShortText"]
+
+    @property
+    def team_based(self) -> bool:
+        return self._attrs["teamBased"]
+
+    @property
+    def only_team_leader(self) -> bool:
+        return self._attrs["onlyTeamLeader"]
+
+    @property
+    def max_team_size(self) -> int:
+        return self._attrs["maxTeamSize"]
+
+    @property
+    def project_creation_limit(self) -> int:
+        return self._attrs["projectCreationLimit"]
+
+    @property
     def encrypt_submissions(self) -> bool:
         return self._attrs["encryptSubmissions"]
 
@@ -88,8 +133,16 @@ class Competition(Model):
         return self._attrs["phalaKeyUrl"]
 
     @property
+    def hide_train_frequency(self) -> bool:
+        return self._attrs["hideTrainFrequency"]
+
+    @property
+    def hide_force_first_train(self) -> bool:
+        return self._attrs["hideForceFirstTrain"]
+
+    @property
     def data_releases(self):
-        from .data_release import DataReleaseCollection
+        from crunch.api._domain.data_release import DataReleaseCollection
 
         return DataReleaseCollection(
             competition=self,
@@ -98,7 +151,7 @@ class Competition(Model):
 
     @property
     def metrics(self):
-        from .metric import MetricCollection
+        from crunch.api._domain.metric import MetricCollection
 
         return MetricCollection(
             competition=self,
@@ -108,7 +161,7 @@ class Competition(Model):
 
     @property
     def targets(self):
-        from .target import TargetCollection
+        from crunch.api._domain.target import TargetCollection
 
         return TargetCollection(
             competition=self,
@@ -117,7 +170,7 @@ class Competition(Model):
 
     @property
     def projects(self):
-        from .project import ProjectCollection
+        from crunch.api._domain.project import ProjectCollection
 
         return ProjectCollection(
             competition=self,
@@ -126,7 +179,7 @@ class Competition(Model):
 
     @property
     def quickstarters(self):
-        from .quickstarter import QuickstarterCollection
+        from crunch.api._domain.quickstarter import QuickstarterCollection
 
         return QuickstarterCollection(
             competition=self,
@@ -135,7 +188,7 @@ class Competition(Model):
 
     @property
     def rounds(self):
-        from .round import RoundCollection
+        from crunch.api._domain.round import RoundCollection
 
         return RoundCollection(
             competition=self,
@@ -144,7 +197,7 @@ class Competition(Model):
 
     @property
     def leaderboards(self):
-        from .leaderboard import LeaderboardCollection
+        from crunch.api._domain.leaderboard import LeaderboardCollection
 
         return LeaderboardCollection(
             competition=self,
@@ -156,15 +209,12 @@ class CompetitionCollection(Collection[Competition]):
 
     model = Competition
 
-    def __iter__(self) -> Iterator[Competition]:
-        return super().__iter__()  # type: ignore
-
     def get(
         self,
-        id_or_name: CompetitionIdentifierType
+        id_or_name: "CompetitionIdentifierType"
     ) -> Competition:
         return self.prepare_model(
-            self._client.api.get_competition(
+            self._checked_client.api.get_competition(
                 id_or_name
             )
         )
@@ -180,9 +230,9 @@ class CompetitionCollection(Collection[Competition]):
         featured: Optional[bool] = None,
         organizer_name: Optional[str] = None,
         team_based: Optional[bool] = None,
-    ) -> Generator[Competition, None, None]:
+    ) -> Iterator[Competition]:
         return self.prepare_models(
-            self._client.api.list_competitions_v2(
+            self._checked_client.api.list_competitions_v2(
                 format=format,
                 mode=mode,
                 status=status,
@@ -195,7 +245,7 @@ class CompetitionCollection(Collection[Competition]):
         )
 
 
-class CompetitionEndpointMixin:
+class CompetitionEndpointMixin(EndpointMixin):
 
     def list_competitions_v2(
         self,
@@ -207,8 +257,8 @@ class CompetitionEndpointMixin:
         featured: Optional[bool],
         organizer_name: Optional[str],
         team_based: Optional[bool],
-    ) -> Generator[dict, None, None]:
-        params = {}
+    ) -> Iterator["JsonValue"]:
+        params: Dict[str, Any] = {}
 
         if format is not None:
             params["format"] = format.name
@@ -248,7 +298,7 @@ class CompetitionEndpointMixin:
 
     def get_competition(
         self,
-        identifier
+        identifier: "CompetitionIdentifierType"
     ):
         return self._result(
             self.get(

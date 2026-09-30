@@ -2,16 +2,20 @@ import dataclasses
 import enum
 import os
 import time
-import typing
 from datetime import datetime
 from io import BytesIO
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Optional
 
 import dataclasses_json
 import requests
 from tqdm.auto import tqdm
 
-from ...utils import split_into_chunks
-from .._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.utils import split_into_chunks
+
+if TYPE_CHECKING:
+    from crunch.api._client import Client
+    from crunch.api._types import Attrs
 
 _MAXIMUM_BATCH_SIZE = 100
 
@@ -33,7 +37,7 @@ class DeleteUploadResult(enum.Enum):
     NOT_FOUND = "NOT_FOUND"
 
 
-@dataclasses_json.dataclass_json(
+@dataclasses_json.dataclass_json(  # type: ignore[call-overload]
     letter_case=dataclasses_json.LetterCase.CAMEL,
     undefined=dataclasses_json.Undefined.EXCLUDE,
 )
@@ -42,12 +46,10 @@ class PresignedUploadRequest:
 
     method: str
     url: str
-    headers: typing.Dict[str, str]
+    headers: Dict[str, str]
 
 
-class Upload(Model):
-
-    resource_identifier_attribute = "id"
+class Upload(Model[str]):
 
     @property
     def id(self) -> str:
@@ -86,7 +88,7 @@ class Upload(Model):
         return datetime.fromisoformat(self._attrs["createdAt"])
 
     @property
-    def chunks(self) -> typing.List["UploadChunk"]:
+    def chunks(self) -> List["UploadChunk"]:
         return [
             UploadChunk(self, chunk_attrs, self._client)
             for chunk_attrs in self._attrs["chunks"]
@@ -94,41 +96,42 @@ class Upload(Model):
 
     def complete(self):
         self._attrs.update(
-            self._client.api.complete_upload(
+            self._checked_client.api.complete_upload(
                 self.id,
             )
         )
 
     def abort(self):
         self._attrs.update(
-            self._client.api.abort_upload(
+            self._checked_client.api.abort_upload(
                 self.id,
             )
         )
 
     def delete(self):
         self._attrs.update(
-            self._client.api.delete_upload(
+            self._checked_client.api.delete_upload(
                 self.id,
             )
         )
 
 
-class UploadChunk(Model):
-
-    id_attribute = None
-    resource_identifier_attribute = "number"
+class UploadChunk(Model[int]):
 
     def __init__(
         self,
         upload: Upload,
-        attrs=None,
-        client=None,
-        collection=None
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["Collection[UploadChunk]"] = None
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._upload = upload
+
+    @property
+    def resource_identifier(self) -> int:
+        return self.number
 
     @property
     def upload(self):
@@ -156,8 +159,8 @@ class UploadChunk(Model):
 
     @property
     def request(self) -> PresignedUploadRequest:
-        return PresignedUploadRequest.from_dict(
-            self._client.api.get_upload_chunk_request(
+        return PresignedUploadRequest.from_dict(  # type: ignore[attr-defined]
+            self._checked_client.api.get_upload_chunk_request(
                 self.upload.id,
                 self.number,
             )
@@ -165,7 +168,7 @@ class UploadChunk(Model):
 
     def confirm(self, hash: str):
         self._attrs.update(
-            self._client.api.confirm_upload_chunk(
+            self._checked_client.api.confirm_upload_chunk(
                 self.upload.id,
                 self.number,
                 hash,
@@ -174,12 +177,12 @@ class UploadChunk(Model):
 
     def send(
         self,
-        fd: typing.BinaryIO,
+        fd: BinaryIO,
         max_retry: int = 10,
-        byte_callback: typing.Optional[typing.Callable[[int], None]] = None,
-        retry_callback: typing.Optional[typing.Callable[[], None]] = None,
+        byte_callback: Optional[Callable[[int], None]] = None,
+        retry_callback: Optional[Callable[[], None]] = None,
     ):
-        from ...utils import LimitedSizeIO
+        from crunch.utils import LimitedSizeIO
 
         seek_back_to = self.offset
         if not fd.seekable():
@@ -230,33 +233,30 @@ class UploadCollection(Collection[Upload]):
 
     model = Upload
 
-    def __iter__(self) -> typing.Iterator[Upload]:
-        return super().__iter__()
-
     def create(
         self,
         *,
         name: str,
         size: int,
         encrypted: bool = False,
-        preferred_chunk_size: typing.Optional[int] = None
+        preferred_chunk_size: Optional[int] = None
     ) -> Upload:
         return self.prepare_model(
-            self._client.api.create_upload(
+            self._checked_client.api.create_upload(
                 name,
                 size,
                 encrypted,
                 preferred_chunk_size,
             )
         )
-    
+
     def send_from_file(
         self,
         *,
         path: str,
         name: str,
-        size: typing.Optional[int] = None,
-        preferred_chunk_size: typing.Optional[int] = None,
+        size: Optional[int] = None,
+        preferred_chunk_size: Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
     ) -> Upload:
@@ -276,10 +276,10 @@ class UploadCollection(Collection[Upload]):
     def send_from_io(
         self,
         *,
-        io: typing.BinaryIO,
+        io: BinaryIO,
         name: str,
         size: int,
-        preferred_chunk_size: typing.Optional[int] = None,
+        preferred_chunk_size: Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
     ) -> Upload:
@@ -338,19 +338,19 @@ class UploadCollection(Collection[Upload]):
         id: str
     ) -> Upload:
         return self.prepare_model(
-            self._client.api.get_upload(
+            self._checked_client.api.get_upload(
                 id,
             )
         )
 
     def batch_list(
         self,
-        upload_ids: typing.List[str],
-    ) -> typing.Dict[str, typing.Optional[Upload]]:
+        upload_ids: List[str],
+    ) -> Dict[str, Optional[Upload]]:
         if not upload_ids:
             return {}
 
-        results: typing.Dict[str, typing.Optional[Upload]] = {}
+        results: Dict[str, Optional[Upload]] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
             response = self._client.api.get_upload_batch(upload_ids_chunk)["uploads"]
@@ -368,12 +368,12 @@ class UploadCollection(Collection[Upload]):
 
     def batch_delete(
         self,
-        upload_ids: typing.List[str],
-    ) -> typing.Dict[str, DeleteUploadResult]:
+        upload_ids: List[str],
+    ) -> Dict[str, DeleteUploadResult]:
         if not upload_ids:
             return {}
 
-        results: typing.Dict[str, DeleteUploadResult] = {}
+        results: Dict[str, DeleteUploadResult] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
             response = self._client.api.delete_upload_batch(upload_ids_chunk)["uploads"]
@@ -384,14 +384,14 @@ class UploadCollection(Collection[Upload]):
         return results
 
 
-class UploadEndpointMixin:
+class UploadEndpointMixin(EndpointMixin):
 
     def create_upload(
         self,
-        name,
-        size,
-        encrypted,
-        preferred_chunk_size
+        name: str,
+        size: int,
+        encrypted: bool,
+        preferred_chunk_size: Optional[int]
     ):
         return self._result(
             self.post(
@@ -408,7 +408,7 @@ class UploadEndpointMixin:
 
     def get_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.get(
@@ -419,8 +419,8 @@ class UploadEndpointMixin:
 
     def get_upload_chunk_request(
         self,
-        id,
-        chunk_number
+        id: str,
+        chunk_number: int
     ):
         return self._result(
             self.get(
@@ -431,9 +431,9 @@ class UploadEndpointMixin:
 
     def confirm_upload_chunk(
         self,
-        id,
-        chunk_number,
-        hash
+        id: str,
+        chunk_number: int,
+        hash: str
     ):
         return self._result(
             self.post(
@@ -447,7 +447,7 @@ class UploadEndpointMixin:
 
     def abort_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.post(
@@ -459,7 +459,7 @@ class UploadEndpointMixin:
 
     def complete_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.post(
@@ -471,7 +471,7 @@ class UploadEndpointMixin:
 
     def delete_upload(
         self,
-        id
+        id: str
     ):
         return self._result(
             self.delete(

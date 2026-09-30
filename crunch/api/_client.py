@@ -1,6 +1,6 @@
 import os
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Iterator, Optional, Tuple, cast
 
 import requests
 from tqdm.auto import tqdm
@@ -14,13 +14,16 @@ from crunch.api._domain.data_release import DataReleaseEndpointMixin
 from crunch.api._domain.leaderboard import LeaderboardEndpointMixin
 from crunch.api._domain.library import LibraryCollection, LibraryEndpointMixin
 from crunch.api._domain.metric import MetricEndpointMixin
+from crunch.api._domain.model import ModelEndpointMixin
+from crunch.api._domain.model_file import ModelFileEndpointMixin
 from crunch.api._domain.phase import PhaseEndpointMixin
 from crunch.api._domain.prediction import PredictionEndpointMixin
-from crunch.api._domain.project import Project, ProjectEndpointMixin, ProjectTokenCollection
+from crunch.api._domain.project import ProjectEndpointMixin, ProjectTokenCollection
 from crunch.api._domain.quickstarter import QuickstarterEndpointMixin
 from crunch.api._domain.round import RoundEndpointMixin
 from crunch.api._domain.run import RunEndpointMixin
 from crunch.api._domain.runner import RunnerRun, RunnerRunEndpointMixin
+from crunch.api._domain.runtime import RuntimeOptionEndpointMixin
 from crunch.api._domain.score import ScoreEndpointMixin
 from crunch.api._domain.submission import SubmissionEndpointMixin
 from crunch.api._domain.submission_file import SubmissionFileEndpointMixin
@@ -29,10 +32,12 @@ from crunch.api._domain.upload import UploadCollection, UploadEndpointMixin
 from crunch.api._domain.user import UserCollection, UserEndpointMixin
 from crunch.api._errors import ApiException, convert_error
 from crunch.api._pagination import PageRequest
+from crunch.api._resource import JsonValue
 from crunch.constants import API_KEY_ENV_VAR
 from crunch.utils import build_user_agent
 
 if TYPE_CHECKING:
+    from crunch.api._domain.project import Project
     from crunch.utils import ProjectInfo
 
 
@@ -44,11 +49,14 @@ class EndpointClient(
     LeaderboardEndpointMixin,
     LibraryEndpointMixin,
     MetricEndpointMixin,
+    ModelEndpointMixin,
+    ModelFileEndpointMixin,
     PhaseEndpointMixin,
     PredictionEndpointMixin,
     ProjectEndpointMixin,
     QuickstarterEndpointMixin,
     RoundEndpointMixin,
+    RuntimeOptionEndpointMixin,
     RunEndpointMixin,
     RunnerRunEndpointMixin,
     ScoreEndpointMixin,
@@ -231,7 +239,7 @@ class EndpointClient(
         self,
         requester: Callable[[PageRequest], requests.Response],
         page_size: Optional[int] = None
-    ):
+    ) -> Iterator[JsonValue]:
         if not page_size:
             page_size = self.page_size
 
@@ -241,11 +249,11 @@ class EndpointClient(
             self._raise_for_status(response)
 
             try:
-                json = response.json()
+                json: Dict[str, Any] = response.json()
             except requests.exceptions.JSONDecodeError as json_error:
                 raise ValueError(f"could not parse json: `{response.text}`") from json_error
 
-            content = json["content"]
+            content: list = json["content"]
             for item in content:
                 yield item
 
@@ -331,7 +339,7 @@ class Client:
     def from_project(
         *,
         show_progress: bool = True,
-    ) -> Tuple["Client", Project]:
+    ) -> Tuple["Client", "Project"]:
         from crunch.utils import read_project_info, read_token
 
         store.load_from_env()
@@ -348,6 +356,6 @@ class Client:
         )
 
         competition = client.competitions.get(project_info.competition_name)
-        project = competition.projects.get_reference(None, (project_info.user_id, project_info.project_name))
+        project = competition.projects.get_reference(userId=project_info.user_id, name=project_info.project_name)
 
         return client, project

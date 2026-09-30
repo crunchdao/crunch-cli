@@ -47,7 +47,7 @@ def _build_gitignore(
     ignored_paths: List[str],
     use_parent_gitignore: bool,
 ) -> Callable[[str], Tuple[bool, bool]]:
-    from ...external import gitignorefile
+    from crunch.external import gitignorefile
 
     rules: List[gitignorefile._IgnoreRule] = []  # type: ignore
     for line in ignored_paths:

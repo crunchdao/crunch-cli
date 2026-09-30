@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
-from crunch.api._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
     from crunch.api._identifiers import CompetitionIdentifierType
+    from crunch.api._resource import JsonValue
 
 
 class DataReleaseTargetResolution(Enum):
@@ -22,10 +23,7 @@ class DataReleaseTargetResolution(Enum):
         return self.name
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class DataFile:
 
@@ -60,10 +58,7 @@ class DataReleaseSplitReduced(Enum):
 SplitKeyPythonType = Union[str, int]
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,
-    undefined=Undefined.EXCLUDE,
-)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class DataReleaseSplit:
 
@@ -74,9 +69,9 @@ class DataReleaseSplit:
     @staticmethod
     def from_dict_array(
         input: List[Dict[str, Any]]
-    ):
+    ) -> List["DataReleaseSplit"]:
         return [
-            DataReleaseSplit.from_dict(x)
+            DataReleaseSplit.from_dict(x)  # type: ignore[attr-defined]
             for x in input
         ]
 
@@ -91,9 +86,7 @@ class SizeVariant(Enum):
         return self.name
 
 
-class DataRelease(Model):
-
-    resource_identifier_attribute = "number"
+class DataRelease(Model[int]):
 
     def __init__(
         self,
@@ -102,13 +95,13 @@ class DataRelease(Model):
         client: Optional["Client"] = None,
         collection: Optional["DataReleaseCollection"] = None
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
 
     @property
-    def id(self) -> int:
-        return super().id  # type: ignore
+    def resource_identifier(self) -> int:
+        return self.number
 
     @property
     def competition(self):
@@ -146,7 +139,7 @@ class DataRelease(Model):
             files = self._attrs["dataFiles"]
 
         return {
-            key: DataFile.from_dict(value)
+            key: DataFile.from_dict(value)  # type: ignore[attr-defined]
             for key, value in files.items()
         }
 
@@ -181,16 +174,13 @@ class DataReleaseCollection(Collection[DataRelease]):
 
         self.competition = competition
 
-    def __iter__(self) -> Iterator[DataRelease]:
-        return super().__iter__()
-
     def get(
         self,
         number: Union[int, str],
         include_splits: bool = True,
     ) -> DataRelease:
         return self.prepare_model(
-            self._client.api.get_data_release(
+            self._checked_client.api.get_data_release(
                 self.competition.id,
                 number,
                 include_splits=include_splits,
@@ -201,19 +191,20 @@ class DataReleaseCollection(Collection[DataRelease]):
         self
     ) -> List[DataRelease]:
         return self.prepare_models(
-            self._client.api.list_data_releases(
+            self._checked_client.api.list_data_releases(
                 self.competition.id
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", DataRelease], *args: Any):
         return super().prepare_model(
             attrs,
-            self.competition
+            self.competition,
+            *args,
         )
 
 
-class DataReleaseEndpointMixin:
+class DataReleaseEndpointMixin(EndpointMixin):
 
     def list_data_releases(
         self,
@@ -229,7 +220,7 @@ class DataReleaseEndpointMixin:
     def get_data_release(
         self,
         competition_identifier: "CompetitionIdentifierType",
-        number: int,
+        number: Union[int, str],
         include_splits: bool = False,
     ):
         return self._result(

@@ -22,6 +22,7 @@ from crunch.api._domain.library import Library as Library
 from crunch.api._domain.metric import Metric as Metric
 from crunch.api._domain.metric import ReducerFunction as ReducerFunction
 from crunch.api._domain.metric import ScorerFunction as ScorerFunction
+from crunch.api._domain.metric import Unit as Unit
 from crunch.api._domain.phase import Phase as Phase
 from crunch.api._domain.phase import PhaseType as PhaseType
 from crunch.api._domain.prediction import Prediction as Prediction
@@ -32,7 +33,11 @@ from crunch.api._domain.quickstarter import Quickstarter as Quickstarter
 from crunch.api._domain.quickstarter import QuickstarterFile as QuickstarterFile
 from crunch.api._domain.round import Round as Round
 from crunch.api._domain.run import Run as Run
+from crunch.api._domain.run import RunLog as RunLog
+from crunch.api._domain.run import RunStatus as RunStatus
 from crunch.api._domain.runner import RunnerRun as RunnerRun
+from crunch.api._domain.runtime import RuntimeOption as RuntimeOption
+from crunch.api._domain.runtime import RuntimeOptionStatus as RuntimeOptionStatus
 from crunch.api._domain.score import Score as Score
 from crunch.api._domain.submission import Submission as Submission
 from crunch.api._domain.submission import SubmissionType as SubmissionType
@@ -69,6 +74,7 @@ from crunch.api._errors import PhaseNotFoundException as PhaseNotFoundException
 from crunch.api._errors import PredictionSubmissionNotAllowedException as PredictionSubmissionNotAllowedException
 from crunch.api._errors import PredictionTooBigException as PredictionTooBigException
 from crunch.api._errors import ProjectNotFoundException as ProjectNotFoundException
+from crunch.api._errors import QuickstarterNotFoundException as QuickstarterNotFoundException
 from crunch.api._errors import RestrictedPhaseActionException as RestrictedPhaseActionException
 from crunch.api._errors import RetryableException as RetryableException
 from crunch.api._errors import RoundNotFoundException as RoundNotFoundException
@@ -83,3 +89,4 @@ from crunch.api._identifiers import CompetitionIdentifierType as CompetitionIden
 from crunch.api._identifiers import CrunchIdentifierType as CrunchIdentifierType
 from crunch.api._identifiers import PhaseIdentifierType as PhaseIdentifierType
 from crunch.api._identifiers import RoundIdentifierType as RoundIdentifierType
+from crunch.api._identifiers import SubmissionIdentifierType as SubmissionIdentifierType
