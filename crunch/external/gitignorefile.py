@@ -4,6 +4,7 @@
 
 import os
 import re
+from typing import Optional
 
 DEFAULT_IGNORE_NAMES = [".gitignore", ".git/info/exclude"]
 
@@ -182,7 +183,7 @@ class _Path:
         return self.__joined
 
 
-def _rule_from_pattern(pattern):
+def _rule_from_pattern(pattern: str) -> Optional["_IgnoreRule"]:
     # Takes a `.gitignore` match pattern, such as "*.py[cod]" or "**/*.bak",
     # and returns an `_IgnoreRule` suitable for matching against files and
     # directories. Patterns which do not match files, such as comments

@@ -1,10 +1,10 @@
 click
 crunch-convert>=0.12.1
-crunch-encrypt
 coloredlogs
 dataclasses_json
 inquirer
 joblib
+mashumaro
 nvidia-ml-py
 pandas
 psutil

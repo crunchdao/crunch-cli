@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from types import ModuleType
-from typing import Any, Callable, List, Literal, Optional
+from typing import Any, Callable, List, Literal, Optional, Tuple
 
 from crunch.runner.types import KwargsLike
+
+DEFAULT_LOG_LIMITS: Tuple[int, int] = (1000, 500)
 
 
 class RunnerContext(ABC):
@@ -102,6 +104,7 @@ class RunnerContext(ABC):
         span_hidden_parameters: Optional[List[str]] = None,
         span_attributes: Optional[KwargsLike] = None,
         install_data_fuse: bool = True,
+        log_limits: Tuple[int, int] = DEFAULT_LOG_LIMITS,
     ) -> None:
         """
         Execute a command.
@@ -113,6 +116,7 @@ class RunnerContext(ABC):
             span_hidden_parameters (Optional[List[str]]): The parameters to hide from the span (e.g., contain useless information).
             span_attributes (Optional[KwargsLike]): Additional attributes to merge with the span's attributes.
             install_data_fuse (bool): Whether to temporarily allow data access, which is only restricted after the data fuse is tripped. If disabled, no data access is ever permitted and triggering the fuse has no effect.
+            log_limits (Tuple[int, int]): The logging output limits are as follows: the first limit is the number of lines as the head and the second limit is the number of lines as the tail. Everything in between will be lost. This is only used in a cloud environment.
 
         Returns:
             None: This function does not return anything.
@@ -135,6 +139,7 @@ class RunnerExecutorContext(ABC):
 
 
 _sentinel = object()
+
 
 class UserModule(ABC):
 

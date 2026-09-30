@@ -2,20 +2,22 @@ import dataclasses
 import enum
 import os
 import time
+from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, Union, overload
+from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Optional
 
 import dataclasses_json
 import requests
 from tqdm.auto import tqdm
 
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.utils import split_into_chunks
 
 if TYPE_CHECKING:
-    from crunch_encrypt.ecies import EphemeralPublicKeyPem, PublicKeyPem
-
     from crunch.api._client import Client
     from crunch.api._types import Attrs
+
+_MAXIMUM_BATCH_SIZE = 100
 
 
 class UploadStatus(enum.Enum):
@@ -30,6 +32,11 @@ class UploadProvider(enum.Enum):
     AWS_S3 = "AWS_S3"
 
 
+class DeleteUploadResult(enum.Enum):
+    DELETED = "DELETED"
+    NOT_FOUND = "NOT_FOUND"
+
+
 @dataclasses_json.dataclass_json(  # type: ignore[call-overload]
     letter_case=dataclasses_json.LetterCase.CAMEL,
     undefined=dataclasses_json.Undefined.EXCLUDE,
@@ -40,6 +47,19 @@ class PresignedUploadRequest:
     method: str
     url: str
     headers: Dict[str, str]
+
+
+@dataclasses_json.dataclass_json(  # type: ignore[call-overload]
+    letter_case=dataclasses_json.LetterCase.CAMEL,
+    undefined=dataclasses_json.Undefined.EXCLUDE,
+)
+@dataclasses.dataclass(frozen=True)
+class CreateUploadRequest:
+
+    name: str
+    size: int
+    encrypted: bool = False
+    preferred_chunk_size: Optional[int] = None
 
 
 class Upload(Model[str]):
@@ -71,6 +91,14 @@ class Upload(Model[str]):
     @property
     def provider(self):
         return UploadProvider[self._attrs["provider"]]
+
+    @property
+    def expires_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["expiresAt"])
+
+    @property
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["createdAt"])
 
     @property
     def chunks(self) -> List["UploadChunk"]:
@@ -253,70 +281,25 @@ class UploadCollection(Collection[Upload]):
                 io=file,
                 name=name,
                 size=size,
-                public_key_pem=None,
                 preferred_chunk_size=preferred_chunk_size,
                 progress_bar=progress_bar,
                 max_retry=max_retry,
             )
 
-    @overload
     def send_from_io(
         self,
         *,
         io: BinaryIO,
         name: str,
         size: int,
-        public_key_pem: Literal[None],
-        preferred_chunk_size: Optional[int],
-        progress_bar: bool,
-        max_retry: int = 10,
-    ) -> Upload:
-        pass
-
-    @overload
-    def send_from_io(
-        self,
-        *,
-        io: BinaryIO,
-        name: str,
-        size: int,
-        public_key_pem: "PublicKeyPem",
-        preferred_chunk_size: Optional[int],
-        progress_bar: bool,
-        max_retry: int = 10,
-    ) -> Tuple[Upload, "EphemeralPublicKeyPem"]:
-        pass
-
-    def send_from_io(
-        self,
-        *,
-        io: BinaryIO,
-        name: str,
-        size: int,
-        public_key_pem: Optional["PublicKeyPem"],
         preferred_chunk_size: Optional[int] = None,
         progress_bar: bool = False,
         max_retry: int = 10,
-    ) -> Union[Upload, Tuple[Upload, "EphemeralPublicKeyPem"]]:
-        ephemeral_public_key_pem: Optional[str] = None
-
-        encrypted = public_key_pem is not None
-        if encrypted:
-            from crunch_encrypt.ecies import OVERHEAD_BYTES_COUNT, ECIESEncryptIO
-
-            encrypt_io = ECIESEncryptIO(
-                io,
-                public_key_pem=public_key_pem,
-            )
-            io = encrypt_io
-
-            ephemeral_public_key_pem = encrypt_io.ephemeral_public_key_pem
-            size += OVERHEAD_BYTES_COUNT
-
+    ) -> Upload:
         upload = self.create(
             name=name,
             size=size,
-            encrypted=encrypted,
+            encrypted=False,
             preferred_chunk_size=preferred_chunk_size,
         )
 
@@ -361,10 +344,6 @@ class UploadCollection(Collection[Upload]):
 
         upload.complete()
 
-        if public_key_pem is not None:
-            assert ephemeral_public_key_pem is not None
-            return upload, ephemeral_public_key_pem
-
         return upload
 
     def get(
@@ -376,6 +355,73 @@ class UploadCollection(Collection[Upload]):
                 id,
             )
         )
+
+    def batch_create(
+        self,
+        upload_requests: List["CreateUploadRequest"],
+    ) -> List[Upload]:
+        if not upload_requests:
+            return []
+
+        created_uploads: List[Upload] = []
+
+        try:
+            for upload_requests_chunk in split_into_chunks(upload_requests, _MAXIMUM_BATCH_SIZE):
+                response = self._client.api.create_upload_batch(
+                    [upload_request.to_dict() for upload_request in upload_requests_chunk]
+                )
+
+                created_uploads.extend(self.prepare_models(response["uploads"]))
+        except Exception as exception:
+            if created_uploads:
+                try:
+                    self.batch_delete([upload.id for upload in created_uploads])
+                except Exception as cleanup_exception:
+                    raise exception from cleanup_exception
+
+            raise
+
+        return created_uploads
+
+    def batch_list(
+        self,
+        upload_ids: List[str],
+    ) -> Dict[str, Optional[Upload]]:
+        if not upload_ids:
+            return {}
+
+        results: Dict[str, Optional[Upload]] = {}
+
+        for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
+            response = self._client.api.get_upload_batch(upload_ids_chunk)["uploads"]
+
+            for upload_id in upload_ids_chunk:
+                upload_data = response.get(upload_id)
+                
+                results[upload_id] = (
+                    self.prepare_model(upload_data)
+                    if upload_data is not None
+                    else None
+                )
+
+        return results
+
+    def batch_delete(
+        self,
+        upload_ids: List[str],
+    ) -> Dict[str, DeleteUploadResult]:
+        if not upload_ids:
+            return {}
+
+        results: Dict[str, DeleteUploadResult] = {}
+
+        for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
+            response = self._client.api.delete_upload_batch(upload_ids_chunk)["uploads"]
+
+            for upload_id in upload_ids_chunk:
+                results[upload_id] = DeleteUploadResult[response[upload_id]]
+
+        return results
 
 
 class UploadEndpointMixin(EndpointMixin):
@@ -472,4 +518,46 @@ class UploadEndpointMixin(EndpointMixin):
                 f"/v1/uploads/{id}",
                 json={},
             )
+        )
+
+    def create_upload_batch(
+        self,
+        uploads
+    ):
+        return self._result(
+            self.post(
+                "/v1/uploads/~/create",
+                json={
+                    "uploads": uploads,
+                }
+            ),
+            json=True
+        )
+
+    def get_upload_batch(
+        self,
+        upload_ids
+    ):
+        return self._result(
+            self.post(
+                "/v1/uploads/~/list",
+                json={
+                    "uploadIds": upload_ids,
+                }
+            ),
+            json=True
+        )
+
+    def delete_upload_batch(
+        self,
+        upload_ids
+    ):
+        return self._result(
+            self.post(
+                "/v1/uploads/~/delete",
+                json={
+                    "uploadIds": upload_ids,
+                }
+            ),
+            json=True
         )

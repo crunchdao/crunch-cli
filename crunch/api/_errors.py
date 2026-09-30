@@ -726,6 +726,18 @@ class QuickstarterNotFoundException(ApiException):
         print(f"The quickstarter `{self.quickstarter_name}` was not found.")
 
 
+class InvalidRunTokenException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        run_id: int,
+    ):
+        super().__init__(message)
+
+        self.run_id = run_id
+
+
 def convert_error(
     response: Dict[str, Any]
 ):

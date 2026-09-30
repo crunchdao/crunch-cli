@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from typing import Any, List, Literal, Optional
+from typing import Any, List, Literal, Optional, Tuple
 
 import click
 
@@ -214,7 +214,8 @@ class LocalRunnerContext(RunnerContext):
         trace: bool = True,
         span_hidden_parameters: Optional[List[str]] = None,
         span_attributes: Optional[KwargsLike] = None,
-        install_data_fuse: bool = True,
+        install_data_fuse: bool = True,  # unavailable locally
+        log_limits: Tuple[int, int] = (0, 0),  # unavailable locally
     ) -> None:
         self.log(f"executing - command={command}")
 

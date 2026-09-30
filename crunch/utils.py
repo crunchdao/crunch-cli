@@ -233,6 +233,11 @@ def smart_call(
     return function(**arguments)
 
 
+def split_into_chunks(items: List[_T], chunk_size: int) -> Iterable[List[_T]]:
+    for start_index in range(0, len(items), chunk_size):
+        yield items[start_index:start_index + chunk_size]
+
+
 def cut_url(url: str):
     try:
         url = url[:url.index("?")]
