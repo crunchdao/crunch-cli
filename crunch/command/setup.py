@@ -47,7 +47,7 @@ def setup(
     _, project = api.Client.from_project()
 
     if submission_number == "scratch":
-        print(f"you decided to start from scratch, previous submission will not be downloaded")
+        print(f"setup: you decided to start from scratch, previous submission will not be downloaded")
         return
 
     try:
@@ -64,10 +64,10 @@ def setup(
             utils.download(url, path)
 
     except api.NeverSubmittedException:
-        print(f"you appear to have never submitted code before")
+        print(f"setup: you appear to have never submitted code before")
 
     except api.EncryptedSubmissionException:
-        print(f"you appear to have submitted an encrypted submission")
+        print(f"setup: you appear to have submitted an encrypted submission")
 
 
 def setup_notebook(

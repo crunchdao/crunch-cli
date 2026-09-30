@@ -15,13 +15,13 @@ def _check_if_already_exists(directory: str, force: bool):
     if force:
         return True
     elif len(os.listdir(directory)):
-        print(f"{directory}: directory not empty (use --force to overwrite)")
+        print(f"init: {directory}: directory not empty (use --force to overwrite)")
         raise click.Abort()
 
 
 def _delete_tree_if_exists(path: str):
     if os.path.exists(path):
-        print(f"delete {path}")
+        print(f"init: {path}: deleting")
         shutil.rmtree(path)
 
 

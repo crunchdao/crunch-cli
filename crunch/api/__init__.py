@@ -89,3 +89,4 @@ from crunch.api._identifiers import CompetitionIdentifierType as CompetitionIden
 from crunch.api._identifiers import CrunchIdentifierType as CrunchIdentifierType
 from crunch.api._identifiers import PhaseIdentifierType as PhaseIdentifierType
 from crunch.api._identifiers import RoundIdentifierType as RoundIdentifierType
+from crunch.api._identifiers import SubmissionIdentifierType as SubmissionIdentifierType

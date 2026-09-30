@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Optional, Sequence
 
 import click
 
@@ -7,9 +7,31 @@ from crunch.command._common import get_project, reformat_datetime
 from crunch.external.humanfriendly import format_size
 from crunch.utils import ascii_table
 
+if TYPE_CHECKING:
+    from crunch.api import SubmissionIdentifierType
+
+
+class SubmissionIdentifierClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
+    name = "identifier"
+
+    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> "SubmissionIdentifierType":
+        if "@last" == value:
+            return "@last"
+
+        if isinstance(value, int) or value.isdigit():
+            return int(value)
+
+        self.fail(
+            f"'{value}' is not a valid integer.",
+            param,
+            ctx
+        )
+
 
 def submission_list(
+    *,
     limit: Optional[int],
+    show_tips: bool = False,
 ):
     submissions = get_project().submissions.list()
 
@@ -32,25 +54,36 @@ def submission_list(
     if reached_limit:
         rows = rows[:limit]
 
+    print("submissions:")
     ascii_table(
         headers=["#", "Message", "Size", "Model", "Created At"],
         values=rows,
     )
 
     if reached_limit:
-        print(f"display: only displaying the first {limit} runs, use `--limit <n>` to show more or `--all` to show all")
+        print()
+        print(f"pagination: only displaying the first {limit} submissions, use `--limit <n>` to show more or `--all` to show all")
+
+    if show_tips:
+        print()
+        print(f"tips:")
+        print(f"  - To show a submission details, use `crunch submission show <number>`.")
 
 
-def submission_show(submission_number: int):
-    submission = _get_submission(submission_number)
+def submission_show(
+    *,
+    submission_identifier: "SubmissionIdentifierType",
+    show_tips: bool = False,
+):
+    submission = _get_submission(submission_identifier)
 
     model = submission.model
 
-    print("Submission Details:")
-    print(f"  Number: {submission.number}")
-    print(f"  Message: {submission.message!r}")
-    print(f"  Size: {format_size(submission.total_size)}")
-    print(f"  Created At: {reformat_datetime(submission.created_at)}")
+    print("submission:")
+    print(f"  number: {submission.number}")
+    print(f"  message: {submission.message!r}")
+    print(f"  size: {format_size(submission.total_size)}")
+    print(f"  created at: {reformat_datetime(submission.created_at)}")
 
     main_file_path = submission.main_file_path
     model_directory_path = submission.model_directory_path
@@ -63,11 +96,11 @@ def submission_show(submission_number: int):
 
         print(f"    {file.name} ({format_size(file.size)}){suffix}")
 
-    print("")
-    print("Model Details:")
+    print()
+    print("model:")
     if model is not None:
-        print(f"  Size: {format_size(model.total_size)}")
-        print(f"  Directory: {model_directory_path}")
+        print(f"  size: {format_size(model.total_size)}")
+        print(f"  directory: {model_directory_path}")
 
         print("  Files:")
         for file in model.files:
@@ -75,10 +108,15 @@ def submission_show(submission_number: int):
     else:
         print("  (no model)")
 
+    if show_tips:
+        print()
+        print(f"tips:")
+        print(f"  - To create a run using this submission, use `crunch run create --submission {submission.number}`.")
 
-def _get_submission(number: int):
+
+def _get_submission(identifier: "SubmissionIdentifierType"):
     try:
-        return get_project().submissions.get(number)
+        return get_project().submissions.get(identifier)
     except SubmissionNotFoundException:
-        print(f"submission: not found: #{number}")
+        print(f"submission: not found: #{identifier}")
         raise click.Abort()

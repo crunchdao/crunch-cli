@@ -1,16 +1,20 @@
-from typing import Any, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Sequence
 
+from crunch.api import RuntimeOptionStatus
 from crunch.command._common import get_project
 from crunch.utils import ascii_table
 
+if TYPE_CHECKING:
+    from crunch.api import SubmissionIdentifierType
+
 
 def runtime_list(
-    submission_number: Optional[int],
+    submission_identifier: "SubmissionIdentifierType",
+    show_tips: bool = False,
 ):
     project = get_project()
 
-    # TODO Add @last, and ensure at least one submission
-    submission = project.submissions.get(submission_number) if submission_number is not None else project.submissions.list()[-1]
+    submission = project.submissions.get(submission_identifier)
 
     has_one_requestable = False
 
@@ -30,23 +34,25 @@ def runtime_list(
             )
         )
 
-        if option.status.name == "REQUESTABLE":
+        if option.status == RuntimeOptionStatus.REQUESTABLE:
             has_one_requestable = True
 
+    print("runtimes:")
     ascii_table(
-        headers=["Name", "Display Name", "RAM", "CPU", "GPU", "Status"],
+        headers=["name", "display name", "ram", "cpu", "gpu", "status"],
         values=rows
     )
 
-    if has_one_requestable:
-        print("")
-        print("Tips:")
-        print("  Request a runtime option with `crunch runtime request <name>`")
+    if show_tips and has_one_requestable:
+        print()
+        print("tips:")
+        print("  - Request a runtime option with `crunch runtime request <name> --justification <reason>`.")
 
 
 def runtime_request(
     runtime_option_name: str,
-    submission_number: Optional[int],
+    submission_identifier: "SubmissionIdentifierType",
     justification: str,
+    show_tips: bool = False,
 ):
     raise NotImplementedError()

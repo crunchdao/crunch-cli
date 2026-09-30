@@ -20,4 +20,4 @@ def update_token(
     write_project_info(project_info)
     write_token(plain)
 
-    print("token updated")
+    print("update-token: updated")
