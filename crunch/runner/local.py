@@ -131,7 +131,7 @@ class LocalRunner(Runner):
                 tracer=self.tracer,
             )
 
-        self.log(f"save prediction - path={self.prediction_directory_path}", important=True)
+        self.log(f"save prediction - path={os.path.relpath(self.prediction_directory_path)}{os.sep}", important=True)
 
     def finalize(self):
         pass
