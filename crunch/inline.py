@@ -17,7 +17,7 @@ from crunch.api import ApiException, Competition, CompetitionFormat, Competition
 from crunch.command.convert import convert
 from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
-from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY, DOT_PREDICTION_DIRECTORY
+from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY
 from crunch.notebook import IPyNbNotAvailableError, NotebookEnvironment
 from crunch.repository import Repository
 from crunch.runner import is_inside

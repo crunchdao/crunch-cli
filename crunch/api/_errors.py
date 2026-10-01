@@ -436,17 +436,24 @@ class ProjectNotFoundException(ApiException):
 
     def print_helper(
         self,
+        competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from crunch.repository import Repository
+        from ._client import Client
 
         print("Project not found.")
 
-        repository = Repository.open()
-        client, project = repository.create_client()
+        if competition_name is None:
+            competition_name = _try_get_competition_name()
 
-        print("\nPlease follow this link to copy and paste your new setup command:")
-        print(client.format_web_url(f'/competitions/{project.competition.name}/submit'))
+        client = Client.from_env()
+
+        if competition_name is not None:
+            print("\nPlease follow this link to copy and paste your new setup command:")
+            print(client.format_web_url(f'/competitions/{competition_name}/submit'))
+        else:
+            print("\nPlease go on the competition page and get a new setup command:")
+            print(client.format_web_url(''))
 
         _print_contact()
 

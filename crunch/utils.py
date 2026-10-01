@@ -6,13 +6,10 @@ import shutil
 import time
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Generic, Iterable, List, NoReturn, Optional, Set, Type, TypeVar, Union, cast
+from typing import Any, BinaryIO, Callable, Dict, Generic, Iterable, List, Optional, Set, Type, TypeVar, Union, cast
 
 import requests
 from tqdm.auto import tqdm
-
-if TYPE_CHECKING:
-    from crunch.api import ApiException
 
 
 def get_process_memory() -> int:
@@ -269,12 +266,6 @@ def download(
             source_file_path,
             destination_file_path
         )
-
-
-def exit_via(error: "ApiException", **kwargs: Any) -> NoReturn:
-    print("\n---")
-    error.print_helper(**kwargs)
-    exit(1)
 
 
 class Tracer:

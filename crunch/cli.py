@@ -13,7 +13,7 @@ from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
 
-from . import __version__, api, command, constants, store, utils
+from . import __version__, api, command, constants, store
 
 store.load_from_env()
 
@@ -64,6 +64,13 @@ def _open_repository() -> Repository:
     return repository
 
 
+_COMPETITION_NAME_META_KEY = "crunch.competition_name"
+
+
+def _remember_competition_name(competition_name: str) -> None:
+    click.get_current_context().meta[_COMPETITION_NAME_META_KEY] = competition_name
+
+
 class _CliGroup(click.Group):
 
     def invoke(self, ctx: click.Context) -> Any:
@@ -72,6 +79,12 @@ class _CliGroup(click.Group):
         except RepositoryError as error:
             print(f"project: {error}", file=sys.stderr)
             raise click.Abort()
+        except api.ApiException as error:
+            print("\n---")
+            error.print_helper(
+                competition_name=ctx.meta.get(_COMPETITION_NAME_META_KEY),
+            )
+            ctx.exit(1)
 
 
 @click.group(cls=_CliGroup)
@@ -140,19 +153,16 @@ def list_competitions(
 
     client = api.Client.from_env()
 
-    try:
-        competitions = client.competitions.list(
-            format=format,
-            status=status,
-            mode=mode,
-            continuous=continuous,
-            external=external,
-            featured=featured,
-            organizer_name=organizer_name,
-            team_based=team_based,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    competitions = client.competitions.list(
+        format=format,
+        status=status,
+        mode=mode,
+        continuous=continuous,
+        external=external,
+        featured=featured,
+        organizer_name=organizer_name,
+        team_based=team_based,
+    )
 
     if not competitions:
         print("No competitions found.")
@@ -181,6 +191,8 @@ def init(
     directory: str,
     model_directory_path: str,
 ):
+    _remember_competition_name(competition_name)
+
     directory = _format_directory(directory, competition_name, project_name)
 
     try:
@@ -195,11 +207,6 @@ def init(
             command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
 
     print("\n---")
     print(f"Success! Your environment has been correctly initialized.")
@@ -237,6 +244,7 @@ def setup(
     data_size_variant_raw: str,
 ):
     _echo_version()
+    _remember_competition_name(competition_name)
 
     if notebook:
         if force:
@@ -282,11 +290,6 @@ def setup(
             command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -316,6 +319,7 @@ def setup_notebook(
     clone_token: str,
 ):
     _echo_version()
+    _remember_competition_name(competition_name)
 
     directory = os.getcwd()
 
@@ -335,11 +339,6 @@ def setup_notebook(
             command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -361,15 +360,12 @@ def quickstarter(
 ):
     repository = _open_repository()
 
-    try:
-        command.quickstarter(
-            repository,
-            name=name,
-            show_notebook=show_notebook,
-            overwrite=overwrite,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    command.quickstarter(
+        repository,
+        name=name,
+        show_notebook=show_notebook,
+        overwrite=overwrite,
+    )
 
     print(f"quickstarter deployed")
 
@@ -421,18 +417,15 @@ def push(
         raise click.Abort()
 
     with convert_if_necessary(main_file_path):
-        try:
-            command.push(
-                repository=repository,
-                message=message,
-                main_file_path=main_file_path,
-                model_directory_relative_path=model_directory_path,
-                include_installed_packages_version=not no_pip_freeze,
-                no_afterword=False,
-                dry=dry,
-            )
-        except api.ApiException as error:
-            utils.exit_via(error)
+        command.push(
+            repository=repository,
+            message=message,
+            main_file_path=main_file_path,
+            model_directory_relative_path=model_directory_path,
+            include_installed_packages_version=not no_pip_freeze,
+            no_afterword=False,
+            dry=dry,
+        )
 
 
 def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
@@ -486,8 +479,6 @@ def download(
         )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(error)
 
 
 @cli.command(help="Convert a notebook to a python script.")
@@ -507,18 +498,15 @@ def convert(
     notebook_file_path: str,
     python_file_path: str,
 ):
-    try:
-        command.convert(
-            notebook_file_path=notebook_file_path,
-            python_file_path=python_file_path,
-            override=override,
-            write_requirements=requirements,
-            write_embedded_files=embedded_files,
-            no_freeze=no_freeze,
-            verbose=verbose,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    command.convert(
+        notebook_file_path=notebook_file_path,
+        python_file_path=python_file_path,
+        override=override,
+        write_requirements=requirements,
+        write_embedded_files=embedded_files,
+        no_freeze=no_freeze,
+        verbose=verbose,
+    )
 
 
 @cli.command(help="Update a project token.")
@@ -531,13 +519,10 @@ def update_token(
 
     repository = _open_repository()
 
-    try:
-        command.update_token(
-            repository,
-            clone_token=clone_token
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    command.update_token(
+        repository,
+        clone_token=clone_token
+    )
 
 
 @cli.group(name="runner")
@@ -571,19 +556,16 @@ def local(
         no_determinism_check = None
 
     with convert_if_necessary(main_file_path):
-        try:
-            command.test(
-                repository,
-                main_file_path,
-                model_directory_path,
-                not no_force_first_train,
-                train_frequency,
-                round_number,
-                has_gpu,
-                no_determinism_check,
-            )
-        except api.ApiException as error:
-            utils.exit_via(error)
+        command.test(
+            repository,
+            main_file_path,
+            model_directory_path,
+            not no_force_first_train,
+            train_frequency,
+            round_number,
+            has_gpu,
+            no_determinism_check,
+        )
 
 
 @runner_group.command(help="Cloud runner, do not directly run!")
@@ -783,16 +765,11 @@ def organize_group(
     context: click.Context,
     competition_name: str,
 ):
+    _remember_competition_name(competition_name)
+
     client = api.Client.from_env()
 
-    try:
-        competition = client.competitions.get(competition_name)
-    except api.CompetitionNameNotFoundException:
-        print(f"competition {competition_name} not found", file=sys.stderr)
-        raise click.Abort()
-    except api.ApiException as error:
-        utils.exit_via(error)
-
+    competition = client.competitions.get(competition_name)
     context.obj = competition
 
 
