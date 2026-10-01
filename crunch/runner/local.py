@@ -25,7 +25,7 @@ class LocalRunner(Runner):
 
     def __init__(
         self,
-        repository: Repository,
+        repository: "Repository",
         user_module: Any,
         runner_module: Optional[RunnerModule],
         model_directory_path: str,
