@@ -4,6 +4,7 @@ import click
 
 import crunch.api as api
 import crunch.command as command
+from crunch.command.init import SetupMode
 from crunch.repository import Repository
 from crunch.utils import download
 
@@ -31,7 +32,7 @@ class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[report
 
 
 def setup(
-    clone_token: str,
+    setup_mode: SetupMode,
     submission_number: SetupSubmissionNumberType,
     directory: str,
     model_directory: str,
@@ -43,7 +44,7 @@ def setup(
     data_size_variant: api.SizeVariant,
 ) -> Repository:
     repository = command.init(
-        clone_token=clone_token,
+        setup_mode=setup_mode,
         directory=directory,
         model_directory=model_directory,
         force=force,
@@ -87,7 +88,7 @@ def setup(
 
 
 def setup_notebook(
-    clone_token: str,
+    setup_mode: SetupMode,
     submission_number: SetupSubmissionNumberType,
     directory: str,
     model_directory: str,
@@ -95,7 +96,7 @@ def setup_notebook(
     data_size_variant: api.SizeVariant,
 ) -> Repository:
     return setup(
-        clone_token,
+        setup_mode,
         submission_number,
         directory,
         model_directory,

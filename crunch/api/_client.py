@@ -266,6 +266,14 @@ class Client:
         self.web_base_url = web_base_url
 
     @property
+    def api_auth(self):
+        return self.api.auth_
+
+    @api_auth.setter
+    def api_auth(self, value: Auth):
+        self.api.auth_ = value
+
+    @property
     def competitions(self):
         return CompetitionCollection(client=self)
 

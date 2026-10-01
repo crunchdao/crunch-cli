@@ -3,14 +3,16 @@ import os
 import shutil
 import tempfile
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict, Optional, Tuple
 
 import crunch.store as store
 from crunch.api import Client, Project, SizeVariant
-from crunch.api._auth import PushTokenAuth
+from crunch.api._auth import ApiKeyAuth, Auth, PushTokenAuth
 from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY, PROJECT_FILE, TOKEN_FILE, UPLOAD_CACHE_FILE
 
 __all__ = [
+    "Authentication",
     "ProjectInfo",
     "Repository",
     "RepositoryError",
@@ -58,12 +60,18 @@ class RepositoryFileInvalidError(RepositoryError):
         self.cause = cause
 
 
+class Authentication(Enum):
+    PUSH_TOKEN = "PUSH_TOKEN"
+    NOTEBOOK_ENVIRONMENT_SECRET_API_KEY = "NOTEBOOK_ENVIRONMENT_SECRET_API_KEY"
+
+
 @dataclass(frozen=True)
 class ProjectInfo:
     competition_name: str
     project_name: str
     user_id: int
     size_variant: SizeVariant
+    authentication: Authentication = Authentication.PUSH_TOKEN
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -71,6 +79,7 @@ class ProjectInfo:
             "projectName": self.project_name,
             "userId": self.user_id,
             "sizeVariant": self.size_variant.name,
+            "authentication": self.authentication.name,
         }
 
     @staticmethod
@@ -85,23 +94,22 @@ class ProjectInfo:
             project_name=root.get("projectName") or "default",  # backward compatibility
             user_id=root["userId"],
             size_variant=size_variant,
+            authentication=Authentication[root.get("authentication") or Authentication.PUSH_TOKEN.name],  # backward compatibility
         )
 
 
 class Repository:
-    """
-    Workspace of a project, identified by a `.crunchdao/` directory at its root (similar to `.git/`).
-    """
 
     def __init__(
         self,
         root_directory_path: str,
         project: ProjectInfo,
-        push_token: str,
+        push_token: Optional[str],
     ):
         self._root_directory_path = os.path.abspath(root_directory_path)
         self._project = project
         self._push_token = push_token
+        self._auth: Optional[Auth] = None
 
     @property
     def root_directory_path(self) -> str:
@@ -145,6 +153,7 @@ class Repository:
         project_name: Optional[str] = None,
         user_id: Optional[int] = None,
         size_variant: Optional[SizeVariant] = None,
+        authentication: Optional[Authentication] = None,
     ) -> ProjectInfo:
         current = self._project
 
@@ -153,19 +162,22 @@ class Repository:
             project_name=project_name if project_name is not None else current.project_name,
             user_id=user_id if user_id is not None else current.user_id,
             size_variant=size_variant if size_variant is not None else current.size_variant,
+            authentication=authentication if authentication is not None else current.authentication,
         )
 
         self.write_project(project)
+        self._auth = None
 
         return project
 
-    def get_push_token(self) -> str:
+    def get_push_token(self) -> Optional[str]:
         return self._push_token
 
     def write_push_token(self, plain_push_token: str) -> None:
         _write_file_atomically(self.push_token_file_path, plain_push_token)
 
         self._push_token = plain_push_token
+        self._auth = None
 
     def read_upload_cache(self) -> Optional[Any]:
         path = self.upload_cache_file_path
@@ -188,7 +200,7 @@ class Repository:
         client = Client(
             store.api_base_url,
             store.web_base_url,
-            PushTokenAuth(self._push_token),
+            self._get_auth(),
             show_progress=show_progress,
         )
 
@@ -196,6 +208,26 @@ class Repository:
         project = competition.projects.get_reference(None, (self._project.user_id, self._project.project_name))  # pyright: ignore[reportUnknownMemberType]
 
         return client, project
+
+    def _get_auth(self) -> Auth:
+        if self._auth is None:
+            self._auth = self._create_auth()
+
+        return self._auth
+
+    def _create_auth(self) -> Auth:
+        authentication = self._project.authentication
+
+        if authentication == Authentication.PUSH_TOKEN:
+            if self._push_token is None:
+                raise RepositoryFileNotFoundError(self.push_token_file_path)
+
+            return PushTokenAuth(self._push_token)
+
+        if authentication == Authentication.NOTEBOOK_ENVIRONMENT_SECRET_API_KEY:
+            return ApiKeyAuth.from_notebook_environment()
+
+        raise ValueError(f"unsupported authentication: {authentication}")
 
     @staticmethod
     def open(
@@ -213,7 +245,11 @@ class Repository:
         except (ValueError, KeyError) as error:
             raise RepositoryFileInvalidError(project_file_path, error) from error
 
-        push_token = _read_file(os.path.join(dot_crunch_directory_path, TOKEN_FILE))
+        push_token = (
+            _read_file(os.path.join(dot_crunch_directory_path, TOKEN_FILE))
+            if project.authentication == Authentication.PUSH_TOKEN
+            else None
+        )
 
         return Repository(root_directory_path, project, push_token)
 
@@ -233,9 +269,12 @@ class Repository:
         directory_path: str,
         *,
         project: ProjectInfo,
-        push_token: str,
+        push_token: Optional[str],
         overwrite: bool = False,
     ) -> "Repository":
+        if (project.authentication == Authentication.PUSH_TOKEN) != (push_token is not None):
+            raise ValueError(f"a push token must be provided if and only if the authentication is {Authentication.PUSH_TOKEN.name}")
+
         repository = Repository(directory_path, project, push_token)
 
         dot_crunch_directory_path = repository.dot_crunch_directory_path
@@ -250,7 +289,9 @@ class Repository:
         os.makedirs(repository.prediction_directory_path, exist_ok=True)
 
         repository.write_project(project)
-        repository.write_push_token(push_token)
+
+        if push_token is not None:
+            repository.write_push_token(push_token)
 
         return repository
 

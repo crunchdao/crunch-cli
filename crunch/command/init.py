@@ -1,9 +1,26 @@
 import os
+from dataclasses import dataclass
+from typing import Optional, Union
 
 import click
 
 from crunch.api import Client, SizeVariant
-from crunch.repository import ProjectInfo, Repository
+from crunch.api._auth import ApiKeyAuth
+from crunch.repository import Authentication, ProjectInfo, Repository
+
+
+@dataclass
+class CloneTokenSetupMode:
+    token: str
+
+
+@dataclass
+class ApiKeySetupMode:
+    competition_name: str
+    project_name: str
+
+
+SetupMode = Union[CloneTokenSetupMode, ApiKeySetupMode]
 
 
 def _check_if_already_exists(directory: str, force: bool):
@@ -19,7 +36,7 @@ def _check_if_already_exists(directory: str, force: bool):
 
 def init(
     *,
-    clone_token: str,
+    setup_mode: SetupMode,
     directory: str,
     model_directory: str,
     force: bool,
@@ -27,10 +44,21 @@ def init(
 ) -> Repository:
     should_overwrite = _check_if_already_exists(directory, force)
 
-    client = Client.from_env()
-    project_token = client.project_tokens.upgrade(clone_token)
+    push_token: Optional[str]
+    if isinstance(setup_mode, CloneTokenSetupMode):
+        client = Client.from_env()
+        project_token = client.project_tokens.upgrade(setup_mode.token)
 
-    project = project_token.project
+        project = project_token.project
+        authentication = Authentication.PUSH_TOKEN
+        push_token = project_token.plain
+    else:
+        auth = ApiKeyAuth.from_notebook_environment()
+        client = Client.from_env(auth=auth)
+
+        project = client.competitions.get(setup_mode.competition_name).projects.get("@me", setup_mode.project_name)
+        authentication = Authentication.NOTEBOOK_ENVIRONMENT_SECRET_API_KEY
+        push_token = None
 
     repository = Repository.init(
         directory,
@@ -39,8 +67,9 @@ def init(
             project_name=project.name,
             user_id=project.user_id,
             size_variant=data_size_variant,
+            authentication=authentication,
         ),
-        push_token=project_token.plain,
+        push_token=push_token,
         overwrite=bool(should_overwrite),
     )
 

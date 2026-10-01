@@ -9,6 +9,8 @@ import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
 from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumberType
+from crunch.command.init import ApiKeySetupMode, CloneTokenSetupMode, SetupMode
+from crunch.notebook import NotebookSecretNotAccessibleError
 from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
@@ -71,6 +73,32 @@ def _remember_competition_name(competition_name: str) -> None:
     click.get_current_context().meta[_COMPETITION_NAME_META_KEY] = competition_name
 
 
+_token_option = click.option("--token", "clone_token", required=False, help="Clone token to use.")
+_api_key_option = click.option("--api-key", "use_api_key", is_flag=True, help="Authenticate with the CRUNCH_API_KEY secret of the notebook platform (Kaggle, Colab, ...) instead of a clone token.")
+
+
+def _create_setup_mode(
+    *,
+    clone_token: Optional[str],
+    use_api_key: bool,
+    competition_name: str,
+    project_name: str,
+) -> SetupMode:
+    if clone_token and use_api_key:
+        raise click.UsageError("a clone token and `--api-key` cannot be used together")
+
+    if clone_token:
+        return CloneTokenSetupMode(token=clone_token)
+
+    if not use_api_key:
+        raise click.UsageError("either a clone token or `--api-key` must be provided")
+
+    return ApiKeySetupMode(
+        competition_name=competition_name,
+        project_name=project_name,
+    )
+
+
 class _CliGroup(click.Group):
 
     def invoke(self, ctx: click.Context) -> Any:
@@ -78,6 +106,9 @@ class _CliGroup(click.Group):
             return super().invoke(ctx)
         except RepositoryError as error:
             print(f"project: {error}", file=sys.stderr)
+            raise click.Abort()
+        except NotebookSecretNotAccessibleError as error:
+            print(f"secret: {error}", file=sys.stderr)
             raise click.Abort()
         except api.ApiException as error:
             print("\n---")
@@ -175,7 +206,8 @@ def list_competitions(
 
 
 @cli.command(help="Initialize an empty workspace directory.")
-@click.option("--token", "clone_token", required=True, help="Clone token to use.")
+@_token_option
+@_api_key_option
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
@@ -183,7 +215,8 @@ def list_competitions(
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
 def init(
-    clone_token: str,
+    clone_token: Optional[str],
+    use_api_key: bool,
     no_data: bool,
     force: bool,
     competition_name: str,
@@ -193,11 +226,18 @@ def init(
 ):
     _remember_competition_name(competition_name)
 
+    setup_mode = _create_setup_mode(
+        clone_token=clone_token,
+        use_api_key=use_api_key,
+        competition_name=competition_name,
+        project_name=project_name,
+    )
+
     directory = _format_directory(directory, competition_name, project_name)
 
     try:
         repository = command.init(
-            clone_token=clone_token,
+            setup_mode=setup_mode,
             directory=directory,
             model_directory=model_directory_path,
             force=force,
@@ -213,7 +253,8 @@ def init(
 
 
 @cli.command(help="Setup a workspace directory.")
-@click.option("--token", "clone_token", required=True, help="Clone token to use.")
+@_token_option
+@_api_key_option
 @click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
@@ -228,7 +269,8 @@ def init(
 @click.argument("project-name", required=True)
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
 def setup(
-    clone_token: str,
+    clone_token: Optional[str],
+    use_api_key: bool,
     submission_number: SetupSubmissionNumberType,
     no_data: bool,
     no_model: bool,
@@ -243,8 +285,16 @@ def setup(
     notebook: bool,
     data_size_variant_raw: str,
 ):
-    _echo_version()
     _remember_competition_name(competition_name)
+
+    setup_mode = _create_setup_mode(
+        clone_token=clone_token,
+        use_api_key=use_api_key,
+        competition_name=competition_name,
+        project_name=project_name,
+    )
+
+    _echo_version()
 
     if notebook:
         if force:
@@ -274,7 +324,7 @@ def setup(
 
     try:
         repository = command.setup(
-            clone_token,
+            setup_mode,
             submission_number,
             directory,
             model_directory_path,
@@ -307,19 +357,32 @@ def setup(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
+@_api_key_option
 @click.argument("competition-name", required=True)
-@click.argument("clone-token")
+@click.argument("clone-token-or-project-name", required=True)
 def setup_notebook(
     submission_number: SetupSubmissionNumberType,
     no_data: bool,
     no_model: bool,
     model_directory_path: str,
     data_size_variant_raw: str,
+    use_api_key: bool,
     competition_name: str,
-    clone_token: str,
+    clone_token_or_project_name: str,
 ):
-    _echo_version()
     _remember_competition_name(competition_name)
+
+    # kept as a single argument to keep the command short, its terrible...
+    setup_mode: SetupMode
+    if use_api_key:
+        setup_mode = ApiKeySetupMode(
+            competition_name=competition_name,
+            project_name=clone_token_or_project_name,
+        )
+    else:
+        setup_mode = CloneTokenSetupMode(token=clone_token_or_project_name)
+
+    _echo_version()
 
     directory = os.getcwd()
 
@@ -327,7 +390,7 @@ def setup_notebook(
 
     try:
         repository = command.setup_notebook(
-            clone_token,
+            setup_mode,
             submission_number,
             directory,
             model_directory_path,

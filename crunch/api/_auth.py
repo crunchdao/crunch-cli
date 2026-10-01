@@ -2,6 +2,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
+from crunch.constants import API_KEY_ENV_VAR
+
 
 class Auth(ABC):
 
@@ -49,6 +51,15 @@ class ApiKeyAuth(Auth):
         data: Optional[Dict[str, str]],
     ):
         headers["Authorization"] = f"API-Key {self._key}"
+
+    @staticmethod
+    def from_notebook_environment() -> "ApiKeyAuth":
+        from crunch.notebook import NotebookEnvironment
+
+        environment = NotebookEnvironment.detect()
+        api_key = environment.get_secret(API_KEY_ENV_VAR)
+
+        return ApiKeyAuth(api_key)
 
 
 class PushTokenAuth(Auth):

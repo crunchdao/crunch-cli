@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from crunch.api import Client
+from crunch.repository import Authentication
 
 if TYPE_CHECKING:
     from crunch.repository import Repository
@@ -17,10 +18,11 @@ def update_token(
     plain = project_token.plain
     project = project_token.project
 
+    repository.write_push_token(plain)
     repository.update_project(
         project_name=project.name,
         user_id=project.user_id,
+        authentication=Authentication.PUSH_TOKEN,
     )
-    repository.write_push_token(plain)
 
     print("update-token: updated")
