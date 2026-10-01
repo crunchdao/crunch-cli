@@ -18,11 +18,11 @@ class NotebookEnvironment(ABC):
 
     @staticmethod
     def detect() -> "NotebookEnvironment":
-        if Colab.ENVVAR in os.environ:
-            return Colab()
-
         if Kaggle.ENVVAR in os.environ:
             return Kaggle()
+
+        if Colab.ENVVAR in os.environ:
+            return Colab()
 
         return Generic()
 
@@ -40,7 +40,7 @@ def _colab_gif(have_runs: bool) -> str:
 
 class Colab(NotebookEnvironment):
 
-    ENVVAR = "COLAB_RELEASE_TAG"
+    ENVVAR = "COLAB_GPU"
 
     def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
         return "Colab", _colab_gif(have_runs)
