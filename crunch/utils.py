@@ -1,159 +1,15 @@
 import datetime
-import json
 import logging
 import os
 import re
 import shutil
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Generic, Iterable, List, Literal, NoReturn, Optional, Set, Type, TypeVar, Union, cast, overload
+from typing import Any, BinaryIO, Callable, Dict, Generic, Iterable, List, Optional, Set, Type, TypeVar, Union, cast
 
-import click
 import requests
 from tqdm.auto import tqdm
-
-from crunch.constants import DOT_CRUNCH_DIRECTORY, PROJECT_FILE, TOKEN_FILE
-
-if TYPE_CHECKING:
-    from crunch.api import ApiException, SizeVariant
-
-
-def change_root():
-    while True:
-        current = os.getcwd()
-
-        if os.path.exists(DOT_CRUNCH_DIRECTORY):
-            print(f"project: found {current}")
-            return
-
-        os.chdir("../")
-        if current == os.getcwd():
-            print("project: not found")
-            raise click.Abort()
-
-
-if TYPE_CHECKING:
-    @overload
-    def _read_crunch_file(
-        name: str,
-        raise_if_missing: Literal[True] = True,
-    ) -> str:
-        ...
-
-    @overload
-    def _read_crunch_file(
-        name: str,
-        raise_if_missing: Literal[False] = False,
-    ) -> Optional[str]:
-        ...
-
-
-def _read_crunch_file(
-    name: str,
-    raise_if_missing: bool = True,
-):
-    path = os.path.join(DOT_CRUNCH_DIRECTORY, name)
-
-    if not os.path.exists(path):
-        if raise_if_missing:
-            print(f"{path}: not found, are you in the project directory?")
-            print(f"{path}: make sure to `cd <competition>` first")
-            raise click.Abort()
-
-        return None
-
-    with open(path) as fd:
-        return fd.read()
-
-
-def write_token(plain_push_token: str, directory: str = "."):
-    dot_crunch_path = os.path.join(
-        directory,
-        DOT_CRUNCH_DIRECTORY
-    )
-
-    token_file_path = os.path.join(dot_crunch_path, TOKEN_FILE)
-    with open(token_file_path, "w") as fd:
-        fd.write(plain_push_token)
-
-
-@dataclass
-class ProjectInfo:
-    competition_name: str
-    project_name: str
-    user_id: int
-    size_variant: "SizeVariant"
-
-
-def write_project_info(info: ProjectInfo, directory: str = "."):
-    dot_crunch_path = os.path.join(
-        directory,
-        DOT_CRUNCH_DIRECTORY
-    )
-
-    path = os.path.join(dot_crunch_path, PROJECT_FILE)
-    with open(path, "w") as fd:
-        json.dump({
-            "competitionName": info.competition_name,
-            "projectName": info.project_name,
-            "userId": info.user_id,
-            "sizeVariant": info.size_variant.name,
-        }, fd)
-
-
-if TYPE_CHECKING:
-    @overload
-    def read_project_info(
-        raise_if_missing: Literal[True] = True,
-    ) -> ProjectInfo:
-        ...
-
-    @overload
-    def read_project_info(
-        raise_if_missing: Literal[False] = False,
-    ) -> Optional[ProjectInfo]:
-        ...
-
-
-def read_project_info(
-    raise_if_missing: bool = True,
-) -> Optional[ProjectInfo]:
-    from crunch.api import SizeVariant
-
-    content = _read_crunch_file(PROJECT_FILE, raise_if_missing)
-    if not raise_if_missing and content is None:
-        return None
-
-    assert content is not None
-    root = json.loads(content)
-
-    try:
-        size_variant = SizeVariant[root["sizeVariant"]]
-    except:
-        size_variant = SizeVariant.DEFAULT
-
-    # TODO: need of a better system for handling file versions
-    return ProjectInfo(
-        root["competitionName"],
-        root.get("projectName") or "default",  # backward compatibility
-        root["userId"],
-        size_variant,
-    )
-
-
-def try_get_competition_name():
-    project_info = read_project_info(False)
-
-    if project_info is None:
-        return None
-
-    return project_info.competition_name
-
-
-def read_token():
-    return _read_crunch_file(TOKEN_FILE)
 
 
 def get_process_memory() -> int:
@@ -410,12 +266,6 @@ def download(
             source_file_path,
             destination_file_path
         )
-
-
-def exit_via(error: "ApiException", **kwargs: Any) -> NoReturn:
-    print("\n---")
-    error.print_helper(**kwargs)
-    exit(1)
 
 
 class Tracer:

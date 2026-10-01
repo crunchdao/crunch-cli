@@ -7,7 +7,6 @@ import click
 
 from crunch.api import ApiException, Competition, PhaseType, SubmissionType, Target
 from crunch.constants import DEFAULT_MODEL_DIRECTORY
-from crunch.utils import exit_via
 
 if TYPE_CHECKING:
     from . import CodeLoader, ModuleFileName
@@ -122,8 +121,8 @@ def leaderboard_rank(
                 for ranked_project in ranked_projects
             ],
         )
-    except ApiException as error:
-        exit_via(error)
+    except ApiException:
+        raise
     except BaseException as error:
         print(f"\n\nLeaderboard rank function failed: {error}")
 
@@ -185,8 +184,8 @@ def leaderboard_compare(
                 for similarity in similarities
             ],
         )
-    except ApiException as error:
-        exit_via(error)
+    except ApiException:
+        raise
     except BaseException as error:
         print(f"\n\nLeaderboard rank function failed: {error}")
 
@@ -255,8 +254,8 @@ def reward_compute_bounties(
                 for rank, rewarded_project in enumerate(rewarded_projects)
             ],
         )
-    except ApiException as error:
-        exit_via(error)
+    except ApiException:
+        raise
     except BaseException as error:
         print(f"\n\nBounty rewards compute function failed: {error}")
 
@@ -307,8 +306,8 @@ def scoring_check(
         print(f"\n\nPrediction is valid!")
     except ParticipantVisibleError as error:
         print(f"\n\nPrediction is not valid: {error}")
-    except ApiException as error:
-        exit_via(error)
+    except ApiException:
+        raise
     except BaseException as error:
         print(f"\n\nPrediction check function failed: {error}")
 
@@ -374,8 +373,8 @@ def scoring_score(
         )
     except ParticipantVisibleError as error:
         print(f"\n\nPrediction is not scorable: {error}")
-    except ApiException as error:
-        exit_via(error)
+    except ApiException:
+        raise
     except BaseException as error:
         print(f"\n\nPrediction score function failed: {error}")
 
@@ -431,8 +430,8 @@ def submission_check(
         print(f"\n\nSubmission is valid!")
     except ParticipantVisibleError as error:
         print(f"\n\nSubmission is not valid: {error}")
-    except ApiException as error:
-        exit_via(error)
+    except ApiException:
+        raise
     except BaseException as error:
         print(f"\n\nSubmission check function failed: {error}")
 
