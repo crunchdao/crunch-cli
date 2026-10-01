@@ -13,12 +13,13 @@ import psutil
 
 import crunch.tester as tester
 from crunch.__version__ import __version__
-from crunch.api import ApiException, Client, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
+from crunch.api import ApiException, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
 from crunch.command.convert import convert
 from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
 from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY, DOT_PREDICTION_DIRECTORY
 from crunch.notebook import IPyNbNotAvailableError, NotebookEnvironment
+from crunch.repository import Repository
 from crunch.runner import is_inside
 from crunch.runner.tracing import LocalTraceExporter
 from crunch.runner.types import KwargsLike
@@ -72,8 +73,12 @@ class _Inline:
         print(f"----")
 
     @cached_property
+    def _repository(self) -> Repository:
+        return Repository.open()
+
+    @cached_property
     def _competition(self) -> Competition:
-        _, project = Client.from_project()
+        _, project = self._repository.create_client()
         competition = project.competition.reload()  # pyright: ignore[reportUnknownMemberType]
 
         return competition
@@ -92,6 +97,7 @@ class _Inline:
                 data_directory_path,
                 _,
             ) = download(
+                self._repository,
                 round_number=round_number,
                 force=force,
             )
@@ -144,10 +150,10 @@ class _Inline:
                 self.logger.warning("")
 
             tester.run(
+                self._repository,
                 self.user_module,
                 self._runner_module,
                 self.model_directory_path,
-                DOT_PREDICTION_DIRECTORY,
                 force_first_train,
                 train_frequency,
                 round_number,
@@ -215,7 +221,7 @@ class _Inline:
         try:
             ipynb = self._notebook_environment.extract_ipynb()
         except IPyNbNotAvailableError as error:
-            client, project = Client.from_project()
+            client, project = self._repository.create_client()
             nice_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook")
 
             encoded_message = urllib.parse.quote_plus(message)
@@ -296,6 +302,7 @@ class _Inline:
 
         try:
             submission = push(
+                repository=self._repository,
                 message=message,
                 main_file_path=main_file_name,
                 model_directory_relative_path=model_directory_relative_path,
@@ -315,7 +322,7 @@ class _Inline:
             gif_file_name = "create-deployment.gif"
             click_path = f"submissions/{submission.number}?openDeploy-{submission.id}=true"
 
-        client, project = Client.from_project()
+        client, project = self._repository.create_client()
         run_url = client.format_web_url(f"/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/{click_path}")
 
         display(Markdown(dedent(f"""

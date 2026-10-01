@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from typing import Any, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Literal, Optional, Tuple
 
 import click
 
@@ -17,11 +17,15 @@ from crunch.runner.unstructured import RunnerContext, RunnerExecutorContext, Use
 from crunch.unstructured import RunnerModule
 from crunch.utils import get_process_memory, smart_call
 
+if TYPE_CHECKING:
+    from crunch.repository import Repository
+
 
 class LocalRunner(Runner):
 
     def __init__(
         self,
+        repository: Repository,
         user_module: Any,
         runner_module: Optional[RunnerModule],
         model_directory_path: str,
@@ -44,6 +48,7 @@ class LocalRunner(Runner):
             determinism_check_enabled=determinism_check_enabled,
         )
 
+        self.repository = repository
         self.user_module = user_module
         self.runner_module = runner_module
         self.model_directory_path = model_directory_path
@@ -103,6 +108,7 @@ class LocalRunner(Runner):
                 self.data_directory_path,
                 self.data_paths,
             ) = download(
+                self.repository,
                 round_number=self.round_number,
             )
         except (CrunchNotFoundException, MissingPhaseDataException):

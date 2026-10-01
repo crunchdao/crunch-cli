@@ -13,7 +13,7 @@ from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist,
 import crunch.store as store
 from crunch.api import Client
 from crunch.constants import REQUIREMENTS_R_TXT, REQUIREMENTS_TXT
-from crunch.utils import try_get_competition_name
+from crunch.repository import Repository
 
 __all__ = [
     "extract_from_requirements",
@@ -287,7 +287,8 @@ def _log_problems(
         logger.warning("no forbidden library found")
         return
 
-    competition_name = try_get_competition_name()
+    repository = Repository.try_open()
+    competition_name = repository.get_project().competition_name if repository is not None else None
     client = Client.from_env()
     query_param = "requestAlias" if is_alias else "requestName"
 

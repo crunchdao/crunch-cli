@@ -1,13 +1,15 @@
 import os
 import typing
 
-from .. import api, constants, downloader, utils
+import crunch.downloader as downloader
+from crunch.api import Round, RoundIdentifierType, RoundNotFoundException, SizeVariant
+from crunch.repository import Repository
 
 
 def _get_data_urls(
-    round: api.Round,
+    round: Round,
     data_directory_path: str,
-    size_variant: api.SizeVariant,
+    size_variant: SizeVariant,
 ) -> typing.Dict[str, downloader.PreparedDataFile]:
     data_release = round.phases.get_submission().get_data_release(size_variant=size_variant)
     data_files = data_release.data_files
@@ -16,20 +18,20 @@ def _get_data_urls(
 
 
 def download(
-    round_number: api.RoundIdentifierType = "@current",
+    repository: Repository,
+    round_number: RoundIdentifierType = "@current",
     force: bool = False,
-    size_variant: typing.Optional[api.SizeVariant] = None,
+    size_variant: typing.Optional[SizeVariant] = None,
 ):
-    client, project = api.Client.from_project()
+    _, project = repository.create_client()
 
-    project_info = client.project_info
+    current_size_variant = repository.get_project().size_variant
     if size_variant is None:
-        size_variant = project_info.size_variant
+        size_variant = current_size_variant
 
         changed_variant = True
-    elif project_info.size_variant != size_variant:
-        project_info.size_variant = size_variant
-        utils.write_project_info(project_info)
+    elif current_size_variant != size_variant:
+        repository.update_project(size_variant=size_variant)
         print(f"project: set default size variant: {size_variant.name.lower()}")
 
         changed_variant = True
@@ -40,7 +42,7 @@ def download(
 
     try:
         round = competition.rounds.get(round_number)
-    except api.RoundNotFoundException as original:
+    except RoundNotFoundException as original:
         if round_number != "@current":
             raise
 
@@ -48,10 +50,10 @@ def download(
 
         try:
             round = competition.rounds.last
-        except api.RoundNotFoundException:
+        except RoundNotFoundException:
             raise original
 
-    data_directory_path = constants.DOT_DATA_DIRECTORY
+    data_directory_path = repository.data_directory_path
     os.makedirs(data_directory_path, exist_ok=True)
 
     prepared_data_files = _get_data_urls(

@@ -1,11 +1,9 @@
 import os
-import shutil
 
 import click
 
 from crunch.api import Client, SizeVariant
-from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
-from crunch.utils import ProjectInfo, write_project_info, write_token
+from crunch.repository import ProjectInfo, Repository
 
 
 def _check_if_already_exists(directory: str, force: bool):
@@ -19,12 +17,6 @@ def _check_if_already_exists(directory: str, force: bool):
         raise click.Abort()
 
 
-def _delete_tree_if_exists(path: str):
-    if os.path.exists(path):
-        print(f"delete {path}")
-        shutil.rmtree(path)
-
-
 def init(
     *,
     clone_token: str,
@@ -32,32 +24,27 @@ def init(
     model_directory: str,
     force: bool,
     data_size_variant: SizeVariant = SizeVariant.DEFAULT
-):
-    should_delete = _check_if_already_exists(directory, force)
+) -> Repository:
+    should_overwrite = _check_if_already_exists(directory, force)
 
     client = Client.from_env()
     project_token = client.project_tokens.upgrade(clone_token)
 
-    dot_crunch_path = os.path.join(directory, DOT_CRUNCH_DIRECTORY)
-    if should_delete:
-        _delete_tree_if_exists(dot_crunch_path)
-
-    os.makedirs(dot_crunch_path, exist_ok=True)
-
-    plain = project_token.plain
     project = project_token.project
 
-    project_info = ProjectInfo(
-        project.competition.name,
-        project.name,
-        project.user_id,
-        data_size_variant,
+    repository = Repository.init(
+        directory,
+        project=ProjectInfo(
+            competition_name=project.competition.name,
+            project_name=project.name,
+            user_id=project.user_id,
+            size_variant=data_size_variant,
+        ),
+        push_token=project_token.plain,
+        overwrite=bool(should_overwrite),
     )
 
-    write_project_info(project_info, directory)
-    write_token(plain, directory)
-
-    os.chdir(directory)
+    os.chdir(repository.root_directory_path)
     os.makedirs(model_directory, exist_ok=True)
-    os.makedirs(DOT_DATA_DIRECTORY, exist_ok=True)
-    os.makedirs(DOT_PREDICTION_DIRECTORY, exist_ok=True)
+
+    return repository

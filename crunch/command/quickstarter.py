@@ -4,6 +4,7 @@ from typing import Optional
 import click
 
 from crunch.api import Client, Quickstarter
+from crunch.repository import Repository
 from crunch.utils import download
 
 
@@ -58,11 +59,12 @@ def _select(
 
 
 def quickstarter(
+    repository: Repository,
     name: Optional[str],
     show_notebook: bool,
     overwrite: bool,
 ):
-    client, project = Client.from_project()
+    client, project = repository.create_client()
     competition = project.competition
 
     quickstarter = _select(

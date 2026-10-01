@@ -9,7 +9,17 @@ from crunch.api._domain.phase import PhaseType
 from crunch.api._domain.project import ProjectTokenType
 from crunch.external.humanfriendly import format_size
 from crunch.external.inflection import camelize, underscore
-from crunch.utils import smart_call, try_get_competition_name
+from crunch.utils import smart_call
+
+
+def _try_get_competition_name() -> Optional[str]:
+    from crunch.repository import Repository
+
+    repository = Repository.try_open()
+    if repository is None:
+        return None
+
+    return repository.get_project().competition_name
 
 
 def _print_contact(
@@ -240,7 +250,7 @@ class ForbiddenLibraryException(ApiException):
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
         if competition_name is None:
-            competition_name = try_get_competition_name()
+            competition_name = _try_get_competition_name()
 
         client = Client.from_env()
 
@@ -289,7 +299,7 @@ class InvalidProjectTokenException(ApiException):
         print("Your token seems to have expired or is invalid.")
 
         if competition_name is None:
-            competition_name = try_get_competition_name()
+            competition_name = _try_get_competition_name()
 
         client = Client.from_env()
 
@@ -428,11 +438,12 @@ class ProjectNotFoundException(ApiException):
         self,
         **kwargs: Any,
     ) -> None:
-        from ._client import Client
+        from crunch.repository import Repository
 
         print("Project not found.")
 
-        client, project = Client.from_project()
+        repository = Repository.open()
+        client, project = repository.create_client()
 
         print("\nPlease follow this link to copy and paste your new setup command:")
         print(client.format_web_url(f'/competitions/{project.competition.name}/submit'))
@@ -622,7 +633,7 @@ class CannotParticipateException(ApiException):
             print("- You have not accepted the rules of the competition")
 
             if competition_name is None:
-                competition_name = try_get_competition_name()
+                competition_name = _try_get_competition_name()
 
             if competition_name is not None:
                 self._show_url("Accept the rules", f"/competitions/{competition_name}")

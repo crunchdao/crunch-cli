@@ -8,6 +8,8 @@ from typing import Any, Callable, List, Optional
 import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
+from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumberType
+from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
 
@@ -43,26 +45,6 @@ DATA_SIZE_VARIANTS = [
 ]
 
 
-class SubmissionNumberType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
-    name = "number"
-
-    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
-        if "latest" == value:
-            return "latest"
-
-        if "scratch" == value:
-            return "scratch"
-
-        if isinstance(value, int) or value.isdigit():
-            return int(value)
-
-        self.fail(
-            f"'{value}' is not a valid integer.",
-            param,
-            ctx
-        )
-
-
 def _format_directory(directory: str, competition_name: str, project_name: str):
     directory = directory \
         .replace("{competitionName}", competition_name) \
@@ -75,7 +57,24 @@ def _echo_version():
     click.echo(f"{__version__.__title__}, version {__version__.__version__}")
 
 
-@click.group()
+def _open_repository() -> Repository:
+    repository = Repository.open()
+
+    os.chdir(repository.root_directory_path)
+    return repository
+
+
+class _CliGroup(click.Group):
+
+    def invoke(self, ctx: click.Context) -> Any:
+        try:
+            return super().invoke(ctx)
+        except RepositoryError as error:
+            print(f"project: {error}", file=sys.stderr)
+            raise click.Abort()
+
+
+@click.group(cls=_CliGroup)
 @click.version_option(__version__.__version__, package_name="__version__.__title__")
 @click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_PRODUCTION, help="Set the API base url.")
@@ -185,7 +184,7 @@ def init(
     directory = _format_directory(directory, competition_name, project_name)
 
     try:
-        command.init(
+        repository = command.init(
             clone_token=clone_token,
             directory=directory,
             model_directory=model_directory_path,
@@ -193,7 +192,7 @@ def init(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
@@ -208,7 +207,7 @@ def init(
 
 @cli.command(help="Setup a workspace directory.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
-@click.option("--submission", "submission_number", required=False, type=SubmissionNumberType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
@@ -223,7 +222,7 @@ def init(
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
 def setup(
     clone_token: str,
-    submission_number: command.SetupSubmissionNumber,
+    submission_number: SetupSubmissionNumberType,
     no_data: bool,
     no_model: bool,
     force: bool,
@@ -266,7 +265,7 @@ def setup(
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        command.setup(
+        repository = command.setup(
             clone_token,
             submission_number,
             directory,
@@ -280,7 +279,7 @@ def setup(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
@@ -300,7 +299,7 @@ def setup(
 
 
 @cli.command(help="Setup a notebook workspace.")
-@click.option("--submission", "submission_number", required=False, type=SubmissionNumberType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
@@ -308,7 +307,7 @@ def setup(
 @click.argument("competition-name", required=True)
 @click.argument("clone-token")
 def setup_notebook(
-    submission_number: command.SetupSubmissionNumber,
+    submission_number: SetupSubmissionNumberType,
     no_data: bool,
     no_model: bool,
     model_directory_path: str,
@@ -323,7 +322,7 @@ def setup_notebook(
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        command.setup_notebook(
+        repository = command.setup_notebook(
             clone_token,
             submission_number,
             directory,
@@ -333,7 +332,7 @@ def setup_notebook(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
     except api.ApiException as error:
@@ -360,10 +359,11 @@ def quickstarter(
     show_notebook: bool,
     overwrite: bool,
 ):
-    utils.change_root()
+    repository = _open_repository()
 
     try:
         command.quickstarter(
+            repository,
             name=name,
             show_notebook=show_notebook,
             overwrite=overwrite,
@@ -414,7 +414,7 @@ def push(
     no_pip_freeze: bool,
     dry: bool,
 ):
-    utils.change_root()
+    repository = _open_repository()
 
     if export_path is not None:
         print("--export is not supported anymore", file=sys.stderr)
@@ -423,6 +423,7 @@ def push(
     with convert_if_necessary(main_file_path):
         try:
             command.push(
+                repository=repository,
                 message=message,
                 main_file_path=main_file_path,
                 model_directory_relative_path=model_directory_path,
@@ -468,7 +469,7 @@ def download(
     force: bool,
     size_variant_raw: Optional[str],
 ):
-    utils.change_root()
+    repository = _open_repository()
 
     size_variant = (
         api.SizeVariant[size_variant_raw.upper()]
@@ -478,6 +479,7 @@ def download(
 
     try:
         command.download(
+            repository,
             round_number,
             force,
             size_variant,
@@ -527,10 +529,11 @@ def update_token(
     if not clone_token:
         clone_token = click.prompt("Clone Token", hide_input=True)
 
-    utils.change_root()
+    repository = _open_repository()
 
     try:
         command.update_token(
+            repository,
             clone_token=clone_token
         )
     except api.ApiException as error:
@@ -550,13 +553,13 @@ def local(
     no_force_first_train: bool,
     train_frequency: int,
     skip_library_check: bool,
-    round_number: str,
+    round_number: RoundIdentifierType,
     has_gpu: bool,
     no_determinism_check: Optional[bool],
 ):
     from . import library, tester
 
-    utils.change_root()
+    repository = _open_repository()
     tester.install_logger()
 
     if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
@@ -570,9 +573,9 @@ def local(
     with convert_if_necessary(main_file_path):
         try:
             command.test(
+                repository,
                 main_file_path,
                 model_directory_path,
-                constants.DOT_PREDICTION_DIRECTORY,
                 not no_force_first_train,
                 train_frequency,
                 round_number,
