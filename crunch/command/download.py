@@ -53,7 +53,7 @@ def download(
         except RoundNotFoundException:
             raise original
 
-    data_directory_path = repository.data_directory_path
+    data_directory_path = os.path.relpath(repository.data_directory_path)
     os.makedirs(data_directory_path, exist_ok=True)
 
     prepared_data_files = _get_data_urls(
