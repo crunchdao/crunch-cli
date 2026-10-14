@@ -132,7 +132,7 @@ def run_list(
                 run.id,
                 _to_enriched_status(run),
                 run.submission.number,
-                run.duration,
+                run.duration or "unknown",
                 reformat_datetime(run.created_at),
                 selection_string,
             )
@@ -143,7 +143,7 @@ def run_list(
 
     print("runs:")
     ascii_table(
-        headers=["#", "status", "subm. #", "duration", "created at", "selection"],
+        headers=["id", "status", "subm. #", "duration", "created at", "selection"],
         values=rows,
     )
 

@@ -206,8 +206,6 @@ class SubmissionEndpointMixin(EndpointMixin):
         code_files: Dict[str, str],
         model_files: Dict[str, str],
     ):
-        from crunch.api._auth import PushTokenAuth
-
         return self._result(
             self.post(
                 f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
@@ -218,8 +216,6 @@ class SubmissionEndpointMixin(EndpointMixin):
                     "type": type,
                     "codeFiles": code_files,
                     "modelFiles": model_files,
-                    # TODO Use a better way to pass the push token
-                    "pushToken": self.auth_._token if isinstance(self.auth_, PushTokenAuth) else None,
                 },
             ),
             json=True,

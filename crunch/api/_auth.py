@@ -67,10 +67,7 @@ class PushTokenAuth(Auth):
         params: Dict[str, str],
         data: Optional[Dict[str, str]],
     ):
-        if data is not None:
-            data["pushToken"] = self._token
-        else:
-            params["pushToken"] = self._token
+        headers["Authorization"] = f"Project-Token {self._token}"
 
     def strip(
         self,
@@ -99,4 +96,4 @@ class RunTokenAuth(Auth):
         params: Dict[str, str],
         data: Optional[Dict[str, str]],
     ):
-        headers["X-Run-Token"] = self._token
+        headers["Authorization"] = f"Run-Token {self._token}"
