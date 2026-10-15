@@ -175,7 +175,7 @@ class Collection(Generic[T]):
 
         raise Exception(f"can't create {self.model.__name__} list from {attrs_list}")
 
-    def _prepare_models_with_yield(self, attrs_list: GeneratorType[T], args: Any):
+    def _prepare_models_with_yield(self, attrs_list: Iterator[Union["JsonValue", T]], args: Any):
         for attrs in attrs_list:
             yield self.prepare_model(attrs, *args)
 
