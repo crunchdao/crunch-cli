@@ -204,6 +204,12 @@ class Competition(Model[int]):
             client=self._client
         )
 
+    @property
+    def runtime_definitions(self):
+        from crunch.api._domain.runtime import RuntimeDefinitionCollection
+
+        return RuntimeDefinitionCollection(self, self._client)
+
 
 class CompetitionCollection(Collection[Competition]):
 

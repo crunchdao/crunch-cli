@@ -9,6 +9,7 @@ from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
+    from crunch.api._domain.competition import Competition
     from crunch.api._domain.submission import Submission
     from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
     from crunch.api._resource import JsonValue
@@ -67,24 +68,83 @@ class RuntimeDefinitionSpecification:
     gpu: RuntimeDefinitionSpecificationGpu
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
-@dataclass(frozen=True)
-class RuntimeDefinition:
-
-    id: int
-    name: str
-    type: RuntimeType
-    display_name: str
-    description: str
-    powered_by: RuntimeDefinitionPoweredBy
-    specification: RuntimeDefinitionSpecification
-
-
 class RuntimeOptionStatus(Enum):
     AVAILABLE = "AVAILABLE"
     REQUESTABLE = "REQUESTABLE"
     REQUESTED = "REQUESTED"
     BLOCKED = "BLOCKED"
+
+
+class RuntimeDefinition(Model[str]):
+
+    def __init__(
+        self,
+        submission: "Submission",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["RuntimeOptionCollection"] = None
+    ):
+        super().__init__(attrs=attrs, client=client, collection=collection)
+
+        self._submission = submission
+
+    @property
+    def id(self) -> str:
+        return self._attrs["name"]
+
+    @property
+    def name(self) -> str:
+        return self._attrs["name"]
+
+    @property
+    def type(self):
+        return RuntimeType[self._attrs["type"]]
+
+    @property
+    def display_name(self) -> str:
+        return self._attrs["displayName"]
+
+    @property
+    def description(self) -> str:
+        return self._attrs["description"]
+
+    @property
+    def powered_by(self) -> RuntimeDefinitionPoweredBy:
+        return RuntimeDefinitionPoweredBy.from_dict(self._attrs["poweredBy"])  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+
+    @property
+    def specification(self) -> RuntimeDefinitionSpecification:
+        return RuntimeDefinitionSpecification.from_dict(self._attrs["specification"])  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+
+
+class RuntimeDefinitionCollection(Collection[RuntimeDefinition]):
+
+    model = RuntimeDefinition
+
+    def __init__(
+        self,
+        competition: "Competition",
+        client: Optional["Client"] = None
+    ):
+        super().__init__(client)
+
+        self.competition = competition
+
+    def list(
+        self
+    ) -> Iterator[RuntimeDefinition]:
+        return self.prepare_models(
+            self._checked_client.api.list_runtime_definitions(
+                self.competition.id,
+            )
+        )
+
+    def prepare_model(self, attrs: Union["JsonValue", RuntimeDefinition], *args: Any) -> RuntimeDefinition:
+        return super().prepare_model(
+            attrs,
+            self.competition,
+            *args
+        )
 
 
 class RuntimeOption(Model[int]):
@@ -118,7 +178,7 @@ class RuntimeOption(Model[int]):
 
     @property
     def definition(self) -> RuntimeDefinition:
-        return RuntimeDefinition.from_dict(self._attrs["definition"])  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+        return RuntimeDefinition.from_dict(self._attrs["definition"], None)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
 
 
 class RuntimeOptionCollection(Collection[RuntimeOption]):
@@ -154,7 +214,22 @@ class RuntimeOptionCollection(Collection[RuntimeOption]):
         )
 
 
-class RuntimeOptionEndpointMixin(EndpointMixin):
+class RuntimeEndpointMixin(EndpointMixin):
+
+    def list_runtime_definitions(
+        self,
+        competition_identifier: "CompetitionIdentifierType",
+    ):
+        return self._paginated(
+            lambda page_request: self.get(
+                f"/v1/competitions/{competition_identifier}/runtime-definitions",
+                params={
+                    "page": page_request.number,
+                    "size": page_request.size,
+                },
+            ),
+            page_size=1000,
+        )
 
     def list_runtime_options(
         self,

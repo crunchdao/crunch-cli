@@ -23,7 +23,7 @@ from crunch.api._domain.quickstarter import QuickstarterEndpointMixin
 from crunch.api._domain.round import RoundEndpointMixin
 from crunch.api._domain.run import RunEndpointMixin
 from crunch.api._domain.runner import RunnerRun, RunnerRunEndpointMixin
-from crunch.api._domain.runtime import RuntimeOptionEndpointMixin
+from crunch.api._domain.runtime import RuntimeEndpointMixin
 from crunch.api._domain.score import ScoreEndpointMixin
 from crunch.api._domain.submission import SubmissionEndpointMixin
 from crunch.api._domain.submission_file import SubmissionFileEndpointMixin
@@ -56,7 +56,7 @@ class EndpointClient(
     ProjectEndpointMixin,
     QuickstarterEndpointMixin,
     RoundEndpointMixin,
-    RuntimeOptionEndpointMixin,
+    RuntimeEndpointMixin,
     RunEndpointMixin,
     RunnerRunEndpointMixin,
     ScoreEndpointMixin,
