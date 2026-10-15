@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Sequence
 import click
 
 from crunch.api import Prediction, Run, RunLog, RunNotFoundException, RunStatus, RuntimeOptionStatus, Score
+from crunch.api._errors import NeverSubmittedException, SubmissionNotFoundException
 from crunch.command._common import get_project, reformat_datetime
 from crunch.utils import ascii_table
 
@@ -23,7 +24,26 @@ def run_create(
 ):
     project = get_project()
 
-    submission = project.submissions.get(submission_identifier)
+    try:
+        submission = project.submissions.get(submission_identifier)
+    except NeverSubmittedException:
+        print(f"run: you must submit at least once")
+        
+        if show_tips:
+            print()
+            print("tips:")
+            print(f"  - Submit using `crunch push`.")
+
+        raise click.Abort()
+    except SubmissionNotFoundException:
+        print(f"submission: not found: {submission_identifier}")
+        
+        if show_tips:
+            print()
+            print("tips:")
+            print(f"  - List already submitted submissions using `crunch submission list`.")
+
+        raise click.Abort()
 
     runtime_options = list(submission.runtime_options.list())
 
