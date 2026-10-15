@@ -168,7 +168,7 @@ def run_show(
     print("run:")
     print(f"  id: {run.id}")
     print(f"  status: {_to_enriched_status(run)}")
-    print(f"  created at: {reformat_datetime(run.started_at)}")
+    print(f"  created at: {reformat_datetime(run.created_at)}")
     print(f"  started at: {reformat_datetime(run.started_at)}")
     print(f"  ended at: {reformat_datetime(run.ended_at)}")
     print(f"  duration: {run.duration or '(unknown)'}")
