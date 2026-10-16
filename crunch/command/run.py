@@ -52,7 +52,7 @@ def run_create(
 
         raise click.Abort()
 
-    if runtime_option.quota == 0:
+    if runtime_option.quota.total_seconds() == 0:
         print(f"run: you are out of quota, you must wait until the next refresh cycle")
 
         if show_tips:
