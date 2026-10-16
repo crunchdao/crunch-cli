@@ -96,6 +96,15 @@ class Project(Model[int]):
         )
 
     @property
+    def predictions(self):
+        from crunch.api._domain.prediction import PredictionCollection
+
+        return PredictionCollection(
+            project=self,
+            client=self._client
+        )
+
+    @property
     def runs(self):
         from crunch.api._domain.run import RunCollection
 

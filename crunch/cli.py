@@ -907,7 +907,7 @@ def cloud(
 
     model_directory_path = os.path.join(code_directory, model_directory)
 
-    auth = api.auth.RunTokenAuth(run_token)
+    auth = api.Auth.run_token(run_token)
     client = api.Client.from_env(auth, show_progress=False)
 
     competition = client.competitions.get(competition_name)

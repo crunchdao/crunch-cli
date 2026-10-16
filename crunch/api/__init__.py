@@ -1,4 +1,5 @@
-import crunch.api._auth as auth  # pyright: ignore[reportUnusedImport]
+from crunch.api._auth import Auth as Auth
+from crunch.api._auth import AuthorizationScheme as AuthorizationScheme
 from crunch.api._client import Client as Client
 from crunch.api._domain.common import GpuRequirement as GpuRequirement
 from crunch.api._domain.competition import Competition as Competition

@@ -4,10 +4,9 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Iterator, Optio
 
 import requests
 from tqdm.auto import tqdm
-from urllib3.exceptions import RequestError
 
 import crunch.store as store
-from crunch.api._auth import ApiKeyAuth, Auth, NoneAuth, PushTokenAuth
+from crunch.api._auth import Auth
 from crunch.api._domain.competition import CompetitionCollection, CompetitionEndpointMixin
 from crunch.api._domain.crunch import CrunchEndpointMixin
 from crunch.api._domain.data_release import DataReleaseEndpointMixin
@@ -70,13 +69,12 @@ class EndpointClient(
     def __init__(
         self,
         base_url: str,
-        auth: Auth,
+        auth: Optional[Auth],
         show_progress: bool,
     ):
         super().__init__()
 
         self.base_url = base_url
-        self.auth_ = auth
         self.show_progress = show_progress
         self.page_size = 100
 
@@ -84,13 +82,13 @@ class EndpointClient(
             "User-Agent": build_user_agent(),
         })
 
+        if auth is not None:
+            self.headers["Authorization"] = auth.header_value
+
     def request(self, method: str, url: str, *args: Any, **kwargs: Any):
         headers: Dict[str, str] = kwargs.pop("headers", None) or {}
-        params: Dict[str, str] = kwargs.pop("params", None) or {}
         data: Any = kwargs.pop("data", None)
         files: Any = kwargs.pop("files", None)
-
-        self.auth_.apply(headers, params, data)
 
         progress: Optional[tqdm] = None
 
@@ -141,14 +139,10 @@ class EndpointClient(
                 urllib.parse.urljoin(self.base_url, url),
                 *args,
                 headers=headers,
-                params=params,
                 data=data,
                 files=files,
                 **kwargs,
             )
-        except requests.exceptions.RequestException as error:
-            self._strip_secrets(error)
-            raise error
         finally:
             if progress is not None:
                 progress.close()
@@ -165,8 +159,6 @@ class EndpointClient(
         try:
             response.raise_for_status()
         except requests.HTTPError as error:
-            self._strip_secrets(error)
-
             if expect_json and not is_json:
                 raise ApiException(f"received {response.status_code}: {response.text or '<no content>'}") from error
 
@@ -179,34 +171,6 @@ class EndpointClient(
             content_type,
             is_json,
         )
-
-    def _strip_secrets(self, error: BaseException):
-        if not self.auth_:
-            return None
-
-        args = list(error.args)
-
-        for index, arg in enumerate(args):
-            if isinstance(arg, BaseException):
-                self._strip_secrets(arg)
-
-                if isinstance(arg, RequestError):
-                    arg.url = self.auth_.strip(arg.url) or arg.url
-
-                continue
-
-            if not isinstance(arg, str):
-                continue
-
-            new_arg = self.auth_.strip(arg)
-            if new_arg is not None:
-                args[index] = new_arg
-
-        error.args = tuple(args)
-
-        cause = error.__cause__
-        if cause is not None:
-            self._strip_secrets(cause)
 
     def _result(
         self,
@@ -269,7 +233,7 @@ class Client:
         self,
         api_base_url: str,
         web_base_url: str,
-        auth: Auth,
+        auth: Optional[Auth],
         project_info: Optional["ProjectInfo"] = None,
         *,
         show_progress: bool = True,
@@ -324,9 +288,7 @@ class Client:
         if auth is None:
             api_key = os.getenv(API_KEY_ENV_VAR)
             if api_key:
-                auth = ApiKeyAuth(api_key)
-            else:
-                auth = NoneAuth()
+                auth = Auth.api_key(api_key)
 
         return Client(
             store.api_base_url,
@@ -350,7 +312,7 @@ class Client:
         client = Client(
             store.api_base_url,
             store.web_base_url,
-            PushTokenAuth(push_token),
+            Auth.project_token(push_token),
             project_info,
             show_progress=show_progress,
         )

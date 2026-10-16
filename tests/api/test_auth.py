@@ -5,61 +5,41 @@ import crunch.api as api
 
 class AuthTest(unittest.TestCase):
 
-    def test_none(self):
-        auth = api.auth.NoneAuth()
+    def test_bearer(self):
+        auth = api.Auth.bearer("hello")
 
-        headers = {}
-        params = {}
-        data = {}
-
-        auth.apply(headers, params, data)
-
-        self.assertDictEqual(headers, {})
-        self.assertDictEqual(params, {})
-        self.assertDictEqual(data, {})
+        self.assertEqual(auth.scheme, api.AuthorizationScheme.BEARER)
+        self.assertEqual(auth.header_value, "Bearer hello")
 
     def test_api_key(self):
-        key = "hello"
-        auth = api.auth.ApiKeyAuth(key)
+        auth = api.Auth.api_key("hello")
 
-        headers = {}
-        params = {}
-        data = {}
+        self.assertEqual(auth.scheme, api.AuthorizationScheme.API_KEY)
+        self.assertEqual(auth.header_value, "API-Key hello")
 
-        auth.apply(headers, params, data)
+    def test_project_token(self):
+        auth = api.Auth.project_token("hello")
 
-        self.assertDictEqual(headers, {
-            "Authorization": f"API-Key {key}"
-        })
-        self.assertDictEqual(params, {})
-        self.assertDictEqual(data, {})
+        self.assertEqual(auth.scheme, api.AuthorizationScheme.PROJECT_TOKEN)
+        self.assertEqual(auth.header_value, "Project-Token hello")
 
-    def test_push_token_data(self):
-        token = "hello"
-        auth = api.auth.PushTokenAuth(token)
+    def test_run_token(self):
+        auth = api.Auth.run_token("hello")
 
-        headers = {}
-        params = {}
-        data = {}
+        self.assertEqual(auth.scheme, api.AuthorizationScheme.RUN_TOKEN)
+        self.assertEqual(auth.header_value, "Run-Token hello")
 
-        auth.apply(headers, params, data)
+    def test_repr_hides_token(self):
+        auth = api.Auth.api_key("hello")
 
-        self.assertDictEqual(headers, {})
-        self.assertDictEqual(params, {})
-        self.assertDictEqual(data, {
-            "pushToken": token
-        })
+        self.assertNotIn("hello", repr(auth))
 
-    def test_push_token_params(self):
-        token = "hello"
-        auth = api.auth.PushTokenAuth(token)
+    def test_client_sets_header(self):
+        client = api.Client("http://api/", "http://web/", api.Auth.api_key("hello"))
 
-        headers = {}
-        params = {}
+        self.assertEqual(client.api.headers["Authorization"], "API-Key hello")
 
-        auth.apply(headers, params, None)
+    def test_client_without_auth(self):
+        client = api.Client("http://api/", "http://web/", None)
 
-        self.assertDictEqual(headers, {})
-        self.assertDictEqual(params, {
-            "pushToken": token
-        })
+        self.assertNotIn("Authorization", client.api.headers)

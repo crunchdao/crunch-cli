@@ -2,7 +2,7 @@
 Heavily inspired (copied) from https://github.com/docker/docker-py/blob/main/docker/models/resource.py.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Iterable, Iterator, List, Literal, Optional, Type, TypeVar, Union, cast, overload
 
@@ -10,7 +10,6 @@ import requests
 
 
 if TYPE_CHECKING:
-    from crunch.api._auth import Auth
     from crunch.api._client import Client
     from crunch.api._pagination import PageRequest
 
@@ -193,7 +192,6 @@ class EndpointMixin(ABC):
         put: Callable[..., requests.Response]
         delete: Callable[..., requests.Response]
         page_size: int
-        auth_: "Auth"
 
         def _paginated(
             self,
