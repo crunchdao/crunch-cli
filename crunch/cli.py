@@ -818,7 +818,7 @@ def whitelist_validate(
         language = RequirementLanguage.PYTHON
 
     if requirements_txt_file_path is None:
-        requirements_txt_file_path = language.original_txt_file_name
+        requirements_txt_file_path = language.txt_file_name
 
     exit(command.whitelist_validate(
         requirements_txt_file_path=requirements_txt_file_path,
