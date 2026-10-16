@@ -22,6 +22,7 @@ from crunch.command.setup import SetupSubmissionNumberType as SetupSubmissionNum
 from crunch.command.setup import setup as setup
 from crunch.command.setup import setup_notebook as setup_notebook
 from crunch.command.status import status as status
+from crunch.command.submission import submission_checkout as submission_checkout
 from crunch.command.submission import submission_list as submission_list
 from crunch.command.submission import submission_show as submission_show
 from crunch.command.test import test as test

@@ -1,12 +1,14 @@
-from typing import TYPE_CHECKING, Any, List, Optional, Sequence
+import os
+from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Sequence, Set
 
 import click
 
-from crunch.api import SubmissionNotFoundException
+from crunch.api import EncryptedSubmissionException, NeverSubmittedException, SubmissionNotFoundException
 from crunch.command._common import get_project, reformat_datetime
+from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
 from crunch.external.humanfriendly import format_size
 from crunch.repository import Repository
-from crunch.utils import ascii_table
+from crunch.utils import ascii_table, download, to_unix_path
 
 if TYPE_CHECKING:
     from crunch.api import SubmissionIdentifierType
@@ -21,7 +23,6 @@ class SubmissionIdentifierClickType(click.ParamType):  # pyright: ignore[reportM
             return None
 
         return "[@last|<number>]"
-
 
     def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> "SubmissionIdentifierType":
         if "@last" == value:
@@ -123,6 +124,127 @@ def submission_show(
         print()
         print(f"tips:")
         print(f"  - To create a run using this submission, use `crunch run create --submission {submission.number}`.")
+
+
+def submission_checkout(
+    repository: Repository,
+    *,
+    submission_identifier: "SubmissionIdentifierType",
+    files: Optional[List[str]],
+    show_tips: bool = False,
+):
+    requested_paths: Optional[Set[str]] = None
+    if files is not None:
+        requested_paths = set()
+
+        for file in files:
+            project_path = _to_project_path(repository, file)
+            if project_path is None:
+                print(f"checkout: {file}: outside of the project")
+                raise click.Abort()
+
+            requested_paths.add(project_path)
+
+    try:
+        submission = _get_submission(repository, submission_identifier)
+    except NeverSubmittedException:
+        print("checkout: you have never submitted, there is nothing to check out")
+        raise click.Abort()
+
+    try:
+        urls = submission.project.clone(
+            submission_number=submission.number,
+            include_model=True,
+        )
+    except EncryptedSubmissionException:
+        print(f"checkout: submission #{submission.number} is encrypted and cannot be checked out")
+        raise click.Abort()
+
+    if requested_paths is not None:
+        selected_paths: Set[str] = set()
+        unmatched_paths: List[str] = []
+
+        for requested_path in requested_paths:
+            matched_paths = _match_paths(urls.keys(), requested_path)
+            if matched_paths:
+                selected_paths.update(matched_paths)
+            else:
+                unmatched_paths.append(requested_path)
+
+        if unmatched_paths:
+            for unmatched_path in unmatched_paths:
+                specific_message = _find_specific_message(unmatched_path)
+                if specific_message is None:
+                    specific_message = "not found in submission"
+
+                print(f"checkout: {unmatched_path}: {specific_message}")
+
+            if show_tips:
+                print()
+                print("tips:")
+                print(f"  - To list the files of the submission, use `crunch submission show {submission.number}`.")
+
+            raise click.Abort()
+
+        urls = {
+            path: url
+            for path, url in urls.items()
+            if path in selected_paths
+        }
+
+    for path, url in urls.items():
+        download(url, path)
+
+    print(f"checkout: {len(urls)} file(s) restored from submission #{submission.number}")
+
+    if show_tips:
+        print()
+        print("tips:")
+        print("  - Local files that are not part of the submission are left untouched.")
+
+
+_SPECIFIC_MESSAGES = {
+    DOT_DATA_DIRECTORY: "the data is never part of a submission, use `crunch download` instead",
+    DOT_PREDICTION_DIRECTORY: "only for local use, cannot be checked out",
+    DOT_CRUNCH_DIRECTORY: "only for local use, cannot be checked out",
+}
+
+
+def _find_specific_message(project_path: str) -> Optional[str]:
+    for directory, message in _SPECIFIC_MESSAGES.items():
+        if project_path.rstrip("/") == directory or project_path.startswith(directory + "/"):
+            return message
+
+    return None
+
+
+def _match_paths(paths: Iterable[str], requested_path: str) -> List[str]:
+    paths = list(paths)
+    if requested_path in paths:
+        return [requested_path]
+
+    directory_prefix = requested_path.rstrip("/") + "/"
+    if directory_prefix == "./":  # the project root
+        return paths
+
+    return [
+        path
+        for path in paths
+        if path.startswith(directory_prefix)
+    ]
+
+
+def _to_project_path(repository: Repository, path: str) -> Optional[str]:
+    try:
+        relative_path = os.path.relpath(os.path.abspath(path), repository.root_directory_path)
+    except ValueError:  # on windows, when the path is on another drive
+        return None
+
+    relative_path = to_unix_path(relative_path)
+    if relative_path == ".." or relative_path.startswith("../"):
+        return None
+
+    return relative_path
 
 
 def _get_submission(repository: Repository, identifier: "SubmissionIdentifierType"):

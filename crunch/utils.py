@@ -370,6 +370,22 @@ def is_running_inside_notebook():
         return False
 
 
+def to_unix_path(input: str):
+    if input == ".":
+        return input + "/"
+
+    has_trailing_slash = input.endswith(("/", "\\"))
+
+    input = os.path.normpath(input)\
+        .replace("\\", "/")\
+        .replace("//", "/")
+
+    if has_trailing_slash and not input.endswith("/"):
+        input += "/"
+
+    return input
+
+
 def build_user_agent() -> str:
     import platform
     import sys

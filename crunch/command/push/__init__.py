@@ -12,6 +12,7 @@ from crunch.api import Client, ForbiddenLibraryException, Submission, Submission
 from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, REQUIREMENTS_R_TXT, REQUIREMENTS_TXT, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size, format_timespan
 from crunch.repository import Repository
+from crunch.utils import to_unix_path
 
 from ._cache import FileUploadCache, NoUploadCache, UploadCache, to_modification_time
 
@@ -25,22 +26,6 @@ class RequirementsMode(Enum):
 
     # try to freeze it and include both files if different
     FREEZE = auto()
-
-
-def _to_unix_path(input: str):
-    if input == ".":
-        return input + "/"
-
-    has_trailing_slash = input.endswith(("/", "\\"))
-
-    input = os.path.normpath(input)\
-        .replace("\\", "/")\
-        .replace("//", "/")
-
-    if has_trailing_slash and not input.endswith("/"):
-        input += "/"
-
-    return input
 
 
 def _build_gitignore(
@@ -80,7 +65,7 @@ def _list_files(
     *,
     use_parent_gitignore: bool = False,
 ) -> Dict[str, str]:
-    directory_path = _to_unix_path(directory_path)
+    directory_path = to_unix_path(directory_path)
     directory_path_prefix = (
         len(directory_path)
         + int(not directory_path.endswith("/"))  # add 1 if value not ends with a slash
@@ -90,7 +75,7 @@ def _list_files(
     found_files: Dict[str, str] = {}
 
     for root, _, files in os.walk(directory_path, topdown=False):
-        root = _to_unix_path(root)
+        root = to_unix_path(root)
 
         if root.startswith(directory_path):
             root = root[directory_path_prefix:]
@@ -98,8 +83,8 @@ def _list_files(
             root = ""
 
         for file in files:
-            relative_path = _to_unix_path(os.path.join(root, file))
-            absolute_path = _to_unix_path(os.path.join(directory_path, relative_path))
+            relative_path = to_unix_path(os.path.join(root, file))
+            absolute_path = to_unix_path(os.path.join(directory_path, relative_path))
 
             if any(is_ignored(relative_path)):
                 continue
@@ -120,7 +105,7 @@ def list_code_files(
         [
             *IGNORED_CODE_FILES,
             *(COLAB_IGNORED_CODE_FILES if is_in_colab else []),
-            _to_unix_path(f"/{model_directory_relative_path}/"),
+            to_unix_path(f"/{model_directory_relative_path}/"),
         ],
     )
 

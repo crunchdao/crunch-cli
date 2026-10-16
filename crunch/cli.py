@@ -3,7 +3,7 @@ import json
 import os
 import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence
 
 import click
 
@@ -343,7 +343,6 @@ def setup_notebook(
     print(f"4. Download and submit your code to the platform!")
 
 
-
 @contextmanager
 def convert_if_necessary(
     main_file_path: str
@@ -606,6 +605,29 @@ def submission_show(
     command.submission_show(
         repository,
         submission_identifier=submission,
+        show_tips=show_tips,
+    )
+
+
+@submission_group.command(name="checkout", help="Check out files (or everything) from a submission.")
+@click.argument("submission", type=SubmissionIdentifierClickType())
+@click.argument("files", nargs=-1)
+def submission_checkout(
+    submission: "SubmissionIdentifierType",
+    files: Sequence[str],
+):
+    # resolve before chdir
+    absolute_files = [
+        os.path.abspath(file)
+        for file in files
+    ]
+
+    repository = _open_repository()
+
+    command.submission_checkout(
+        repository,
+        submission_identifier=submission,
+        files=absolute_files if len(absolute_files) else None,
         show_tips=show_tips,
     )
 
