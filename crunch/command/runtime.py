@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, List, Sequence
 import click
 
 from crunch.api import NeverSubmittedException, RuntimeOptionStatus, SubmissionNotFoundException
-from crunch.command._common import get_project
+from crunch.command._common import get_project, get_submission
 from crunch.repository import Repository
 from crunch.utils import ascii_table
 
@@ -93,14 +93,7 @@ def runtime_request(
 ):
     project = get_project(repository)
 
-    try:
-        submission = project.submissions.get(submission_identifier)
-    except NeverSubmittedException:
-        print("submission: you must submit at least once before requesting a runtime")
-        raise click.Abort()
-    except SubmissionNotFoundException:
-        print(f"submission: not found: {submission_identifier}")
-        raise click.Abort()
+    submission = get_submission(project, submission_identifier, show_tips=show_tips)
 
     option = next(
         (

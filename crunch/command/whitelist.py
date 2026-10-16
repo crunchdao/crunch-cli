@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
 import click
 
+from crunch import store
 from crunch.api import Client, GpuRequirement
 from crunch.command._common import get_project
 from crunch.repository import Repository
@@ -138,7 +139,10 @@ def whitelist_validate(
         print(exception, file=sys.stderr)
         raise click.Abort()
 
-    whitelist = CrunchHubWhitelist()
+    whitelist = CrunchHubWhitelist(
+        api_base_url=store.api_base_url,
+    )
+
     has_one_not_whitelisted = False
 
     for requirement in requirements:

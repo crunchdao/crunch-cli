@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Sequence, Set
 
 import click
 
-from crunch.api import EncryptedSubmissionException, NeverSubmittedException, SubmissionNotFoundException
-from crunch.command._common import get_project, reformat_datetime
+from crunch.api import EncryptedSubmissionException
+from crunch.command._common import get_project, get_submission, reformat_datetime
 from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
 from crunch.external.humanfriendly import format_size
 from crunch.repository import Repository
@@ -87,7 +87,7 @@ def submission_show(
     submission_identifier: "SubmissionIdentifierType",
     show_tips: bool = False,
 ):
-    submission = _get_submission(repository, submission_identifier)
+    submission = get_submission(get_project(repository), submission_identifier, show_tips=show_tips)
 
     model = submission.model
 
@@ -145,11 +145,7 @@ def submission_checkout(
 
             requested_paths.add(project_path)
 
-    try:
-        submission = _get_submission(repository, submission_identifier)
-    except NeverSubmittedException:
-        print("checkout: you have never submitted, there is nothing to check out")
-        raise click.Abort()
+    submission = get_submission(get_project(repository), submission_identifier, show_tips=show_tips)
 
     try:
         urls = submission.project.clone(
@@ -246,10 +242,3 @@ def _to_project_path(repository: Repository, path: str) -> Optional[str]:
 
     return relative_path
 
-
-def _get_submission(repository: Repository, identifier: "SubmissionIdentifierType"):
-    try:
-        return get_project(repository).submissions.get(identifier)
-    except SubmissionNotFoundException:
-        print(f"submission: not found: #{identifier}")
-        raise click.Abort()
