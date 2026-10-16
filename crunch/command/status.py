@@ -35,8 +35,8 @@ def status(
 
     print()
     print(f"run parameters:")
-    print(f"  can configure force first train: {"no" if competition.hide_force_first_train else "yes"}")
-    print(f"  can configure train frequency: {"no" if competition.hide_train_frequency else "yes"}")
+    print(f"  can configure force first train: {'no' if competition.hide_force_first_train else 'yes'}")
+    print(f"  can configure train frequency: {'no' if competition.hide_train_frequency else 'yes'}")
 
     if show_tips:
         print()
