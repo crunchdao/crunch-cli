@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import IntEnum
 from time import sleep
 from time import time as current_time
 from typing import TYPE_CHECKING, Any, List, Optional, Sequence
@@ -28,7 +29,7 @@ def run_create(
         submission = project.submissions.get(submission_identifier)
     except NeverSubmittedException:
         print(f"run: you must submit at least once")
-        
+
         if show_tips:
             print()
             print("tips:")
@@ -37,7 +38,7 @@ def run_create(
         raise click.Abort()
     except SubmissionNotFoundException:
         print(f"submission: not found: {submission_identifier}")
-        
+
         if show_tips:
             print()
             print("tips:")
@@ -309,35 +310,65 @@ def run_logs(
             print(f"  - To follow the logs in real-time, use `crunch run logs {run.id} --follow`.")
 
 
+class RunWaitExitCode(IntEnum):
+
+    SUCCEEDED = 0
+    FAILED = 1
+    TIMED_OUT = 2
+    TERMINATED = 3
+
+
 def run_wait(
     *,
     run_id: int,
     timeout: Optional[int],
     poll_interval: int,
     show_tips: bool = False,
-):
+) -> RunWaitExitCode:
     run = _get_run(run_id)
     if not _is_running(run):
         print("wait: already completed")
-        return
-
-    print("wait: waiting for completion")
-
-    start_time = current_time()
-    while _is_running(run.reload()):
-        sleep(poll_interval)
-
-        if timeout is not None and (current_time() - start_time) > timeout:
-            print("wait: timeout exceeded")
-            break
-
     else:
-        print("wait: completed")
+        print("wait: waiting for completion")
 
-    if show_tips and not timeout:
+        start_time = current_time()
+        while _is_running(run.reload()):
+            sleep(poll_interval)
+
+            if timeout is not None and (current_time() - start_time) > timeout:
+                print("wait: timeout exceeded")
+                break
+
+        else:
+            print("wait: completed")
+
+    exit_code = _to_wait_exit_code(run)
+    print(f"wait: run status: {exit_code.name} ({_to_enriched_status(run)})")
+
+    if show_tips:
         print()
         print("tips:")
-        print(f"  - To only wait for a certain amount of time, use `crunch run wait {run_id} --timeout <seconds>`.")
+
+        if not timeout:
+            print(f"  - To only wait for a certain amount of time, use `crunch run wait {run_id} --timeout <seconds>`.")
+
+        print(f"  - The exit code is the run status: {', '.join(f'{code.value} = {code.name}' for code in RunWaitExitCode)}.")
+
+    return exit_code
+
+
+def _to_wait_exit_code(run: "Run") -> RunWaitExitCode:
+    if _is_running(run):
+        return RunWaitExitCode.TIMED_OUT
+
+    if run.terminated:
+        return RunWaitExitCode.TERMINATED
+
+    prediction = run.prediction
+    if not run.success or (prediction is not None and prediction.valid == False):
+        return RunWaitExitCode.FAILED
+
+    return RunWaitExitCode.SUCCEEDED
 
 
 def run_select(

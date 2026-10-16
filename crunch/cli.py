@@ -688,18 +688,18 @@ def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
     )
 
 
-@run_group.command(name="wait", help="Wait for a run to complete.")
+@run_group.command(name="wait", help="Wait for a run to complete. Exit code: 0 = succeeded, 1 = failed, 2 = timed out (still running), 3 = terminated.")
 @click.option("--timeout", type=int, required=False)
 @click.option("--poll-interval", type=int, default=10)
 @click.argument("run_id", type=int, required=True)
 @wrap_root_and_api
 def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
-    command.run_wait(
+    exit(command.run_wait(
         run_id=run_id,
         timeout=timeout,
         poll_interval=poll_interval,
         show_tips=show_tips,
-    )
+    ))
 
 
 @run_group.command(name="select", help="Select a run for the Out-of-Sample.")
