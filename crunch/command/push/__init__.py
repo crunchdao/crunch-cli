@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum, auto
 from io import BytesIO
 from typing import BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, overload
@@ -141,7 +141,7 @@ def _upload_files(
 
     total_size: int = 0
 
-    now = datetime.now()
+    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
 
     def format_age(created_at: datetime) -> str:
         return format_timespan(now - created_at, max_units=1)
