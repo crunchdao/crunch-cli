@@ -11,6 +11,7 @@ from crunch import store
 from crunch.api import Client, ForbiddenLibraryException, Submission, SubmissionType, Upload, UploadStatus
 from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size, format_timespan
+from crunch.repository import Repository
 
 from ._cache import FileUploadCache, NoUploadCache, UploadCache, to_modification_time
 
@@ -354,6 +355,7 @@ def _upload_files(
 @overload
 def push(
     *,
+    repository: Repository,
     message: str,
     main_file_path: str,
     model_directory_relative_path: str,
@@ -367,6 +369,7 @@ def push(
 @overload
 def push(
     *,
+    repository: Repository,
     message: str,
     main_file_path: str,
     model_directory_relative_path: str,
@@ -379,6 +382,7 @@ def push(
 
 def push(
     *,
+    repository: Repository,
     message: str,
     main_file_path: str,
     model_directory_relative_path: str,
@@ -391,16 +395,16 @@ def push(
         print(f"submission: message too long: {message_length}/{SUBMISSION_MESSAGE_LENGTH}", file=sys.stderr)
         raise click.Abort()
 
-    submission_directory_path = os.path.abspath(".")
+    submission_directory_path = repository.root_directory_path
 
-    client, project = Client.from_project()
+    client, project = repository.create_client()
     competition = project.competition
 
     preferred_chunk_size = 50_000_000
 
     keep_cached = not dry
     upload_cache: UploadCache = (
-        FileUploadCache.load(submission_directory_path, client)
+        FileUploadCache.load(repository, client)
         if keep_cached
         else NoUploadCache()
     )

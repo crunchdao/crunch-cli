@@ -20,7 +20,8 @@ IGNORED_MODEL_FILES = [
     ".git/",
     f"{DOT_CRUNCH_DIRECTORY}/",
     "__pycache__/",
-    ".ipynb_checkpoints/",
+    ".ipynb_checkpoints/",  # Jupyter
+    ".virtual_documents/",  # Kaggle
     ".env",
     "*.pyc",
     *MACOS_HIDDEN_FILES,

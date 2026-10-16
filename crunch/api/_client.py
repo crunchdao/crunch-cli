@@ -1,6 +1,6 @@
 import os
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Iterator, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Tuple, cast
 
 import requests
 from tqdm.auto import tqdm
@@ -34,10 +34,6 @@ from crunch.api._pagination import PageRequest
 from crunch.api._resource import JsonValue
 from crunch.constants import API_KEY_ENV_VAR
 from crunch.utils import build_user_agent
-
-if TYPE_CHECKING:
-    from crunch.api._domain.project import Project
-    from crunch.utils import ProjectInfo
 
 
 class EndpointClient(
@@ -234,13 +230,11 @@ class Client:
         api_base_url: str,
         web_base_url: str,
         auth: Optional[Auth],
-        project_info: Optional["ProjectInfo"] = None,
         *,
         show_progress: bool = True,
     ):
         self.api = EndpointClient(api_base_url, auth, show_progress)
         self.web_base_url = web_base_url
-        self.project_info = project_info
 
     @property
     def competitions(self):
@@ -296,28 +290,3 @@ class Client:
             auth,
             show_progress=show_progress,
         )
-
-    @staticmethod
-    def from_project(
-        *,
-        show_progress: bool = True,
-    ) -> Tuple["Client", "Project"]:
-        from crunch.utils import read_project_info, read_token
-
-        store.load_from_env()
-
-        project_info = read_project_info()
-        push_token = read_token()
-
-        client = Client(
-            store.api_base_url,
-            store.web_base_url,
-            Auth.project_token(push_token),
-            project_info,
-            show_progress=show_progress,
-        )
-
-        competition = client.competitions.get(project_info.competition_name)
-        project = competition.projects.get_reference(userId=project_info.user_id, name=project_info.project_name)
-
-        return client, project

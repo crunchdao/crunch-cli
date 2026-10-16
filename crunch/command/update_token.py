@@ -1,13 +1,16 @@
+from typing import TYPE_CHECKING
+
 from crunch.api import Client
-from crunch.utils import read_project_info, write_project_info, write_token
+
+if TYPE_CHECKING:
+    from crunch.repository import Repository
 
 
 def update_token(
+    repository: "Repository",
     clone_token: str,
 ):
     client = Client.from_env()
-
-    project_info = read_project_info()
 
     project_token = client.project_tokens.upgrade(clone_token)
 
@@ -15,9 +18,10 @@ def update_token(
     plain = project_token.plain
     assert plain is not None
 
-    project_info.project_name = project.name
-    project_info.user_id = project.user_id
-    write_project_info(project_info)
-    write_token(plain)
+    repository.update_project(
+        project_name=project.name,
+        user_id=project.user_id,
+    )
+    repository.write_push_token(plain)
 
     print("update-token: updated")

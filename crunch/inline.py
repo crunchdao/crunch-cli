@@ -13,11 +13,13 @@ import psutil
 
 import crunch.tester as tester
 from crunch.__version__ import __version__
-from crunch.api import ApiException, Client, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
+from crunch.api import ApiException, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
 from crunch.command.convert import convert
 from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
-from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY, DOT_PREDICTION_DIRECTORY
+from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY
+from crunch.notebook import IPyNbNotAvailableError, NotebookEnvironment
+from crunch.repository import Repository
 from crunch.runner import is_inside
 from crunch.runner.tracing import LocalTraceExporter
 from crunch.runner.types import KwargsLike
@@ -47,6 +49,7 @@ class _Inline:
         self.has_gpu = has_gpu
 
         self._trace_exporter = LocalTraceExporter()
+        self._notebook_environment = NotebookEnvironment.detect()
 
         print(f"loaded crunch tools for module: {user_module}")
 
@@ -70,8 +73,12 @@ class _Inline:
         print(f"----")
 
     @cached_property
+    def _repository(self) -> Repository:
+        return Repository.open()
+
+    @cached_property
     def _competition(self) -> Competition:
-        _, project = Client.from_project()
+        _, project = self._repository.create_client()
         competition = project.competition.reload()  # pyright: ignore[reportUnknownMemberType]
 
         return competition
@@ -90,6 +97,7 @@ class _Inline:
                 data_directory_path,
                 _,
             ) = download(
+                self._repository,
                 round_number=round_number,
                 force=force,
             )
@@ -142,10 +150,10 @@ class _Inline:
                 self.logger.warning("")
 
             tester.run(
+                self._repository,
                 self.user_module,
                 self._runner_module,
                 self.model_directory_path,
-                DOT_PREDICTION_DIRECTORY,
                 force_first_train,
                 train_frequency,
                 round_number,
@@ -211,39 +219,22 @@ class _Inline:
             return
 
         try:
-            from google.colab import _message  # type: ignore
-            response = _message.blocking_request("get_ipynb", request="", timeout_sec=5)  # type: ignore
-
-            if response is None:
-                raise NotImplementedError(f"google.colab._message.blocking_request did not answered")
-
-            error = response.get("error")  # type: ignore
-            if error is not None:
-                raise NotImplementedError(f"{error.get('type')}: {error.get('description')}")  # type: ignore
-
-            ipynb = response.get("ipynb")  # type: ignore
-            if ipynb is None:
-                raise NotImplementedError(f"missing ipynb, available keys are: {list(response.keys())}")  # type: ignore
-
-            if ipynb.get("cells") is None:  # type: ignore
-                raise NotImplementedError(f"missing cells, available keys are: {list(ipynb.keys())}")  # type: ignore
-        except (ImportError, NotImplementedError) as error:
-            client, project = Client.from_project()
+            ipynb = self._notebook_environment.extract_ipynb()
+        except IPyNbNotAvailableError as error:
+            client, project = self._repository.create_client()
             nice_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook")
 
             encoded_message = urllib.parse.quote_plus(message)
             real_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook?projectName={project.name}&message={encoded_message}")
 
-            gif_file_name = "download-and-submit-notebook.gif"
-            if not self._does_create_run:
-                gif_file_name = "download-and-submit-notebook-deployment.gif"
+            platform_name, gif_file_name = self._notebook_environment.display_name_and_gif(have_runs=self._does_create_run)
 
             display(Markdown(dedent(f"""
                 ---
 
                 Your work could not be submitted automatically, please do so manually:
-                1. Download your Notebook from Colab
-                2. Upload it to the platform
+                1. Download your Notebook from {platform_name}
+                2. Upload it to the Crunch platform
                 3. Create a run to validate it
 
                 ### >> [{nice_url}]({real_url})
@@ -251,7 +242,7 @@ class _Inline:
                 <img alt="Download and Submit Notebook" src="https://raw.githubusercontent.com/crunchdao/competitions/refs/heads/master/documentation/animations/{gif_file_name}" height="600px" />
 
                 <br />
-                <small>Error preventing submit: <code>{error}</code></small>
+                <small>Error preventing submit: <code>{error}</code> for {self._notebook_environment.__class__.__name__}</small>
             """)))
             return
 
@@ -311,6 +302,7 @@ class _Inline:
 
         try:
             submission = push(
+                repository=self._repository,
                 message=message,
                 main_file_path=main_file_name,
                 model_directory_relative_path=model_directory_relative_path,
@@ -330,7 +322,7 @@ class _Inline:
             gif_file_name = "create-deployment.gif"
             click_path = f"submissions/{submission.number}?openDeploy-{submission.id}=true"
 
-        client, project = Client.from_project()
+        client, project = self._repository.create_client()
         run_url = client.format_web_url(f"/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/{click_path}")
 
         display(Markdown(dedent(f"""

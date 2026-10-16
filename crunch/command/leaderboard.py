@@ -1,11 +1,13 @@
 from crunch.api import Unit
 from crunch.command._common import get_project
+from crunch.repository import Repository
 
 
 def leaderboard(
+    repository: Repository,
     show_tips: bool = True,
 ):
-    project = get_project()
+    project = get_project(repository)
     competition = project.competition
 
     all_metrics = {

@@ -6,6 +6,7 @@ from crunch.api import Competition, RoundIdentifierType
 from crunch.unstructured import RunnerModule
 
 if TYPE_CHECKING:
+    from crunch.repository import Repository
     from crunch.runner.tracing import LocalTraceExporter
 
 _logged_installed = False
@@ -32,10 +33,10 @@ def install_logger():
 
 
 def run(
+    repository: "Repository",
     user_module: Any,
     runner_module: Optional[RunnerModule],
     model_directory_path: str,
-    prediction_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
     round_number: RoundIdentifierType,
@@ -52,10 +53,11 @@ def run(
 
     from .runner.local import LocalRunner
     runner = LocalRunner(
+        repository,
         user_module,
         runner_module,
         model_directory_path,
-        prediction_directory_path,
+        repository.prediction_directory_path,
         force_first_train,
         train_frequency,
         round_number,

@@ -4,6 +4,7 @@ import click
 
 from crunch.api import NeverSubmittedException, RuntimeOptionStatus, SubmissionNotFoundException
 from crunch.command._common import get_project
+from crunch.repository import Repository
 from crunch.utils import ascii_table
 
 if TYPE_CHECKING:
@@ -12,11 +13,12 @@ if TYPE_CHECKING:
 
 
 def runtime_list(
+    repository: Repository,
     *,
     submission_identifier: "SubmissionIdentifierType",
     show_tips: bool = False,
 ):
-    project = get_project()
+    project = get_project(repository)
 
     try:
         submission = project.submissions.get(submission_identifier)
@@ -82,13 +84,14 @@ def _to_runtime_definition_columns(definition: "RuntimeDefinition") -> Sequence[
 
 
 def runtime_request(
+    repository: Repository,
     *,
     runtime_option_name: str,
     submission_identifier: "SubmissionIdentifierType",
     justification: str,
     show_tips: bool = False,
 ):
-    project = get_project()
+    project = get_project(repository)
 
     try:
         submission = project.submissions.get(submission_identifier)

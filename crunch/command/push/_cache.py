@@ -1,7 +1,5 @@
 import hashlib
-import json
 import os
-import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -12,7 +10,8 @@ from mashumaro.config import BaseConfig
 from mashumaro.mixins.dict import DataClassDictMixin
 
 from crunch.api import ApiException, Client, Upload, UploadStatus
-from crunch.constants import DOT_CRUNCH_DIRECTORY, UPLOAD_CACHE_FILE, UPLOAD_CACHE_VERSION
+from crunch.constants import UPLOAD_CACHE_VERSION
+from crunch.repository import Repository
 
 _INITIAL_TIME_TO_LIVE = 3
 _EARLY_DELETE_THRESHOLD = timedelta(hours=3)
@@ -113,10 +112,10 @@ class FileUploadCache(UploadCache):
 
     def __init__(
         self,
-        directory: str,
+        repository: Repository,
         entries: List[UploadCacheEntry],
     ):
-        self._directory = directory
+        self._repository = repository
         self._entries = entries
 
     def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> Tuple[Checksum, Optional[Upload]]:
@@ -158,31 +157,15 @@ class FileUploadCache(UploadCache):
 
     def persist(self) -> None:
         try:
-            path = _cache_file_path(self._directory)
-            directory_path = os.path.dirname(path)
-            os.makedirs(directory_path, exist_ok=True)
+            content: Any = {
+                "version": UPLOAD_CACHE_VERSION,
+                "entries": [
+                    entry.to_dict()
+                    for entry in self._entries
+                ],
+            }
 
-            tmpfd, temporary_path = tempfile.mkstemp(
-                prefix=f".{UPLOAD_CACHE_FILE}.",
-                dir=directory_path,
-            )
-
-            try:
-                with os.fdopen(tmpfd, "w") as fd:
-                    content: Any = {
-                        "version": UPLOAD_CACHE_VERSION,
-                        "entries": [
-                            entry.to_dict()
-                            for entry in self._entries
-                        ],
-                    }
-
-                    json.dump(content, fd)
-
-                os.replace(temporary_path, path)
-            except BaseException:
-                os.unlink(temporary_path)
-                raise
+            self._repository.write_upload_cache(content)
         except Exception as exception:
             print(f"upload cache: could not be saved: {exception}")
 
@@ -242,26 +225,21 @@ class FileUploadCache(UploadCache):
             ))
 
     @staticmethod
-    def load(directory: str, client: Client) -> "FileUploadCache":
-        entries = _load_upload_cache(directory)
+    def load(repository: Repository, client: Client) -> "FileUploadCache":
+        entries = _load_upload_cache(repository)
         entries = _reconcile_upload_cache_entries(entries, client)
         entries = _age_upload_cache_entries(entries, client)
 
-        return FileUploadCache(directory, entries)
+        return FileUploadCache(repository, entries)
 
 
-def _cache_file_path(directory: str) -> str:
-    return os.path.join(directory, DOT_CRUNCH_DIRECTORY, UPLOAD_CACHE_FILE)
-
-
-def _load_upload_cache(directory: str) -> List[UploadCacheEntry]:
-    path = _cache_file_path(directory)
-    if not os.path.exists(path):
-        return []
+def _load_upload_cache(repository: Repository) -> List[UploadCacheEntry]:
+    path = repository.upload_cache_file_path
 
     try:
-        with open(path) as fd:
-            content = json.load(fd)
+        content = repository.read_upload_cache()
+        if content is None:
+            return []
 
         version = content.get("version")
         if version != UPLOAD_CACHE_VERSION:

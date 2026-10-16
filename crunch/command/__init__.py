@@ -17,6 +17,8 @@ from crunch.command.run import run_terminate as run_terminate
 from crunch.command.run import run_wait as run_wait
 from crunch.command.runtime import runtime_list as runtime_list
 from crunch.command.runtime import runtime_request as runtime_request
+from crunch.command.setup import SetupSubmissionNumberClickType as SetupSubmissionNumberClickType
+from crunch.command.setup import SetupSubmissionNumberType as SetupSubmissionNumberType
 from crunch.command.setup import setup as setup
 from crunch.command.setup import setup_notebook as setup_notebook
 from crunch.command.status import status as status

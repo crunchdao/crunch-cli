@@ -2,19 +2,21 @@ from typing import Any, Literal, Optional, Union
 
 import click
 
-from .. import api, command, utils
+import crunch.api as api
+import crunch.command as command
+from crunch.repository import Repository
+from crunch.utils import download
 
-SetupSubmissionNumber = Union[int, Literal["latest", "scratch"]]
+SetupSubmissionNumberType = Union[int, Literal["latest", "scratch"]]
 
 
 class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "number"
 
-    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> str:
+    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
         return "[latest|scratch|<number>]"
 
-
-    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
+    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> SetupSubmissionNumberType:
         if "latest" == value:
             return "latest"
 
@@ -33,14 +35,14 @@ class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[report
 
 def setup(
     clone_token: str,
-    submission_number: SetupSubmissionNumber,
+    submission_number: SetupSubmissionNumberType,
     directory: str,
     model_directory: str,
     force: bool,
     no_model: bool,
     data_size_variant: api.SizeVariant,
-):
-    command.init(
+) -> Repository:
+    repository = command.init(
         clone_token=clone_token,
         directory=directory,
         model_directory=model_directory,
@@ -48,11 +50,11 @@ def setup(
         data_size_variant=data_size_variant,
     )
 
-    _, project = api.Client.from_project()
+    _, project = repository.create_client()
 
     if submission_number == "scratch":
         print(f"setup: you decided to start from scratch, previous submission will not be downloaded")
-        return
+        return repository
 
     try:
         urls = project.clone(
@@ -65,7 +67,7 @@ def setup(
         )
 
         for path, url in urls.items():
-            utils.download(url, path)
+            download(url, path)
 
     except api.NeverSubmittedException:
         print(f"setup: you appear to have never submitted code before")
@@ -73,16 +75,18 @@ def setup(
     except api.EncryptedSubmissionException:
         print(f"setup: you appear to have submitted an encrypted submission")
 
+    return repository
+
 
 def setup_notebook(
     clone_token: str,
-    submission_number: SetupSubmissionNumber,
+    submission_number: SetupSubmissionNumberType,
     directory: str,
     model_directory: str,
     no_model: bool,
     data_size_variant: api.SizeVariant,
-):
-    setup(
+) -> Repository:
+    return setup(
         clone_token,
         submission_number,
         directory,

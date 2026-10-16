@@ -5,6 +5,7 @@ import click
 
 from crunch.api import Client, GpuRequirement
 from crunch.command._common import get_project
+from crunch.repository import Repository
 from crunch.utils import ascii_table
 
 if TYPE_CHECKING:
@@ -165,6 +166,7 @@ def whitelist_validate(
 
 
 def whitelist_request(
+    repository: Repository,
     *,
     name: Optional[str],
     alias: Optional[str],
@@ -173,7 +175,7 @@ def whitelist_request(
     additional_details: Optional[str],
     show_tips: bool = False,
 ):
-    competition = get_project().competition
+    competition = get_project(repository).competition
 
     library_request = competition.library_requests.create(
         name=name,

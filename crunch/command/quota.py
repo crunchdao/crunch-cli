@@ -2,13 +2,15 @@ from datetime import timedelta
 
 from crunch.command._common import get_project
 from crunch.external.humanfriendly import format_size
+from crunch.repository import Repository
 
 
 def quota(
+    repository: Repository,
     *,
     show_tips: bool = False,
 ):
-    project = get_project()
+    project = get_project(repository)
 
     submit = project.submit_quota
     compute = project.compute_quota

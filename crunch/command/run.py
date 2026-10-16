@@ -9,6 +9,7 @@ import click
 from crunch.api import Prediction, Run, RunLog, RunNotFoundException, RunStatus, RuntimeOptionStatus, Score
 from crunch.api._errors import NeverSubmittedException, SubmissionNotFoundException
 from crunch.command._common import get_project, reformat_datetime
+from crunch.repository import Repository
 from crunch.utils import ascii_table
 
 if TYPE_CHECKING:
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
 
 def run_create(
+    repository: Repository,
     *,
     submission_identifier: "SubmissionIdentifierType",
     train_frequency: Optional[int],
@@ -23,7 +25,7 @@ def run_create(
     runtime_definition_name: str,
     show_tips: bool = False,
 ):
-    project = get_project()
+    project = get_project(repository)
 
     try:
         submission = project.submissions.get(submission_identifier)
@@ -129,11 +131,12 @@ def run_create(
 
 
 def run_list(
+    repository: Repository,
     *,
     limit: Optional[int],
     show_tips: bool = False,
 ):
-    project = get_project()
+    project = get_project(repository)
     runs = project.runs.list()
     selected_run = None  # TODO project.selection.run
 
@@ -180,11 +183,12 @@ def run_list(
 
 
 def run_show(
+    repository: Repository,
     *,
     run_id: int,
     show_tips: bool = False,
 ):
-    run = _get_run(run_id)
+    run = _get_run(repository, run_id)
 
     print("run:")
     print(f"  id: {run.id}")
@@ -233,6 +237,7 @@ def run_show(
 
 
 def run_logs(
+    repository: Repository,
     *,
     run_id: int,
     tail: Optional[int],
@@ -240,7 +245,7 @@ def run_logs(
     debug: bool,
     show_tips: bool = False,
 ):
-    run = _get_run(run_id)
+    run = _get_run(repository, run_id)
 
     in_package_installer: Optional[str] = None
 
@@ -319,13 +324,14 @@ class RunWaitExitCode(IntEnum):
 
 
 def run_wait(
+    repository: Repository,
     *,
     run_id: int,
     timeout: Optional[int],
     poll_interval: int,
     show_tips: bool = False,
 ) -> RunWaitExitCode:
-    run = _get_run(run_id)
+    run = _get_run(repository, run_id)
     if not _is_running(run):
         print("wait: already completed")
     else:
@@ -372,11 +378,12 @@ def _to_wait_exit_code(run: "Run") -> RunWaitExitCode:
 
 
 def run_select(
+    repository: Repository,
     *,
     run_id: int,
     show_tips: bool = False,
 ):
-    run = _get_run(run_id)
+    run = _get_run(repository, run_id)
     run.select()
 
     print(f"select: run {run_id} selected")
@@ -388,11 +395,12 @@ def run_select(
 
 
 def run_terminate(
+    repository: Repository,
     *,
     run_id: int,
     show_tips: bool = False,
 ):
-    run = _get_run(run_id)
+    run = _get_run(repository, run_id)
     if not _is_running(run):
         print("terminate: already over")
         return
@@ -423,9 +431,9 @@ def _format_score_value(score: Score) -> str:
     return f"metric: {metric.display_name!r}: {unit.format_value(score.value)}"
 
 
-def _get_run(id: int):
+def _get_run(repository: Repository, id: int):
     try:
-        return get_project().runs.get(id)
+        return get_project(repository).runs.get(id)
     except RunNotFoundException:
         print(f"run: not found: {id}")
         raise click.Abort()

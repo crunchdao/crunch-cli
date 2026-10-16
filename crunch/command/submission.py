@@ -5,6 +5,7 @@ import click
 from crunch.api import SubmissionNotFoundException
 from crunch.command._common import get_project, reformat_datetime
 from crunch.external.humanfriendly import format_size
+from crunch.repository import Repository
 from crunch.utils import ascii_table
 
 if TYPE_CHECKING:
@@ -37,11 +38,12 @@ class SubmissionIdentifierClickType(click.ParamType):  # pyright: ignore[reportM
 
 
 def submission_list(
+    repository: Repository,
     *,
     limit: Optional[int],
     show_tips: bool = False,
 ):
-    submissions = get_project().submissions.list()
+    submissions = get_project(repository).submissions.list()
 
     reached_limit = limit is not None and len(submissions) > limit
 
@@ -79,11 +81,12 @@ def submission_list(
 
 
 def submission_show(
+    repository: Repository,
     *,
     submission_identifier: "SubmissionIdentifierType",
     show_tips: bool = False,
 ):
-    submission = _get_submission(submission_identifier)
+    submission = _get_submission(repository, submission_identifier)
 
     model = submission.model
 
@@ -122,9 +125,9 @@ def submission_show(
         print(f"  - To create a run using this submission, use `crunch run create --submission {submission.number}`.")
 
 
-def _get_submission(identifier: "SubmissionIdentifierType"):
+def _get_submission(repository: Repository, identifier: "SubmissionIdentifierType"):
     try:
-        return get_project().submissions.get(identifier)
+        return get_project(repository).submissions.get(identifier)
     except SubmissionNotFoundException:
         print(f"submission: not found: #{identifier}")
         raise click.Abort()

@@ -7,22 +7,22 @@ from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 import click
 
-from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType
-from crunch.command.setup import SetupSubmissionNumberClickType
+from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
+from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumberType
 from crunch.command.submission import SubmissionIdentifierClickType
 from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
+from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
 
-from . import __version__, api, command, constants, store, utils
+from . import __version__, api, command, constants, store
 
 store.load_from_env()
 
 if TYPE_CHECKING:
     from crunch_convert import RequirementLanguage
 
-    from crunch.api import GpuRequirement, RoundIdentifierType, SubmissionIdentifierType
-    from crunch.command.setup import SetupSubmissionNumber
+    from crunch.api import GpuRequirement, SubmissionIdentifierType
 
 
 DIRECTORY_DEFAULT_FORMAT = "{competitionName}-{projectName}"
@@ -67,7 +67,37 @@ def _echo_version():
 show_tips: bool = False
 
 
-@click.group()
+def _open_repository() -> Repository:
+    repository = Repository.open()
+
+    os.chdir(repository.root_directory_path)
+    return repository
+
+
+_COMPETITION_NAME_META_KEY = "crunch.competition_name"
+
+
+def _remember_competition_name(competition_name: str) -> None:
+    click.get_current_context().meta[_COMPETITION_NAME_META_KEY] = competition_name
+
+
+class _CliGroup(click.Group):
+
+    def invoke(self, ctx: click.Context) -> Any:
+        try:
+            return super().invoke(ctx)
+        except RepositoryError as error:
+            print(f"project: {error}", file=sys.stderr)
+            raise click.Abort()
+        except api.ApiException as error:
+            print("\n---")
+            error.print_helper(
+                competition_name=ctx.meta.get(_COMPETITION_NAME_META_KEY),
+            )
+            ctx.exit(1)
+
+
+@click.group(cls=_CliGroup)
 @click.version_option(__version__.__version__, package_name="__version__.__title__")
 @click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
 @click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_PRODUCTION, help="Set the API base url.")
@@ -138,19 +168,16 @@ def list_competitions(
 
     client = api.Client.from_env()
 
-    try:
-        competitions = client.competitions.list(
-            format=format,
-            status=status,
-            mode=mode,
-            continuous=continuous,
-            external=external,
-            featured=featured,
-            organizer_name=organizer_name,
-            team_based=team_based,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    competitions = client.competitions.list(
+        format=format,
+        status=status,
+        mode=mode,
+        continuous=continuous,
+        external=external,
+        featured=featured,
+        organizer_name=organizer_name,
+        team_based=team_based,
+    )
 
     if not competitions:
         print("No competitions found.")
@@ -179,10 +206,12 @@ def init(
     directory: str,
     model_directory_path: str,
 ):
+    _remember_competition_name(competition_name)
+
     directory = _format_directory(directory, competition_name, project_name)
 
     try:
-        command.init(
+        repository = command.init(
             clone_token=clone_token,
             directory=directory,
             model_directory=model_directory_path,
@@ -190,14 +219,9 @@ def init(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
 
     print("\n---")
     print(f"Success! Your environment has been correctly initialized.")
@@ -217,7 +241,7 @@ def init(
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
 def setup(
     clone_token: str,
-    submission_number: "SetupSubmissionNumber",
+    submission_number: SetupSubmissionNumberType,
     no_data: bool,
     no_model: bool,
     force: bool,
@@ -229,6 +253,7 @@ def setup(
     data_size_variant_raw: str,
 ):
     _echo_version()
+    _remember_competition_name(competition_name)
 
     if notebook:
         if force:
@@ -245,7 +270,7 @@ def setup(
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        command.setup(
+        repository = command.setup(
             clone_token,
             submission_number,
             directory,
@@ -256,14 +281,9 @@ def setup(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -284,7 +304,7 @@ def setup(
 @click.argument("competition-name", required=True)
 @click.argument("clone-token")
 def setup_notebook(
-    submission_number: "SetupSubmissionNumber",
+    submission_number: SetupSubmissionNumberType,
     no_data: bool,
     no_model: bool,
     model_directory_path: str,
@@ -293,13 +313,14 @@ def setup_notebook(
     clone_token: str,
 ):
     _echo_version()
+    _remember_competition_name(competition_name)
 
     directory = os.getcwd()
 
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        command.setup_notebook(
+        repository = command.setup_notebook(
             clone_token,
             submission_number,
             directory,
@@ -309,14 +330,9 @@ def setup_notebook(
         )
 
         if not no_data:
-            command.download(force=True)
+            command.download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         command.download_no_data_available()
-    except api.ApiException as error:
-        utils.exit_via(
-            error,
-            competition_name=competition_name
-        )
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -326,21 +342,6 @@ def setup_notebook(
     print(f"3. Run a test: `crunch_tools.test()`")
     print(f"4. Download and submit your code to the platform!")
 
-
-def wrap_root_and_api(function: Callable[..., Any]):
-    def wrapped(*args: Any, **kwargs: Any):
-        utils.change_root()
-
-        try:
-            return function(*args, **kwargs)
-        except api.ApiException as error:
-            utils.exit_via(error)
-
-    wrapped.__name__ = function.__name__
-    wrapped.__doc__ = function.__doc__
-    wrapped.__annotations__ = function.__annotations__
-
-    return wrapped
 
 
 @contextmanager
@@ -375,7 +376,6 @@ def convert_if_necessary(
 @click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
 @click.option("--dry", is_flag=True, help="Prepare file but do not really create the submission.")
-@wrap_root_and_api
 def push(
     message: str,
     main_file_path: str,
@@ -384,12 +384,15 @@ def push(
     no_pip_freeze: bool,
     dry: bool,
 ):
+    repository = _open_repository()
+
     if export_path is not None:
         print("--export is not supported anymore", file=sys.stderr)
         raise click.Abort()
 
     with convert_if_necessary(main_file_path):
         command.push(
+            repository=repository,
             message=message,
             main_file_path=main_file_path,
             model_directory_relative_path=model_directory_path,
@@ -428,12 +431,13 @@ def test(
 @click.option("--round-number", default="@current")
 @click.option("--force", is_flag=True, help="Force the download of the data.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
-@wrap_root_and_api
 def download(
     round_number: "RoundIdentifierType",
     force: bool,
     size_variant_raw: Optional[str],
 ):
+    repository = _open_repository()
+
     size_variant = (
         api.SizeVariant[size_variant_raw.upper()]
         if size_variant_raw is not None
@@ -442,6 +446,7 @@ def download(
 
     try:
         command.download(
+            repository,
             round_number,
             force,
             size_variant,
@@ -467,54 +472,59 @@ def convert(
     notebook_file_path: str,
     python_file_path: str,
 ):
-    try:
-        command.convert(
-            notebook_file_path=notebook_file_path,
-            python_file_path=python_file_path,
-            overwrite=overwrite,
-            write_requirements=requirements,
-            write_embedded_files=embedded_files,
-            no_freeze=no_freeze,
-            verbose=verbose,
-        )
-    except api.ApiException as error:
-        utils.exit_via(error)
+    command.convert(
+        notebook_file_path=notebook_file_path,
+        python_file_path=python_file_path,
+        overwrite=overwrite,
+        write_requirements=requirements,
+        write_embedded_files=embedded_files,
+        no_freeze=no_freeze,
+        verbose=verbose,
+    )
 
 
 @cli.command(help="Update a project token.")
 @click.argument("clone-token", required=False)
-@wrap_root_and_api
 def update_token(
     clone_token: str,
 ):
     if not clone_token:
         clone_token = click.prompt("Clone Token", hide_input=True)
 
+    repository = _open_repository()
+
     command.update_token(
+        repository,
         clone_token=clone_token
     )
 
 
 @cli.command(help="Show information on the competition.")
-@wrap_root_and_api
 def status():
+    repository = _open_repository()
+
     command.status(
+        repository,
         show_tips=show_tips,
     )
 
 
 @cli.command(help="Show the project's rank on the leaderboard.")
-@wrap_root_and_api
 def leaderboard():
+    repository = _open_repository()
+
     command.leaderboard(
+        repository,
         show_tips=show_tips,
     )
 
 
 @cli.command(help="Show the project's quota.")
-@wrap_root_and_api
 def quota():
+    repository = _open_repository()
+
     command.quota(
+        repository,
         show_tips=show_tips,
     )
 
@@ -525,20 +535,24 @@ def quickstarter_group():
 
 
 @quickstarter_group.command(name="list", help="List available quickstarters.")
-@wrap_root_and_api
 def quickstarter_list():
+    repository = _open_repository()
+
     command.quickstarter_list(
+        repository,
         show_tips=show_tips,
     )
 
 
 @quickstarter_group.command(name="show", help="Show a quickstarter.")
 @click.argument("quickstarter_name", required=True)
-@wrap_root_and_api
 def quickstarter_show(
     quickstarter_name: str,
 ):
+    repository = _open_repository()
+
     command.quickstarter_show(
+        repository,
         quickstarter_name=quickstarter_name,
         show_tips=show_tips,
     )
@@ -547,12 +561,14 @@ def quickstarter_show(
 @quickstarter_group.command(name="apply", help="Download a quickstarter locally.")
 @click.argument("quickstarter_name", required=True)
 @click.option("--overwrite", is_flag=True)
-@wrap_root_and_api
 def quickstarter_apply(
     quickstarter_name: str,
     overwrite: bool,
 ):
+    repository = _open_repository()
+
     command.quickstarter_apply(
+        repository,
         quickstarter_name=quickstarter_name,
         overwrite=overwrite,
         show_tips=show_tips,
@@ -567,12 +583,14 @@ def submission_group():
 @submission_group.command(name="list", help="List submissions.")
 @click.option("--limit", type=int, default=10)
 @click.option("--all", is_flag=True)
-@wrap_root_and_api
 def submission_list(
     limit: int,
     all: bool,
 ):
+    repository = _open_repository()
+
     command.submission_list(
+        repository,
         limit=limit if not all else None,
         show_tips=show_tips,
     )
@@ -580,11 +598,13 @@ def submission_list(
 
 @submission_group.command(name="show", help="Show a submission.")
 @click.argument("submission", type=SubmissionIdentifierClickType(), required=True)
-@wrap_root_and_api
 def submission_show(
     submission: "SubmissionIdentifierType",
 ):
+    repository = _open_repository()
+
     command.submission_show(
+        repository,
         submission_identifier=submission,
         show_tips=show_tips,
     )
@@ -597,11 +617,13 @@ def runtime_group():
 
 @runtime_group.command(name="list", help="List runtimes.")
 @click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
-@wrap_root_and_api
 def runtime_list(
     submission: "SubmissionIdentifierType",
 ):
+    repository = _open_repository()
+
     command.runtime_list(
+        repository,
         submission_identifier=submission,
         show_tips=show_tips,
     )
@@ -611,13 +633,15 @@ def runtime_list(
 @click.argument("runtime", type=str, required=True)
 @click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
 @click.option("--justification", type=str, required=True)
-@wrap_root_and_api
 def runtime_request(
     runtime: str,
     submission: "SubmissionIdentifierType",
     justification: str,
 ):
+    repository = _open_repository()
+
     command.runtime_request(
+        repository,
         runtime_option_name=runtime,
         submission_identifier=submission,
         justification=justification,
@@ -635,14 +659,16 @@ def run_group():
 @click.option("--train-frequency", type=int, required=False)
 @click.option("--force-first-train", type=bool, required=False)
 @click.option("--runtime", type=str, required=True)
-@wrap_root_and_api
 def run_create(
     submission: "SubmissionIdentifierType",
     train_frequency: Optional[int],
     force_first_train: Optional[bool],
     runtime: str,
 ):
+    repository = _open_repository()
+
     command.run_create(
+        repository,
         submission_identifier=submission,
         train_frequency=train_frequency,
         force_first_train=force_first_train,
@@ -654,9 +680,11 @@ def run_create(
 @run_group.command(name="list", help="List runs.")
 @click.option("--limit", type=int, default=10)
 @click.option("--all", is_flag=True)
-@wrap_root_and_api
 def run_list(limit: int, all: bool):
+    repository = _open_repository()
+
     command.run_list(
+        repository,
         limit=limit if not all else None,
         show_tips=show_tips,
     )
@@ -664,9 +692,11 @@ def run_list(limit: int, all: bool):
 
 @run_group.command(name="show", help="Show a run.")
 @click.argument("run_id", type=int, required=True)
-@wrap_root_and_api
 def run_show(run_id: int):
+    repository = _open_repository()
+
     command.run_show(
+        repository,
         run_id=run_id,
         show_tips=show_tips,
     )
@@ -677,9 +707,11 @@ def run_show(run_id: int):
 @click.option("--follow", is_flag=True)
 @click.option("--debug", is_flag=True)
 @click.argument("run_id", type=int, required=True)
-@wrap_root_and_api
 def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
+    repository = _open_repository()
+
     command.run_logs(
+        repository,
         run_id=run_id,
         tail=tail,
         follow=follow,
@@ -692,9 +724,11 @@ def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
 @click.option("--timeout", type=int, required=False)
 @click.option("--poll-interval", type=int, default=10)
 @click.argument("run_id", type=int, required=True)
-@wrap_root_and_api
 def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
+    repository = _open_repository()
+
     exit(command.run_wait(
+        repository,
         run_id=run_id,
         timeout=timeout,
         poll_interval=poll_interval,
@@ -704,9 +738,11 @@ def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
 
 @run_group.command(name="select", help="Select a run for the Out-of-Sample.")
 @click.argument("run_id", type=int, required=True)
-@wrap_root_and_api
 def run_select(run_id: int):
+    repository = _open_repository()
+
     command.run_select(
+        repository,
         run_id=run_id,
         show_tips=show_tips,
     )
@@ -714,9 +750,11 @@ def run_select(run_id: int):
 
 @run_group.command(name="terminate", help="Terminate a run.")
 @click.argument("run_id", type=int, required=True)
-@wrap_root_and_api
 def run_terminate(run_id: int):
+    repository = _open_repository()
+
     command.run_terminate(
+        repository,
         run_id=run_id,
         show_tips=show_tips,
     )
@@ -773,7 +811,6 @@ def whitelist_validate(
 @click.option("--language", type=ProgrammingLanguageClickType())
 @click.option("--gpu", "gpu_requirement", type=GpuRequirementClickType())
 @click.option("--additional-details", type=str)
-@wrap_root_and_api
 def whitelist_request(
     name: Optional[str],
     alias: Optional[str],
@@ -784,7 +821,10 @@ def whitelist_request(
     if not name and not alias:
         raise click.UsageError("at least one of `--name` or `--alias` must be provided")
 
+    repository = _open_repository()
+
     command.whitelist_request(
+        repository,
         name=name,
         alias=alias,
         language=language,
@@ -801,19 +841,19 @@ def runner_group():
 
 @runner_group.command(help="Run your code locally.")
 @local_options
-@wrap_root_and_api
 def local(
     main_file_path: str,
     model_directory_path: str,
     no_force_first_train: bool,
     train_frequency: int,
     skip_library_check: bool,
-    round_number: str,
+    round_number: RoundIdentifierType,
     has_gpu: bool,
     no_determinism_check: Optional[bool],
 ):
     from . import library, tester
 
+    repository = _open_repository()
     tester.install_logger()
 
     if not skip_library_check and os.path.exists(constants.REQUIREMENTS_TXT):
@@ -826,9 +866,9 @@ def local(
 
     with convert_if_necessary(main_file_path):
         command.test(
+            repository,
             main_file_path,
             model_directory_path,
-            constants.DOT_PREDICTION_DIRECTORY,
             not no_force_first_train,
             train_frequency,
             round_number,
@@ -1034,16 +1074,11 @@ def organize_group(
     context: click.Context,
     competition_name: str,
 ):
+    _remember_competition_name(competition_name)
+
     client = api.Client.from_env()
 
-    try:
-        competition = client.competitions.get(competition_name)
-    except api.CompetitionNameNotFoundException:
-        print(f"competition {competition_name} not found", file=sys.stderr)
-        raise click.Abort()
-    except api.ApiException as error:
-        utils.exit_via(error)
-
+    competition = client.competitions.get(competition_name)
     context.obj = competition
 
 

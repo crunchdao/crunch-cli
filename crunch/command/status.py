@@ -1,11 +1,13 @@
 from crunch.command._common import get_project, reformat_datetime
+from crunch.repository import Repository
 
 
 def status(
+    repository: Repository,
     *,
     show_tips: bool = True,
 ):
-    project = get_project()
+    project = get_project(repository)
     competition = project.competition
 
     print(f"competition:")

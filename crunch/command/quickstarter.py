@@ -5,14 +5,16 @@ import click
 
 from crunch.api import Quickstarter, QuickstarterNotFoundException
 from crunch.command._common import get_project
+from crunch.repository import Repository
 from crunch.utils import ascii_table, download
 
 
 def quickstarter_list(
+    repository: Repository,
     *,
     show_tips: bool = False,
 ):
-    project = get_project()
+    project = get_project(repository)
     quickstarters = project.competition.quickstarters.list()
 
     rows: List[Sequence[Any]] = []
@@ -40,11 +42,12 @@ def quickstarter_list(
 
 
 def quickstarter_show(
+    repository: Repository,
     *,
     quickstarter_name: str,
     show_tips: bool = False,
 ):
-    quickstarter = _get_quickstarter(quickstarter_name)
+    quickstarter = _get_quickstarter(repository, quickstarter_name)
 
     print("quickstarter:")
     print(f"  name: {quickstarter.name}")
@@ -65,12 +68,13 @@ def quickstarter_show(
 
 
 def quickstarter_apply(
+    repository: Repository,
     *,
     quickstarter_name: str,
     overwrite: bool = False,
     show_tips: bool = False,
 ):
-    quickstarter = _get_quickstarter(quickstarter_name)
+    quickstarter = _get_quickstarter(repository, quickstarter_name)
 
     files = quickstarter.files
 
@@ -90,9 +94,9 @@ def quickstarter_apply(
         print(f"  - This quickstarter is a notebook, to convert to a main.py, you can do `crunch convert {files[0].name}`, but it only useful for people that want to work with python files as the documentation will be excluded.")
 
 
-def _get_quickstarter(name: str):
+def _get_quickstarter(repository: Repository, name: str):
     try:
-        return get_project().competition.quickstarters.get(name)
+        return get_project(repository).competition.quickstarters.get(name)
     except QuickstarterNotFoundException:
         print(f"quickstarter: not found: {name}")
         raise click.Abort()
