@@ -19,7 +19,10 @@ def quota(
     print(f"  code files: {format_size(submit.code_files.total_size, binary=True)}")
     print(f"  model files: {format_size(submit.model_files.total_size, binary=True)}")
     print(f"  prediction files: {format_size(submit.prediction_file.total_size, binary=True)}")
-    print(f"  submissions per day: {submit.submissions_per_day.current}/{submit.submissions_per_day.maximum}")
+
+    submissions_per_day = submit.submissions_per_day
+    remaining_text = "blocked" if submissions_per_day.current > submissions_per_day.maximum else f"{submissions_per_day.maximum - submissions_per_day.current} remaining"
+    print(f"  submissions per day: {submissions_per_day.current}/{submissions_per_day.maximum} ({remaining_text} for today)")
 
     print()
     print("compute quota:")
