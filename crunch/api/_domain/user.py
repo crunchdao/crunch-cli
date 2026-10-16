@@ -1,12 +1,16 @@
-import typing
+from typing import TYPE_CHECKING, List
 
-from .._identifiers import CompetitionIdentifierType
-from .._resource import Collection, Model
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
+    from crunch.api._identifiers import CompetitionIdentifierType
 
 
-class User(Model):
+class User(Model[int]):
 
-    resource_identifier_attribute = "login"
+    @property
+    def resource_identifier(self) -> str:
+        return self.login
 
     @property
     def login(self):
@@ -17,16 +21,13 @@ class UserCollection(Collection[User]):
 
     model = User
 
-    def __iter__(self) -> typing.Iterator[User]:
-        return super().__iter__()
-
     def get(
         self,
-        id_or_login: CompetitionIdentifierType
+        identifier: "CompetitionIdentifierType"
     ) -> User:
         return self.prepare_model(
-            self._client.api.get_user(
-                id_or_login
+            self._checked_client.api.get_user(
+                identifier
             )
         )
 
@@ -39,13 +40,13 @@ class UserCollection(Collection[User]):
 
     def list(
         self
-    ) -> typing.List[User]:
+    ) -> List[User]:
         return self.prepare_models(
-            self._client.api.list_users()
+            self._checked_client.api.list_users()
         )
 
 
-class UserEndpointMixin:
+class UserEndpointMixin(EndpointMixin):
 
     def list_users(
         self
@@ -59,7 +60,7 @@ class UserEndpointMixin:
 
     def get_user(
         self,
-        identifier
+        identifier: "CompetitionIdentifierType"
     ):
         return self._result(
             self.get(

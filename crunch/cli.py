@@ -1,14 +1,16 @@
-import contextlib
 import functools
 import json
 import os
 import sys
-from typing import Any, Callable, List, Optional
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence
 
 import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
 from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumberType
+from crunch.command.submission import SubmissionIdentifierClickType
+from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
 from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
@@ -16,6 +18,11 @@ from crunch.unstructured.cli import organize_test_group
 from . import __version__, api, command, constants, store
 
 store.load_from_env()
+
+if TYPE_CHECKING:
+    from crunch_convert import RequirementLanguage
+
+    from crunch.api import GpuRequirement, SubmissionIdentifierType
 
 
 DIRECTORY_DEFAULT_FORMAT = "{competitionName}-{projectName}"
@@ -57,6 +64,9 @@ def _echo_version():
     click.echo(f"{__version__.__title__}, version {__version__.__version__}")
 
 
+show_tips: bool = False
+
+
 def _open_repository() -> Repository:
     repository = Repository.open()
 
@@ -94,12 +104,14 @@ class _CliGroup(click.Group):
 @click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_PRODUCTION, help="Set the Web base url.")
 @click.option("--competitions", "competitions_source", envvar=constants.COMPETITIONS_SOURCE_ENV_VAR, default=constants.COMPETITIONS_SOURCE_DEFAULT, help="Set the Competitions repository location.")
 @click.option("--environment", "--env", "environment_name", envvar=constants.ENVIRONMENT_ENV_VAR, help="Connect to another environment.")
+@click.option("--no-tips", is_flag=True, help="Disable tips.")
 def cli(
     debug: bool,
     api_base_url: str,
     web_base_url: str,
     competitions_source: str,
     environment_name: str,
+    no_tips: bool,
 ):
     constants.RUN_VIA_CLI = True
 
@@ -107,6 +119,9 @@ def cli(
     store.api_base_url = api_base_url
     store.web_base_url = web_base_url
     store.competitions_source = competitions_source
+
+    global show_tips
+    show_tips = not no_tips
 
     environment_name = ENVIRONMENT_ALIASES.get(environment_name) or environment_name
     if environment_name in ENVIRONMENTS:
@@ -214,14 +229,11 @@ def init(
 
 @cli.command(help="Setup a workspace directory.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
-@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scratch" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
-@click.option("--no-quickstarter", is_flag=True, help="Disable quickstarter selection.")
-@click.option("--quickstarter-name", type=str, help="Pre-select a quickstarter.")
-@click.option("--show-notebook-quickstarters", is_flag=True, help="Show quickstarters notebook in selection.")
 @click.option("--notebook", is_flag=True, help="Setup everything for a notebook environment.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
@@ -237,9 +249,6 @@ def setup(
     project_name: str,
     directory: str,
     model_directory_path: str,
-    no_quickstarter: bool,
-    quickstarter_name: Optional[str],
-    show_notebook_quickstarters: bool,
     notebook: bool,
     data_size_variant_raw: str,
 ):
@@ -250,22 +259,10 @@ def setup(
         if force:
             print("notebook `--force` is implicit", file=sys.stderr)
 
-        if no_quickstarter:
-            print("notebook `--no-quickstarter` is implicit", file=sys.stderr)
-
-        if quickstarter_name:
-            print("notebook `--quickstarter-name` is incompatible, ignoring it", file=sys.stderr)
-            quickstarter_name = None
-
-        if show_notebook_quickstarters:
-            print("notebook `--show-notebook-quickstarters` is incompatible, ignoring it", file=sys.stderr)
-            show_notebook_quickstarters = False
-
         if directory != DIRECTORY_DEFAULT_FORMAT:
             print("notebook `[directory]` is forced to '.'", file=sys.stderr)
 
         force = True
-        no_quickstarter = True
         directory = "."
     else:
         directory = _format_directory(directory, competition_name, project_name)
@@ -280,9 +277,6 @@ def setup(
             model_directory_path,
             force,
             no_model,
-            not no_quickstarter,
-            quickstarter_name,
-            show_notebook_quickstarters,
             data_size_variant,
         )
 
@@ -302,7 +296,7 @@ def setup(
 
 
 @cli.command(help="Setup a notebook workspace.")
-@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scratch" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
@@ -349,28 +343,7 @@ def setup_notebook(
     print(f"4. Download and submit your code to the platform!")
 
 
-@cli.command(help="Setup a workspace directory with the latest submission of you code.")
-@click.option("--name", type=str, help="Pre-select a quickstarter.")
-@click.option("--show-notebook", is_flag=True, help="Show quickstarters notebook in selection.")
-@click.option("--overwrite", is_flag=True, help="Overwrite any files that are conflicting.")
-def quickstarter(
-    name: str,
-    show_notebook: bool,
-    overwrite: bool,
-):
-    repository = _open_repository()
-
-    command.quickstarter(
-        repository,
-        name=name,
-        show_notebook=show_notebook,
-        overwrite=overwrite,
-    )
-
-    print(f"quickstarter deployed")
-
-
-@contextlib.contextmanager
+@contextmanager
 def convert_if_necessary(
     main_file_path: str
 ):
@@ -458,7 +431,7 @@ def test(
 @click.option("--force", is_flag=True, help="Force the download of the data.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
 def download(
-    round_number: RoundIdentifierType,
+    round_number: "RoundIdentifierType",
     force: bool,
     size_variant_raw: Optional[str],
 ):
@@ -482,7 +455,7 @@ def download(
 
 
 @cli.command(help="Convert a notebook to a python script.")
-@click.option("--override", is_flag=True, help="Force overwrite of the python file.")
+@click.option("--overwrite", is_flag=True, help="Force overwrite of the python file.")
 @click.option("--requirements", is_flag=True, help="Also export the `requirements.txt` file.")
 @click.option("--embedded-files", is_flag=True, help="Also export the embedded files.")
 @click.option("--no-freeze", is_flag=True, help="Don't freeze the requirements with locally installed versions.")
@@ -490,7 +463,7 @@ def download(
 @click.argument("notebook-file-path", required=True)
 @click.argument("python-file-path", default="main.py")
 def convert(
-    override: bool,
+    overwrite: bool,
     requirements: bool,
     embedded_files: bool,
     no_freeze: bool,
@@ -501,7 +474,7 @@ def convert(
     command.convert(
         notebook_file_path=notebook_file_path,
         python_file_path=python_file_path,
-        override=override,
+        overwrite=overwrite,
         write_requirements=requirements,
         write_embedded_files=embedded_files,
         no_freeze=no_freeze,
@@ -522,6 +495,364 @@ def update_token(
     command.update_token(
         repository,
         clone_token=clone_token
+    )
+
+
+@cli.command(help="Show information on the competition.")
+def status():
+    repository = _open_repository()
+
+    command.status(
+        repository,
+        show_tips=show_tips,
+    )
+
+
+@cli.command(help="Show the project's rank on the leaderboard.")
+def leaderboard():
+    repository = _open_repository()
+
+    command.leaderboard(
+        repository,
+        show_tips=show_tips,
+    )
+
+
+@cli.command(help="Show the project's quota.")
+def quota():
+    repository = _open_repository()
+
+    command.quota(
+        repository,
+        show_tips=show_tips,
+    )
+
+
+@cli.group(name="quickstarter", help="Manage quickstarters.")
+def quickstarter_group():
+    pass
+
+
+@quickstarter_group.command(name="list", help="List available quickstarters.")
+def quickstarter_list():
+    repository = _open_repository()
+
+    command.quickstarter_list(
+        repository,
+        show_tips=show_tips,
+    )
+
+
+@quickstarter_group.command(name="show", help="Show a quickstarter.")
+@click.argument("quickstarter_name", required=True)
+def quickstarter_show(
+    quickstarter_name: str,
+):
+    repository = _open_repository()
+
+    command.quickstarter_show(
+        repository,
+        quickstarter_name=quickstarter_name,
+        show_tips=show_tips,
+    )
+
+
+@quickstarter_group.command(name="apply", help="Download a quickstarter locally.")
+@click.argument("quickstarter_name", required=True)
+@click.option("--overwrite", is_flag=True)
+def quickstarter_apply(
+    quickstarter_name: str,
+    overwrite: bool,
+):
+    repository = _open_repository()
+
+    command.quickstarter_apply(
+        repository,
+        quickstarter_name=quickstarter_name,
+        overwrite=overwrite,
+        show_tips=show_tips,
+    )
+
+
+@cli.group(name="submission", help="Manage submissions.")
+def submission_group():
+    pass
+
+
+@submission_group.command(name="list", help="List submissions.")
+@click.option("--limit", type=int, default=10)
+@click.option("--all", is_flag=True)
+def submission_list(
+    limit: int,
+    all: bool,
+):
+    repository = _open_repository()
+
+    command.submission_list(
+        repository,
+        limit=limit if not all else None,
+        show_tips=show_tips,
+    )
+
+
+@submission_group.command(name="show", help="Show a submission.")
+@click.argument("submission", type=SubmissionIdentifierClickType(), required=True)
+def submission_show(
+    submission: "SubmissionIdentifierType",
+):
+    repository = _open_repository()
+
+    command.submission_show(
+        repository,
+        submission_identifier=submission,
+        show_tips=show_tips,
+    )
+
+
+@submission_group.command(name="checkout", help="Check out files (or everything) from a submission.")
+@click.argument("submission", type=SubmissionIdentifierClickType())
+@click.argument("files", nargs=-1)
+def submission_checkout(
+    submission: "SubmissionIdentifierType",
+    files: Sequence[str],
+):
+    # resolve before chdir
+    absolute_files = [
+        os.path.abspath(file)
+        for file in files
+    ]
+
+    repository = _open_repository()
+
+    command.submission_checkout(
+        repository,
+        submission_identifier=submission,
+        files=absolute_files if len(absolute_files) else None,
+        show_tips=show_tips,
+    )
+
+
+@cli.group(name="runtime", help="Manage runtimes.")
+def runtime_group():
+    pass
+
+
+@runtime_group.command(name="list", help="List runtimes.")
+@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
+def runtime_list(
+    submission: "SubmissionIdentifierType",
+):
+    repository = _open_repository()
+
+    command.runtime_list(
+        repository,
+        submission_identifier=submission,
+        show_tips=show_tips,
+    )
+
+
+@runtime_group.command(name="request", help="Request a runtime option.")
+@click.argument("runtime", type=str, required=True)
+@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
+@click.option("--justification", type=str, required=True)
+def runtime_request(
+    runtime: str,
+    submission: "SubmissionIdentifierType",
+    justification: str,
+):
+    repository = _open_repository()
+
+    command.runtime_request(
+        repository,
+        runtime_option_name=runtime,
+        submission_identifier=submission,
+        justification=justification,
+        show_tips=show_tips,
+    )
+
+
+@cli.group(name="run", help="Manage runs.")
+def run_group():
+    pass
+
+
+@run_group.command(name="create", help="Create a run.")
+@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
+@click.option("--train-frequency", type=int, required=False)
+@click.option("--force-first-train", type=bool, required=False)
+@click.option("--runtime", type=str, required=True)
+def run_create(
+    submission: "SubmissionIdentifierType",
+    train_frequency: Optional[int],
+    force_first_train: Optional[bool],
+    runtime: str,
+):
+    repository = _open_repository()
+
+    command.run_create(
+        repository,
+        submission_identifier=submission,
+        train_frequency=train_frequency,
+        force_first_train=force_first_train,
+        runtime_definition_name=runtime,
+        show_tips=show_tips,
+    )
+
+
+@run_group.command(name="list", help="List runs.")
+@click.option("--limit", type=int, default=10)
+@click.option("--all", is_flag=True)
+def run_list(limit: int, all: bool):
+    repository = _open_repository()
+
+    command.run_list(
+        repository,
+        limit=limit if not all else None,
+        show_tips=show_tips,
+    )
+
+
+@run_group.command(name="show", help="Show a run.")
+@click.argument("run_id", type=int, required=True)
+def run_show(run_id: int):
+    repository = _open_repository()
+
+    command.run_show(
+        repository,
+        run_id=run_id,
+        show_tips=show_tips,
+    )
+
+
+@run_group.command(name="logs", help="Show the logs of a run.")
+@click.option("-t", "--tail", type=int, required=False)
+@click.option("--follow", is_flag=True)
+@click.option("--debug", is_flag=True)
+@click.argument("run_id", type=int, required=True)
+def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
+    repository = _open_repository()
+
+    command.run_logs(
+        repository,
+        run_id=run_id,
+        tail=tail,
+        follow=follow,
+        debug=debug,
+        show_tips=show_tips,
+    )
+
+
+@run_group.command(name="wait", help="Wait for a run to complete. Exit code: 0 = succeeded, 1 = failed, 2 = timed out (still running), 3 = terminated.")
+@click.option("--timeout", type=int, required=False)
+@click.option("--poll-interval", type=int, default=10)
+@click.argument("run_id", type=int, required=True)
+def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
+    repository = _open_repository()
+
+    exit(command.run_wait(
+        repository,
+        run_id=run_id,
+        timeout=timeout,
+        poll_interval=poll_interval,
+        show_tips=show_tips,
+    ))
+
+
+@run_group.command(name="select", help="Select a run for the Out-of-Sample.")
+@click.argument("run_id", type=int, required=True)
+def run_select(run_id: int):
+    repository = _open_repository()
+
+    command.run_select(
+        repository,
+        run_id=run_id,
+        show_tips=show_tips,
+    )
+
+
+@run_group.command(name="terminate", help="Terminate a run.")
+@click.argument("run_id", type=int, required=True)
+def run_terminate(run_id: int):
+    repository = _open_repository()
+
+    command.run_terminate(
+        repository,
+        run_id=run_id,
+        show_tips=show_tips,
+    )
+
+
+@cli.group(name="whitelist", help="Manage whitelisted libraries.")
+def whitelist_group():
+    pass
+
+
+@whitelist_group.command(name="search", help="Search whitelisted libraries.")
+@click.option("--language", type=ProgrammingLanguageClickType())
+@click.argument("query", type=str, required=True)
+@click.option("--limit", type=int, default=10)
+@click.option("--all", is_flag=True)
+def whitelist_search(
+    query: str,
+    language: Optional["RequirementLanguage"],
+    limit: int,
+    all: bool,
+):
+    exit(command.whitelist_search(
+        query=query,
+        language=language,
+        limit=limit if not all else None,
+        show_tips=show_tips,
+    ))
+
+
+@whitelist_group.command(name="validate", help="Validate a requirements.txt file.")
+@click.option("--language", type=ProgrammingLanguageClickType())
+@click.argument("requirements_txt_file_path", type=str, required=False)
+def whitelist_validate(
+    requirements_txt_file_path: Optional[str],
+    language: Optional["RequirementLanguage"],
+):
+    if language is None:
+        from crunch_convert import RequirementLanguage
+        language = RequirementLanguage.PYTHON
+
+    if requirements_txt_file_path is None:
+        requirements_txt_file_path = language.txt_file_name
+
+    exit(command.whitelist_validate(
+        requirements_txt_file_path=requirements_txt_file_path,
+        language=language,
+        show_tips=show_tips,
+    ))
+
+
+@whitelist_group.command(name="request", help="Request a library to be whitelisted.")
+@click.option("--name", type=str)
+@click.option("--alias", type=str)
+@click.option("--language", type=ProgrammingLanguageClickType())
+@click.option("--gpu", "gpu_requirement", type=GpuRequirementClickType())
+@click.option("--additional-details", type=str)
+def whitelist_request(
+    name: Optional[str],
+    alias: Optional[str],
+    language: Optional["RequirementLanguage"],
+    gpu_requirement: Optional["GpuRequirement"],
+    additional_details: Optional[str],
+):
+    if not name and not alias:
+        raise click.UsageError("at least one of `--name` or `--alias` must be provided")
+
+    repository = _open_repository()
+
+    command.whitelist_request(
+        repository,
+        name=name,
+        alias=alias,
+        language=language,
+        gpu_requirement=gpu_requirement,
+        additional_details=additional_details,
+        show_tips=show_tips,
     )
 
 
@@ -638,7 +969,7 @@ def cloud(
 
     model_directory_path = os.path.join(code_directory, model_directory)
 
-    auth = api.auth.RunTokenAuth(run_token)
+    auth = api.Auth.run_token(run_token)
     client = api.Client.from_env(auth, show_progress=False)
 
     competition = client.competitions.get(competition_name)

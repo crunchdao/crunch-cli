@@ -1,26 +1,70 @@
-import datetime
-import enum
-import typing
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
-from .._resource import Collection, Model
-from .competition import Competition
-from .user import User
+from dataclasses_json import LetterCase, Undefined, dataclass_json
+
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
+    from crunch.api._client import Client
+    from crunch.api._domain.competition import Competition
+    from crunch.api._domain.user import User
+    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
+    from crunch.api._resource import JsonValue
+    from crunch.api._types import Attrs
 
 
-class Project(Model):
+@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
+@dataclass
+class FileLimit:
+    total_size: int
 
-    resource_identifier_attribute = ("userId", "name")
+
+@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
+@dataclass
+class CountLimit:
+    current: int
+    maximum: int
+    bypass: bool
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
+@dataclass
+class ProjectSubmitQuota:
+    code_files: FileLimit
+    model_files: FileLimit
+    notebook_file: FileLimit
+    prediction_file: FileLimit
+    submissions_per_day: CountLimit
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
+@dataclass
+class ProjectComputeQuota:
+    available: int
+    remaining: int
+    used: int
+    running: bool
+
+
+class Project(Model[int]):
 
     def __init__(
         self,
-        competition: Competition,
-        attrs=None,
-        client=None,
-        collection=None
+        competition: "Competition",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["ProjectCollection"] = None,
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
+
+    @property
+    def resource_identifier(self) -> Tuple[int, str]:
+        return (self.user_id, self.name)
 
     @property
     def competition(self):
@@ -35,12 +79,16 @@ class Project(Model):
         return self._attrs["name"]
 
     @property
-    def user(self) -> User:
-        return self._client.users.get(self.user_id)
+    def user(self) -> "User":
+        return self._checked_client.users.get(self.user_id)
+
+    @property
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["createdAt"])
 
     @property
     def submissions(self):
-        from .submission import SubmissionCollection
+        from crunch.api._domain.submission import SubmissionCollection
 
         return SubmissionCollection(
             project=self,
@@ -48,8 +96,17 @@ class Project(Model):
         )
 
     @property
+    def predictions(self):
+        from crunch.api._domain.prediction import PredictionCollection
+
+        return PredictionCollection(
+            project=self,
+            client=self._client
+        )
+
+    @property
     def runs(self):
-        from .run import RunCollection
+        from crunch.api._domain.run import RunCollection
 
         return RunCollection(
             project=self,
@@ -57,26 +114,127 @@ class Project(Model):
         )
 
     @property
-    def predictions(self):
-        from .prediction import PredictionCollection
+    def submit_quota(self) -> ProjectSubmitQuota:
+        return ProjectSubmitQuota.from_dict(  # type: ignore[attr-defined]
+            self._checked_client.api.get_project_submit_quota(
+                self.competition.id,
+                self.user_id,
+                self.name,
+            )
+        )
 
-        return PredictionCollection(
-            project=self,
-            client=self._client
+    @property
+    def compute_quota(self) -> ProjectComputeQuota:
+        return ProjectComputeQuota.from_dict(  # type: ignore[attr-defined]
+            self._checked_client.api.get_project_compute_quota(
+                self.competition.id,
+                self.user_id,
+                self.name,
+            )
+        )
+
+    @property
+    def selection(self) -> "ProjectSelection":
+        return ProjectSelection(
+            self,
+            cast("Attrs", self._checked_client.api.get_project_selection(
+                self.competition.id,
+                self.user_id,
+                self.name,
+            )),
+            client=self._client,
         )
 
     def clone(
         self,
-        submission_number: typing.Optional[int],
-        include_model: typing.Optional[bool],
-    ) -> typing.Dict[str, str]:
-        return self._client.api.clone_project(
+        submission_number: Optional[int],
+        include_model: Optional[bool],
+    ) -> Dict[str, str]:
+        return self._checked_client.api.clone_project(
             self.competition.id,
             self.user_id,
             self.name,
             submission_number,
             include_model,
-        )
+        )  # pyright: ignore[reportReturnType]
+
+
+class ProjectSelectionOrigin(Enum):
+
+    SELECTION = "SELECTION"
+    """Explicitly selected for the current round."""
+
+    PREVIOUS_ROUND = "PREVIOUS_ROUND"
+    """Carried over from the selection of the previous round."""
+
+    LAST_RUN = "LAST_RUN"
+    """Nothing selected, the last successful run is used by default."""
+
+    def __repr__(self):
+        return self.name
+
+
+class ProjectSelection(Model[None]):
+
+    def __init__(
+        self,
+        project: Project,
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+    ):
+        super().__init__(attrs=attrs, client=client)
+
+        self._project = project
+
+    def __repr__(self):
+        return f"ProjectSelection(run_id={self.run_id}, origin={self.origin!r})"
+
+    @property
+    def project(self):
+        return self._project
+
+    @property
+    def origin(self):
+        return ProjectSelectionOrigin[self._attrs["origin"]]
+
+    @property
+    def run_id(self) -> Optional[int]:
+        return self._attrs.get("runId")
+
+    @property
+    def run(self):
+        run_id = self.run_id
+        if run_id is None:
+            return None
+
+        return self._project.runs.get(run_id)
+
+    @property
+    def submission_number(self) -> Optional[int]:
+        submission = self._attrs.get("submission")
+        return submission["number"] if submission else None
+
+    @property
+    def train_frequency(self) -> Optional[int]:
+        return self._attrs.get("trainFrequency")
+
+    @property
+    def force_first_train(self) -> Optional[bool]:
+        return self._attrs.get("forceFirstTrain")
+
+    @property
+    def runnable(self) -> bool:
+        return bool(self._attrs.get("runnable"))
+
+    @property
+    def created_at(self) -> Optional[datetime]:
+        created_at = self._attrs.get("createdAt")
+        return datetime.fromisoformat(created_at) if created_at else None
+
+    @property
+    def updated_at(self) -> Optional[datetime]:
+        updated_at = self._attrs.get("updatedAt")
+        return datetime.fromisoformat(updated_at) if updated_at else None
 
 
 class ProjectCollection(Collection[Project]):
@@ -85,23 +243,20 @@ class ProjectCollection(Collection[Project]):
 
     def __init__(
         self,
-        competition: Competition,
-        client=None
+        competition: "Competition",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.competition = competition
 
-    def __iter__(self) -> typing.Iterator[Project]:
-        return super().__iter__()
-
     def get(
         self,
-        user_identifier: typing.Union[int, str] = "@me",
-        project_identifier: typing.Union[int, str, typing.Literal["@first"]] = "@first"
+        user_identifier: "UserIdentifierType" = "@me",
+        project_identifier: "ProjectIdentifierType" = "@first"
     ) -> Project:
         return self.prepare_model(
-            self._client.api.get_project(
+            self._checked_client.api.get_project(
                 self.competition.id,
                 user_identifier,
                 project_identifier
@@ -110,23 +265,24 @@ class ProjectCollection(Collection[Project]):
 
     def list(
         self,
-        user_identifier: typing.Union[int, str] = "@me",
-    ) -> typing.List[Project]:
+        user_identifier: Union[int, str] = "@me",
+    ) -> List[Project]:
         return self.prepare_models(
-            self._client.api.list_projects(
+            self._checked_client.api.list_projects(
                 self.competition.id,
                 user_identifier
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", Project], *args: Any):
         return super().prepare_model(
             attrs,
-            self.competition
+            self.competition,
+            *args
         )
 
 
-class ProjectTokenType(enum.Enum):
+class ProjectTokenType(Enum):
 
     TEMPORARY = "TEMPORARY"
     PERMANENT = "PERMANENT"
@@ -135,16 +291,16 @@ class ProjectTokenType(enum.Enum):
         return self.name
 
 
-class ProjectToken(Model):
+class ProjectToken(Model[int]):
 
     def __init__(
         self,
-        competition: typing.Optional[Competition],
-        attrs=None,
-        client=None,
-        collection=None
+        competition: Optional["Competition"],
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["ProjectTokenCollection"] = None,
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
 
@@ -153,14 +309,14 @@ class ProjectToken(Model):
         project_attrs = self._attrs["project"]
 
         competition_id = project_attrs["competitionId"]
-        competition = self._client.competitions.get(competition_id)
+        competition = self._checked_client.competitions.get(competition_id)
 
         return competition.projects.prepare_model(
             project_attrs
         )
 
     @property
-    def plain(self) -> str:
+    def plain(self) -> Optional[str]:
         return self._attrs.get("plain")
 
     @property
@@ -173,7 +329,7 @@ class ProjectToken(Model):
         if value is None:
             return None
 
-        return datetime.datetime.fromisoformat(value)
+        return datetime.fromisoformat(value)
 
 
 class ProjectTokenCollection(Collection[ProjectToken]):
@@ -182,8 +338,8 @@ class ProjectTokenCollection(Collection[ProjectToken]):
 
     def __init__(
         self,
-        competition: Competition,
-        client=None
+        competition: "Competition",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
@@ -193,46 +349,44 @@ class ProjectTokenCollection(Collection[ProjectToken]):
         self,
         clone_token: str
     ) -> ProjectToken:
-        response = self._client.api.upgrade_project_token(
-            clone_token
-        )
-
         return self.prepare_model(
-            response,
+            self._checked_client.api.upgrade_project_token(
+                clone_token
+            ),
             self.competition
         )
 
 
-class ProjectEndpointMixin:
+class ProjectEndpointMixin(EndpointMixin):
 
     def get_project(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType"
     ):
         return self._result(
             self.get(
                 f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}"
             ),
-            json=True
+            json=True,
         )
 
     def list_projects(
         self,
-        competition_identifier,
-        user_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
     ):
         return self._result(
             self.get(
                 f"/v3/competitions/{competition_identifier}/projects/{user_identifier}"
             ),
-            json=True
+            json=True,
         )
 
     def upgrade_project_token(
         self,
-        clone_token
+        clone_token: str,
     ):
         return self._result(
             self.post(
@@ -246,13 +400,13 @@ class ProjectEndpointMixin:
 
     def clone_project(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier,
-        submission_number,
-        include_model,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+        submission_number: Optional[int],
+        include_model: Optional[bool],
     ):
-        params = {}
+        params: Dict[str, Any] = {}
 
         if submission_number is not None:
             params["submissionNumber"] = submission_number
@@ -265,5 +419,44 @@ class ProjectEndpointMixin:
                 f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/clone",
                 params=params
             ),
-            json=True
+            json=True,
+        )
+
+    def get_project_submit_quota(
+        self,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+    ):
+        return self._result(
+            self.get(
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/quota/submit",
+            ),
+            json=True,
+        )
+
+    def get_project_compute_quota(
+        self,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+    ):
+        return self._result(
+            self.get(
+                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/quota/compute",
+            ),
+            json=True,
+        )
+
+    def get_project_selection(
+        self,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+    ):
+        return self._result(
+            self.get(
+                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/selection",
+            ),
+            json=True,
         )

@@ -1,23 +1,31 @@
-import typing
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
-from .._resource import Collection, Model
-from .submission import Submission
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
+    from crunch.api._client import Client
+    from crunch.api._domain.submission import Submission
+    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
+    from crunch.api._resource import JsonValue
+    from crunch.api._types import Attrs
 
 
-class SubmissionFile(Model):
-
-    resource_identifier_attribute = "name"
+class SubmissionFile(Model[int]):
 
     def __init__(
         self,
-        submission: Submission,
-        attrs=None,
-        client=None,
-        collection=None
+        submission: "Submission",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["SubmissionFileCollection"] = None
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._submission = submission
+
+    @property
+    def resource_identifier(self) -> str:
+        return self.name
 
     @property
     def submission(self):
@@ -46,25 +54,22 @@ class SubmissionFileCollection(Collection[SubmissionFile]):
 
     def __init__(
         self,
-        submission: Submission,
-        client=None
+        submission: "Submission",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.submission = submission
 
-    def __iter__(self) -> typing.Iterator[SubmissionFile]:
-        return super().__iter__()
-
     def list(
         self
-    ) -> typing.List[SubmissionFile]:
+    ) -> List[SubmissionFile]:
         from_attrs = self.submission._attrs.get("files")
         if from_attrs:
             return self.prepare_models(from_attrs)
 
         return self.prepare_models(
-            self._client.api.list_submission_files(
+            self._checked_client.api.list_submission_files(
                 self.submission.project.competition.id,
                 self.submission.project.user_id,
                 self.submission.project.name,
@@ -72,21 +77,22 @@ class SubmissionFileCollection(Collection[SubmissionFile]):
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", SubmissionFile], *args: Any) -> SubmissionFile:
         return super().prepare_model(
             attrs,
-            self.submission
+            self.submission,
+            *args
         )
 
 
-class SubmissionFileEndpointMixin:
+class SubmissionFileEndpointMixin(EndpointMixin):
 
     def list_submission_files(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier,
-        submission_number,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+        submission_number: int,
     ):
         return self._result(
             self.get(

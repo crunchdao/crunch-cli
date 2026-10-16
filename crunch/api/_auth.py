@@ -1,102 +1,46 @@
-import re
-from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from enum import Enum
 
 
-class Auth(ABC):
+class AuthorizationScheme(Enum):
 
-    @abstractmethod
-    def apply(
-        self,
-        headers: Dict[str, str],
-        params: Dict[str, str],
-        data: Optional[Dict[str, str]],
-    ):
-        ...
+    BEARER = "Bearer"
+    API_KEY = "API-Key"
+    PROJECT_TOKEN = "Project-Token"
+    RUN_TOKEN = "Run-Token"
 
-    def strip(
-        self,
-        error_message: str,
-    ) -> Optional[str]:
-        return error_message
+    def __repr__(self):
+        return self.name
 
 
-class NoneAuth(Auth):
-
-    def apply(
-        self,
-        headers: Dict[str, str],
-        params: Dict[str, str],
-        data: Optional[Dict[str, str]],
-    ):
-        pass
-
-
-class ApiKeyAuth(Auth):
+class Auth:
 
     def __init__(
         self,
-        key: str
+        scheme: AuthorizationScheme,
+        token: str,
     ):
-        super().__init__()
-
-        self._key = key
-
-    def apply(
-        self,
-        headers: Dict[str, str],
-        params: Dict[str, str],
-        data: Optional[Dict[str, str]],
-    ):
-        headers["Authorization"] = f"API-Key {self._key}"
-
-
-class PushTokenAuth(Auth):
-
-    def __init__(
-        self,
-        token: str
-    ):
-        super().__init__()
-
+        self.scheme = scheme
         self._token = token
 
-    def apply(
-        self,
-        headers: Dict[str, str],
-        params: Dict[str, str],
-        data: Optional[Dict[str, str]],
-    ):
-        if data is not None:
-            data["pushToken"] = self._token
-        else:
-            params["pushToken"] = self._token
+    @property
+    def header_value(self) -> str:
+        return f"{self.scheme.value} {self._token}"
 
-    def strip(
-        self,
-        error_message: str,
-    ):
-        return re.sub(
-            r"pushToken=\w+",
-            "pushToken=HIDDEN",
-            error_message
-        )
+    def __repr__(self):
+        return f"Auth(scheme={self.scheme!r})"
 
+    @staticmethod
+    def bearer(token: str):
+        return Auth(AuthorizationScheme.BEARER, token)
 
-class RunTokenAuth(Auth):
+    @staticmethod
+    def api_key(key: str):
+        return Auth(AuthorizationScheme.API_KEY, key)
 
-    def __init__(
-        self,
-        token: str
-    ):
-        super().__init__()
+    @staticmethod
+    def project_token(token: str):
+        return Auth(AuthorizationScheme.PROJECT_TOKEN, token)
 
-        self._token = token
-
-    def apply(
-        self,
-        headers: Dict[str, str],
-        params: Dict[str, str],
-        data: Optional[Dict[str, str]],
-    ):
-        headers["X-Run-Token"] = self._token
+    @staticmethod
+    def run_token(token: str):
+        return Auth(AuthorizationScheme.RUN_TOKEN, token)

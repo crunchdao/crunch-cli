@@ -5,7 +5,7 @@ def convert(
     notebook_file_path: str,
     python_file_path: str,
     *,
-    override: bool = False,
+    overwrite: bool = False,
     write_requirements: bool = False,
     write_embedded_files: bool = False,
     no_freeze: bool = False,
@@ -15,7 +15,7 @@ def convert(
 
     options: List[str] = []
 
-    if override:
+    if overwrite:
         options.append("--override")
 
     if write_requirements:

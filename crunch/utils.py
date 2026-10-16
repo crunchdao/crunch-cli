@@ -6,7 +6,7 @@ import shutil
 import time
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
-from typing import Any, BinaryIO, Callable, Dict, Generic, Iterable, List, Optional, Set, Type, TypeVar, Union, cast
+from typing import Any, BinaryIO, Callable, Dict, Generic, Iterable, List, Optional, Sequence, Set, Type, TypeVar, Union, cast
 
 import requests
 from tqdm.auto import tqdm
@@ -370,6 +370,22 @@ def is_running_inside_notebook():
         return False
 
 
+def to_unix_path(input: str):
+    if input == ".":
+        return input + "/"
+
+    has_trailing_slash = input.endswith(("/", "\\"))
+
+    input = os.path.normpath(input)\
+        .replace("\\", "/")\
+        .replace("//", "/")
+
+    if has_trailing_slash and not input.endswith("/"):
+        input += "/"
+
+    return input
+
+
 def build_user_agent() -> str:
     import platform
     import sys
@@ -380,3 +396,49 @@ def build_user_agent() -> str:
     os_name = platform.system()  # "Linux", "Darwin", "Windows"
 
     return f"crunch-cli/{crunch_version} (Python/{python_version}; {os_name})"
+
+
+def ascii_table(
+    *,
+    headers: Sequence[str],
+    values: List[Sequence[Any]],
+    spacing: int = 3,
+):
+    rows = [
+        list(map(str, row))
+        for row in values
+    ]
+
+    header_liness = [
+        header.split("\n")
+        for header in headers
+    ]
+
+    max_header_lines_count = max(len(header_lines) for header_lines in header_liness)
+    for _ in range(max_header_lines_count):
+        rows.insert(0, [""] * len(headers))
+
+    for index, header_lines in enumerate(header_liness):
+        for line_index, line in enumerate(header_lines):
+            # Headers are lists, so they are indexable and mutable.
+            rows[line_index][index] = line  # pyright: ignore[reportIndexIssue]
+
+    max_length_per_columns = [
+        max((len(row[index]) for row in rows))
+        for index in range(len(rows[0]))
+    ]
+
+    separators = [
+        "-" * (max_length_per_columns[index])
+        for index in range(len(max_length_per_columns))
+    ]
+    rows.insert(max_header_lines_count, separators)
+
+    for index, row in enumerate(rows):
+        print("  ", end="")
+
+        for column_index, value in enumerate(row):
+            width = max_length_per_columns[column_index] + spacing
+            print(value.ljust(width), end="")
+
+        print()

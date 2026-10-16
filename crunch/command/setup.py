@@ -13,6 +13,9 @@ SetupSubmissionNumberType = Union[int, Literal["latest", "scratch"]]
 class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "number"
 
+    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+        return "[latest|scratch|<number>]"
+
     def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> SetupSubmissionNumberType:
         if "latest" == value:
             return "latest"
@@ -37,9 +40,6 @@ def setup(
     model_directory: str,
     force: bool,
     no_model: bool,
-    show_quickstarters: bool,
-    quickstarter_name: Optional[str],
-    show_notebook_quickstarters: bool,
     data_size_variant: api.SizeVariant,
 ) -> Repository:
     repository = command.init(
@@ -53,7 +53,7 @@ def setup(
     _, project = repository.create_client()
 
     if submission_number == "scratch":
-        print(f"you decided to start from scratch, previous submission will not be downloaded")
+        print(f"setup: you decided to start from scratch, previous submission will not be downloaded")
         return repository
 
     try:
@@ -70,18 +70,10 @@ def setup(
             download(url, path)
 
     except api.NeverSubmittedException:
-        if show_quickstarters:
-            command.quickstarter(
-                repository,
-                quickstarter_name,
-                show_notebook_quickstarters,
-                True,
-            )
-        else:
-            print(f"you appear to have never submitted code before")
+        print(f"setup: you appear to have never submitted code before")
 
     except api.EncryptedSubmissionException:
-        print(f"you appear to have submitted an encrypted submission")
+        print(f"setup: you appear to have submitted an encrypted submission")
 
     return repository
 
@@ -101,8 +93,5 @@ def setup_notebook(
         model_directory,
         True,
         no_model,
-        False,
-        None,
-        False,
         data_size_variant,
     )

@@ -13,7 +13,7 @@ def _check_if_already_exists(directory: str, force: bool):
     if force:
         return True
     elif len(os.listdir(directory)):
-        print(f"{directory}: directory not empty (use --force to override)")
+        print(f"init: {directory}: directory not empty (use --force to overwrite)")
         raise click.Abort()
 
 
@@ -31,6 +31,8 @@ def init(
     project_token = client.project_tokens.upgrade(clone_token)
 
     project = project_token.project
+    plain = project_token.plain
+    assert plain is not None
 
     repository = Repository.init(
         directory,
@@ -40,7 +42,7 @@ def init(
             user_id=project.user_id,
             size_variant=data_size_variant,
         ),
-        push_token=project_token.plain,
+        push_token=plain,
         overwrite=bool(should_overwrite),
     )
 

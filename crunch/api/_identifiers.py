@@ -31,6 +31,7 @@ CrunchIdentifierType = Union[
     Literal[
         "@current",
         "@next",
+        "@last",
         "@published",
     ]
 ]
@@ -51,4 +52,11 @@ UserIdentifierType = Union[
 ProjectIdentifierType = Union[
     int,
     str,
+]
+
+SubmissionIdentifierType = Union[
+    int,
+    Literal[
+        "@last",
+    ],
 ]

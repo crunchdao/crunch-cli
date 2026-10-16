@@ -32,7 +32,7 @@ def download(
         changed_variant = True
     elif current_size_variant != size_variant:
         repository.update_project(size_variant=size_variant)
-        print(f"project: set default size variant: {size_variant.name.lower()}")
+        print(f"download: set default size variant: {size_variant.name.lower()}")
 
         changed_variant = True
     else:

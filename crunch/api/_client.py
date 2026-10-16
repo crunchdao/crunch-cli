@@ -1,19 +1,20 @@
 import os
 import urllib.parse
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Tuple, cast
 
 import requests
 from tqdm.auto import tqdm
-from urllib3.exceptions import RequestError
 
 import crunch.store as store
-from crunch.api._auth import ApiKeyAuth, Auth, NoneAuth
+from crunch.api._auth import Auth
 from crunch.api._domain.competition import CompetitionCollection, CompetitionEndpointMixin
 from crunch.api._domain.crunch import CrunchEndpointMixin
 from crunch.api._domain.data_release import DataReleaseEndpointMixin
 from crunch.api._domain.leaderboard import LeaderboardEndpointMixin
 from crunch.api._domain.library import LibraryCollection, LibraryEndpointMixin
 from crunch.api._domain.metric import MetricEndpointMixin
+from crunch.api._domain.model import ModelEndpointMixin
+from crunch.api._domain.model_file import ModelFileEndpointMixin
 from crunch.api._domain.phase import PhaseEndpointMixin
 from crunch.api._domain.prediction import PredictionEndpointMixin
 from crunch.api._domain.project import ProjectEndpointMixin, ProjectTokenCollection
@@ -21,6 +22,7 @@ from crunch.api._domain.quickstarter import QuickstarterEndpointMixin
 from crunch.api._domain.round import RoundEndpointMixin
 from crunch.api._domain.run import RunEndpointMixin
 from crunch.api._domain.runner import RunnerRun, RunnerRunEndpointMixin
+from crunch.api._domain.runtime import RuntimeEndpointMixin
 from crunch.api._domain.score import ScoreEndpointMixin
 from crunch.api._domain.submission import SubmissionEndpointMixin
 from crunch.api._domain.submission_file import SubmissionFileEndpointMixin
@@ -29,6 +31,7 @@ from crunch.api._domain.upload import UploadCollection, UploadEndpointMixin
 from crunch.api._domain.user import UserCollection, UserEndpointMixin
 from crunch.api._errors import ApiException, convert_error
 from crunch.api._pagination import PageRequest
+from crunch.api._resource import JsonValue
 from crunch.constants import API_KEY_ENV_VAR
 from crunch.utils import build_user_agent
 
@@ -41,11 +44,14 @@ class EndpointClient(
     LeaderboardEndpointMixin,
     LibraryEndpointMixin,
     MetricEndpointMixin,
+    ModelEndpointMixin,
+    ModelFileEndpointMixin,
     PhaseEndpointMixin,
     PredictionEndpointMixin,
     ProjectEndpointMixin,
     QuickstarterEndpointMixin,
     RoundEndpointMixin,
+    RuntimeEndpointMixin,
     RunEndpointMixin,
     RunnerRunEndpointMixin,
     ScoreEndpointMixin,
@@ -59,13 +65,12 @@ class EndpointClient(
     def __init__(
         self,
         base_url: str,
-        auth: Auth,
+        auth: Optional[Auth],
         show_progress: bool,
     ):
         super().__init__()
 
         self.base_url = base_url
-        self.auth_ = auth
         self.show_progress = show_progress
         self.page_size = 100
 
@@ -73,13 +78,13 @@ class EndpointClient(
             "User-Agent": build_user_agent(),
         })
 
+        if auth is not None:
+            self.headers["Authorization"] = auth.header_value
+
     def request(self, method: str, url: str, *args: Any, **kwargs: Any):
         headers: Dict[str, str] = kwargs.pop("headers", None) or {}
-        params: Dict[str, str] = kwargs.pop("params", None) or {}
         data: Any = kwargs.pop("data", None)
         files: Any = kwargs.pop("files", None)
-
-        self.auth_.apply(headers, params, data)
 
         progress: Optional[tqdm] = None
 
@@ -130,14 +135,10 @@ class EndpointClient(
                 urllib.parse.urljoin(self.base_url, url),
                 *args,
                 headers=headers,
-                params=params,
                 data=data,
                 files=files,
                 **kwargs,
             )
-        except requests.exceptions.RequestException as error:
-            self._strip_secrets(error)
-            raise error
         finally:
             if progress is not None:
                 progress.close()
@@ -154,8 +155,6 @@ class EndpointClient(
         try:
             response.raise_for_status()
         except requests.HTTPError as error:
-            self._strip_secrets(error)
-
             if expect_json and not is_json:
                 raise ApiException(f"received {response.status_code}: {response.text or '<no content>'}") from error
 
@@ -168,34 +167,6 @@ class EndpointClient(
             content_type,
             is_json,
         )
-
-    def _strip_secrets(self, error: BaseException):
-        if not self.auth_:
-            return None
-
-        args = list(error.args)
-
-        for index, arg in enumerate(args):
-            if isinstance(arg, BaseException):
-                self._strip_secrets(arg)
-
-                if isinstance(arg, RequestError):
-                    arg.url = self.auth_.strip(arg.url) or arg.url
-
-                continue
-
-            if not isinstance(arg, str):
-                continue
-
-            new_arg = self.auth_.strip(arg)
-            if new_arg is not None:
-                args[index] = new_arg
-
-        error.args = tuple(args)
-
-        cause = error.__cause__
-        if cause is not None:
-            self._strip_secrets(cause)
 
     def _result(
         self,
@@ -228,7 +199,7 @@ class EndpointClient(
         self,
         requester: Callable[[PageRequest], requests.Response],
         page_size: Optional[int] = None
-    ):
+    ) -> Iterator[JsonValue]:
         if not page_size:
             page_size = self.page_size
 
@@ -238,11 +209,11 @@ class EndpointClient(
             self._raise_for_status(response)
 
             try:
-                json = response.json()
+                json: Dict[str, Any] = response.json()
             except requests.exceptions.JSONDecodeError as json_error:
                 raise ValueError(f"could not parse json: `{response.text}`") from json_error
 
-            content = json["content"]
+            content: list = json["content"]
             for item in content:
                 yield item
 
@@ -258,7 +229,7 @@ class Client:
         self,
         api_base_url: str,
         web_base_url: str,
-        auth: Auth,
+        auth: Optional[Auth],
         *,
         show_progress: bool = True,
     ):
@@ -311,9 +282,7 @@ class Client:
         if auth is None:
             api_key = os.getenv(API_KEY_ENV_VAR)
             if api_key:
-                auth = ApiKeyAuth(api_key)
-            else:
-                auth = NoneAuth()
+                auth = Auth.api_key(api_key)
 
         return Client(
             store.api_base_url,

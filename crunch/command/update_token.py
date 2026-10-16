@@ -14,8 +14,9 @@ def update_token(
 
     project_token = client.project_tokens.upgrade(clone_token)
 
-    plain = project_token.plain
     project = project_token.project
+    plain = project_token.plain
+    assert plain is not None
 
     repository.update_project(
         project_name=project.name,

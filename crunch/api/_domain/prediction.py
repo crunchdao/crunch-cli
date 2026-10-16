@@ -1,19 +1,26 @@
-import typing
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
-from .._resource import Collection, Model
-from .project import Project
+from crunch.api._resource import Collection, EndpointMixin, Model
+
+if TYPE_CHECKING:
+    from crunch.api._client import Client
+    from crunch.api._domain.metric import Unit
+    from crunch.api._domain.project import Project
+    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
+    from crunch.api._resource import JsonValue
+    from crunch.api._types import Attrs
 
 
-class Prediction(Model):
+class Prediction(Model[int]):
 
     def __init__(
         self,
-        project: Project,
-        attrs=None,
-        client=None,
-        collection=None
+        project: "Project",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["PredictionCollection"] = None,
     ):
-        super().__init__(attrs, client, collection)
+        super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._project = project
 
@@ -26,12 +33,42 @@ class Prediction(Model):
         return self._attrs["name"]
 
     @property
+    def valid(self) -> Optional[bool]:
+        return self._attrs["valid"]
+
+    @property
+    def success(self) -> Optional[bool]:
+        return self._attrs["success"]
+
+    @property
+    def error_message(self) -> Optional[str]:
+        return self._attrs["error"]
+
+    @property
     def managed(self) -> bool:
         return self._attrs["managed"]
 
     @property
+    def deterministic(self) -> bool:
+        return self._attrs["deterministic"]
+
+    @property
+    def primary_mean(self) -> Optional[float]:
+        return self._attrs.get("primaryMean")
+
+    @property
+    def primary_unit(self) -> Optional["Unit"]:
+        from crunch.api._domain.metric import Unit
+
+        unit_attrs = self._attrs.get("primaryUnit")
+        if unit_attrs is None:
+            return None
+
+        return Unit.from_dict(unit_attrs)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType, reportAttributeAccessIssue]
+
+    @property
     def scores(self):
-        from .score import ScoreCollection
+        from crunch.api._domain.score import ScoreCollection
 
         return ScoreCollection(
             prediction=self,
@@ -45,22 +82,19 @@ class PredictionCollection(Collection[Prediction]):
 
     def __init__(
         self,
-        project: Project,
-        client=None
+        project: "Project",
+        client: Optional["Client"] = None
     ):
         super().__init__(client)
 
         self.project = project
-
-    def __iter__(self) -> typing.Iterator[Prediction]:
-        return super().__iter__()
 
     def get(
         self,
         id: int
     ) -> Prediction:
         return self.prepare_model(
-            self._client.api.get_prediction(
+            self._checked_client.api.get_prediction(
                 self.project.competition.id,
                 self.project.user_id,
                 self.project.name,
@@ -70,29 +104,30 @@ class PredictionCollection(Collection[Prediction]):
 
     def list(
         self
-    ) -> typing.List[Prediction]:
+    ) -> List[Prediction]:
         return self.prepare_models(
-            self._client.api.list_predictions(
+            self._checked_client.api.list_predictions(
                 self.project.competition.id,
                 self.project.user_id,
                 self.project.name,
             )
         )
 
-    def prepare_model(self, attrs):
+    def prepare_model(self, attrs: Union["JsonValue", Prediction], *args: Any) -> Prediction:
         return super().prepare_model(
             attrs,
-            self.project
+            self.project,
+            *args
         )
 
 
-class PredictionEndpointMixin:
+class PredictionEndpointMixin(EndpointMixin):
 
     def list_predictions(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType"
     ):
         return self._result(
             self.get(
@@ -103,10 +138,10 @@ class PredictionEndpointMixin:
 
     def get_prediction(
         self,
-        competition_identifier,
-        user_identifier,
-        project_identifier,
-        prediction_id
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+        prediction_id: int
     ):
         return self._result(
             self.get(

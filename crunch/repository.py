@@ -6,8 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 import crunch.store as store
-from crunch.api import Client, Project, SizeVariant
-from crunch.api._auth import PushTokenAuth
+from crunch.api import Auth, Client, Project, SizeVariant
 from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY, PROJECT_FILE, TOKEN_FILE, UPLOAD_CACHE_FILE
 
 __all__ = [
@@ -188,12 +187,12 @@ class Repository:
         client = Client(
             store.api_base_url,
             store.web_base_url,
-            PushTokenAuth(self._push_token),
+            Auth.project_token(self._push_token),
             show_progress=show_progress,
         )
 
         competition = client.competitions.get(self._project.competition_name)
-        project = competition.projects.get_reference(None, (self._project.user_id, self._project.project_name))  # pyright: ignore[reportUnknownMemberType]
+        project = competition.projects.get_reference(userId=self._project.user_id, name=self._project.project_name)
 
         return client, project
 
