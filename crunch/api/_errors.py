@@ -498,6 +498,26 @@ class RunNotFoundException(ApiException):
         _print_contact()
 
 
+class RunNotSuccessfulException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        id: int,
+    ):
+        super().__init__(message)
+
+        self.run_id = id
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"The run #{self.run_id} did not complete successfully.")
+        print()
+        print("Only successful runs can be selected.")
+
+
 class RuntimeDefinitionNotFoundException(ApiException):
 
     def __init__(

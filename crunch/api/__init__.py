@@ -30,6 +30,8 @@ from crunch.api._domain.phase import Phase as Phase
 from crunch.api._domain.phase import PhaseType as PhaseType
 from crunch.api._domain.prediction import Prediction as Prediction
 from crunch.api._domain.project import Project as Project
+from crunch.api._domain.project import ProjectSelection as ProjectSelection
+from crunch.api._domain.project import ProjectSelectionOrigin as ProjectSelectionOrigin
 from crunch.api._domain.project import ProjectToken as ProjectToken
 from crunch.api._domain.project import ProjectTokenType as ProjectTokenType
 from crunch.api._domain.quickstarter import Quickstarter as Quickstarter
@@ -85,6 +87,7 @@ from crunch.api._errors import RestrictedPhaseActionException as RestrictedPhase
 from crunch.api._errors import RetryableException as RetryableException
 from crunch.api._errors import RoundNotFoundException as RoundNotFoundException
 from crunch.api._errors import RunNotFoundException as RunNotFoundException
+from crunch.api._errors import RunNotSuccessfulException as RunNotSuccessfulException
 from crunch.api._errors import RuntimeDefinitionNotFoundException as RuntimeDefinitionNotFoundException
 from crunch.api._errors import SubmissionCustomCheckFailedException as SubmissionCustomCheckFailedException
 from crunch.api._errors import SubmissionNotFoundException as SubmissionNotFoundException

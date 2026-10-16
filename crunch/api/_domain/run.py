@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypedDict, Union, cast
 
 from crunch.api._resource import Collection, EndpointMixin
 from crunch.api._resource import Model as BaseModel
@@ -134,13 +134,17 @@ class Run(BaseModel[int]):
         )
 
     def select(self):
-        self._attrs.update(
-            self._checked_client.api.select_run(
+        from crunch.api._domain.project import ProjectSelection
+
+        return ProjectSelection(
+            self._project,
+            cast("Attrs", self._checked_client.api.select_run(
                 self._project.competition.id,
                 self._project.user_id,
                 self._project.name,
                 self.id
-            )
+            )),
+            client=self._client,
         )
 
     def terminate(self):

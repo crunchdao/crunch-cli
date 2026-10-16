@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
@@ -133,6 +133,18 @@ class Project(Model[int]):
             )
         )
 
+    @property
+    def selection(self) -> "ProjectSelection":
+        return ProjectSelection(
+            self,
+            cast("Attrs", self._checked_client.api.get_project_selection(
+                self.competition.id,
+                self.user_id,
+                self.name,
+            )),
+            client=self._client,
+        )
+
     def clone(
         self,
         submission_number: Optional[int],
@@ -145,6 +157,84 @@ class Project(Model[int]):
             submission_number,
             include_model,
         )  # pyright: ignore[reportReturnType]
+
+
+class ProjectSelectionOrigin(Enum):
+
+    SELECTION = "SELECTION"
+    """Explicitly selected for the current round."""
+
+    PREVIOUS_ROUND = "PREVIOUS_ROUND"
+    """Carried over from the selection of the previous round."""
+
+    LAST_RUN = "LAST_RUN"
+    """Nothing selected, the last successful run is used by default."""
+
+    def __repr__(self):
+        return self.name
+
+
+class ProjectSelection(Model[None]):
+
+    def __init__(
+        self,
+        project: Project,
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+    ):
+        super().__init__(attrs=attrs, client=client)
+
+        self._project = project
+
+    def __repr__(self):
+        return f"ProjectSelection(run_id={self.run_id}, origin={self.origin!r})"
+
+    @property
+    def project(self):
+        return self._project
+
+    @property
+    def origin(self):
+        return ProjectSelectionOrigin[self._attrs["origin"]]
+
+    @property
+    def run_id(self) -> Optional[int]:
+        return self._attrs.get("runId")
+
+    @property
+    def run(self):
+        run_id = self.run_id
+        if run_id is None:
+            return None
+
+        return self._project.runs.get(run_id)
+
+    @property
+    def submission_number(self) -> Optional[int]:
+        submission = self._attrs.get("submission")
+        return submission["number"] if submission else None
+
+    @property
+    def train_frequency(self) -> Optional[int]:
+        return self._attrs.get("trainFrequency")
+
+    @property
+    def force_first_train(self) -> Optional[bool]:
+        return self._attrs.get("forceFirstTrain")
+
+    @property
+    def runnable(self) -> bool:
+        return bool(self._attrs.get("runnable"))
+
+    @property
+    def created_at(self) -> Optional[datetime]:
+        created_at = self._attrs.get("createdAt")
+        return datetime.fromisoformat(created_at) if created_at else None
+
+    @property
+    def updated_at(self) -> Optional[datetime]:
+        updated_at = self._attrs.get("updatedAt")
+        return datetime.fromisoformat(updated_at) if updated_at else None
 
 
 class ProjectCollection(Collection[Project]):
@@ -354,6 +444,19 @@ class ProjectEndpointMixin(EndpointMixin):
         return self._result(
             self.get(
                 f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/quota/compute",
+            ),
+            json=True,
+        )
+
+    def get_project_selection(
+        self,
+        competition_identifier: "CompetitionIdentifierType",
+        user_identifier: "UserIdentifierType",
+        project_identifier: "ProjectIdentifierType",
+    ):
+        return self._result(
+            self.get(
+                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/selection",
             ),
             json=True,
         )

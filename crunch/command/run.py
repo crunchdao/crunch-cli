@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Sequence
 
 import click
 
-from crunch.api import Prediction, Run, RunLog, RunNotFoundException, RunStatus, RuntimeOptionStatus, Score
+from crunch.api import CurrentRoundNotFoundException, Prediction, Project, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, Score
 from crunch.api._errors import NeverSubmittedException, SubmissionNotFoundException
 from crunch.command._common import get_project, reformat_datetime
 from crunch.repository import Repository
@@ -138,19 +138,12 @@ def run_list(
 ):
     project = get_project(repository)
     runs = project.runs.list()
-    selected_run = None  # TODO project.selection.run
+    selection = _get_selection(project)
 
     reached_limit = limit is not None and len(runs) > limit
 
     rows: List[Sequence[Any]] = []
     for run in reversed(runs):
-        if not run.success:
-            selection_string = "not selectable"
-        elif selected_run is not None and run.id == selected_run.id:
-            selection_string = "selected"
-        else:
-            selection_string = "selectable"
-
         rows.append(
             (
                 run.id,
@@ -158,7 +151,7 @@ def run_list(
                 run.submission.number,
                 run.duration or "unknown",
                 reformat_datetime(run.created_at),
-                selection_string,
+                _to_selection_status(run, selection),
             )
         )
 
@@ -181,6 +174,9 @@ def run_list(
         print(f"  - To view details of a specific run, use `crunch run show <run-id>`.")
         print(f"  - To view the logs of a specific run, use `crunch run logs <run-id>`.")
 
+        if selection is not None and selection.origin != ProjectSelectionOrigin.SELECTION:
+            print(f"  - No run is explicitly selected for this round, to pick one, use `crunch run select <run-id>`.")
+
 
 def run_show(
     repository: Repository,
@@ -189,10 +185,12 @@ def run_show(
     show_tips: bool = False,
 ):
     run = _get_run(repository, run_id)
+    selection = _get_selection(run.project)
 
     print("run:")
     print(f"  id: {run.id}")
     print(f"  status: {_to_enriched_status(run)}")
+    print(f"  selection: {_to_selection_status(run, selection)}")
     print(f"  created at: {reformat_datetime(run.created_at)}")
     print(f"  started at: {reformat_datetime(run.started_at)}")
     print(f"  ended at: {reformat_datetime(run.ended_at)}")
@@ -232,7 +230,7 @@ def run_show(
 
         if run.status != RunStatus.COMPLETED:
             print(f"  - To terminate this run, use `crunch run terminate {run.id}`.")
-        elif run.success:
+        elif run.success and not _is_explicitly_selected(run, selection):
             print(f"  - To select this run for the Out-of-Sample, use `crunch run select {run.id}`.")
 
 
@@ -363,6 +361,34 @@ def run_wait(
     return exit_code
 
 
+SELECTION_ORIGIN_STATUSES = {
+    ProjectSelectionOrigin.SELECTION: "selected",
+    ProjectSelectionOrigin.PREVIOUS_ROUND: "selected (from prev. round)",
+    ProjectSelectionOrigin.LAST_RUN: "selected (last, by default)",
+}
+
+
+def _get_selection(project: Project) -> Optional[ProjectSelection]:
+    try:
+        return project.selection
+    except CurrentRoundNotFoundException:
+        return None
+
+
+def _to_selection_status(run: Run, selection: Optional[ProjectSelection]) -> str:
+    if selection is not None and selection.run_id == run.id:
+        return SELECTION_ORIGIN_STATUSES[selection.origin]
+
+    if not run.success:
+        return "not selectable"
+
+    return "selectable"
+
+
+def _is_explicitly_selected(run: Run, selection: Optional[ProjectSelection]) -> bool:
+    return selection is not None and selection.run_id == run.id and selection.origin == ProjectSelectionOrigin.SELECTION
+
+
 def _to_wait_exit_code(run: "Run") -> RunWaitExitCode:
     if _is_running(run):
         return RunWaitExitCode.TIMED_OUT
@@ -384,9 +410,20 @@ def run_select(
     show_tips: bool = False,
 ):
     run = _get_run(repository, run_id)
-    run.select()
 
-    print(f"select: run {run_id} selected")
+    try:
+        selection = run.select()
+    except RunNotSuccessfulException:
+        print(f"select: run {run_id} is not successful, only successful runs can be selected")
+
+        if show_tips:
+            print()
+            print("tips:")
+            print("  - To find a selectable run, use `crunch run list`.")
+
+        raise click.Abort()
+
+    print(f"select: run {selection.run_id} selected (submission #{selection.submission_number})")
 
     if show_tips:
         print()
