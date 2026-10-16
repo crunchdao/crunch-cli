@@ -14,6 +14,14 @@ if TYPE_CHECKING:
 class SubmissionIdentifierClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "identifier"
 
+    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> Optional[str]:  # pyright: ignore[reportIncompatibleMethodOverride]
+        # keep the argument name in usage, brackets there would read as optional
+        if isinstance(param, click.Argument):
+            return None
+
+        return "[@last|<number>]"
+
+
     def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> "SubmissionIdentifierType":
         if "@last" == value:
             return "@last"

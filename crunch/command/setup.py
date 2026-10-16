@@ -10,6 +10,10 @@ SetupSubmissionNumber = Union[int, Literal["latest", "scratch"]]
 class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "number"
 
+    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> str:
+        return "[latest|scratch|<number>]"
+
+
     def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]):
         if "latest" == value:
             return "latest"

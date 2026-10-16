@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING, Any, Callable, List, Optional
 import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType
+from crunch.command.setup import SetupSubmissionNumberClickType
 from crunch.command.submission import SubmissionIdentifierClickType
+from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
 
@@ -17,7 +19,10 @@ from . import __version__, api, command, constants, store, utils
 store.load_from_env()
 
 if TYPE_CHECKING:
-    from crunch.api import RoundIdentifierType, SubmissionIdentifierType
+    from crunch_convert import RequirementLanguage
+
+    from crunch.api import GpuRequirement, RoundIdentifierType, SubmissionIdentifierType
+    from crunch.command.setup import SetupSubmissionNumber
 
 
 DIRECTORY_DEFAULT_FORMAT = "{competitionName}-{projectName}"
@@ -200,7 +205,7 @@ def init(
 
 @cli.command(help="Setup a workspace directory.")
 @click.option("--token", "clone_token", required=True, help="Clone token to use.")
-@click.option("--submission", "submission_number", required=False, type=command.SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scratch" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
@@ -212,7 +217,7 @@ def init(
 @click.argument("directory", default=DIRECTORY_DEFAULT_FORMAT)
 def setup(
     clone_token: str,
-    submission_number: command.SetupSubmissionNumber,
+    submission_number: "SetupSubmissionNumber",
     no_data: bool,
     no_model: bool,
     force: bool,
@@ -271,7 +276,7 @@ def setup(
 
 
 @cli.command(help="Setup a notebook workspace.")
-@click.option("--submission", "submission_number", required=False, type=command.SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scrach" to disable)')
+@click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scratch" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
@@ -279,7 +284,7 @@ def setup(
 @click.argument("competition-name", required=True)
 @click.argument("clone-token")
 def setup_notebook(
-    submission_number: command.SetupSubmissionNumber,
+    submission_number: "SetupSubmissionNumber",
     no_data: bool,
     no_model: bool,
     model_directory_path: str,
@@ -713,6 +718,78 @@ def run_select(run_id: int):
 def run_terminate(run_id: int):
     command.run_terminate(
         run_id=run_id,
+        show_tips=show_tips,
+    )
+
+
+@cli.group(name="whitelist", help="Manage whitelisted libraries.")
+def whitelist_group():
+    pass
+
+
+@whitelist_group.command(name="search", help="Search whitelisted libraries.")
+@click.option("--language", type=ProgrammingLanguageClickType())
+@click.argument("query", type=str, required=True)
+@click.option("--limit", type=int, default=10)
+@click.option("--all", is_flag=True)
+def whitelist_search(
+    query: str,
+    language: Optional["RequirementLanguage"],
+    limit: int,
+    all: bool,
+):
+    exit(command.whitelist_search(
+        query=query,
+        language=language,
+        limit=limit if not all else None,
+        show_tips=show_tips,
+    ))
+
+
+@whitelist_group.command(name="validate", help="Validate a requirements.txt file.")
+@click.option("--language", type=ProgrammingLanguageClickType())
+@click.argument("requirements_txt_file_path", type=str, required=False)
+def whitelist_validate(
+    requirements_txt_file_path: Optional[str],
+    language: Optional["RequirementLanguage"],
+):
+    if language is None:
+        from crunch_convert import RequirementLanguage
+        language = RequirementLanguage.PYTHON
+
+    if requirements_txt_file_path is None:
+        requirements_txt_file_path = language.original_txt_file_name
+
+    exit(command.whitelist_validate(
+        requirements_txt_file_path=requirements_txt_file_path,
+        language=language,
+        show_tips=show_tips,
+    ))
+
+
+@whitelist_group.command(name="request", help="Request a library to be whitelisted.")
+@click.option("--name", type=str)
+@click.option("--alias", type=str)
+@click.option("--language", type=ProgrammingLanguageClickType())
+@click.option("--gpu", "gpu_requirement", type=GpuRequirementClickType())
+@click.option("--additional-details", type=str)
+@wrap_root_and_api
+def whitelist_request(
+    name: Optional[str],
+    alias: Optional[str],
+    language: Optional["RequirementLanguage"],
+    gpu_requirement: Optional["GpuRequirement"],
+    additional_details: Optional[str],
+):
+    if not name and not alias:
+        raise click.UsageError("at least one of `--name` or `--alias` must be provided")
+
+    command.whitelist_request(
+        name=name,
+        alias=alias,
+        language=language,
+        gpu_requirement=gpu_requirement,
+        additional_details=additional_details,
         show_tips=show_tips,
     )
 

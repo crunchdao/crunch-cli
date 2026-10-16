@@ -205,6 +205,15 @@ class Competition(Model[int]):
         )
 
     @property
+    def library_requests(self):
+        from crunch.api._domain.library import LibraryRequestCollection
+
+        return LibraryRequestCollection(
+            competition=self,
+            client=self._client
+        )
+
+    @property
     def runtime_definitions(self):
         from crunch.api._domain.runtime import RuntimeDefinitionCollection
 

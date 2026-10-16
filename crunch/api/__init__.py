@@ -19,6 +19,8 @@ from crunch.api._domain.enum_ import Language as Language
 from crunch.api._domain.enum_ import SplitKeyType as SplitKeyType
 from crunch.api._domain.leaderboard import Leaderboard as Leaderboard
 from crunch.api._domain.library import Library as Library
+from crunch.api._domain.library import LibraryRequest as LibraryRequest
+from crunch.api._domain.library import LibraryRequestVerdict as LibraryRequestVerdict
 from crunch.api._domain.metric import Metric as Metric
 from crunch.api._domain.metric import ReducerFunction as ReducerFunction
 from crunch.api._domain.metric import ScorerFunction as ScorerFunction

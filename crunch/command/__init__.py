@@ -17,13 +17,13 @@ from crunch.command.run import run_terminate as run_terminate
 from crunch.command.run import run_wait as run_wait
 from crunch.command.runtime import runtime_list as runtime_list
 from crunch.command.runtime import runtime_request as runtime_request
-from crunch.command.setup import SetupSubmissionNumber as SetupSubmissionNumber
-from crunch.command.setup import SetupSubmissionNumberClickType as SetupSubmissionNumberClickType
 from crunch.command.setup import setup as setup
 from crunch.command.setup import setup_notebook as setup_notebook
 from crunch.command.status import status as status
-from crunch.command.submission import SubmissionIdentifierClickType as SubmissionIdentifierClickType
 from crunch.command.submission import submission_list as submission_list
 from crunch.command.submission import submission_show as submission_show
 from crunch.command.test import test as test
 from crunch.command.update_token import update_token as update_token
+from crunch.command.whitelist import whitelist_request as whitelist_request
+from crunch.command.whitelist import whitelist_search as whitelist_search
+from crunch.command.whitelist import whitelist_validate as whitelist_validate
