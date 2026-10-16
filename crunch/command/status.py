@@ -31,6 +31,11 @@ def status(
     print(f"  name: {project.name}")
     print(f"  created at: {reformat_datetime(project.created_at)}")
 
+    print()
+    print(f"run parameters:")
+    print(f"  can configure force first train: {"no" if competition.hide_force_first_train else "yes"}")
+    print(f"  can configure train frequency: {"no" if competition.hide_train_frequency else "yes"}")
+
     if show_tips:
         print()
         print(f"tips:")
