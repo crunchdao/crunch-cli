@@ -9,7 +9,7 @@ import click
 
 from crunch import store
 from crunch.api import Client, ForbiddenLibraryException, Submission, SubmissionType, Upload, UploadStatus
-from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, SUBMISSION_MESSAGE_LENGTH
+from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, REQUIREMENTS_R_TXT, REQUIREMENTS_TXT, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size, format_timespan
 from crunch.repository import Repository
 
@@ -397,6 +397,11 @@ def push(
 
     submission_directory_path = repository.root_directory_path
 
+    found_code_files = list_code_files(submission_directory_path, model_directory_relative_path)
+    if REQUIREMENTS_TXT not in found_code_files:
+        print(f"warning: no {REQUIREMENTS_TXT} found, the cloud environment pre-installed packages might change, include one to ensure consistent dependencies")
+        raise click.Abort()
+
     client, project = repository.create_client()
     competition = project.competition
 
@@ -416,7 +421,7 @@ def push(
         _upload_files(
             group_name="code",
             storage=code_files,
-            found_files=list_code_files(submission_directory_path, model_directory_relative_path),
+            found_files=found_code_files,
             dry=dry,
             client=client,
             preferred_chunk_size=preferred_chunk_size,
