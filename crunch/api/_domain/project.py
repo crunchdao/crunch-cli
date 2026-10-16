@@ -181,8 +181,7 @@ class ProjectCollection(Collection[Project]):
             self._checked_client.api.list_projects(
                 self.competition.id,
                 user_identifier
-            ),
-            self.competition
+            )
         )
 
     def prepare_model(self, attrs: Union["JsonValue", Project], *args: Any):
