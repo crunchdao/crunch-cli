@@ -99,6 +99,17 @@ class TargetCollection(Collection[Target]):
             )
         )
 
+    @property
+    def primary(self) -> Optional[Target]:
+        return next(
+            (
+                target
+                for target in self.list()
+                if target.primary
+            ),
+            None
+        )
+
     def prepare_model(self, attrs: Union["JsonValue", Target], *args: Any) -> Target:
         return super().prepare_model(
             attrs,

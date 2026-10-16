@@ -139,6 +139,7 @@ def run_list(
     project = get_project(repository)
     runs = project.runs.list()
     selection = _get_selection(project)
+    primary_target = project.competition.targets.primary
 
     reached_limit = limit is not None and len(runs) > limit
 
@@ -151,6 +152,7 @@ def run_list(
                 run.submission.number,
                 run.duration or "unknown",
                 reformat_datetime(run.created_at),
+                _format_primary_score(run.prediction),
                 _to_selection_status(run, selection),
             )
         )
@@ -160,7 +162,7 @@ def run_list(
 
     print("runs:")
     ascii_table(
-        headers=["id", "status", "subm. #", "duration", "created at", "selection"],
+        headers=["id", "status", "subm. #", "duration", "created at", primary_target.name if primary_target is not None else "score", "selection"],
         values=rows,
     )
 
@@ -458,6 +460,21 @@ def run_terminate(
 
 def _is_running(run: "Run") -> bool:
     return run.status != RunStatus.COMPLETED
+
+
+def _format_primary_score(prediction: Optional[Prediction]) -> str:
+    if prediction is None:
+        return "(none)"
+
+    primary_mean = prediction.primary_mean
+    if primary_mean is None:
+        return "(none)"
+
+    primary_unit = prediction.primary_unit
+    if primary_unit is None:
+        return str(primary_mean)
+
+    return primary_unit.format_value(primary_mean)
 
 
 def _format_score_value(score: Score) -> str:

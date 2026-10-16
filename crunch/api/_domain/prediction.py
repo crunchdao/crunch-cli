@@ -4,6 +4,7 @@ from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
+    from crunch.api._domain.metric import Unit
     from crunch.api._domain.project import Project
     from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
     from crunch.api._resource import JsonValue
@@ -50,6 +51,20 @@ class Prediction(Model[int]):
     @property
     def deterministic(self) -> bool:
         return self._attrs["deterministic"]
+
+    @property
+    def primary_mean(self) -> Optional[float]:
+        return self._attrs.get("primaryMean")
+
+    @property
+    def primary_unit(self) -> Optional["Unit"]:
+        from crunch.api._domain.metric import Unit
+
+        unit_attrs = self._attrs.get("primaryUnit")
+        if unit_attrs is None:
+            return None
+
+        return Unit.from_dict(unit_attrs)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType, reportAttributeAccessIssue]
 
     @property
     def scores(self):
