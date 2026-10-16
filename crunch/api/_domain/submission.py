@@ -95,6 +95,12 @@ class Submission(BaseModel[int]):
 
         return RuntimeOptionCollection(self, self._client)
 
+    @property
+    def runtime_access_requests(self):
+        from crunch.api._domain.runtime import RuntimeAccessRequestCollection
+
+        return RuntimeAccessRequestCollection(self, self._client)
+
 
 class SubmissionCollection(Collection[Submission]):
 

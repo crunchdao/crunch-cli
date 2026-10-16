@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
 
@@ -214,6 +214,98 @@ class RuntimeOptionCollection(Collection[RuntimeOption]):
         )
 
 
+class RuntimeAccessRequestVerdict(Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class RuntimeAccessRequest(Model[int]):
+
+    def __init__(
+        self,
+        submission: "Submission",
+        attrs: Optional["Attrs"] = None,
+        client: Optional["Client"] = None,
+        collection: Optional["RuntimeAccessRequestCollection"] = None
+    ):
+        super().__init__(attrs=attrs, client=client, collection=collection)
+
+        self._submission = submission
+
+    @property
+    def submission(self):
+        return self._submission
+
+    @property
+    def definition(self) -> RuntimeDefinition:
+        return RuntimeDefinition.from_dict(self._attrs["definition"], None)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+
+    @property
+    def justification(self) -> Optional[str]:
+        return self._attrs.get("justification")
+
+    @property
+    def verdict(self):
+        return RuntimeAccessRequestVerdict[self._attrs["verdict"]]
+
+    @property
+    def verdict_reason(self) -> Optional[str]:
+        return self._attrs.get("verdictReason")
+
+    @property
+    def verdict_at(self) -> Optional[datetime]:
+        verdict_at = self._attrs.get("verdictAt")
+        return datetime.fromisoformat(verdict_at) if verdict_at else None
+
+    @property
+    def further_request_blocked(self) -> bool:
+        return bool(self._attrs.get("furtherRequestBlocked"))
+
+    @property
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self._attrs["createdAt"])
+
+
+class RuntimeAccessRequestCollection(Collection[RuntimeAccessRequest]):
+
+    model = RuntimeAccessRequest
+
+    def __init__(
+        self,
+        submission: "Submission",
+        client: Optional["Client"] = None
+    ):
+        super().__init__(client)
+
+        self.submission = submission
+
+    def create(
+        self,
+        *,
+        definition_name: str,
+        justification: Optional[str] = None,
+    ) -> RuntimeAccessRequest:
+        project = self.submission.project
+
+        return self.prepare_model(
+            self._checked_client.api.create_runtime_access_request(
+                competition_id=project.competition.id,
+                project_id=project.id,
+                submission_number=self.submission.number,
+                definition_name=definition_name,
+                justification=justification,
+            )
+        )
+
+    def prepare_model(self, attrs: Union["JsonValue", RuntimeAccessRequest], *args: Any) -> RuntimeAccessRequest:
+        return super().prepare_model(
+            attrs,
+            self.submission,
+            *args
+        )
+
+
 class RuntimeEndpointMixin(EndpointMixin):
 
     def list_runtime_definitions(
@@ -247,4 +339,26 @@ class RuntimeEndpointMixin(EndpointMixin):
                 },
             ),
             page_size=1000,
+        )
+
+    def create_runtime_access_request(
+        self,
+        competition_id: int,
+        project_id: int,
+        submission_number: int,
+        definition_name: str,
+        justification: Optional[str],
+    ):
+        return self._result(
+            self.post(
+                "/v1/runtime-access-requests",
+                json={
+                    "competitionId": competition_id,
+                    "projectId": project_id,
+                    "submissionNumber": submission_number,
+                    "definitionName": definition_name,
+                    "justification": justification,
+                },
+            ),
+            json=True
         )

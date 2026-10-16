@@ -382,6 +382,24 @@ class EncryptedSubmissionException(ApiException):
         raise NotImplementedError()
 
 
+class PendingRuntimeAccessRequestException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        runtime_definition_name: str,
+    ):
+        super().__init__(message)
+
+        self.runtime_definition_name = runtime_definition_name
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"A request for the runtime `{self.runtime_definition_name}` is already pending review.")
+
+
 class PredictionSubmissionNotAllowedException(ApiException):
 
     def print_helper(
@@ -460,6 +478,24 @@ class RunNotFoundException(ApiException):
         print("The run may have been removed or the project is not the owner.")
 
         _print_contact()
+
+
+class RuntimeDefinitionNotFoundException(ApiException):
+
+    def __init__(
+        self,
+        message: str,
+        runtime_definition_name: str,
+    ):
+        super().__init__(message)
+
+        self.runtime_definition_name = runtime_definition_name
+
+    def print_helper(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        print(f"The runtime `{self.runtime_definition_name}` does not exists.")
 
 
 class RestrictedPhaseActionException(ApiException):

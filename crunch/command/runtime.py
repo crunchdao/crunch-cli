@@ -88,4 +88,57 @@ def runtime_request(
     justification: str,
     show_tips: bool = False,
 ):
-    raise NotImplementedError()
+    project = get_project()
+
+    try:
+        submission = project.submissions.get(submission_identifier)
+    except NeverSubmittedException:
+        print("submission: you must submit at least once before requesting a runtime")
+        raise click.Abort()
+    except SubmissionNotFoundException:
+        print(f"submission: not found: {submission_identifier}")
+        raise click.Abort()
+
+    option = next(
+        (
+            option
+            for option in submission.runtime_options
+            if option.definition.name == runtime_option_name
+        ),
+        None
+    )
+
+    if option is None:
+        print(f"runtime: not found: {runtime_option_name}")
+
+        if show_tips:
+            print()
+            print("tips:")
+            print("  - List the available runtimes with `crunch runtime list`.")
+
+        raise click.Abort()
+
+    if option.status == RuntimeOptionStatus.AVAILABLE:
+        print(f"runtime: {runtime_option_name}: already available, no request needed")
+        return
+
+    if option.status == RuntimeOptionStatus.REQUESTED:
+        print(f"runtime: {runtime_option_name}: already requested, pending review")
+        return
+
+    if option.status == RuntimeOptionStatus.BLOCKED:
+        print(f"runtime: {runtime_option_name}: blocked, further requests are not allowed")
+        raise click.Abort()
+
+    runtime_access_request = submission.runtime_access_requests.create(
+        definition_name=runtime_option_name,
+        justification=justification,
+    )
+
+    print(f"request: created #{runtime_access_request.id} for {runtime_option_name} on submission #{submission.number} ({runtime_access_request.verdict.name.lower()})")
+
+    if show_tips:
+        print()
+        print("tips:")
+        print("  - Runtime requests are reviewed by the Crunch team, the user will receive the outcome via email.")
+        print("  - Check the status with `crunch runtime list`.")

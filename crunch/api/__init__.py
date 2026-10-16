@@ -39,6 +39,8 @@ from crunch.api._domain.run import Run as Run
 from crunch.api._domain.run import RunLog as RunLog
 from crunch.api._domain.run import RunStatus as RunStatus
 from crunch.api._domain.runner import RunnerRun as RunnerRun
+from crunch.api._domain.runtime import RuntimeAccessRequest as RuntimeAccessRequest
+from crunch.api._domain.runtime import RuntimeAccessRequestVerdict as RuntimeAccessRequestVerdict
 from crunch.api._domain.runtime import RuntimeOption as RuntimeOption
 from crunch.api._domain.runtime import RuntimeOptionStatus as RuntimeOptionStatus
 from crunch.api._domain.score import Score as Score
@@ -74,6 +76,7 @@ from crunch.api._errors import NeverSubmittedException as NeverSubmittedExceptio
 from crunch.api._errors import NextRoundNotFoundException as NextRoundNotFoundException
 from crunch.api._errors import NullPointerException as NullPointerException
 from crunch.api._errors import PhaseNotFoundException as PhaseNotFoundException
+from crunch.api._errors import PendingRuntimeAccessRequestException as PendingRuntimeAccessRequestException
 from crunch.api._errors import PredictionSubmissionNotAllowedException as PredictionSubmissionNotAllowedException
 from crunch.api._errors import PredictionTooBigException as PredictionTooBigException
 from crunch.api._errors import ProjectNotFoundException as ProjectNotFoundException
@@ -82,6 +85,7 @@ from crunch.api._errors import RestrictedPhaseActionException as RestrictedPhase
 from crunch.api._errors import RetryableException as RetryableException
 from crunch.api._errors import RoundNotFoundException as RoundNotFoundException
 from crunch.api._errors import RunNotFoundException as RunNotFoundException
+from crunch.api._errors import RuntimeDefinitionNotFoundException as RuntimeDefinitionNotFoundException
 from crunch.api._errors import SubmissionCustomCheckFailedException as SubmissionCustomCheckFailedException
 from crunch.api._errors import SubmissionNotFoundException as SubmissionNotFoundException
 from crunch.api._errors import SubmissionTooBigException as SubmissionTooBigException
