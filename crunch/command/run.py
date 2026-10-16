@@ -259,7 +259,7 @@ def run_logs(
     last_id = logs[-1]["id"] if logs else None
 
     if tail is not None:
-        logs = logs[-tail:]
+        logs = logs[-tail:] if tail else []
 
     for line in logs:
         _print_log(line, debug)
