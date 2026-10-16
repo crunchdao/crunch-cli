@@ -52,11 +52,7 @@ def reformat_datetime(
     if input is None:
         return default
 
-    return (
-        input
-        .replace(tzinfo=timezone.utc, microsecond=0)
-        .astimezone(tz=None)
-        .replace(tzinfo=None)
-        .isoformat()
-        .replace("T", " ")
-    )
+    if input.utcoffset() is None:
+        input = input.replace(tzinfo=timezone.utc)
+
+    return input.astimezone().replace(tzinfo=None, microsecond=0).isoformat().replace("T", " ")
