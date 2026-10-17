@@ -104,11 +104,12 @@ class Repository:
         root_directory_path: str,
         project: ProjectInfo,
         project_token: Optional[str],
+        auth: Optional[Auth] = None,
     ):
         self._root_directory_path = os.path.abspath(root_directory_path)
         self._project = project
         self._project_token = project_token
-        self._auth: Optional[Auth] = None
+        self._auth = auth
 
     @property
     def root_directory_path(self) -> str:
@@ -164,8 +165,10 @@ class Repository:
             authentication=authentication if authentication is not None else current.authentication,
         )
 
+        if project.authentication != current.authentication:
+            self._auth = None
+
         self.write_project(project)
-        self._auth = None
 
         return project
 
@@ -175,8 +178,10 @@ class Repository:
     def write_project_token(self, plain_project_token: str) -> None:
         _write_file_atomically(self.project_token_file_path, plain_project_token)
 
+        if plain_project_token != self._project_token:
+            self._auth = None
+
         self._project_token = plain_project_token
-        self._auth = None
 
     def read_upload_cache(self) -> Optional[Any]:
         path = self.upload_cache_file_path
@@ -270,11 +275,12 @@ class Repository:
         project: ProjectInfo,
         project_token: Optional[str],
         overwrite: bool = False,
+        auth: Optional[Auth] = None,
     ) -> "Repository":
         if (project.authentication == Authentication.PROJECT_TOKEN) != (project_token is not None):
             raise ValueError(f"a push token must be provided if and only if the authentication is {Authentication.PROJECT_TOKEN.name}")
 
-        repository = Repository(directory_path, project, project_token)
+        repository = Repository(directory_path, project, project_token, auth)
 
         dot_crunch_directory_path = repository.dot_crunch_directory_path
         if os.path.exists(dot_crunch_directory_path):
