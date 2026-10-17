@@ -1,9 +1,25 @@
 import os
+from dataclasses import dataclass
+from typing import Optional, Union
 
 import click
 
-from crunch.api import Client, SizeVariant
-from crunch.repository import ProjectInfo, Repository
+from crunch.api import Auth, Client, SizeVariant
+from crunch.repository import Authentication, ProjectInfo, Repository
+
+
+@dataclass
+class CloneTokenSetupCredentials:
+    token: str
+
+
+@dataclass
+class ApiKeySetupCredentials:
+    competition_name: str
+    project_name: str
+
+
+SetupCredentials = Union[CloneTokenSetupCredentials, ApiKeySetupCredentials]
 
 
 def _check_if_already_exists(directory: str, force: bool):
@@ -19,7 +35,7 @@ def _check_if_already_exists(directory: str, force: bool):
 
 def init(
     *,
-    clone_token: str,
+    setup_credentials: SetupCredentials,
     directory: str,
     model_directory: str,
     force: bool,
@@ -27,12 +43,21 @@ def init(
 ) -> Repository:
     should_overwrite = _check_if_already_exists(directory, force)
 
-    client = Client.from_env()
-    project_token = client.project_tokens.upgrade(clone_token)
+    plain_token: Optional[str]
+    if isinstance(setup_credentials, CloneTokenSetupCredentials):
+        client = Client.from_env()
+        project_token = client.project_tokens.upgrade(setup_credentials.token)
 
-    project = project_token.project
-    plain = project_token.plain
-    assert plain is not None
+        project = project_token.project
+        authentication = Authentication.PROJECT_TOKEN
+        plain_token = project_token.plain
+    else:
+        auth = Auth.api_key_from_notebook_environment()
+        client = Client.from_env(auth=auth)
+
+        project = client.competitions.get(setup_credentials.competition_name).projects.get("@me", setup_credentials.project_name)
+        authentication = Authentication.NOTEBOOK_ENVIRONMENT_SECRET_API_KEY
+        plain_token = None
 
     repository = Repository.init(
         directory,
@@ -41,8 +66,9 @@ def init(
             project_name=project.name,
             user_id=project.user_id,
             size_variant=data_size_variant,
+            authentication=authentication,
         ),
-        push_token=plain,
+        project_token=plain_token,
         overwrite=bool(should_overwrite),
     )
 

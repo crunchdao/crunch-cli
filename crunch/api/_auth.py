@@ -1,5 +1,7 @@
 from enum import Enum
 
+from crunch.constants import API_KEY_ENV_VAR
+
 
 class AuthorizationScheme(Enum):
 
@@ -36,6 +38,15 @@ class Auth:
     @staticmethod
     def api_key(key: str):
         return Auth(AuthorizationScheme.API_KEY, key)
+
+    @staticmethod
+    def api_key_from_notebook_environment():
+        from crunch.notebook import NotebookEnvironment
+
+        environment = NotebookEnvironment.detect()
+        api_key = environment.get_secret(API_KEY_ENV_VAR)
+
+        return Auth.api_key(api_key)
 
     @staticmethod
     def project_token(token: str):
