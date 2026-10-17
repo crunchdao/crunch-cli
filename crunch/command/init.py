@@ -72,7 +72,7 @@ class ApiKeySetupCredentials(SetupCredentials):
     def __init__(
         self,
         competition_name: str,
-        project_identifier: ProjectIdentifierType = "@first",
+        project_identifier: "ProjectIdentifierType" = "@first",
     ):
         self.competition_name = competition_name
         self.project_identifier = project_identifier
