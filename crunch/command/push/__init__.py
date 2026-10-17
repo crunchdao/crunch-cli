@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from enum import Enum, auto
@@ -437,6 +438,7 @@ def push(
             type=SubmissionType.CODE,
             code_files=_to_upload_ids(code_files),
             model_files=_to_upload_ids(model_files),
+            submitter_imprint=_get_submitter_imprint(),
         )
 
         if not no_afterword:
@@ -487,3 +489,24 @@ def _print_success(
 
     url = client.format_web_url(f"/competitions/{competition.name}/projects/{project.user_id}/{project.name}/submissions/{submission.number}")
     print(f"find it on your dashboard: {url}")
+
+
+def _get_submitter_imprint() -> str:
+    try:
+        from detect_agent import determine_agent
+
+        result = determine_agent()
+        if result["is_agent"] is True:
+            name = result["agent"]["name"]
+
+            if not re.fullmatch(r"[!-~]{1,100}", name):
+                return "agent/unknown"
+
+            return f"agent/{name}"
+    except Exception:
+        pass
+
+    if sys.stdin is not None and sys.stdin.isatty():
+        return "human/cli"
+
+    return "unknown/cli"

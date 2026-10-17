@@ -2,6 +2,7 @@ click
 crunch-convert>=0.12.1
 coloredlogs
 dataclasses_json
+detect_agent
 inquirer
 joblib
 mashumaro

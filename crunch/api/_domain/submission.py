@@ -148,6 +148,7 @@ class SubmissionCollection(Collection[Submission]):
         type: SubmissionType,
         code_files: Dict[str, str],
         model_files: Dict[str, str],
+        submitter_imprint: str,
     ) -> Submission:
         return self.prepare_model(
             self._checked_client.api.create_submission(
@@ -160,6 +161,7 @@ class SubmissionCollection(Collection[Submission]):
                 type.name,
                 code_files,
                 model_files,
+                submitter_imprint,
             )
         )
 
@@ -211,6 +213,7 @@ class SubmissionEndpointMixin(EndpointMixin):
         type: str,
         code_files: Dict[str, str],
         model_files: Dict[str, str],
+        submitter_imprint: str,
     ):
         return self._result(
             self.post(
@@ -222,6 +225,7 @@ class SubmissionEndpointMixin(EndpointMixin):
                     "type": type,
                     "codeFiles": code_files,
                     "modelFiles": model_files,
+                    "submitterImprint": submitter_imprint,
                 },
             ),
             json=True,
