@@ -305,7 +305,17 @@ class _Debugging(NotebookEnvironment):
             raise IPyNbNotAvailableError(f"notebook file `{path}` does not exist")
 
         with open(path, "r", encoding="utf-8") as fd:
-            return fd.read()
+            source = fd.read()
+
+        try:
+            ipynb = json.loads(source)  # type: ignore
+        except json.JSONDecodeError as error:
+            raise IPyNbNotAvailableError(f"failed to parse sourceNullable as JSON: {error}")
+
+        if ipynb.get("cells") is None:  # type: ignore
+            raise IPyNbNotAvailableError(f"missing cells, available keys are: {list(ipynb.keys())}")  # type: ignore
+
+        return ipynb  # type: ignore
 
     def get_secret(self, name: str) -> str:
         value = input(f"{name}: ").strip()
