@@ -9,7 +9,7 @@ from typing import BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, ove
 import click
 
 from crunch import store
-from crunch.api import Client, ForbiddenLibraryException, Submission, SubmissionType, Upload, UploadStatus
+from crunch.api import Client, ForbiddenLibraryException, Submission, SubmissionType, Upload, UploadStatus, WebUrlFormatter
 from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, REQUIREMENTS_TXT, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size, format_timespan
 from crunch.repository import Repository
@@ -445,7 +445,7 @@ def push(
         )
 
         if not no_afterword:
-            _print_success(client, submission)
+            _print_success(submission)
 
         return submission
     finally:
@@ -480,7 +480,6 @@ def _cleanup(
 
 
 def _print_success(
-    client: Client,
     submission: Submission,
 ):
     print("\n---")
@@ -490,7 +489,12 @@ def _print_success(
     project = submission.project
     competition = project.competition
 
-    url = client.format_web_url(f"/competitions/{competition.name}/projects/{project.user_id}/{project.name}/submissions/{submission.number}")
+    url = WebUrlFormatter.from_env().submission(
+        competition.name,
+        user_id=project.user_id,
+        project_name=project.name,
+        submission_number=submission.number,
+    )
     print(f"find it on your dashboard: {url}")
 
 

@@ -35,11 +35,11 @@ class AuthTest(unittest.TestCase):
         self.assertNotIn("hello", repr(auth))
 
     def test_client_sets_header(self):
-        client = api.Client("http://api/", "http://web/", api.Auth.api_key("hello"))
+        client = api.Client("http://api/", api.Auth.api_key("hello"))
 
         self.assertEqual(client.api.headers["Authorization"], "API-Key hello")
 
     def test_client_without_auth(self):
-        client = api.Client("http://api/", "http://web/", None)
+        client = api.Client("http://api/", None)
 
         self.assertNotIn("Authorization", client.api.headers)

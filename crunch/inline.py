@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import sys
-import urllib.parse
 from functools import cached_property
 from textwrap import dedent
 from types import ModuleType
@@ -13,7 +12,7 @@ import psutil
 
 import crunch.tester as tester
 from crunch.__version__ import __version__
-from crunch.api import ApiException, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
+from crunch.api import ApiException, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType, WebUrlFormatter
 from crunch.command.convert import convert
 from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
@@ -221,11 +220,13 @@ class _Inline:
         try:
             ipynb = self._notebook_environment.extract_ipynb()
         except IPyNbNotAvailableError as error:
-            client, project = self._repository.create_client()
-            nice_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook")
-
-            encoded_message = urllib.parse.quote_plus(message)
-            real_url = client.format_web_url(f"/competitions/{self._competition.name}/submit/notebook?projectName={project.name}&message={encoded_message}")
+            web_url_formatter = WebUrlFormatter.from_env()
+            nice_url = web_url_formatter.submit_notebook(self._competition.name)
+            real_url = web_url_formatter.submit_notebook(
+                self._competition.name,
+                project_name=self._repository.get_project().project_name,
+                message=message,
+            )
 
             platform_name, gif_file_name = self._notebook_environment.display_name_and_gif(have_runs=self._does_create_run)
 
@@ -316,15 +317,26 @@ class _Inline:
             error.print_helper()
             return
 
+        _, project = self._repository.create_client()
+        web_url_formatter = WebUrlFormatter.from_env()
+
         if self._does_create_run:
             gif_file_name = "create-run.gif"
-            click_path = f"runs/create?submissionNumber={submission.number}"
+            run_url = web_url_formatter.create_run(
+                self._competition.name,
+                user_login=project.user.login,
+                project_name=project.name,
+                submission_number=submission.number,
+            )
         else:
             gif_file_name = "create-deployment.gif"
-            click_path = f"submissions/{submission.number}?openDeploy-{submission.id}=true"
-
-        client, project = self._repository.create_client()
-        run_url = client.format_web_url(f"/competitions/{self._competition.name}/models/{project.user.login}/{project.name}/{click_path}")
+            run_url = web_url_formatter.deploy_submission(
+                self._competition.name,
+                user_login=project.user.login,
+                project_name=project.name,
+                submission_number=submission.number,
+                submission_id=submission.id,
+            )
 
         display(Markdown(dedent(f"""
             ---

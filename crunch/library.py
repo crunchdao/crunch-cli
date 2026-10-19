@@ -11,7 +11,7 @@ from crunch_convert.notebook import BadCellHandling, extract_from_cells
 from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist, MultipleLibraryAliasCandidateException, RequirementParseError, Whitelist, parse_from_file
 
 import crunch.store as store
-from crunch.api import Client
+from crunch.api import WebUrlFormatter
 from crunch.constants import REQUIREMENTS_R_TXT, REQUIREMENTS_TXT
 from crunch.repository import Repository
 
@@ -289,8 +289,7 @@ def _log_problems(
 
     repository = Repository.try_open()
     competition_name = repository.get_project().competition_name if repository is not None else None
-    client = Client.from_env()
-    query_param = "requestAlias" if is_alias else "requestName"
+    web_url_formatter = WebUrlFormatter.from_env()
 
     show_warning = False
 
@@ -301,7 +300,12 @@ def _log_problems(
             logger.error(f"forbidden library: {package} ({language.name.lower()})")
 
             if competition_name:
-                url = client.format_web_url(f"/competitions/{competition_name}/resources/whitelisted-libraries?{query_param}={package}&requestLanguage={language.name}")
+                url = web_url_formatter.whitelisted_libraries(
+                    competition_name,
+                    request_name=None if is_alias else package,
+                    request_alias=package if is_alias else None,
+                    request_language=language.name,
+                )
                 logger.error(f"  -> request to whitelist: {url}")
 
             show_warning = True

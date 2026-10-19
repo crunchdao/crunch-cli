@@ -190,7 +190,6 @@ class Repository:
 
         client = Client(
             store.api_base_url,
-            store.web_base_url,
             auth,
             show_progress=show_progress,
         )

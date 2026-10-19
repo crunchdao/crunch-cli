@@ -228,13 +228,11 @@ class Client:
     def __init__(
         self,
         api_base_url: str,
-        web_base_url: str,
         auth: Optional[Auth],
         *,
         show_progress: bool = True,
     ):
         self.api = EndpointClient(api_base_url, auth, show_progress)
-        self.web_base_url = web_base_url
 
     @property
     def competitions(self):
@@ -265,12 +263,6 @@ class Client:
             client=self
         )
 
-    def format_web_url(self, path: str):
-        return urllib.parse.urljoin(
-            self.web_base_url,
-            path
-        )
-
     @staticmethod
     def from_env(
         auth: Optional[Auth] = None,
@@ -284,7 +276,6 @@ class Client:
 
         return Client(
             store.api_base_url,
-            store.web_base_url,
             auth,
             show_progress=show_progress,
         )

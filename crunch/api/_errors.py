@@ -7,6 +7,7 @@ from dataclasses_json import DataClassJsonMixin
 
 from crunch.api._domain.phase import PhaseType
 from crunch.api._domain.project import ProjectTokenType
+from crunch.api._web_url_formatter import WebUrlFormatter
 from crunch.external.humanfriendly import format_size
 from crunch.external.inflection import camelize, underscore
 from crunch.utils import smart_call
@@ -77,6 +78,10 @@ class AuthorizationDeniedException(ApiException):
         print(f"You do not have permission to access this resource: {self.message}")
 
         _print_contact()
+
+
+AccessDeniedException = AuthorizationDeniedException
+InsufficientAuthenticationException = AuthorizationDeniedException
 
 
 class ValidationFailedException(ApiException):
@@ -245,22 +250,19 @@ class ForbiddenLibraryException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from crunch.api._client import Client
-
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
         if competition_name is None:
             competition_name = _try_get_competition_name()
 
-        client = Client.from_env()
+        web_url_formatter = WebUrlFormatter.from_env()
 
         print("\nProblematic packages:")
         for requirement in self.requirements:
             print(f"- {requirement.name}")
 
             if competition_name is not None:
-                request_language_param = "&requestLanguage={requirement.language}" if requirement.language != "PYTHON" else ""
-                url = client.format_web_url(f'/competitions/{competition_name}/resources/whitelisted-libraries?requestName={requirement.name}{request_language_param}')
+                url = web_url_formatter.whitelisted_libraries(competition_name, request_name=requirement.name, request_language=requirement.language)
                 print(f"  >> Request to whitelist: {url}")
 
         _print_contact("the package should be allowed")
@@ -294,21 +296,19 @@ class InvalidProjectTokenException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from crunch.api._client import Client
-
         print("Your token seems to have expired or is invalid.")
 
         if competition_name is None:
             competition_name = _try_get_competition_name()
 
-        client = Client.from_env()
+        web_url_formatter = WebUrlFormatter.from_env()
 
         if competition_name is not None:
             print("\nPlease follow this link to copy and paste your new setup command:")
-            print(client.format_web_url(f'/competitions/{competition_name}/submit'))
+            print(web_url_formatter.submit(competition_name))
         else:
             print("\nPlease go on the competition page and get a new setup command:")
-            print(client.format_web_url(f''))
+            print(web_url_formatter.home())
 
         _print_contact()
 
@@ -457,21 +457,19 @@ class ProjectNotFoundException(ApiException):
         competition_name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        from crunch.api._client import Client
-
         print("Project not found.")
 
         if competition_name is None:
             competition_name = _try_get_competition_name()
 
-        client = Client.from_env()
+        web_url_formatter = WebUrlFormatter.from_env()
 
         if competition_name is not None:
             print("\nPlease follow this link to copy and paste your new setup command:")
-            print(client.format_web_url(f'/competitions/{competition_name}/submit'))
+            print(web_url_formatter.submit(competition_name))
         else:
             print("\nPlease go on the competition page and get a new setup command:")
-            print(client.format_web_url(''))
+            print(web_url_formatter.home())
 
         _print_contact()
 
@@ -699,23 +697,19 @@ class CannotParticipateException(ApiException):
                 competition_name = _try_get_competition_name()
 
             if competition_name is not None:
-                self._show_url("Accept the rules", f"/competitions/{competition_name}")
+                self._show_url("Accept the rules", WebUrlFormatter.from_env().competition(competition_name))
 
         if not self.has_accepted_legal:
             print("- You have not accepted the new Terms of Use and Privacy Policy.")
-            self._show_url("Accept them (you should see a dialog)", "/account")
+            self._show_url("Accept them (you should see a dialog)", WebUrlFormatter.from_env().account())
 
         if not any([self.has_problem, not self.is_verified, self.is_restricted, not self.rule_accepted, not self.has_accepted_legal]):
             print("- Unknown reason")
 
         _print_contact()
 
-    def _show_url(self, action_text: str, path: str):
-        from crunch.api._client import Client
-        client = Client.from_env()
-
-        link = client.format_web_url(path)
-        print(f"  >> {action_text}: {link}")
+    def _show_url(self, action_text: str, url: str):
+        print(f"  >> {action_text}: {url}")
 
 
 class MissingMainFileException(ApiException):

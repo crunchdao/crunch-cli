@@ -101,3 +101,4 @@ from crunch.api._identifiers import PhaseIdentifierType as PhaseIdentifierType
 from crunch.api._identifiers import ProjectIdentifierType as ProjectIdentifierType
 from crunch.api._identifiers import RoundIdentifierType as RoundIdentifierType
 from crunch.api._identifiers import SubmissionIdentifierType as SubmissionIdentifierType
+from crunch.api._web_url_formatter import WebUrlFormatter as WebUrlFormatter

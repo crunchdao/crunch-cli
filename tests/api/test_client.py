@@ -70,9 +70,3 @@ class ClientTest(unittest.TestCase):
 
         for score in islice(prediction.scores.list(), 2):
             print(score)
-
-    def test_format_web_url(self):
-        url = self.client.format_web_url("/a/b/c")
-
-        self.assertTrue(url.startswith("http://") or url.startswith("https://"))
-        self.assertTrue(url.endswith("/a/b/c"))
