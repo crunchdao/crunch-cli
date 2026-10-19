@@ -52,6 +52,9 @@ UserIdentifierType = Union[
 ProjectIdentifierType = Union[
     int,
     str,
+    Literal[
+        "@first",
+    ],
 ]
 
 SubmissionIdentifierType = Union[

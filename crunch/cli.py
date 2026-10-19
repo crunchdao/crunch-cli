@@ -9,7 +9,7 @@ import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
 from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumberType
-from crunch.command.init import ApiKeySetupCredentials, CloneTokenSetupCredentials, SetupCredentials
+from crunch.command.init import API_KEY_CLONE_TOKEN, format_directory
 from crunch.command.submission import SubmissionIdentifierClickType
 from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
 from crunch.notebook import NotebookSecretNotAccessibleError
@@ -54,14 +54,6 @@ DATA_SIZE_VARIANTS = [
 ]
 
 
-def _format_directory(directory: str, competition_name: str, project_name: str):
-    directory = directory \
-        .replace("{competitionName}", competition_name) \
-        .replace("{projectName}", project_name)
-
-    return os.path.normpath(directory)
-
-
 def _echo_version():
     click.echo(f"{__version__.__title__}, version {__version__.__version__}")
 
@@ -83,23 +75,7 @@ def _remember_competition_name(competition_name: str) -> None:
     click.get_current_context().meta[_COMPETITION_NAME_META_KEY] = competition_name
 
 
-API_KEY_CLONE_TOKEN = "@api-key"
 _token_option = click.option("--token", "clone_token", required=True, help=f"Clone token to use, or `{API_KEY_CLONE_TOKEN}` to authenticate with the CRUNCH_API_KEY secret of the notebook platform (Kaggle, Colab, ...).")
-
-
-def _create_setup_credentials(
-    *,
-    clone_token: str,
-    competition_name: str,
-    project_name: Optional[str],
-) -> SetupCredentials:
-    if clone_token == API_KEY_CLONE_TOKEN:
-        if project_name is None:
-            return ApiKeySetupCredentials(competition_name)
-
-        return ApiKeySetupCredentials(competition_name, project_name)
-
-    return CloneTokenSetupCredentials(clone_token, project_name)
 
 
 class _CliGroup(click.Group):
@@ -232,17 +208,13 @@ def init(
 ):
     _remember_competition_name(competition_name)
 
-    setup_credentials = _create_setup_credentials(
-        clone_token=clone_token,
-        competition_name=competition_name,
-        project_name=project_name,
-    )
-
-    directory = _format_directory(directory, competition_name, setup_credentials.get_project_name())
+    directory = format_directory(directory, competition_name, project_name)
 
     try:
         repository = command.init(
-            setup_credentials=setup_credentials,
+            clone_token=clone_token,
+            competition_name=competition_name,
+            project_name=project_name,
             directory=directory,
             model_directory=model_directory_path,
             force=force,
@@ -264,7 +236,6 @@ def init(
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
-@click.option("--notebook", is_flag=True, help="Setup everything for a notebook environment.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
@@ -279,42 +250,27 @@ def setup(
     project_name: str,
     directory: str,
     model_directory_path: str,
-    notebook: bool,
     data_size_variant_raw: str,
 ):
     _remember_competition_name(competition_name)
 
-    setup_credentials = _create_setup_credentials(
-        clone_token=clone_token,
-        competition_name=competition_name,
-        project_name=project_name,
-    )
-
     _echo_version()
 
-    if notebook:
-        if force:
-            print("notebook `--force` is implicit", file=sys.stderr)
-
-        if directory != DIRECTORY_DEFAULT_FORMAT:
-            print("notebook `[directory]` is forced to '.'", file=sys.stderr)
-
-        force = True
-        directory = "."
-    else:
-        directory = _format_directory(directory, competition_name, setup_credentials.get_project_name())
+    directory = format_directory(directory, competition_name, project_name)
 
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
         repository = command.setup(
-            setup_credentials,
-            submission_number,
-            directory,
-            model_directory_path,
-            force,
-            no_model,
-            data_size_variant,
+            clone_token=clone_token,
+            competition_name=competition_name,
+            project_name=project_name,
+            submission_number=submission_number,
+            directory=directory,
+            model_directory=model_directory_path,
+            force=force,
+            no_model=no_model,
+            data_size_variant=data_size_variant,
         )
 
         if not no_data:
@@ -326,7 +282,7 @@ def setup(
     print(f"Success! Your environment has been correctly setup.")
     print(f"Next recommended actions:")
 
-    if directory != '.':
+    if directory != ".":
         print(f" - To get inside your workspace directory, run: cd {directory}")
 
     print(f" - To see all of the available commands of the Crunch CLI, run: crunch --help")
@@ -353,29 +309,21 @@ def setup_notebook(
 ):
     _remember_competition_name(competition_name)
 
-    if clone_token != API_KEY_CLONE_TOKEN and project_name is not None:
-        raise click.UsageError(f"a project name can only be given with `{API_KEY_CLONE_TOKEN}`, a clone token already identifies its project")
-
-    setup_credentials = _create_setup_credentials(
-        clone_token=clone_token,
-        competition_name=competition_name,
-        project_name=project_name,
-    )
-
     _echo_version()
-
-    directory = os.getcwd()
 
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        repository = command.setup_notebook(
-            setup_credentials,
-            submission_number,
-            directory,
-            model_directory_path,
-            no_model,
-            data_size_variant,
+        repository = command.setup(
+            clone_token=clone_token,
+            competition_name=competition_name,
+            project_name=project_name,
+            submission_number=submission_number,
+            directory=os.getcwd(),
+            model_directory=model_directory_path,
+            force=True,
+            no_model=no_model,
+            data_size_variant=data_size_variant,
         )
 
         if not no_data:

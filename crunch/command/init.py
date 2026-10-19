@@ -1,124 +1,103 @@
 import os
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import cached_property
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import click
 
 from crunch.api import Auth, Client, Project, SizeVariant
-from crunch.repository import Authentication, ProjectInfo, Repository
+from crunch.repository import ProjectInfo, Repository
 
-if TYPE_CHECKING:
-    from crunch.api import ProjectIdentifierType
+COMPETITION_NAME_PLACEHOLDER = "{competitionName}"
+PROJECT_NAME_PLACEHOLDER = "{projectName}"
+
+API_KEY_CLONE_TOKEN = "@api-key"
 
 
 @dataclass(frozen=True)
 class ProjectAccess:
     project: Project
-    authentication: Authentication
-    auth: Auth
     project_token: Optional[str]
 
 
-class SetupCredentials(ABC):
+def exchange_clone_token(clone_token: str) -> ProjectAccess:
+    client = Client.from_env()
+    project_token = client.project_tokens.upgrade(clone_token)
 
-    @cached_property
-    @abstractmethod
-    def project_name(self) -> str:
-        ...
+    plain = project_token.plain
+    assert plain is not None
 
-    @cached_property
-    @abstractmethod
-    def access(self) -> ProjectAccess:
-        ...
-
-
-class CloneTokenSetupCredentials(SetupCredentials):
-
-    def __init__(
-        self,
-        token: str,
-        project_name: Optional[str] = None,
-    ):
-        self.token = token
-        self._project_name = project_name
-
-    @cached_property
-    def project_name(self) -> str:
-        if self._project_name is None:
-            raise ValueError("the project of a clone token is only known once the token is used")
-
-        return self._project_name
-
-    @cached_property
-    def access(self) -> ProjectAccess:
-        client = Client.from_env()
-        project_token = client.project_tokens.upgrade(self.token)
-
-        plain = project_token.plain
-        assert plain is not None
-
-        return ProjectAccess(
-            project=project_token.project,
-            authentication=Authentication.PROJECT_TOKEN,
-            auth=Auth.project_token(plain),
-            project_token=plain,
-        )
+    return ProjectAccess(
+        project=project_token.project,
+        project_token=plain,
+    )
 
 
-class ApiKeySetupCredentials(SetupCredentials):
+def find_project_with_api_key(
+    competition_name: str,
+    project_name: str,
+) -> ProjectAccess:
+    client = Client.from_env(auth=Auth.api_key_from_notebook_environment())
 
-    def __init__(
-        self,
-        competition_name: str,
-        project_identifier: "ProjectIdentifierType" = "@first",
-    ):
-        self.competition_name = competition_name
-        self.project_identifier = project_identifier
+    project = client.competitions.get(competition_name).projects.get("@me", project_name)
 
-    @cached_property
-    def project_name(self) -> str:
-        return self.access.project.name
-
-    @cached_property
-    def access(self) -> ProjectAccess:
-        auth = Auth.api_key_from_notebook_environment()
-        client = Client.from_env(auth=auth)
-
-        project = client.competitions.get(self.competition_name).projects.get("@me", self.project_identifier)
-
-        return ProjectAccess(
-            project=project,
-            authentication=Authentication.NOTEBOOK_ENVIRONMENT_SECRET_API_KEY,
-            auth=auth,
-            project_token=None,
-        )
+    return ProjectAccess(
+        project=project,
+        project_token=None,
+    )
 
 
-def _check_if_already_exists(directory: str, force: bool):
-    if not os.path.exists(directory):
-        return False
+def resolve_project_access(
+    *,
+    clone_token: str,
+    competition_name: str,
+    project_name: Optional[str],
+) -> ProjectAccess:
+    if clone_token != API_KEY_CLONE_TOKEN:
+        return exchange_clone_token(clone_token)
 
-    if force:
-        return True
-    elif len(os.listdir(directory)):
+    if project_name is None:
+        raise click.UsageError(f"a project name must be given with `{API_KEY_CLONE_TOKEN}`")
+
+    return find_project_with_api_key(competition_name, project_name)
+
+
+def format_directory(
+    directory: str,
+    competition_name: str,
+    project_name: str,
+) -> str:
+    directory = directory \
+        .replace(COMPETITION_NAME_PLACEHOLDER, competition_name) \
+        .replace(PROJECT_NAME_PLACEHOLDER, project_name)
+
+    return os.path.normpath(directory)
+
+
+def _check_directory_is_empty(directory: str, force: bool):
+    if not force and os.path.exists(directory) and len(os.listdir(directory)):
         print(f"init: {directory}: directory not empty (use --force to overwrite)")
         raise click.Abort()
 
 
 def init(
     *,
-    setup_credentials: SetupCredentials,
+    clone_token: str,
+    competition_name: str,
+    project_name: Optional[str],
     directory: str,
     model_directory: str,
     force: bool,
     data_size_variant: SizeVariant = SizeVariant.DEFAULT
 ) -> Repository:
-    should_overwrite = _check_if_already_exists(directory, force)
+    _check_directory_is_empty(directory, force)
 
-    access = setup_credentials.access
-    project = access.project
+    project_access = resolve_project_access(
+        clone_token=clone_token,
+        competition_name=competition_name,
+        project_name=project_name,
+    )
+
+    project = project_access.project
 
     repository = Repository.init(
         directory,
@@ -127,11 +106,9 @@ def init(
             project_name=project.name,
             user_id=project.user_id,
             size_variant=data_size_variant,
-            authentication=access.authentication,
         ),
-        project_token=access.project_token,
-        auth=access.auth,
-        overwrite=bool(should_overwrite),
+        project_token=project_access.project_token,
+        overwrite=force,
     )
 
     os.chdir(repository.root_directory_path)

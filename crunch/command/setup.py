@@ -4,7 +4,6 @@ import click
 
 import crunch.api as api
 import crunch.command as command
-from crunch.command.init import SetupCredentials
 from crunch.repository import Repository
 from crunch.utils import download
 
@@ -35,7 +34,10 @@ class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[report
 
 
 def setup(
-    setup_credentials: SetupCredentials,
+    *,
+    clone_token: str,
+    competition_name: str,
+    project_name: Optional[str],
     submission_number: SetupSubmissionNumberType,
     directory: str,
     model_directory: str,
@@ -44,7 +46,9 @@ def setup(
     data_size_variant: api.SizeVariant,
 ) -> Repository:
     repository = command.init(
-        setup_credentials=setup_credentials,
+        clone_token=clone_token,
+        competition_name=competition_name,
+        project_name=project_name,
         directory=directory,
         model_directory=model_directory,
         force=force,
@@ -77,22 +81,3 @@ def setup(
         print(f"setup: you appear to have submitted an encrypted submission")
 
     return repository
-
-
-def setup_notebook(
-    setup_credentials: SetupCredentials,
-    submission_number: SetupSubmissionNumberType,
-    directory: str,
-    model_directory: str,
-    no_model: bool,
-    data_size_variant: api.SizeVariant,
-) -> Repository:
-    return setup(
-        setup_credentials,
-        submission_number,
-        directory,
-        model_directory,
-        True,
-        no_model,
-        data_size_variant,
-    )
