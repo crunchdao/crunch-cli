@@ -340,22 +340,16 @@ def convert_if_necessary(
 @click.option("-m", "--message", prompt=True, default="", help=f"Specify the change of your code. (like a commit message, limited to {constants.SUBMISSION_MESSAGE_LENGTH} characters)")
 @click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
-@click.option("--export", "export_path", show_default=True, type=str, help="Copy the `.tar` to the specified file.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
 @click.option("--dry", is_flag=True, help="Prepare file but do not really create the submission.")
 def push(
     message: str,
     main_file_path: str,
     model_directory_path: str,
-    export_path: Optional[str],
     no_pip_freeze: bool,
     dry: bool,
 ):
     repository = _open_repository()
-
-    if export_path is not None:
-        print("--export is not supported anymore", file=sys.stderr)
-        raise click.Abort()
 
     with convert_if_necessary(main_file_path):
         command.push(

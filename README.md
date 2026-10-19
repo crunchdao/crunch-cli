@@ -67,7 +67,6 @@ Options:
   -m, --message TEXT      Specify the change of your code. (like a commit message, limited to 1000 characters)
   --main-file TEXT        Entrypoint of your code.  [default: main.py]       
   --model-directory TEXT  Directory where your model is stored.  [default: resources]
-  --export TEXT           Copy the `.tar` to the specified file.
   --no-pip-freeze         Do not do a `pip freeze` to know preferred packages version.
   --dry                   Prepare file but do not really create the submission.
 ```
