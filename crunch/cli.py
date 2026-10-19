@@ -9,8 +9,10 @@ import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
 from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumberType
+from crunch.command.init import API_KEY_CLONE_TOKEN, format_directory
 from crunch.command.submission import SubmissionIdentifierClickType
 from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
+from crunch.notebook import NotebookSecretNotAccessibleError
 from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
@@ -52,14 +54,6 @@ DATA_SIZE_VARIANTS = [
 ]
 
 
-def _format_directory(directory: str, competition_name: str, project_name: str):
-    directory = directory \
-        .replace("{competitionName}", competition_name) \
-        .replace("{projectName}", project_name)
-
-    return os.path.normpath(directory)
-
-
 def _echo_version():
     click.echo(f"{__version__.__title__}, version {__version__.__version__}")
 
@@ -81,6 +75,9 @@ def _remember_competition_name(competition_name: str) -> None:
     click.get_current_context().meta[_COMPETITION_NAME_META_KEY] = competition_name
 
 
+_token_option = click.option("--token", "clone_token", required=True, help=f"Clone token to use, or `{API_KEY_CLONE_TOKEN}` to authenticate with the CRUNCH_API_KEY secret of the notebook platform (Kaggle, Colab, ...).")
+
+
 class _CliGroup(click.Group):
 
     def invoke(self, ctx: click.Context) -> Any:
@@ -88,6 +85,10 @@ class _CliGroup(click.Group):
             return super().invoke(ctx)
         except RepositoryError as error:
             print(f"project: {error}", file=sys.stderr)
+            raise click.Abort()
+        except NotebookSecretNotAccessibleError as error:
+            print(f"secret: {error}", file=sys.stderr)
+            print(f"secret: if the environment was originally created via a clone-token, the file might be missing: run `crunch update-token` to refresh it", file=sys.stderr)
             raise click.Abort()
         except api.ApiException as error:
             print("\n---")
@@ -190,7 +191,7 @@ def list_competitions(
 
 
 @cli.command(help="Initialize an empty workspace directory.")
-@click.option("--token", "clone_token", required=True, help="Clone token to use.")
+@_token_option
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
@@ -208,11 +209,13 @@ def init(
 ):
     _remember_competition_name(competition_name)
 
-    directory = _format_directory(directory, competition_name, project_name)
+    directory = format_directory(directory, competition_name, project_name)
 
     try:
         repository = command.init(
             clone_token=clone_token,
+            competition_name=competition_name,
+            project_name=project_name,
             directory=directory,
             model_directory=model_directory_path,
             force=force,
@@ -228,13 +231,12 @@ def init(
 
 
 @cli.command(help="Setup a workspace directory.")
-@click.option("--token", "clone_token", required=True, help="Clone token to use.")
+@_token_option
 @click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scratch" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
 @click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
-@click.option("--notebook", is_flag=True, help="Setup everything for a notebook environment.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
 @click.argument("project-name", required=True)
@@ -249,35 +251,27 @@ def setup(
     project_name: str,
     directory: str,
     model_directory_path: str,
-    notebook: bool,
     data_size_variant_raw: str,
 ):
-    _echo_version()
     _remember_competition_name(competition_name)
 
-    if notebook:
-        if force:
-            print("notebook `--force` is implicit", file=sys.stderr)
+    _echo_version()
 
-        if directory != DIRECTORY_DEFAULT_FORMAT:
-            print("notebook `[directory]` is forced to '.'", file=sys.stderr)
-
-        force = True
-        directory = "."
-    else:
-        directory = _format_directory(directory, competition_name, project_name)
+    directory = format_directory(directory, competition_name, project_name)
 
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
         repository = command.setup(
-            clone_token,
-            submission_number,
-            directory,
-            model_directory_path,
-            force,
-            no_model,
-            data_size_variant,
+            clone_token=clone_token,
+            competition_name=competition_name,
+            project_name=project_name,
+            submission_number=submission_number,
+            directory=directory,
+            model_directory=model_directory_path,
+            force=force,
+            no_model=no_model,
+            data_size_variant=data_size_variant,
         )
 
         if not no_data:
@@ -289,7 +283,7 @@ def setup(
     print(f"Success! Your environment has been correctly setup.")
     print(f"Next recommended actions:")
 
-    if directory != '.':
+    if directory != ".":
         print(f" - To get inside your workspace directory, run: cd {directory}")
 
     print(f" - To see all of the available commands of the Crunch CLI, run: crunch --help")
@@ -302,7 +296,8 @@ def setup(
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
-@click.argument("clone-token")
+@click.argument("clone-token", required=True)
+@click.argument("project-name", required=False)
 def setup_notebook(
     submission_number: SetupSubmissionNumberType,
     no_data: bool,
@@ -311,22 +306,25 @@ def setup_notebook(
     data_size_variant_raw: str,
     competition_name: str,
     clone_token: str,
+    project_name: Optional[str],
 ):
-    _echo_version()
     _remember_competition_name(competition_name)
 
-    directory = os.getcwd()
+    _echo_version()
 
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        repository = command.setup_notebook(
-            clone_token,
-            submission_number,
-            directory,
-            model_directory_path,
-            no_model,
-            data_size_variant,
+        repository = command.setup(
+            clone_token=clone_token,
+            competition_name=competition_name,
+            project_name=project_name,
+            submission_number=submission_number,
+            directory=os.getcwd(),
+            model_directory=model_directory_path,
+            force=True,
+            no_model=no_model,
+            data_size_variant=data_size_variant,
         )
 
         if not no_data:

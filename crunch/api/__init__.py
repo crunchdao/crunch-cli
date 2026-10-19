@@ -77,8 +77,8 @@ from crunch.api._errors import ModelTooBigException as ModelTooBigException
 from crunch.api._errors import NeverSubmittedException as NeverSubmittedException
 from crunch.api._errors import NextRoundNotFoundException as NextRoundNotFoundException
 from crunch.api._errors import NullPointerException as NullPointerException
-from crunch.api._errors import PhaseNotFoundException as PhaseNotFoundException
 from crunch.api._errors import PendingRuntimeAccessRequestException as PendingRuntimeAccessRequestException
+from crunch.api._errors import PhaseNotFoundException as PhaseNotFoundException
 from crunch.api._errors import PredictionSubmissionNotAllowedException as PredictionSubmissionNotAllowedException
 from crunch.api._errors import PredictionTooBigException as PredictionTooBigException
 from crunch.api._errors import ProjectNotFoundException as ProjectNotFoundException
@@ -98,5 +98,6 @@ from crunch.api._errors import find_error_class as find_error_class
 from crunch.api._identifiers import CompetitionIdentifierType as CompetitionIdentifierType
 from crunch.api._identifiers import CrunchIdentifierType as CrunchIdentifierType
 from crunch.api._identifiers import PhaseIdentifierType as PhaseIdentifierType
+from crunch.api._identifiers import ProjectIdentifierType as ProjectIdentifierType
 from crunch.api._identifiers import RoundIdentifierType as RoundIdentifierType
 from crunch.api._identifiers import SubmissionIdentifierType as SubmissionIdentifierType

@@ -34,7 +34,10 @@ class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[report
 
 
 def setup(
+    *,
     clone_token: str,
+    competition_name: str,
+    project_name: Optional[str],
     submission_number: SetupSubmissionNumberType,
     directory: str,
     model_directory: str,
@@ -44,6 +47,8 @@ def setup(
 ) -> Repository:
     repository = command.init(
         clone_token=clone_token,
+        competition_name=competition_name,
+        project_name=project_name,
         directory=directory,
         model_directory=model_directory,
         force=force,
@@ -76,22 +81,3 @@ def setup(
         print(f"setup: you appear to have submitted an encrypted submission")
 
     return repository
-
-
-def setup_notebook(
-    clone_token: str,
-    submission_number: SetupSubmissionNumberType,
-    directory: str,
-    model_directory: str,
-    no_model: bool,
-    data_size_variant: api.SizeVariant,
-) -> Repository:
-    return setup(
-        clone_token,
-        submission_number,
-        directory,
-        model_directory,
-        True,
-        no_model,
-        data_size_variant,
-    )
