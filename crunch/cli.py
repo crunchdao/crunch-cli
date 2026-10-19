@@ -12,6 +12,7 @@ from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumber
 from crunch.command.init import API_KEY_CLONE_TOKEN, format_directory
 from crunch.command.submission import SubmissionIdentifierClickType
 from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
+from crunch.constants import REQUIREMENTS_TXT
 from crunch.notebook import NotebookSecretNotAccessibleError
 from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
@@ -327,7 +328,12 @@ def convert_if_necessary(
         if not os.path.exists(notebook_file_path):
             raise click.Abort()
 
-        command.convert(notebook_file_path, main_file_path)
+        command.convert(
+            notebook_file_path,
+            main_file_path,
+            write_requirements=not os.path.exists(REQUIREMENTS_TXT),
+        )
+
         converted = True
     try:
         yield
