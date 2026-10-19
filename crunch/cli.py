@@ -88,6 +88,7 @@ class _CliGroup(click.Group):
             raise click.Abort()
         except NotebookSecretNotAccessibleError as error:
             print(f"secret: {error}", file=sys.stderr)
+            print(f"secret: if the environment was originally created via a clone-token, the file might be missing: run `crunch update-token` to refresh it", file=sys.stderr)
             raise click.Abort()
         except api.ApiException as error:
             print("\n---")
