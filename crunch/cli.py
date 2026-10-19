@@ -19,8 +19,6 @@ from crunch.unstructured.cli import organize_test_group
 
 from . import __version__, api, command, constants, store
 
-store.load_from_env()
-
 if TYPE_CHECKING:
     from crunch_convert import RequirementLanguage
 
@@ -28,24 +26,6 @@ if TYPE_CHECKING:
 
 
 DIRECTORY_DEFAULT_FORMAT = "{competitionName}-{projectName}"
-
-
-ENVIRONMENT_PRODUCTION = "production"
-ENVIRONMENT_STAGING = "staging"
-ENVIRONMENT_DEVELOPMENT = "development"
-
-ENVIRONMENT_ALIASES = {
-    "prod": ENVIRONMENT_PRODUCTION,
-    "test": ENVIRONMENT_STAGING,
-    "dev": ENVIRONMENT_DEVELOPMENT,
-    "local": ENVIRONMENT_DEVELOPMENT,
-}
-
-ENVIRONMENTS = {
-    ENVIRONMENT_PRODUCTION: (constants.API_BASE_URL_PRODUCTION, constants.WEB_BASE_URL_PRODUCTION),
-    ENVIRONMENT_STAGING: (constants.API_BASE_URL_STAGING, constants.WEB_BASE_URL_STAGING),
-    ENVIRONMENT_DEVELOPMENT: (constants.API_BASE_URL_DEVELOPMENT, constants.WEB_BASE_URL_DEVELOPMENT),
-}
 
 DATA_SIZE_VARIANTS = [
     api.SizeVariant.DEFAULT.name.lower(),
@@ -100,37 +80,32 @@ class _CliGroup(click.Group):
 
 @click.group(cls=_CliGroup)
 @click.version_option(__version__.__version__, package_name="__version__.__title__")
-@click.option("--debug", envvar=constants.DEBUG_ENV_VAR, is_flag=True, help="Enable debug output.")
-@click.option("--api-base-url", envvar=constants.API_BASE_URL_ENV_VAR, default=constants.API_BASE_URL_PRODUCTION, help="Set the API base url.")
-@click.option("--web-base-url", envvar=constants.WEB_BASE_URL_ENV_VAR, default=constants.WEB_BASE_URL_PRODUCTION, help="Set the Web base url.")
-@click.option("--competitions", "competitions_source", envvar=constants.COMPETITIONS_SOURCE_ENV_VAR, default=constants.COMPETITIONS_SOURCE_DEFAULT, help="Set the Competitions repository location.")
-@click.option("--environment", "--env", "environment_name", envvar=constants.ENVIRONMENT_ENV_VAR, help="Connect to another environment.")
+@click.option("--debug", is_flag=True, help="Enable debug output.")
+@click.option("--api-base-url", help="Set the API base url.")
+@click.option("--web-base-url", help="Set the Web base url.")
+@click.option("--competitions", "competitions_source", help="Set the Competitions repository location.")
+@click.option("--environment", "--env", "environment_name", help="Connect to another environment, overwrites the base urls.")
 @click.option("--no-tips", is_flag=True, help="Disable tips.")
 def cli(
     debug: bool,
-    api_base_url: str,
-    web_base_url: str,
-    competitions_source: str,
-    environment_name: str,
+    api_base_url: Optional[str],
+    web_base_url: Optional[str],
+    competitions_source: Optional[str],
+    environment_name: Optional[str],
     no_tips: bool,
 ):
     constants.RUN_VIA_CLI = True
 
-    store.debug = debug
-    store.api_base_url = api_base_url
-    store.web_base_url = web_base_url
-    store.competitions_source = competitions_source
+    store.override(
+        debug=debug or None,
+        environment=environment_name,
+        api_base_url=api_base_url,
+        web_base_url=web_base_url,
+        competitions_source=competitions_source,
+    )
 
     global show_tips
     show_tips = not no_tips
-
-    environment_name = ENVIRONMENT_ALIASES.get(environment_name) or environment_name
-    if environment_name in ENVIRONMENTS:
-        print(f"environment: forcing {environment_name} urls, ignoring ${constants.API_BASE_URL_ENV_VAR} and ${constants.WEB_BASE_URL_ENV_VAR}")
-
-        store.api_base_url, store.web_base_url = ENVIRONMENTS[environment_name]
-    elif environment_name:
-        print(f"environment: unknown environment `{environment_name}`, ignoring it")
 
 
 @cli.command(help="Test if the server is online.")

@@ -182,8 +182,6 @@ class Repository:
         *,
         show_progress: bool = True,
     ) -> Tuple[Client, Project]:
-        store.load_from_env()
-
         auth = (
             Auth.project_token(self._project_token)
             if self._project_token is not None

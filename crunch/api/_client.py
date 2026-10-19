@@ -277,8 +277,6 @@ class Client:
         *,
         show_progress: bool = True,
     ):
-        store.load_from_env()
-
         if auth is None:
             api_key = os.getenv(API_KEY_ENV_VAR)
             if api_key:
