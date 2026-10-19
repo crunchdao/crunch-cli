@@ -309,6 +309,7 @@ class _Inline:
                 include_installed_packages_version=include_installed_packages_version,
                 no_afterword=True,
                 dry=False,
+                fallback_submitter_imprint=f"human/notebook/{self._notebook_environment.name}",
             )
         except ApiException as error:
             print("\n---")

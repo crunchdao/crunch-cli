@@ -10,7 +10,7 @@ import click
 
 from crunch import store
 from crunch.api import Client, ForbiddenLibraryException, Submission, SubmissionType, Upload, UploadStatus
-from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, REQUIREMENTS_R_TXT, REQUIREMENTS_TXT, SUBMISSION_MESSAGE_LENGTH
+from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, REQUIREMENTS_TXT, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size, format_timespan
 from crunch.repository import Repository
 from crunch.utils import to_unix_path
@@ -347,7 +347,8 @@ def push(
     model_directory_relative_path: str,
     include_installed_packages_version: bool,
     no_afterword: bool,
-    dry: Literal[True]
+    dry: Literal[True],
+    fallback_submitter_imprint: Optional[str] = None,
 ) -> None:
     ...
 
@@ -362,6 +363,7 @@ def push(
     include_installed_packages_version: bool,
     no_afterword: bool,
     dry: Literal[False],
+    fallback_submitter_imprint: Optional[str] = None,
 ) -> Submission:
     ...
 
@@ -375,6 +377,7 @@ def push(
     include_installed_packages_version: bool,
     no_afterword: bool,
     dry: bool,
+    fallback_submitter_imprint: Optional[str] = None,
 ) -> Optional[Submission]:
     message_length = len(message)
     if message_length > SUBMISSION_MESSAGE_LENGTH:
@@ -438,7 +441,7 @@ def push(
             type=SubmissionType.CODE,
             code_files=_to_upload_ids(code_files),
             model_files=_to_upload_ids(model_files),
-            submitter_imprint=_get_submitter_imprint(),
+            submitter_imprint=_get_submitter_imprint(fallback_submitter_imprint),
         )
 
         if not no_afterword:
@@ -491,7 +494,7 @@ def _print_success(
     print(f"find it on your dashboard: {url}")
 
 
-def _get_submitter_imprint() -> str:
+def _get_submitter_imprint(fallback: Optional[str] = None) -> str:
     try:
         from detect_agent import determine_agent
 
@@ -508,5 +511,8 @@ def _get_submitter_imprint() -> str:
 
     if sys.stdin is not None and sys.stdin.isatty():
         return "human/cli"
+
+    if fallback is not None:
+        return fallback
 
     return "unknown/cli"

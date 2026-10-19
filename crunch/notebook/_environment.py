@@ -4,7 +4,7 @@ import os
 import queue
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Literal, Optional, Tuple, overload
 
 import psutil
 
@@ -24,6 +24,11 @@ class NotebookSecretNotAccessibleError(Exception):
 
 class NotebookEnvironment(ABC):
 
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
     @abstractmethod
     def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
         pass
@@ -37,7 +42,17 @@ class NotebookEnvironment(ABC):
         pass
 
     @staticmethod
-    def detect() -> "NotebookEnvironment":
+    @overload
+    def detect(none_if_not_found: Literal[False] = False) -> "NotebookEnvironment":
+        ...
+
+    @staticmethod
+    @overload
+    def detect(none_if_not_found: Literal[True]) -> Optional["NotebookEnvironment"]:
+        ...
+
+    @staticmethod
+    def detect(none_if_not_found: bool = False) -> Optional["NotebookEnvironment"]:
         if Kaggle.ENVVAR in os.environ:
             return Kaggle()
 
@@ -46,6 +61,9 @@ class NotebookEnvironment(ABC):
 
         if _Debugging.ENVVAR in os.environ:
             return _Debugging()
+
+        if none_if_not_found:
+            return None
 
         return Generic()
 
@@ -165,6 +183,10 @@ class Colab(_Jupyter):
 
     ENVVAR = "COLAB_GPU"
 
+    @property
+    def name(self) -> str:
+        return "colab"
+
     def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
         return "Colab", _colab_gif(have_runs)
 
@@ -224,6 +246,10 @@ class Kaggle(_Jupyter):
 
     ENVVAR = "KAGGLE_KERNEL_RUN_TYPE"
 
+    @property
+    def name(self) -> str:
+        return "kaggle"
+
     def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
         # TODO Record separate GIFs for deployments from Kaggle
         return "Kaggle", "download-and-submit-notebook-on-kaggle.gif"
@@ -274,6 +300,10 @@ class Kaggle(_Jupyter):
 
 class Generic(NotebookEnvironment):
 
+    @property
+    def name(self) -> str:
+        return "generic"
+
     def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
         return "your current environment", _colab_gif(have_runs)
 
@@ -293,11 +323,15 @@ class _Debugging(NotebookEnvironment):
 
     ENVVAR = "CRUNCH_NOTEBOOK_ENVIRONMENT_DEBUGGING"
 
+    @property
+    def name(self) -> str:
+        return "debugging"
+
     def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
         return "your debugging environment", _colab_gif(have_runs)
 
     def extract_ipynb(self) -> IPyNb:
-        path = input("Path to the notebook file: ").strip()
+        path = (os.getenv("CRUNCH_NOTEBOOK_ENVIRONMENT_DEBUGGING_NOTEBOOK") or input("Path to the notebook file: ")).strip()
         if not path:
             raise IPyNbNotAvailableError(f"no notebook file path provided")
 
@@ -318,10 +352,7 @@ class _Debugging(NotebookEnvironment):
         return ipynb  # type: ignore
 
     def get_secret(self, name: str) -> str:
-        value = input(f"{name}: ").strip()
-
-        import traceback
-        traceback.print_stack()
+        value = (os.getenv(f"CRUNCH_NOTEBOOK_ENVIRONMENT_DEBUGGING_SECRET_{name}") or input(f"{name}: ")).strip()
 
         if not value:
             raise NotebookSecretNotAccessibleError(f"value `{name}` is not set")
