@@ -476,7 +476,10 @@ def _cleanup(
         if not keep_cached or upload.status != UploadStatus.SUCCEEDED
     ]
 
-    client.uploads.batch_delete(upload_ids_to_delete)
+    try:
+        client.uploads.batch_delete(upload_ids_to_delete)
+    except Exception as error:
+        print(f"push: failed to delete uploads: {error}", file=sys.stderr)
 
 
 def _print_success(
