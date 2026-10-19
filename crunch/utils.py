@@ -247,7 +247,7 @@ def download(
                             fd.write(chunk)
 
                     break
-                except (requests.exceptions.ConnectionError, KeyboardInterrupt) as error:
+                except requests.exceptions.ConnectionError as error:
                     if last:
                         raise
 

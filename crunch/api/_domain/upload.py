@@ -210,7 +210,7 @@ class UploadChunk(Model[int]):
                 response.raise_for_status()
 
                 break
-            except (requests.exceptions.ConnectionError, KeyboardInterrupt) as error:
+            except requests.exceptions.ConnectionError as error:
                 if last:
                     raise
 
