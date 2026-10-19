@@ -38,9 +38,6 @@ def _echo_version():
     click.echo(f"{__version__.__title__}, version {__version__.__version__}")
 
 
-show_tips: bool = False
-
-
 def _open_repository() -> Repository:
     repository = Repository.open()
 
@@ -85,27 +82,25 @@ class _CliGroup(click.Group):
 @click.option("--web-base-url", help="Set the Web base url.")
 @click.option("--competitions", "competitions_source", help="Set the Competitions repository location.")
 @click.option("--environment", "--env", "environment_name", help="Connect to another environment, overwrites the base urls.")
-@click.option("--no-tips", is_flag=True, help="Disable tips.")
+@click.option("--hide-tips", "hide_tips", is_flag=True, help="Hide tips.")
 def cli(
     debug: bool,
     api_base_url: Optional[str],
     web_base_url: Optional[str],
     competitions_source: Optional[str],
     environment_name: Optional[str],
-    no_tips: bool,
+    hide_tips: bool,
 ):
     constants.RUN_VIA_CLI = True
 
     store.override(
-        debug=debug or None,
+        debug=True if debug else None,
         environment=environment_name,
         api_base_url=api_base_url,
         web_base_url=web_base_url,
         competitions_source=competitions_source,
+        show_tips=False if hide_tips else None,
     )
-
-    global show_tips
-    show_tips = not no_tips
 
 
 @cli.command(help="Test if the server is online.")
@@ -477,7 +472,6 @@ def status():
 
     command.status(
         repository,
-        show_tips=show_tips,
     )
 
 
@@ -487,7 +481,6 @@ def leaderboard():
 
     command.leaderboard(
         repository,
-        show_tips=show_tips,
     )
 
 
@@ -497,7 +490,6 @@ def quota():
 
     command.quota(
         repository,
-        show_tips=show_tips,
     )
 
 
@@ -512,7 +504,6 @@ def quickstarter_list():
 
     command.quickstarter_list(
         repository,
-        show_tips=show_tips,
     )
 
 
@@ -526,7 +517,6 @@ def quickstarter_show(
     command.quickstarter_show(
         repository,
         quickstarter_name=quickstarter_name,
-        show_tips=show_tips,
     )
 
 
@@ -543,7 +533,6 @@ def quickstarter_apply(
         repository,
         quickstarter_name=quickstarter_name,
         overwrite=overwrite,
-        show_tips=show_tips,
     )
 
 
@@ -564,7 +553,6 @@ def submission_list(
     command.submission_list(
         repository,
         limit=limit if not all else None,
-        show_tips=show_tips,
     )
 
 
@@ -578,7 +566,6 @@ def submission_show(
     command.submission_show(
         repository,
         submission_identifier=submission,
-        show_tips=show_tips,
     )
 
 
@@ -601,7 +588,6 @@ def submission_checkout(
         repository,
         submission_identifier=submission,
         files=absolute_files if len(absolute_files) else None,
-        show_tips=show_tips,
     )
 
 
@@ -620,7 +606,6 @@ def runtime_list(
     command.runtime_list(
         repository,
         submission_identifier=submission,
-        show_tips=show_tips,
     )
 
 
@@ -640,7 +625,6 @@ def runtime_request(
         runtime_option_name=runtime,
         submission_identifier=submission,
         justification=justification,
-        show_tips=show_tips,
     )
 
 
@@ -668,7 +652,6 @@ def run_create(
         train_frequency=train_frequency,
         force_first_train=force_first_train,
         runtime_definition_name=runtime,
-        show_tips=show_tips,
     )
 
 
@@ -681,7 +664,6 @@ def run_list(limit: int, all: bool):
     command.run_list(
         repository,
         limit=limit if not all else None,
-        show_tips=show_tips,
     )
 
 
@@ -693,7 +675,6 @@ def run_show(run_id: int):
     command.run_show(
         repository,
         run_id=run_id,
-        show_tips=show_tips,
     )
 
 
@@ -711,7 +692,6 @@ def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
         tail=tail,
         follow=follow,
         debug=debug,
-        show_tips=show_tips,
     )
 
 
@@ -727,7 +707,6 @@ def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
         run_id=run_id,
         timeout=timeout,
         poll_interval=poll_interval,
-        show_tips=show_tips,
     ))
 
 
@@ -739,7 +718,6 @@ def run_select(run_id: int):
     command.run_select(
         repository,
         run_id=run_id,
-        show_tips=show_tips,
     )
 
 
@@ -751,7 +729,6 @@ def run_terminate(run_id: int):
     command.run_terminate(
         repository,
         run_id=run_id,
-        show_tips=show_tips,
     )
 
 
@@ -775,7 +752,6 @@ def whitelist_search(
         query=query,
         language=language,
         limit=limit if not all else None,
-        show_tips=show_tips,
     ))
 
 
@@ -796,7 +772,6 @@ def whitelist_validate(
     exit(command.whitelist_validate(
         requirements_txt_file_path=requirements_txt_file_path,
         language=language,
-        show_tips=show_tips,
     ))
 
 
@@ -825,7 +800,6 @@ def whitelist_request(
         language=language,
         gpu_requirement=gpu_requirement,
         additional_details=additional_details,
-        show_tips=show_tips,
     )
 
 

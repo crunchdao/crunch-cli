@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Optional
 
 import click
 
+from crunch import store
 from crunch.api import NeverSubmittedException, SubmissionNotFoundException
 from crunch.repository import Repository
 
@@ -19,15 +20,13 @@ def get_project(repository: Repository):
 def get_submission(
     project: "Project",
     identifier: "SubmissionIdentifierType",
-    *,
-    show_tips: bool = False,
 ):
     try:
         return project.submissions.get(identifier)
     except NeverSubmittedException:
         print(f"submission: you must submit at least once")
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print(f"  - Submit using `crunch push`.")
@@ -36,7 +35,7 @@ def get_submission(
     except SubmissionNotFoundException:
         print(f"submission: not found: {identifier}")
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print(f"  - List already submitted submissions using `crunch submission list`.")

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Sequence, Set
 
 import click
 
+from crunch import store
 from crunch.api import EncryptedSubmissionException
 from crunch.command._common import get_project, get_submission, reformat_datetime
 from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
@@ -42,7 +43,6 @@ def submission_list(
     repository: Repository,
     *,
     limit: Optional[int],
-    show_tips: bool = False,
 ):
     submissions = get_project(repository).submissions.list()
 
@@ -75,7 +75,7 @@ def submission_list(
         print()
         print(f"pagination: only displaying the first {limit} submissions, use `--limit <n>` to show more or `--all` to show all")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print(f"tips:")
         print(f"  - To show a submission details, use `crunch submission show <number>`.")
@@ -85,9 +85,8 @@ def submission_show(
     repository: Repository,
     *,
     submission_identifier: "SubmissionIdentifierType",
-    show_tips: bool = False,
 ):
-    submission = get_submission(get_project(repository), submission_identifier, show_tips=show_tips)
+    submission = get_submission(get_project(repository), submission_identifier)
 
     model = submission.model
 
@@ -120,7 +119,7 @@ def submission_show(
     else:
         print("  (no model)")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print(f"tips:")
         print(f"  - To create a run using this submission, use `crunch run create --submission {submission.number}`.")
@@ -131,7 +130,6 @@ def submission_checkout(
     *,
     submission_identifier: "SubmissionIdentifierType",
     files: Optional[List[str]],
-    show_tips: bool = False,
 ):
     requested_paths: Optional[Set[str]] = None
     if files is not None:
@@ -145,7 +143,7 @@ def submission_checkout(
 
             requested_paths.add(project_path)
 
-    submission = get_submission(get_project(repository), submission_identifier, show_tips=show_tips)
+    submission = get_submission(get_project(repository), submission_identifier)
 
     try:
         urls = submission.project.clone(
@@ -175,7 +173,7 @@ def submission_checkout(
 
                 print(f"checkout: {unmatched_path}: {specific_message}")
 
-            if show_tips:
+            if store.show_tips:
                 print()
                 print("tips:")
                 print(f"  - To list the files of the submission, use `crunch submission show {submission.number}`.")
@@ -193,7 +191,7 @@ def submission_checkout(
 
     print(f"checkout: {len(urls)} file(s) restored from submission #{submission.number}")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print("  - Local files that are not part of the submission are left untouched.")

@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any, List, Sequence
 
 import click
 
+from crunch import store
 from crunch.api import NeverSubmittedException, RuntimeOptionStatus, SubmissionNotFoundException
 from crunch.command._common import get_project, get_submission
 from crunch.repository import Repository
@@ -16,7 +17,6 @@ def runtime_list(
     repository: Repository,
     *,
     submission_identifier: "SubmissionIdentifierType",
-    show_tips: bool = False,
 ):
     project = get_project(repository)
 
@@ -49,7 +49,7 @@ def runtime_list(
             values=rows
         )
 
-        if show_tips and has_one_requestable:
+        if store.show_tips and has_one_requestable:
             print()
             print("tips:")
             print("  - Request a runtime option with `crunch runtime request <name> --justification <reason>`.")
@@ -65,7 +65,7 @@ def runtime_list(
             values=rows
         )
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print("  - You will only know eligibility for runtime options after submitting once.")
@@ -89,11 +89,10 @@ def runtime_request(
     runtime_option_name: str,
     submission_identifier: "SubmissionIdentifierType",
     justification: str,
-    show_tips: bool = False,
 ):
     project = get_project(repository)
 
-    submission = get_submission(project, submission_identifier, show_tips=show_tips)
+    submission = get_submission(project, submission_identifier)
 
     option = next(
         (
@@ -107,7 +106,7 @@ def runtime_request(
     if option is None:
         print(f"runtime: not found: {runtime_option_name}")
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print("  - List the available runtimes with `crunch runtime list`.")
@@ -133,7 +132,7 @@ def runtime_request(
 
     print(f"request: created #{runtime_access_request.id} for {runtime_option_name} on submission #{submission.number} ({runtime_access_request.verdict.name.lower()})")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print("  - Runtime requests are reviewed by the Crunch team, the user will receive the outcome via email.")

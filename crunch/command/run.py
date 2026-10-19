@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Sequence
 
 import click
 
+from crunch import store
 from crunch.api import CurrentRoundNotFoundException, Prediction, Project, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, Score
 from crunch.command._common import get_project, get_submission, reformat_datetime
 from crunch.repository import Repository
@@ -22,10 +23,9 @@ def run_create(
     train_frequency: Optional[int],
     force_first_train: Optional[bool],
     runtime_definition_name: str,
-    show_tips: bool = False,
 ):
     project = get_project(repository)
-    submission = get_submission(project, submission_identifier, show_tips=show_tips)
+    submission = get_submission(project, submission_identifier)
 
     runtime_options = list(submission.runtime_options.list())
 
@@ -34,7 +34,7 @@ def run_create(
         print(f"run: runtime option not found: {runtime_definition_name}")
         print(f"run: available options are:", (', '.join(x.definition.name for x in runtime_options if x.status == RuntimeOptionStatus.AVAILABLE)))
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print(f"  - List available in `crunch runtime list --submission {submission.number}`.")
@@ -45,7 +45,7 @@ def run_create(
         print(f"run: runtime option not available: {runtime_definition_name}")
         print(f"run: available options are: {', '.join(x.definition.name for x in runtime_options if x.status == RuntimeOptionStatus.AVAILABLE)}")
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print(f"  - List available in `crunch runtime list --submission {submission.number}`.")
@@ -55,7 +55,7 @@ def run_create(
     if runtime_option.quota.total_seconds() == 0:
         print(f"run: you are out of quota, you must wait until the next refresh cycle")
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print(f"  - See your remaining quota using `crunch quota`.")
@@ -102,7 +102,7 @@ def run_create(
 
     print(f"run: created: {run.id}")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print(f"  - View the run details using `crunch run show {run.id}`.")
@@ -113,7 +113,6 @@ def run_list(
     repository: Repository,
     *,
     limit: Optional[int],
-    show_tips: bool = False,
 ):
     project = get_project(repository)
     runs = project.runs.list()
@@ -149,7 +148,7 @@ def run_list(
         print()
         print(f"pagination: only displaying the first {limit} runs, use `--limit <n>` to show more or `--all` to show all")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print(f"  - To view details of a specific run, use `crunch run show <run-id>`.")
@@ -163,7 +162,6 @@ def run_show(
     repository: Repository,
     *,
     run_id: int,
-    show_tips: bool = False,
 ):
     run = _get_run(repository, run_id)
     selection = _get_selection(run.project)
@@ -204,7 +202,7 @@ def run_show(
         for score in prediction.scores:
             print(f"    {_format_score_value(score)}")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print(f"  - To view the logs of this run, use `crunch run logs {run.id}`.")
@@ -222,7 +220,6 @@ def run_logs(
     tail: Optional[int],
     follow: bool,
     debug: bool,
-    show_tips: bool = False,
 ):
     run = _get_run(repository, run_id)
 
@@ -282,7 +279,7 @@ def run_logs(
             else:
                 tries -= 1
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print(f"  - To only show the latest logs, use `crunch run logs {run.id} --tail <n>`.")
@@ -308,7 +305,6 @@ def run_wait(
     run_id: int,
     timeout: Optional[int],
     poll_interval: int,
-    show_tips: bool = False,
 ) -> RunWaitExitCode:
     run = _get_run(repository, run_id)
     if not _is_running(run):
@@ -330,7 +326,7 @@ def run_wait(
     exit_code = _to_wait_exit_code(run)
     print(f"wait: run status: {exit_code.name} ({_to_enriched_status(run)})")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
 
@@ -388,7 +384,6 @@ def run_select(
     repository: Repository,
     *,
     run_id: int,
-    show_tips: bool = False,
 ):
     run = _get_run(repository, run_id)
 
@@ -397,7 +392,7 @@ def run_select(
     except RunNotSuccessfulException:
         print(f"select: run {run_id} is not successful, only successful runs can be selected")
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print("  - To find a selectable run, use `crunch run list`.")
@@ -406,7 +401,7 @@ def run_select(
 
     print(f"select: run {selection.run_id} selected (submission #{selection.submission_number})")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("docs:")
         print(f"  - Selection only matters for the Out-of-Sample phase.")
@@ -416,7 +411,6 @@ def run_terminate(
     repository: Repository,
     *,
     run_id: int,
-    show_tips: bool = False,
 ):
     run = _get_run(repository, run_id)
     if not _is_running(run):
@@ -426,7 +420,7 @@ def run_terminate(
     if run.terminated:
         print("terminate: already terminated")
 
-        if show_tips:
+        if store.show_tips:
             print()
             print("tips:")
             print(f"  - If the run refuse to terminate, contact the team.")

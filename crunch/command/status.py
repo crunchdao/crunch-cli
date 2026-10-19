@@ -1,11 +1,10 @@
+from crunch import store
 from crunch.command._common import get_project, reformat_datetime
 from crunch.repository import Repository
 
 
 def status(
     repository: Repository,
-    *,
-    show_tips: bool = True,
 ):
     project = get_project(repository)
     competition = project.competition
@@ -38,7 +37,7 @@ def status(
     print(f"  can configure force first train: {'no' if competition.hide_force_first_train else 'yes'}")
     print(f"  can configure train frequency: {'no' if competition.hide_train_frequency else 'yes'}")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print(f"tips:")
         print(f"  - To manage quickstarters, use `crunch quickstarter`.")

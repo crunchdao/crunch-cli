@@ -74,7 +74,6 @@ def whitelist_search(
     query: str,
     language: Optional["RequirementLanguage"],
     limit: Optional[int],
-    show_tips: bool = False,
 ):
     client = Client.from_env()
 
@@ -113,7 +112,7 @@ def whitelist_search(
         print()
         print(f"pagination: only displaying the first {limit} libraries, use `--limit <n>` to show more or `--all` to show all")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print(f"tips:")
         print(f"  - You can request a package to be whitelisted by using `crunch whitelist request --name <name>`.")
@@ -123,7 +122,6 @@ def whitelist_validate(
     *,
     requirements_txt_file_path: str,
     language: "RequirementLanguage",
-    show_tips: bool = False,
 ):
     from crunch_convert.requirements_txt import CrunchHubWhitelist, RequirementParseError, parse_from_file
 
@@ -155,7 +153,7 @@ def whitelist_validate(
 
         print(f"requirement: {requirement.name}: {tail}")
 
-    if show_tips:
+    if store.show_tips:
         print("")
         print("tips:")
 
@@ -177,7 +175,6 @@ def whitelist_request(
     language: Optional["RequirementLanguage"],
     gpu_requirement: Optional["GpuRequirement"],
     additional_details: Optional[str],
-    show_tips: bool = False,
 ):
     competition = get_project(repository).competition
 
@@ -191,7 +188,7 @@ def whitelist_request(
 
     print(f"request: created #{library_request.id} for {library_request.name or library_request.alias} ({library_request.verdict.name.lower()})")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print(f"tips:")
         print(f"  - Library requests are reviewed by the Crunch team, the user will receive the outcome via email.")

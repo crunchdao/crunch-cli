@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from crunch import store
 from crunch.command._common import get_project
 from crunch.external.humanfriendly import format_size
 from crunch.repository import Repository
@@ -7,8 +8,6 @@ from crunch.repository import Repository
 
 def quota(
     repository: Repository,
-    *,
-    show_tips: bool = False,
 ):
     project = get_project(repository)
 
@@ -31,7 +30,7 @@ def quota(
     print(f"  used: {timedelta(seconds=compute.used)}")
     print(f"  running: {'a run is still running' if compute.running else 'no run is currently running, one can be created'}")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("docs:")
         print(f"  - Size quotas refer to the total size of all files per submission or prediction.")

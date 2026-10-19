@@ -1,3 +1,4 @@
+from crunch import store
 from crunch.api import Unit
 from crunch.command._common import get_project
 from crunch.repository import Repository
@@ -5,7 +6,6 @@ from crunch.repository import Repository
 
 def leaderboard(
     repository: Repository,
-    show_tips: bool = True,
 ):
     project = get_project(repository)
     competition = project.competition
@@ -44,7 +44,7 @@ def leaderboard(
 
             print(f"  metric: {metric.display_name!r}: {metric_unit.format_value(current_value) if current_value is not None else ('unavailable')}")  # pyright: ignore[reportUnknownMemberType, reportOptionalMemberAccess]
 
-    if show_tips:
+    if store.show_tips:
         print()
         print(f"docs:")
         print(f"  - It takes a little while for leaderboards to update after a run is finished.")

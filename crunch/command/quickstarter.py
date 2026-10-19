@@ -3,6 +3,7 @@ from typing import Any, List, Sequence
 
 import click
 
+from crunch import store
 from crunch.api import Quickstarter, QuickstarterNotFoundException
 from crunch.command._common import get_project
 from crunch.repository import Repository
@@ -11,8 +12,6 @@ from crunch.utils import ascii_table, download
 
 def quickstarter_list(
     repository: Repository,
-    *,
-    show_tips: bool = False,
 ):
     project = get_project(repository)
     quickstarters = project.competition.quickstarters.list()
@@ -34,7 +33,7 @@ def quickstarter_list(
         values=rows,
     )
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print(f"  - To show details, use `crunch quickstarter show <name>`.")
@@ -45,7 +44,6 @@ def quickstarter_show(
     repository: Repository,
     *,
     quickstarter_name: str,
-    show_tips: bool = False,
 ):
     quickstarter = _get_quickstarter(repository, quickstarter_name)
 
@@ -61,7 +59,7 @@ def quickstarter_show(
     for file in quickstarter.files:
         print(f"    - {file.name}")
 
-    if show_tips:
+    if store.show_tips:
         print()
         print("tips:")
         print(f"  - To apply/download locally, use `crunch quickstarter apply {quickstarter.name}`.")
@@ -72,7 +70,6 @@ def quickstarter_apply(
     *,
     quickstarter_name: str,
     overwrite: bool = False,
-    show_tips: bool = False,
 ):
     quickstarter = _get_quickstarter(repository, quickstarter_name)
 
@@ -88,7 +85,7 @@ def quickstarter_apply(
         path = os.path.join(".", file.name)  # useful?
         download(file.url, path)
 
-    if show_tips and quickstarter.notebook:
+    if store.show_tips and quickstarter.notebook:
         print()
         print("tips:")
         print(f"  - This quickstarter is a notebook, to convert to a main.py, you can do `crunch convert {files[0].name}`, but it only useful for people that want to work with python files as the documentation will be excluded.")
