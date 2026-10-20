@@ -1,7 +1,7 @@
 click
 crunch-convert>=0.12.1
 coloredlogs
-dataclasses_json
+dataclasses_json>=0.6.0
 detect_agent
 inquirer
 joblib

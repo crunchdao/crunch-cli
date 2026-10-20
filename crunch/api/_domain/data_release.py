@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
@@ -34,7 +34,7 @@ class DataFile:
     compressed: bool
 
 
-DataFiles = Dict[str, DataFile]
+DataFiles: TypeAlias = dict[str, DataFile]
 
 
 class DataReleaseSplitGroup(Enum):
@@ -55,7 +55,7 @@ class DataReleaseSplitReduced(Enum):
         return self.name
 
 
-SplitKeyPythonType = Union[str, int]
+SplitKeyPythonType: TypeAlias = str | int
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
@@ -64,12 +64,12 @@ class DataReleaseSplit:
 
     key: SplitKeyPythonType
     group: DataReleaseSplitGroup
-    reduced: Optional[DataReleaseSplitReduced] = None
+    reduced: DataReleaseSplitReduced | None = None
 
     @staticmethod
     def from_dict_array(
-        input: List[Dict[str, Any]]
-    ) -> List["DataReleaseSplit"]:
+        input: list[dict[str, Any]]
+    ) -> list["DataReleaseSplit"]:
         return [
             DataReleaseSplit.from_dict(x)  # type: ignore[attr-defined]
             for x in input
@@ -91,9 +91,9 @@ class DataRelease(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        attrs: Optional[Dict[str, Any]] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["DataReleaseCollection"] = None
+        attrs: dict[str, Any] | None = None,
+        client: "Client | None" = None,
+        collection: "DataReleaseCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -108,7 +108,7 @@ class DataRelease(Model[int]):
         return self._competition
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> str | None:
         return self._attrs["name"]
 
     @property
@@ -124,7 +124,7 @@ class DataRelease(Model[int]):
         return self._attrs["numberOfFeatures"]
 
     @property
-    def hash(self) -> Optional[str]:
+    def hash(self) -> str | None:
         return self._attrs["hash"]
 
     @property
@@ -144,7 +144,7 @@ class DataRelease(Model[int]):
         }
 
     @property
-    def splits(self) -> List[DataReleaseSplit]:
+    def splits(self) -> list[DataReleaseSplit]:
         splits = self._attrs.get("splits")
         if splits is None:
             self.reload(include_splits=True)
@@ -168,7 +168,7 @@ class DataReleaseCollection(Collection[DataRelease]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -176,7 +176,7 @@ class DataReleaseCollection(Collection[DataRelease]):
 
     def get(
         self,
-        number: Union[int, str],
+        number: int | str,
         include_splits: bool = True,
     ) -> DataRelease:
         return self.prepare_model(
@@ -189,14 +189,14 @@ class DataReleaseCollection(Collection[DataRelease]):
 
     def list(
         self
-    ) -> List[DataRelease]:
+    ) -> list[DataRelease]:
         return self.prepare_models(
             self._checked_client.api.list_data_releases(
                 self.competition.id
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", DataRelease], *args: Any):
+    def prepare_model(self, attrs: "JsonValue | DataRelease", *args: Any):
         return super().prepare_model(
             attrs,
             self.competition,
@@ -220,7 +220,7 @@ class DataReleaseEndpointMixin(EndpointMixin):
     def get_data_release(
         self,
         competition_identifier: "CompetitionIdentifierType",
-        number: Union[int, str],
+        number: int | str,
         include_splits: bool = False,
     ):
         return self._result(

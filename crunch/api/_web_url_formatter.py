@@ -1,5 +1,4 @@
 import urllib.parse
-from typing import Dict, Optional, Union
 
 import crunch.store as store
 
@@ -25,8 +24,8 @@ class WebUrlFormatter:
         self,
         competition_name: str,
         *,
-        project_name: Optional[str] = None,
-        message: Optional[str] = None,
+        project_name: str | None = None,
+        message: str | None = None,
     ) -> str:
         return self._format(
             "competitions", competition_name, "submit", "notebook",
@@ -40,9 +39,9 @@ class WebUrlFormatter:
         self,
         competition_name: str,
         *,
-        request_name: Optional[str] = None,
-        request_alias: Optional[str] = None,
-        request_language: Optional[str] = None,
+        request_name: str | None = None,
+        request_alias: str | None = None,
+        request_language: str | None = None,
     ) -> str:
         return self._format(
             "competitions", competition_name, "resources", "whitelisted-libraries",
@@ -96,8 +95,8 @@ class WebUrlFormatter:
 
     def _format(
         self,
-        *segments: Union[str, int],
-        query: Optional[Dict[str, Union[str, int, None]]] = None,
+        *segments: str | int,
+        query: dict[str, str | int | None] | None = None,
     ) -> str:
         path = "/".join(
             urllib.parse.quote(str(segment), safe="")

@@ -1,5 +1,5 @@
 from logging import Logger
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 from crunch.unstructured._code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured._execute import call_function
@@ -31,7 +31,7 @@ class RunnerModule(ModuleWrapper):
         *,
         data_directory_path: str,
         logger: Logger,
-        print: Optional[Callable[[Any], None]] = None,
+        print: Callable[[Any], None] | None = None,
     ) -> Any:
         return call_function(
             self.get_load_data_function(ensure=True),
@@ -60,7 +60,7 @@ class RunnerModule(ModuleWrapper):
         model_directory_path: str,
         prediction_directory_path: str,
         tracer: "RunnerTracer",
-        print: Optional[Callable[[Any], None]] = None,
+        print: Callable[[Any], None] | None = None,
     ) -> Any:
         return call_function(
             self.get_run_function(ensure=True),
@@ -92,8 +92,8 @@ class RunnerModule(ModuleWrapper):
         data_directory_path: str,
         model_directory_path: str,
         prediction_directory_path: str,
-        print: Optional[Callable[[Any], None]] = None,
-    ) -> Dict[str, Callable[..., Any]]:
+        print: Callable[[Any], None] | None = None,
+    ) -> dict[str, Callable[..., Any]]:
         return call_function(
             self.get_execute_function(ensure=True),
             {

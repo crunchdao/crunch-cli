@@ -50,7 +50,7 @@ setup(
     data_files=[
         (find_pth_directory(), ['crunch-monkeypatch.pth']),
     ],
-    python_requires=">=3",
+    python_requires=">=3.10",
     install_requires=requirements,
     extras_require={
         'test': test_requirements,
@@ -62,7 +62,7 @@ setup(
     },
     classifiers=[
         'Intended Audience :: Developers',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.10',
     ],
     keywords='package development template'
 )

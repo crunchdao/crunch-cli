@@ -3,7 +3,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, List, NewType, Optional, Tuple, cast
+from typing import Any, Callable, NewType, cast
 
 from mashumaro import field_options
 from mashumaro.config import BaseConfig
@@ -43,15 +43,15 @@ class UploadCacheEntry(DataClassDictMixin):
     upload_id: str
     expires_at: datetime
     time_to_live: int
-    known_locations: list[KnownLocation] = field(default_factory=cast(Callable[[], List[KnownLocation]], list),)
+    known_locations: list[KnownLocation] = field(default_factory=cast(Callable[[], list[KnownLocation]], list),)
 
-    upload: Optional[Upload] = field(
+    upload: Upload | None = field(
         default=None,
         init=False,
         metadata=field_options(serialize="omit"),
     )
 
-    def find_known_location(self, relative_path: str) -> Optional[KnownLocation]:
+    def find_known_location(self, relative_path: str) -> KnownLocation | None:
         for location in self.known_locations:
             if location.path == relative_path:
                 return location
@@ -70,11 +70,11 @@ class UploadCacheEntry(DataClassDictMixin):
 class UploadCache(ABC):
 
     @abstractmethod
-    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> tuple[Checksum, Upload | None]:
         ...
 
     @abstractmethod
-    def try_reuse_bytes(self, *, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_bytes(self, *, data: bytes) -> tuple[Checksum, Upload | None]:
         ...
 
     @abstractmethod
@@ -92,10 +92,10 @@ class UploadCache(ABC):
 
 class NoUploadCache(UploadCache):
 
-    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> tuple[Checksum, Upload | None]:
         return (Checksum("none"), None)
 
-    def try_reuse_bytes(self, *, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_bytes(self, *, data: bytes) -> tuple[Checksum, Upload | None]:
         return (Checksum("none"), None)
 
     def register_file(self, *, checksum: Checksum, upload: Upload, relative_path: str, size: int, modification_time: datetime) -> None:
@@ -113,12 +113,12 @@ class FileUploadCache(UploadCache):
     def __init__(
         self,
         repository: Repository,
-        entries: List[UploadCacheEntry],
+        entries: list[UploadCacheEntry],
     ):
         self._repository = repository
         self._entries = entries
 
-    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_file(self, *, relative_path: str, absolute_path: str) -> tuple[Checksum, Upload | None]:
         checksum, stat = self._compute_checksum(relative_path, absolute_path)
 
         entry = self._find_entry_by_checksum(checksum)
@@ -132,7 +132,7 @@ class FileUploadCache(UploadCache):
 
         return (checksum, entry.upload)
 
-    def try_reuse_bytes(self, *, data: bytes) -> Tuple[Checksum, Optional[Upload]]:
+    def try_reuse_bytes(self, *, data: bytes) -> tuple[Checksum, Upload | None]:
         checksum = sha256_bytes(data)
 
         entry = self._find_entry_by_checksum(checksum)
@@ -169,13 +169,13 @@ class FileUploadCache(UploadCache):
         except Exception as exception:
             print(f"upload cache: could not be saved: {exception}")
 
-    def _find_entry_by_checksum(self, checksum: str) -> Optional[UploadCacheEntry]:
+    def _find_entry_by_checksum(self, checksum: str) -> UploadCacheEntry | None:
         return next(
             (entry for entry in self._entries if entry.checksum == checksum),
             None,
         )
 
-    def _compute_checksum(self, relative_path: str, absolute_path: str) -> Tuple[Checksum, os.stat_result]:
+    def _compute_checksum(self, relative_path: str, absolute_path: str) -> tuple[Checksum, os.stat_result]:
         stat = os.stat(absolute_path)
         modification_time = to_modification_time(stat)
 
@@ -233,7 +233,7 @@ class FileUploadCache(UploadCache):
         return FileUploadCache(repository, entries)
 
 
-def _load_upload_cache(repository: Repository) -> List[UploadCacheEntry]:
+def _load_upload_cache(repository: Repository) -> list[UploadCacheEntry]:
     path = repository.upload_cache_file_path
 
     try:
@@ -256,11 +256,11 @@ def _load_upload_cache(repository: Repository) -> List[UploadCacheEntry]:
 
 
 def _reconcile_upload_cache_entries(
-    entries: List[UploadCacheEntry],
+    entries: list[UploadCacheEntry],
     client: Client,
     *,
-    now: Optional[datetime] = None,
-) -> List[UploadCacheEntry]:
+    now: datetime | None = None,
+) -> list[UploadCacheEntry]:
     if now is None:
         now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
 
@@ -286,9 +286,9 @@ def _reconcile_upload_cache_entries(
 
 
 def _age_upload_cache_entries(
-    entries: List[UploadCacheEntry],
+    entries: list[UploadCacheEntry],
     client: Client,
-) -> List[UploadCacheEntry]:
+) -> list[UploadCacheEntry]:
     def should_delete(entry: UploadCacheEntry) -> bool:
         entry.time_to_live -= 1
 
@@ -299,9 +299,9 @@ def _age_upload_cache_entries(
 
 def _delete_matching_upload(
     client: Client,
-    entries: List[UploadCacheEntry],
+    entries: list[UploadCacheEntry],
     predicate: Callable[[UploadCacheEntry], bool],
-) -> List[UploadCacheEntry]:
+) -> list[UploadCacheEntry]:
     matched_ids = {
         entry.upload_id
         for entry in entries

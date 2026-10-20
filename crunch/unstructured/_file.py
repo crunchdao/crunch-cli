@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 from dataclasses_json import LetterCase, Undefined, dataclass_json
@@ -17,7 +17,7 @@ from crunch.constants import TEXT_FILE_EXTENSIONS
 class File:
 
     path: str
-    uri: Optional[str]
+    uri: str | None
     size: int
 
     @property
@@ -42,8 +42,8 @@ class File:
     @classmethod
     def from_dict_array(
         cls,
-        input: List[Dict[str, Any]],
-    ) -> List['File']:
+        input: list[dict[str, Any]],
+    ) -> list['File']:
         return [
             cls.from_dict(x)  # type: ignore
             for x in input

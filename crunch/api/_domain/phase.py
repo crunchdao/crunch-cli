@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -53,9 +53,9 @@ class Phase(Model[int]):
     def __init__(
         self,
         round: "Round",
-        attrs: Optional[Dict[str, Any]] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["PhaseCollection"] = None
+        attrs: dict[str, Any] | None = None,
+        client: "Client | None" = None,
+        collection: "PhaseCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -92,7 +92,7 @@ class Phase(Model[int]):
 
     def get_data_release(
         self,
-        size_variant: Optional["SizeVariant"] = None,
+        size_variant: "SizeVariant | None" = None,
     ):
         from crunch.api._domain.data_release import DataReleaseCollection
 
@@ -119,7 +119,7 @@ class PhaseCollection(Collection[Phase]):
     def __init__(
         self,
         round: "Round",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -163,7 +163,7 @@ class PhaseCollection(Collection[Phase]):
 
     def list(
         self
-    ) -> List[Phase]:
+    ) -> list[Phase]:
         return self.prepare_models(
             self._checked_client.api.list_phases(
                 self.round.competition.id,
@@ -171,7 +171,7 @@ class PhaseCollection(Collection[Phase]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Phase], *args: Any) -> Phase:
+    def prepare_model(self, attrs: "JsonValue | Phase", *args: Any) -> Phase:
         return super().prepare_model(
             attrs,
             self.round,
@@ -210,9 +210,9 @@ class PhaseEndpointMixin(EndpointMixin):
         self,
         competition_identifier: "CompetitionIdentifierType",
         round_identifier: "RoundIdentifierType",
-        size_variant: Optional["SizeVariant"] = None,
+        size_variant: "SizeVariant | None" = None,
     ):
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if size_variant:
             params["sizeVariant"] = size_variant.name
 

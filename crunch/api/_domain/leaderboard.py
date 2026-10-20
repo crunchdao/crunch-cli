@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._identifiers import ProjectIdentifierType, UserIdentifierType
 from crunch.api._resource import Collection, EndpointMixin, Model
@@ -17,9 +17,9 @@ class Leaderboard(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["LeaderboardCollection"] = None
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "LeaderboardCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -37,12 +37,12 @@ class Leaderboard(Model[int]):
         if "targets" not in self._attrs:
             self.reload()
 
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
 
         for target in self._attrs.get("targets") or []:  # pyright: ignore[reportUnknownVariableType]
             crunch = target.get("crunch")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-            target_row: Dict[str, Any] = {
+            target_row: dict[str, Any] = {
                 "target.id": target.get("id"),  # pyright: ignore[reportUnknownMemberType]
                 "target.name": target.get("name"),  # pyright: ignore[reportUnknownMemberType]
                 "crunch.id": crunch.get("id"),  # pyright: ignore[reportUnknownMemberType]
@@ -59,7 +59,7 @@ class Leaderboard(Model[int]):
                 project = position.get("project")  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
                 team = position.get("team") or {}  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
 
-                row: Dict[str, Any] = {
+                row: dict[str, Any] = {
                     **target_row,
                     "user.id": user.get("id"),  # pyright: ignore[reportUnknownMemberType]
                     "user.login": user.get("login"),  # pyright: ignore[reportUnknownMemberType]
@@ -101,9 +101,9 @@ class Leaderboard(Model[int]):
     def get_changes(
         self,
         user_identifier: "UserIdentifierType",
-        project_identifier: Optional["ProjectIdentifierType"] = None,
-        crunch: Optional["Crunch"] = None,
-    ) -> List[Dict[str, Any]]:  # TODO properly type!
+        project_identifier: "ProjectIdentifierType | None" = None,
+        crunch: "Crunch | None" = None,
+    ) -> list[dict[str, Any]]:  # TODO properly type!
         return self._checked_client.api.get_leaderboard_changes(
             self._competition.resource_identifier,
             self.resource_identifier,
@@ -120,7 +120,7 @@ class LeaderboardCollection(Collection[Leaderboard]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -130,7 +130,7 @@ class LeaderboardCollection(Collection[Leaderboard]):
         self,
         identifier: "LeaderboardIdentifierType",
         *,
-        crunch: Optional["Crunch"] = None
+        crunch: "Crunch | None" = None
     ) -> Leaderboard:
         return self.prepare_model(
             self._checked_client.api.get_leaderboard(
@@ -143,7 +143,7 @@ class LeaderboardCollection(Collection[Leaderboard]):
     def get_default(
         self,
         *,
-        crunch: Optional["Crunch"] = None,
+        crunch: "Crunch | None" = None,
     ):
         return self.get(
             "@default",
@@ -156,14 +156,14 @@ class LeaderboardCollection(Collection[Leaderboard]):
 
     def list(
         self
-    ) -> List[Leaderboard]:
+    ) -> list[Leaderboard]:
         return self.prepare_models(
             self._checked_client.api.list_leaderboards(
                 self._competition.resource_identifier,
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Leaderboard], *args: Any) -> Leaderboard:
+    def prepare_model(self, attrs: "JsonValue | Leaderboard", *args: Any) -> Leaderboard:
         return super().prepare_model(
             attrs,
             self._competition,
@@ -188,7 +188,7 @@ class LeaderboardEndpointMixin(EndpointMixin):
         self,
         competition_identifier: "CompetitionIdentifierType",
         leaderboard_identifier: "LeaderboardIdentifierType",
-        crunch_id: Optional[int] = None,
+        crunch_id: int | None = None,
     ):
         return self._result(
             self.get(
@@ -205,8 +205,8 @@ class LeaderboardEndpointMixin(EndpointMixin):
         competition_identifier: "CompetitionIdentifierType",
         leaderboard_identifier: "LeaderboardIdentifierType",
         user_identifier: "UserIdentifierType",
-        project_identifier: Optional["ProjectIdentifierType"] = None,
-        crunch_id: Optional[int] = None,
+        project_identifier: "ProjectIdentifierType | None" = None,
+        crunch_id: int | None = None,
     ):
         return self._result(
             self.get(

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import click
 
@@ -44,9 +44,9 @@ def get_submission(
 
 
 def reformat_datetime(
-    input: Optional[datetime],
+    input: datetime | None,
     *,
-    default: Optional[str] = None,
+    default: str | None = None,
 ):
     if input is None:
         return default

@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from typing import TYPE_CHECKING, Any, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Literal
 
 import click
 
@@ -27,7 +27,7 @@ class LocalRunner(Runner):
         self,
         repository: "Repository",
         user_module: Any,
-        runner_module: Optional[RunnerModule],
+        runner_module: RunnerModule | None,
         model_directory_path: str,
         prediction_directory_path: str,
         force_first_train: bool,
@@ -37,7 +37,7 @@ class LocalRunner(Runner):
         has_gpu: bool,
         determinism_check_enabled: bool,
         logger: logging.Logger,
-        trace_exporter: Optional[LocalTraceExporter],
+        trace_exporter: LocalTraceExporter | None,
     ):
         super().__init__(
             competition_format=competition.format,
@@ -216,12 +216,12 @@ class LocalRunnerContext(RunnerContext):
         self,
         *,
         command: str,
-        parameters: Optional[KwargsLike] = None,
+        parameters: KwargsLike | None = None,
         trace: bool = True,
-        span_hidden_parameters: Optional[List[str]] = None,
-        span_attributes: Optional[KwargsLike] = None,
+        span_hidden_parameters: list[str] | None = None,
+        span_attributes: KwargsLike | None = None,
         install_data_fuse: bool = True,  # unavailable locally
-        log_limits: Tuple[int, int] = (0, 0),  # unavailable locally
+        log_limits: tuple[int, int] = (0, 0),  # unavailable locally
     ) -> None:
         self.log(f"executing - command={command}")
 

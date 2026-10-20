@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
@@ -54,16 +54,16 @@ class Project(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["ProjectCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "ProjectCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
         self._competition = competition
 
     @property
-    def resource_identifier(self) -> Tuple[int, str]:
+    def resource_identifier(self) -> tuple[int, str]:
         return (self.user_id, self.name)
 
     @property
@@ -147,9 +147,9 @@ class Project(Model[int]):
 
     def clone(
         self,
-        submission_number: Optional[int],
-        include_model: Optional[bool],
-    ) -> Dict[str, str]:
+        submission_number: int | None,
+        include_model: bool | None,
+    ) -> dict[str, str]:
         return self._checked_client.api.clone_project(
             self.competition.id,
             self.user_id,
@@ -179,8 +179,8 @@ class ProjectSelection(Model[None]):
     def __init__(
         self,
         project: Project,
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
     ):
         super().__init__(attrs=attrs, client=client)
 
@@ -198,7 +198,7 @@ class ProjectSelection(Model[None]):
         return ProjectSelectionOrigin[self._attrs["origin"]]
 
     @property
-    def run_id(self) -> Optional[int]:
+    def run_id(self) -> int | None:
         return self._attrs.get("runId")
 
     @property
@@ -210,16 +210,16 @@ class ProjectSelection(Model[None]):
         return self._project.runs.get(run_id)
 
     @property
-    def submission_number(self) -> Optional[int]:
+    def submission_number(self) -> int | None:
         submission = self._attrs.get("submission")
         return submission["number"] if submission else None
 
     @property
-    def train_frequency(self) -> Optional[int]:
+    def train_frequency(self) -> int | None:
         return self._attrs.get("trainFrequency")
 
     @property
-    def force_first_train(self) -> Optional[bool]:
+    def force_first_train(self) -> bool | None:
         return self._attrs.get("forceFirstTrain")
 
     @property
@@ -227,12 +227,12 @@ class ProjectSelection(Model[None]):
         return bool(self._attrs.get("runnable"))
 
     @property
-    def created_at(self) -> Optional[datetime]:
+    def created_at(self) -> datetime | None:
         created_at = self._attrs.get("createdAt")
         return datetime.fromisoformat(created_at) if created_at else None
 
     @property
-    def updated_at(self) -> Optional[datetime]:
+    def updated_at(self) -> datetime | None:
         updated_at = self._attrs.get("updatedAt")
         return datetime.fromisoformat(updated_at) if updated_at else None
 
@@ -244,7 +244,7 @@ class ProjectCollection(Collection[Project]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -265,8 +265,8 @@ class ProjectCollection(Collection[Project]):
 
     def list(
         self,
-        user_identifier: Union[int, str] = "@me",
-    ) -> List[Project]:
+        user_identifier: int | str = "@me",
+    ) -> list[Project]:
         return self.prepare_models(
             self._checked_client.api.list_projects(
                 self.competition.id,
@@ -274,7 +274,7 @@ class ProjectCollection(Collection[Project]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Project], *args: Any):
+    def prepare_model(self, attrs: "JsonValue | Project", *args: Any):
         return super().prepare_model(
             attrs,
             self.competition,
@@ -295,10 +295,10 @@ class ProjectToken(Model[int]):
 
     def __init__(
         self,
-        competition: Optional["Competition"],
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["ProjectTokenCollection"] = None,
+        competition: "Competition | None",
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "ProjectTokenCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -316,7 +316,7 @@ class ProjectToken(Model[int]):
         )
 
     @property
-    def plain(self) -> Optional[str]:
+    def plain(self) -> str | None:
         return self._attrs.get("plain")
 
     @property
@@ -339,7 +339,7 @@ class ProjectTokenCollection(Collection[ProjectToken]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -403,10 +403,10 @@ class ProjectEndpointMixin(EndpointMixin):
         competition_identifier: "CompetitionIdentifierType",
         user_identifier: "UserIdentifierType",
         project_identifier: "ProjectIdentifierType",
-        submission_number: Optional[int],
-        include_model: Optional[bool],
+        submission_number: int | None,
+        include_model: bool | None,
     ):
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
 
         if submission_number is not None:
             params["submissionNumber"] = submission_number

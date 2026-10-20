@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -15,9 +15,9 @@ class Round(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        attrs: Optional[Dict[str, Any]] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["RoundCollection"] = None
+        attrs: dict[str, Any] | None = None,
+        client: "Client | None" = None,
+        collection: "RoundCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -60,7 +60,7 @@ class RoundCollection(Collection[Round]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None,
+        client: "Client | None" = None,
     ):
         super().__init__(client)
 
@@ -93,14 +93,14 @@ class RoundCollection(Collection[Round]):
 
     def list(
         self
-    ) -> List[Round]:
+    ) -> list[Round]:
         return self.prepare_models(
             self._checked_client.api.list_rounds(
                 self.competition.resource_identifier,
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Round], *args: Any) -> Round:
+    def prepare_model(self, attrs: "JsonValue | Round", *args: Any) -> Round:
         return super().prepare_model(
             attrs,
             self.competition,

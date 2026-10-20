@@ -4,7 +4,7 @@ import os
 import time
 from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, BinaryIO, Callable
 
 import dataclasses_json
 import requests
@@ -46,7 +46,7 @@ class PresignedUploadRequest:
 
     method: str
     url: str
-    headers: Dict[str, str]
+    headers: dict[str, str]
 
 
 class Upload(Model[str]):
@@ -88,7 +88,7 @@ class Upload(Model[str]):
         return datetime.fromisoformat(self._attrs["createdAt"])
 
     @property
-    def chunks(self) -> List["UploadChunk"]:
+    def chunks(self) -> list["UploadChunk"]:
         return [
             UploadChunk(self, chunk_attrs, self._client)
             for chunk_attrs in self._attrs["chunks"]
@@ -121,9 +121,9 @@ class UploadChunk(Model[int]):
     def __init__(
         self,
         upload: Upload,
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["Collection[UploadChunk]"] = None
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "Collection[UploadChunk] | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -179,8 +179,8 @@ class UploadChunk(Model[int]):
         self,
         fd: BinaryIO,
         max_retry: int = 10,
-        byte_callback: Optional[Callable[[int], None]] = None,
-        retry_callback: Optional[Callable[[], None]] = None,
+        byte_callback: Callable[[int], None] | None = None,
+        retry_callback: Callable[[], None] | None = None,
     ):
         from crunch.utils import LimitedSizeIO
 
@@ -239,7 +239,7 @@ class UploadCollection(Collection[Upload]):
         name: str,
         size: int,
         encrypted: bool = False,
-        preferred_chunk_size: Optional[int] = None
+        preferred_chunk_size: int | None = None
     ) -> Upload:
         return self.prepare_model(
             self._checked_client.api.create_upload(
@@ -255,8 +255,8 @@ class UploadCollection(Collection[Upload]):
         *,
         path: str,
         name: str,
-        size: Optional[int] = None,
-        preferred_chunk_size: Optional[int] = None,
+        size: int | None = None,
+        preferred_chunk_size: int | None = None,
         progress_bar: bool = False,
         max_retry: int = 10,
     ) -> Upload:
@@ -279,7 +279,7 @@ class UploadCollection(Collection[Upload]):
         io: BinaryIO,
         name: str,
         size: int,
-        preferred_chunk_size: Optional[int] = None,
+        preferred_chunk_size: int | None = None,
         progress_bar: bool = False,
         max_retry: int = 10,
     ) -> Upload:
@@ -345,12 +345,12 @@ class UploadCollection(Collection[Upload]):
 
     def batch_list(
         self,
-        upload_ids: List[str],
-    ) -> Dict[str, Optional[Upload]]:
+        upload_ids: list[str],
+    ) -> dict[str, Upload | None]:
         if not upload_ids:
             return {}
 
-        results: Dict[str, Optional[Upload]] = {}
+        results: dict[str, Upload | None] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
             response = self._client.api.get_upload_batch(upload_ids_chunk)["uploads"]
@@ -368,12 +368,12 @@ class UploadCollection(Collection[Upload]):
 
     def batch_delete(
         self,
-        upload_ids: List[str],
-    ) -> Dict[str, DeleteUploadResult]:
+        upload_ids: list[str],
+    ) -> dict[str, DeleteUploadResult]:
         if not upload_ids:
             return {}
 
-        results: Dict[str, DeleteUploadResult] = {}
+        results: dict[str, DeleteUploadResult] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
             response = self._client.api.delete_upload_batch(upload_ids_chunk)["uploads"]
@@ -391,7 +391,7 @@ class UploadEndpointMixin(EndpointMixin):
         name: str,
         size: int,
         encrypted: bool,
-        preferred_chunk_size: Optional[int]
+        preferred_chunk_size: int | None
     ):
         return self._result(
             self.post(

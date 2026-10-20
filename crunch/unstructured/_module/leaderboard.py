@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from itertools import combinations
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable
 
 from dataclasses_json import DataClassJsonMixin
 
@@ -25,16 +25,16 @@ class RankableProjectMetric(DataClassJsonMixin):
     score: float
 
 
-def _rankable_project_factory() -> List[RankableProjectMetric]:
+def _rankable_project_factory() -> list[RankableProjectMetric]:
     return []
 
 
 @dataclass
 class RankableProject(DataClassJsonMixin):
-    id: Optional[float]
+    id: float | None
     group: str
     rewardable: bool
-    metrics: List[RankableProjectMetric] = field(default_factory=_rankable_project_factory)
+    metrics: list[RankableProjectMetric] = field(default_factory=_rankable_project_factory)
 
     def get_metric(self, id: int):
         for metric in self.metrics:
@@ -53,7 +53,7 @@ class RankPass(Enum):
 class RankedProject(DataClassJsonMixin):
     id: int
     rank: int
-    reward_rank: Optional[Union[float, int]]
+    reward_rank: float | int | None
 
 
 @dataclass
@@ -70,7 +70,7 @@ class LeaderboardModule(ModuleWrapper):
         self,
         *,
         ensure: bool = True
-    ) -> Callable[..., List[ComparedSimilarity]]:
+    ) -> Callable[..., list[ComparedSimilarity]]:
         return self._get_function(
             name="compare",
             ensure=ensure,
@@ -79,11 +79,11 @@ class LeaderboardModule(ModuleWrapper):
     def compare(
         self,
         *,
-        targets: List[Target],
-        prediction_directory_path_by_id: Dict[int, str],
+        targets: list[Target],
+        prediction_directory_path_by_id: dict[int, str],
         data_directory_path: str,
-        print: Optional[Callable[[Any], None]] = None,
-    ) -> List[ComparedSimilarity]:
+        print: Callable[[Any], None] | None = None,
+    ) -> list[ComparedSimilarity]:
         """
         Call the compare function of a leaderboard module.
 
@@ -109,7 +109,7 @@ class LeaderboardModule(ModuleWrapper):
         self,
         *,
         ensure: bool = True
-    ) -> Callable[..., List[RankedProject]]:
+    ) -> Callable[..., list[RankedProject]]:
         return self._get_function(
             name="rank",
             ensure=ensure,
@@ -119,11 +119,11 @@ class LeaderboardModule(ModuleWrapper):
         self,
         *,
         target: Target,
-        metrics: List[Metric],
-        projects: List[RankableProject],
+        metrics: list[Metric],
+        projects: list[RankableProject],
         rank_pass: RankPass,
-        print: Optional[Callable[[Any], None]] = None,
-    ) -> List[RankedProject]:
+        print: Callable[[Any], None] | None = None,
+    ) -> list[RankedProject]:
         """
         Call the rank function of a leaderboard module.
 

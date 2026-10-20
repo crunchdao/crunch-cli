@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable
 
 from dataclasses_json import DataClassJsonMixin
 
@@ -20,16 +20,16 @@ class RewardableProjectMetric(DataClassJsonMixin):
     score: float
 
 
-def _rewardable_project_factory() -> List[RewardableProjectMetric]:
+def _rewardable_project_factory() -> list[RewardableProjectMetric]:
     return []
 
 
 @dataclass
 class RewardableProject(DataClassJsonMixin):
-    id: Optional[float]
+    id: float | None
     group: str
     rewardable: bool
-    metrics: List[RewardableProjectMetric] = field(default_factory=_rewardable_project_factory)
+    metrics: list[RewardableProjectMetric] = field(default_factory=_rewardable_project_factory)
 
     def get_metric(self, id: int):
         for metric in self.metrics:
@@ -42,7 +42,7 @@ class RewardableProject(DataClassJsonMixin):
 @dataclass
 class RewardedProject(DataClassJsonMixin):
     id: int
-    amount: Optional[Union[float, int]]
+    amount: float | int | None
 
 
 class RewardModule(ModuleWrapper):
@@ -51,7 +51,7 @@ class RewardModule(ModuleWrapper):
         self,
         *,
         ensure: bool = True
-    ) -> Callable[..., List[RewardedProject]]:
+    ) -> Callable[..., list[RewardedProject]]:
         return self._get_function(
             name="compute_bounties",
             ensure=ensure,
@@ -61,10 +61,10 @@ class RewardModule(ModuleWrapper):
         self,
         *,
         target: Target,
-        metrics: List[Metric],
-        projects: List[RewardableProject],
+        metrics: list[Metric],
+        projects: list[RewardableProject],
         granted_amount: float,
-        print: Optional[Callable[[Any], None]] = None,
+        print: Callable[[Any], None] | None = None,
     ):
         rewarded_projects = call_function(
             self.get_compute_bounties_function(ensure=True),

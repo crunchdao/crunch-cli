@@ -1,65 +1,17 @@
-from typing import Union
+from typing import Literal, TypeAlias
 
-from typing_extensions import Literal
+CompetitionIdentifierType: TypeAlias = int | str
 
-CompetitionIdentifierType = Union[
-    int,
-    str
-]
+RoundIdentifierType: TypeAlias = int | Literal["@current", "@last"]
 
-RoundIdentifierType = Union[
-    int,
-    Literal[
-        "@current",
-        "@last",
-    ]
-]
+PhaseIdentifierType: TypeAlias = str | Literal["submission", "out-of-sample"] | Literal["@current"]
 
-PhaseIdentifierType = Union[
-    str,
-    Literal[
-        "submission",
-        "out-of-sample",
-    ],
-    Literal[
-        "@current",
-    ]
-]
+CrunchIdentifierType: TypeAlias = int | Literal["@current", "@next", "@last", "@published"]
 
-CrunchIdentifierType = Union[
-    int,
-    Literal[
-        "@current",
-        "@next",
-        "@last",
-        "@published",
-    ]
-]
+LeaderboardIdentifierType: TypeAlias = str | Literal["@default", "@mine"]
 
-LeaderboardIdentifierType = Union[
-    str,
-    Literal[
-        "@default",
-        "@mine",
-    ]
-]
+UserIdentifierType: TypeAlias = int | str
 
-UserIdentifierType = Union[
-    int,
-    str,
-]
+ProjectIdentifierType: TypeAlias = int | str | Literal["@first"]
 
-ProjectIdentifierType = Union[
-    int,
-    str,
-    Literal[
-        "@first",
-    ],
-]
-
-SubmissionIdentifierType = Union[
-    int,
-    Literal[
-        "@last",
-    ],
-]
+SubmissionIdentifierType: TypeAlias = int | Literal["@last"]

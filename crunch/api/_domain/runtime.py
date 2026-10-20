@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterator
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
@@ -54,9 +54,9 @@ class RuntimeDefinitionSpecificationCpu:
 @dataclass(frozen=True)
 class RuntimeDefinitionSpecificationGpu:
 
-    count: Optional[int]
-    model: Optional[str]
-    driver: Optional[str]
+    count: int | None
+    model: str | None
+    driver: str | None
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
@@ -80,9 +80,9 @@ class RuntimeDefinition(Model[str]):
     def __init__(
         self,
         submission: "Submission",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["RuntimeOptionCollection"] = None
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "RuntimeOptionCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -124,7 +124,7 @@ class RuntimeDefinitionCollection(Collection[RuntimeDefinition]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -139,7 +139,7 @@ class RuntimeDefinitionCollection(Collection[RuntimeDefinition]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", RuntimeDefinition], *args: Any) -> RuntimeDefinition:
+    def prepare_model(self, attrs: "JsonValue | RuntimeDefinition", *args: Any) -> RuntimeDefinition:
         return super().prepare_model(
             attrs,
             self.competition,
@@ -152,9 +152,9 @@ class RuntimeOption(Model[int]):
     def __init__(
         self,
         submission: "Submission",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["RuntimeOptionCollection"] = None
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "RuntimeOptionCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -188,7 +188,7 @@ class RuntimeOptionCollection(Collection[RuntimeOption]):
     def __init__(
         self,
         submission: "Submission",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -206,7 +206,7 @@ class RuntimeOptionCollection(Collection[RuntimeOption]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", RuntimeOption], *args: Any) -> RuntimeOption:
+    def prepare_model(self, attrs: "JsonValue | RuntimeOption", *args: Any) -> RuntimeOption:
         return super().prepare_model(
             attrs,
             self.submission,
@@ -225,9 +225,9 @@ class RuntimeAccessRequest(Model[int]):
     def __init__(
         self,
         submission: "Submission",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["RuntimeAccessRequestCollection"] = None
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "RuntimeAccessRequestCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -242,7 +242,7 @@ class RuntimeAccessRequest(Model[int]):
         return RuntimeDefinition.from_dict(self._attrs["definition"], None)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
 
     @property
-    def justification(self) -> Optional[str]:
+    def justification(self) -> str | None:
         return self._attrs.get("justification")
 
     @property
@@ -250,11 +250,11 @@ class RuntimeAccessRequest(Model[int]):
         return RuntimeAccessRequestVerdict[self._attrs["verdict"]]
 
     @property
-    def verdict_reason(self) -> Optional[str]:
+    def verdict_reason(self) -> str | None:
         return self._attrs.get("verdictReason")
 
     @property
-    def verdict_at(self) -> Optional[datetime]:
+    def verdict_at(self) -> datetime | None:
         verdict_at = self._attrs.get("verdictAt")
         return datetime.fromisoformat(verdict_at) if verdict_at else None
 
@@ -274,7 +274,7 @@ class RuntimeAccessRequestCollection(Collection[RuntimeAccessRequest]):
     def __init__(
         self,
         submission: "Submission",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -284,7 +284,7 @@ class RuntimeAccessRequestCollection(Collection[RuntimeAccessRequest]):
         self,
         *,
         definition_name: str,
-        justification: Optional[str] = None,
+        justification: str | None = None,
     ) -> RuntimeAccessRequest:
         project = self.submission.project
 
@@ -298,7 +298,7 @@ class RuntimeAccessRequestCollection(Collection[RuntimeAccessRequest]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", RuntimeAccessRequest], *args: Any) -> RuntimeAccessRequest:
+    def prepare_model(self, attrs: "JsonValue | RuntimeAccessRequest", *args: Any) -> RuntimeAccessRequest:
         return super().prepare_model(
             attrs,
             self.submission,
@@ -347,7 +347,7 @@ class RuntimeEndpointMixin(EndpointMixin):
         project_id: int,
         submission_number: int,
         definition_name: str,
-        justification: Optional[str],
+        justification: str | None,
     ):
         return self._result(
             self.post(

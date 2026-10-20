@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import click
 
@@ -16,12 +16,12 @@ if TYPE_CHECKING:
 class ProgrammingLanguageClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "language"
 
-    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> str:
+    def get_metavar(self, param: click.Parameter, ctx: click.Context | None = None) -> str:
         from crunch_convert import RequirementLanguage
 
         return f"[{'|'.join([language.name.lower() for language in RequirementLanguage])}]"
 
-    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> Optional["RequirementLanguage"]:
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> "RequirementLanguage | None":
         if value is None:
             return None
 
@@ -39,14 +39,14 @@ class ProgrammingLanguageClickType(click.ParamType):  # pyright: ignore[reportMi
         )
 
 
-GPU_REQUIREMENT_MAPPING: Dict[str, Optional[GpuRequirement]] = {
+GPU_REQUIREMENT_MAPPING: dict[str, GpuRequirement | None] = {
     "unknown": None,
     "useless": GpuRequirement.OPTIONAL,
     "useful": GpuRequirement.RECOMMENDED,
     "required": GpuRequirement.REQUIRED,
 }
 
-REVERSE_GPU_REQUIREMENT_MAPPING: Dict[Optional[GpuRequirement], str] = {
+REVERSE_GPU_REQUIREMENT_MAPPING: dict[GpuRequirement | None, str] = {
     value: key
     for key, value in GPU_REQUIREMENT_MAPPING.items()
 }
@@ -55,10 +55,10 @@ REVERSE_GPU_REQUIREMENT_MAPPING: Dict[Optional[GpuRequirement], str] = {
 class GpuRequirementClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "gpu"
 
-    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> str:
+    def get_metavar(self, param: click.Parameter, ctx: click.Context | None = None) -> str:
         return f"[{'|'.join(GPU_REQUIREMENT_MAPPING.keys())}]"
 
-    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> Optional["GpuRequirement"]:
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> "GpuRequirement | None":
         if value in GPU_REQUIREMENT_MAPPING:
             return GPU_REQUIREMENT_MAPPING[value]
 
@@ -72,8 +72,8 @@ class GpuRequirementClickType(click.ParamType):  # pyright: ignore[reportMissing
 def whitelist_search(
     *,
     query: str,
-    language: Optional["RequirementLanguage"],
-    limit: Optional[int],
+    language: "RequirementLanguage | None",
+    limit: int | None,
 ):
     client = Client.from_env()
 
@@ -91,7 +91,7 @@ def whitelist_search(
     if reached_limit:
         libraries = libraries[:limit]  # TODO do it at iteration
 
-    rows: List[Sequence[Any]] = []
+    rows: list[Sequence[Any]] = []
     for library in libraries:
         rows.append(
             (
@@ -170,11 +170,11 @@ def whitelist_validate(
 def whitelist_request(
     repository: Repository,
     *,
-    name: Optional[str],
-    alias: Optional[str],
-    language: Optional["RequirementLanguage"],
-    gpu_requirement: Optional["GpuRequirement"],
-    additional_details: Optional[str],
+    name: str | None,
+    alias: str | None,
+    language: "RequirementLanguage | None",
+    gpu_requirement: "GpuRequirement | None",
+    additional_details: str | None,
 ):
     competition = get_project(repository).competition
 

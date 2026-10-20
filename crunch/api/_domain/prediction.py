@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -16,9 +16,9 @@ class Prediction(Model[int]):
     def __init__(
         self,
         project: "Project",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["PredictionCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "PredictionCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -33,15 +33,15 @@ class Prediction(Model[int]):
         return self._attrs["name"]
 
     @property
-    def valid(self) -> Optional[bool]:
+    def valid(self) -> bool | None:
         return self._attrs["valid"]
 
     @property
-    def success(self) -> Optional[bool]:
+    def success(self) -> bool | None:
         return self._attrs["success"]
 
     @property
-    def error_message(self) -> Optional[str]:
+    def error_message(self) -> str | None:
         return self._attrs["error"]
 
     @property
@@ -53,11 +53,11 @@ class Prediction(Model[int]):
         return self._attrs["deterministic"]
 
     @property
-    def primary_mean(self) -> Optional[float]:
+    def primary_mean(self) -> float | None:
         return self._attrs.get("primaryMean")
 
     @property
-    def primary_unit(self) -> Optional["Unit"]:
+    def primary_unit(self) -> "Unit | None":
         from crunch.api._domain.metric import Unit
 
         unit_attrs = self._attrs.get("primaryUnit")
@@ -83,7 +83,7 @@ class PredictionCollection(Collection[Prediction]):
     def __init__(
         self,
         project: "Project",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -104,7 +104,7 @@ class PredictionCollection(Collection[Prediction]):
 
     def list(
         self
-    ) -> List[Prediction]:
+    ) -> list[Prediction]:
         return self.prepare_models(
             self._checked_client.api.list_predictions(
                 self.project.competition.id,
@@ -113,7 +113,7 @@ class PredictionCollection(Collection[Prediction]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Prediction], *args: Any) -> Prediction:
+    def prepare_model(self, attrs: "JsonValue | Prediction", *args: Any) -> Prediction:
         return super().prepare_model(
             attrs,
             self.project,

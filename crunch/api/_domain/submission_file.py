@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -15,9 +15,9 @@ class SubmissionFile(Model[int]):
     def __init__(
         self,
         submission: "Submission",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["SubmissionFileCollection"] = None
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "SubmissionFileCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -55,7 +55,7 @@ class SubmissionFileCollection(Collection[SubmissionFile]):
     def __init__(
         self,
         submission: "Submission",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -63,7 +63,7 @@ class SubmissionFileCollection(Collection[SubmissionFile]):
 
     def list(
         self
-    ) -> List[SubmissionFile]:
+    ) -> list[SubmissionFile]:
         from_attrs = self.submission._attrs.get("files")
         if from_attrs:
             return self.prepare_models(from_attrs)
@@ -77,7 +77,7 @@ class SubmissionFileCollection(Collection[SubmissionFile]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", SubmissionFile], *args: Any) -> SubmissionFile:
+    def prepare_model(self, attrs: "JsonValue | SubmissionFile", *args: Any) -> SubmissionFile:
         return super().prepare_model(
             attrs,
             self.submission,

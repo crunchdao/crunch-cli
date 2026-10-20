@@ -1,5 +1,5 @@
 import dataclasses
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from dataclasses_json import dataclass_json, LetterCase, Undefined
 
@@ -19,12 +19,12 @@ if TYPE_CHECKING:
 class QuickstarterAuthor:
 
     name: str
-    link: Optional[str] = None
+    link: str | None = None
 
     @staticmethod
     def from_dict_array(
-        input: List[Dict[str, Any]],
-    ) -> List["QuickstarterAuthor"]:
+        input: list[dict[str, Any]],
+    ) -> list["QuickstarterAuthor"]:
         return [
             QuickstarterAuthor.from_dict(x)  # type: ignore
             for x in input
@@ -38,12 +38,12 @@ class QuickstarterFile:
     name: str
     url: str
     github_url: str
-    colab_url: Optional[str] = None
+    colab_url: str | None = None
 
     @staticmethod
     def from_dict_array(
-        input: List[Dict[str, Any]],
-    ) -> List["QuickstarterFile"]:
+        input: list[dict[str, Any]],
+    ) -> list["QuickstarterFile"]:
         return [
             QuickstarterFile.from_dict(x)  # type: ignore
             for x in input
@@ -55,9 +55,9 @@ class Quickstarter(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["QuickstarterCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "QuickstarterCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -80,7 +80,7 @@ class Quickstarter(Model[int]):
         return self._attrs["title"]
 
     @property
-    def authors(self) -> List[QuickstarterAuthor]:
+    def authors(self) -> list[QuickstarterAuthor]:
         return QuickstarterAuthor.from_dict_array(self._attrs["authors"])
 
     @property
@@ -92,7 +92,7 @@ class Quickstarter(Model[int]):
         return self._attrs["notebook"]
 
     @property
-    def files(self) -> List[QuickstarterFile]:
+    def files(self) -> list[QuickstarterFile]:
         files = self._attrs.get("files")
         if not files:
             self.reload()
@@ -108,7 +108,7 @@ class QuickstarterCollection(Collection[Quickstarter]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -127,14 +127,14 @@ class QuickstarterCollection(Collection[Quickstarter]):
 
     def list(
         self
-    ) -> List[Quickstarter]:
+    ) -> list[Quickstarter]:
         return self.prepare_models(
             self._checked_client.api.list_quickstarters(
                 self.competition.resource_identifier
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Quickstarter], *args: Any) -> Quickstarter:
+    def prepare_model(self, attrs: "JsonValue | Quickstarter", *args: Any) -> Quickstarter:
         return super().prepare_model(
             attrs,
             self.competition,

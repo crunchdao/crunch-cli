@@ -1,5 +1,5 @@
 import os
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, Iterable, Sequence
 
 import click
 
@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 class SubmissionIdentifierClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "identifier"
 
-    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> Optional[str]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_metavar(self, param: click.Parameter, ctx: click.Context | None = None) -> str | None:  # pyright: ignore[reportIncompatibleMethodOverride]
         # keep the argument name in usage, brackets there would read as optional
         if isinstance(param, click.Argument):
             return None
 
         return "[@last|<number>]"
 
-    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> "SubmissionIdentifierType":
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> "SubmissionIdentifierType":
         if "@last" == value:
             return "@last"
 
@@ -42,13 +42,13 @@ class SubmissionIdentifierClickType(click.ParamType):  # pyright: ignore[reportM
 def submission_list(
     repository: Repository,
     *,
-    limit: Optional[int],
+    limit: int | None,
 ):
     submissions = get_project(repository).submissions.list()
 
     reached_limit = limit is not None and len(submissions) > limit
 
-    rows: List[Sequence[Any]] = []
+    rows: list[Sequence[Any]] = []
     for submission in reversed(submissions):
         model = submission.model
 
@@ -129,9 +129,9 @@ def submission_checkout(
     repository: Repository,
     *,
     submission_identifier: "SubmissionIdentifierType",
-    files: Optional[List[str]],
+    files: list[str] | None,
 ):
-    requested_paths: Optional[Set[str]] = None
+    requested_paths: set[str] | None = None
     if files is not None:
         requested_paths = set()
 
@@ -155,8 +155,8 @@ def submission_checkout(
         raise click.Abort()
 
     if requested_paths is not None:
-        selected_paths: Set[str] = set()
-        unmatched_paths: List[str] = []
+        selected_paths: set[str] = set()
+        unmatched_paths: list[str] = []
 
         for requested_path in requested_paths:
             matched_paths = _match_paths(urls.keys(), requested_path)
@@ -204,7 +204,7 @@ _SPECIFIC_MESSAGES = {
 }
 
 
-def _find_specific_message(project_path: str) -> Optional[str]:
+def _find_specific_message(project_path: str) -> str | None:
     for directory, message in _SPECIFIC_MESSAGES.items():
         if project_path.rstrip("/") == directory or project_path.startswith(directory + "/"):
             return message
@@ -212,7 +212,7 @@ def _find_specific_message(project_path: str) -> Optional[str]:
     return None
 
 
-def _match_paths(paths: Iterable[str], requested_path: str) -> List[str]:
+def _match_paths(paths: Iterable[str], requested_path: str) -> list[str]:
     paths = list(paths)
     if requested_path in paths:
         return [requested_path]
@@ -228,7 +228,7 @@ def _match_paths(paths: Iterable[str], requested_path: str) -> List[str]:
     ]
 
 
-def _to_project_path(repository: Repository, path: str) -> Optional[str]:
+def _to_project_path(repository: Repository, path: str) -> str | None:
     try:
         relative_path = os.path.relpath(os.path.abspath(path), repository.root_directory_path)
     except ValueError:  # on windows, when the path is on another drive

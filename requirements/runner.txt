@@ -1,7 +1,7 @@
 click
 
 
-dataclasses_json
+dataclasses_json>=0.6.0
 
 
 joblib

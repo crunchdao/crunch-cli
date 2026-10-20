@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import crunch.monkey_patches as monkey_patches
 from crunch.api import Competition, RoundIdentifierType
@@ -35,15 +35,15 @@ def install_logger():
 def run(
     repository: "Repository",
     user_module: Any,
-    runner_module: Optional[RunnerModule],
+    runner_module: RunnerModule | None,
     model_directory_path: str,
     force_first_train: bool,
     train_frequency: int,
     round_number: RoundIdentifierType,
     competition: Competition,
     has_gpu: bool = False,
-    no_determinism_check: Optional[bool] = True,
-    trace_exporter: Optional["LocalTraceExporter"] = None,
+    no_determinism_check: bool | None = True,
+    trace_exporter: "LocalTraceExporter | None" = None,
 ):
     monkey_patches.pickle_unpickler_find_class()
     monkey_patches.joblib_parallel_initializer()

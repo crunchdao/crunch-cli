@@ -1,3 +1,3 @@
-from typing import Any, Dict
+from typing import Any, TypeAlias
 
-Attrs = Dict[str, Any]
+Attrs: TypeAlias = dict[str, Any]

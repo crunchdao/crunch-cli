@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Iterable
 
 from crunch.api._domain.common import GpuRequirement
 from crunch.api._domain.enum_ import Language
@@ -34,7 +34,7 @@ class Library(Model[int]):
         return Language[self._attrs["language"]]
 
     @property
-    def aliases(self) -> Tuple[str]:
+    def aliases(self) -> tuple[str]:
         return tuple(self._attrs.get("aliases") or [])
 
 
@@ -45,10 +45,10 @@ class LibraryCollection(Collection[Library]):
     def list(
         self,
         *,
-        name: Optional[str] = None,
-        gpu_requirement: Optional[GpuRequirement] = None,
-        standard: Optional[bool] = None,
-        language: Optional[Union["Language", "ImportedRequirementLanguage"]] = None,
+        name: str | None = None,
+        gpu_requirement: GpuRequirement | None = None,
+        standard: bool | None = None,
+        language: "Language | ImportedRequirementLanguage | None" = None,
     ) -> Iterable[Library]:
         return self.prepare_models(
             self._checked_client.api.list_libraries_v2(
@@ -75,9 +75,9 @@ class LibraryRequest(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["LibraryRequestCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "LibraryRequestCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -92,20 +92,20 @@ class LibraryRequest(Model[int]):
         return Language[self._attrs["language"]]
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> str | None:
         return self._attrs.get("name")
 
     @property
-    def alias(self) -> Optional[str]:
+    def alias(self) -> str | None:
         return self._attrs.get("alias")
 
     @property
-    def gpu_requirement(self) -> Optional[GpuRequirement]:
+    def gpu_requirement(self) -> GpuRequirement | None:
         gpu_requirement = self._attrs.get("gpuRequirement")
         return GpuRequirement[gpu_requirement] if gpu_requirement else None
 
     @property
-    def additional_details(self) -> Optional[str]:
+    def additional_details(self) -> str | None:
         return self._attrs.get("additionalDetails")
 
     @property
@@ -113,11 +113,11 @@ class LibraryRequest(Model[int]):
         return LibraryRequestVerdict[self._attrs["verdict"]]
 
     @property
-    def verdict_reason(self) -> Optional[str]:
+    def verdict_reason(self) -> str | None:
         return self._attrs.get("verdictReason")
 
     @property
-    def verdict_at(self) -> Optional[datetime]:
+    def verdict_at(self) -> datetime | None:
         verdict_at = self._attrs.get("verdictAt")
         return datetime.fromisoformat(verdict_at) if verdict_at else None
 
@@ -133,7 +133,7 @@ class LibraryRequestCollection(Collection[LibraryRequest]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -142,11 +142,11 @@ class LibraryRequestCollection(Collection[LibraryRequest]):
     def create(
         self,
         *,
-        name: Optional[str] = None,
-        alias: Optional[str] = None,
-        language: Optional[Union["Language", "ImportedRequirementLanguage"]] = None,
-        gpu_requirement: Optional[GpuRequirement] = None,
-        additional_details: Optional[str] = None,
+        name: str | None = None,
+        alias: str | None = None,
+        language: "Language | ImportedRequirementLanguage | None" = None,
+        gpu_requirement: GpuRequirement | None = None,
+        additional_details: str | None = None,
     ) -> LibraryRequest:
         return self.prepare_model(
             self._checked_client.api.create_library_request(
@@ -159,7 +159,7 @@ class LibraryRequestCollection(Collection[LibraryRequest]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", LibraryRequest], *args: Any) -> LibraryRequest:
+    def prepare_model(self, attrs: "JsonValue | LibraryRequest", *args: Any) -> LibraryRequest:
         return super().prepare_model(
             attrs,
             self.competition,
@@ -171,12 +171,12 @@ class LibraryEndpointMixin(EndpointMixin):
 
     def list_libraries_v2(
         self,
-        name: Optional[str],
-        gpu_requirement: Optional[GpuRequirement],
-        standard: Optional[bool],
-        language: Optional[Union["Language", "ImportedRequirementLanguage"]],
+        name: str | None,
+        gpu_requirement: GpuRequirement | None,
+        standard: bool | None,
+        language: "Language | ImportedRequirementLanguage | None",
     ):
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
 
         if name is not None:
             params["name"] = name
@@ -205,13 +205,13 @@ class LibraryEndpointMixin(EndpointMixin):
     def create_library_request(
         self,
         competition_id: int,
-        name: Optional[str],
-        alias: Optional[str],
-        language: Optional[Union["Language", "ImportedRequirementLanguage"]],
-        gpu_requirement: Optional[GpuRequirement],
-        additional_details: Optional[str],
+        name: str | None,
+        alias: str | None,
+        language: "Language | ImportedRequirementLanguage | None",
+        gpu_requirement: GpuRequirement | None,
+        additional_details: str | None,
     ):
-        body: Dict[str, Any] = {
+        body: dict[str, Any] = {
             "competitionId": competition_id,
             "name": name,
             "alias": alias,

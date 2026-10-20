@@ -3,13 +3,12 @@ import os
 import re
 import sys
 import traceback
-from typing import Optional
 
 from . import constants
 
 _patchers = []
 
-SHOULD_PRINT_PREFIX_WHEN_POSSIBLE: Optional[str] = None
+SHOULD_PRINT_PREFIX_WHEN_POSSIBLE: str | None = None
 
 
 def _patcher(f):

@@ -3,7 +3,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Literal, TypeAlias
 from urllib.parse import parse_qs, urlencode
 
 import requests
@@ -13,7 +13,7 @@ import crunch.store as store
 from crunch import constants
 from crunch.utils import build_user_agent
 
-ModuleFileName = Literal["leaderboard", "reward", "runner", "scoring", "submission"]
+ModuleFileName: TypeAlias = Literal["leaderboard", "reward", "runner", "scoring", "submission"]
 
 
 class NoCodeFoundError(RuntimeError):
@@ -91,7 +91,7 @@ class HttpCodeLoader(CodeLoader):
         self,
         *,
         url: str,
-        user_agent: Optional[str] = None,
+        user_agent: str | None = None,
     ):
         self._url = url
         self._user_agent = user_agent or build_user_agent()
@@ -136,8 +136,8 @@ class HttpCodeLoader(CodeLoader):
         competition_name: str,
         file_name: ModuleFileName,
         repository: str,
-        reference: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        reference: str | None = None,
+        user_agent: str | None = None,
     ) -> "HttpCodeLoader":
         url = format_github_url(
             repository=repository,
@@ -157,9 +157,9 @@ class HttpCodeLoader(CodeLoader):
         competition_name: str,
         file_name: ModuleFileName,
         base_url: str,
-        schema: Optional[str] = None,
-        reference: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        schema: str | None = None,
+        reference: str | None = None,
+        user_agent: str | None = None,
     ) -> "HttpCodeLoader":
         if schema is None:
             schema = "https"
@@ -230,12 +230,12 @@ class FallbackCodeLoader(CodeLoader):
     def __init__(
         self,
         *,
-        loaders: List[CodeLoader],
+        loaders: list[CodeLoader],
     ):
         self.loaders = loaders
 
     def load(self):
-        suppressed: List[str] = []
+        suppressed: list[str] = []
         for loader in self.loaders:
             try:
                 return loader.load()
@@ -279,7 +279,7 @@ def deduce(
     *,
     competition_name: str,
     file_name: ModuleFileName,
-    source: Optional[str] = None,
+    source: str | None = None,
 ):
     if source is not None:
         source = source.strip()
@@ -361,6 +361,6 @@ def _deduce_one(
         raise ValueError(f"unsupported schema: {schema}")
 
 
-def _get_reference(params: Dict[str, List[str]]) -> Optional[str]:
+def _get_reference(params: dict[str, list[str]]) -> str | None:
     reference, = params.get("reference") or [None]
     return reference

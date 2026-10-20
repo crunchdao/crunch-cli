@@ -1,5 +1,5 @@
 from itertools import groupby
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Iterable
 
 if TYPE_CHECKING:
     from crunch_convert.requirements_txt import NamedRequirement
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 def truncate(
-    values: Set[str],
+    values: set[str],
     max_size: int = 10
 ) -> str:
     size = len(values)
@@ -49,7 +49,7 @@ def delta_message(
     return message
 
 
-def group_metrics_by_target(metrics: List["Metric"]):
+def group_metrics_by_target(metrics: list["Metric"]):
     return [
         (target, list(metrics))
         for target, metrics in groupby(
@@ -63,9 +63,9 @@ def group_metrics_by_target(metrics: List["Metric"]):
 
 
 def find_requirement_by_name(
-    requirements: List["NamedRequirement"],
+    requirements: list["NamedRequirement"],
     name: str,
-) -> Optional["NamedRequirement"]:
+) -> "NamedRequirement | None":
     return next((
         requirement
         for requirement in requirements
@@ -74,9 +74,9 @@ def find_requirement_by_name(
 
 
 def find_file_by_path(
-    files: List["File"],
+    files: list["File"],
     path: str,
-) -> Optional["File"]:
+) -> "File | None":
     return next((
         file
         for file in files

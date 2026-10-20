@@ -1,5 +1,5 @@
 import os
-from typing import Any, List, Sequence
+from typing import Any, Sequence
 
 import click
 
@@ -16,7 +16,7 @@ def quickstarter_list(
     project = get_project(repository)
     quickstarters = project.competition.quickstarters.list()
 
-    rows: List[Sequence[Any]] = []
+    rows: list[Sequence[Any]] = []
     for quickstarter in quickstarters:
         rows.append(
             (

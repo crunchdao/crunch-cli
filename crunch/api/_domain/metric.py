@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from dataclasses_json import Undefined, dataclass_json
 
@@ -53,9 +53,9 @@ class ReducerFunction(Enum):
 @dataclass(frozen=True)
 class Unit:
 
-    prefix: Optional[str]
+    prefix: str | None
     scale: int
-    suffix: Optional[str]
+    suffix: str | None
 
     def format_value(self, value: float) -> str:
         prefix = self.prefix or ''
@@ -70,10 +70,10 @@ class Metric(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        target: Optional["Target"] = None,
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["MetricCollection"] = None,
+        target: "Target | None" = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "MetricCollection | None" = None,
     ):
         from crunch.api._domain.target import Target
 
@@ -135,7 +135,7 @@ class MetricCollection(Collection[Metric]):
         self,
         competition: "Competition",
         target: "Target",
-        client: Optional["Client"] = None,
+        client: "Client | None" = None,
     ):
         super().__init__(client)
 
@@ -157,7 +157,7 @@ class MetricCollection(Collection[Metric]):
 
     def list(
         self
-    ) -> List[Metric]:
+    ) -> list[Metric]:
         return self.prepare_models(
             self._checked_client.api.list_metrics(
                 self.competition.id,
@@ -165,7 +165,7 @@ class MetricCollection(Collection[Metric]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Metric], *args: Any) -> Metric:
+    def prepare_model(self, attrs: "JsonValue | Metric", *args: Any) -> Metric:
         return super().prepare_model(
             attrs,
             self.competition,
@@ -179,7 +179,7 @@ class MetricEndpointMixin(EndpointMixin):
     def get_metric(
         self,
         competition_identifier: "CompetitionIdentifierType",
-        target_name: Optional[str],
+        target_name: str | None,
         metric_name: str
     ):
         return self._result(
@@ -192,7 +192,7 @@ class MetricEndpointMixin(EndpointMixin):
     def list_metrics(
         self,
         competition_identifier: "CompetitionIdentifierType",
-        target_name: Optional[str],
+        target_name: str | None,
     ) -> "JsonValue":
         url = (
             f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics"

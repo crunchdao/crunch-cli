@@ -5,7 +5,7 @@ import sys
 from functools import cached_property
 from textwrap import dedent
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any
 
 import click
 import psutil
@@ -97,7 +97,7 @@ class _Inline:
         round_number: RoundIdentifierType = "@current",
         force: bool = False,
         **kwargs: KwargsLike,
-    ) -> Tuple[Optional["pandas.DataFrame"], Optional["pandas.DataFrame"], Optional["pandas.DataFrame"]]:
+    ) -> tuple["pandas.DataFrame | None", "pandas.DataFrame | None", "pandas.DataFrame | None"]:
         if self._competition.format == CompetitionFormat.STREAM:
             self.load_streams()
 
@@ -141,7 +141,7 @@ class _Inline:
         train_frequency: int = 1,
         raise_abort: bool = False,
         round_number: RoundIdentifierType = "@current",
-        no_determinism_check: Optional[bool] = None,
+        no_determinism_check: bool | None = None,
         skip_whitelisted_library_scan: bool = False,
     ):
         from . import library, tester
@@ -207,7 +207,7 @@ class _Inline:
 
     def submit(
         self,
-        message: Optional[str] = None,
+        message: str | None = None,
         model_directory_relative_path: str = "",
         include_installed_packages_version: bool = False,
         notebook_file_name: str = "notebook.ipynb",
@@ -382,7 +382,7 @@ class _Inline:
 
 
 def load(
-    module_name_or_module: Union[ModuleType, str] = "__main__",
+    module_name_or_module: ModuleType | str = "__main__",
     model_directory_path: str = DEFAULT_MODEL_DIRECTORY,
 ):
     if isinstance(module_name_or_module, str):
@@ -398,7 +398,7 @@ def load(
     )
 
 
-def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
+def _create_usage_figure(metric_objects: list["RunnerRunMetric"]):
     import pandas
     import plotly.graph_objects as go
 
@@ -550,7 +550,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
     return figure
 
 
-def _create_timeline_figure(span_objects: List["LocalSpan"]):
+def _create_timeline_figure(span_objects: list["LocalSpan"]):
     import pandas
     import plotly.graph_objects as go
 
@@ -562,7 +562,7 @@ def _create_timeline_figure(span_objects: List["LocalSpan"]):
         RunnerRunSpanStatus.FAILED: "#ef4343",
     }
 
-    span_dicts: List[Dict[str, Any]] = []
+    span_dicts: list[dict[str, Any]] = []
     for span in span_objects:
         description = span.description
         attributes = span.attributes

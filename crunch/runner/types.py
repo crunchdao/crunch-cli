@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any, TypeAlias
 
-ArgsLike = Tuple[Any, ...]
-KwargsLike = Dict[str, Any]
+ArgsLike: TypeAlias = tuple[Any, ...]
+KwargsLike: TypeAlias = dict[str, Any]

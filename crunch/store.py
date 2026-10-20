@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -51,12 +50,12 @@ def reload() -> None:
 
 def override(
     *,
-    debug: Optional[bool] = None,
-    environment: Optional[str] = None,
-    api_base_url: Optional[str] = None,
-    web_base_url: Optional[str] = None,
-    competitions_source: Optional[str] = None,
-    show_tips: Optional[bool] = None,
+    debug: bool | None = None,
+    environment: str | None = None,
+    api_base_url: str | None = None,
+    web_base_url: str | None = None,
+    competitions_source: str | None = None,
+    show_tips: bool | None = None,
 ) -> None:
     _apply(
         new_debug=debug,
@@ -71,12 +70,12 @@ def override(
 
 def _apply(
     *,
-    new_debug: Optional[bool],
-    new_environment: Optional[str],
-    new_api_base_url: Optional[str],
-    new_web_base_url: Optional[str],
-    new_competitions_source: Optional[str],
-    new_show_tips: Optional[bool],
+    new_debug: bool | None,
+    new_environment: str | None,
+    new_api_base_url: str | None,
+    new_web_base_url: str | None,
+    new_competitions_source: str | None,
+    new_show_tips: bool | None,
     verbose: bool,
 ) -> None:
     global debug, environment, api_base_url, web_base_url, competitions_source, show_tips

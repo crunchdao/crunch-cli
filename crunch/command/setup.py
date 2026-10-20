@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, TypeAlias
 
 import click
 
@@ -7,16 +7,16 @@ import crunch.command as command
 from crunch.repository import Repository
 from crunch.utils import download
 
-SetupSubmissionNumberType = Union[int, Literal["latest", "scratch"]]
+SetupSubmissionNumberType: TypeAlias = int | Literal["latest", "scratch"]
 
 
 class SetupSubmissionNumberClickType(click.ParamType):  # pyright: ignore[reportMissingTypeArgument]
     name = "number"
 
-    def get_metavar(self, param: click.Parameter, ctx: Optional[click.Context] = None) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_metavar(self, param: click.Parameter, ctx: click.Context | None = None) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
         return "[latest|scratch|<number>]"
 
-    def convert(self, value: Any, param: Optional[click.Parameter], ctx: Optional[click.Context]) -> SetupSubmissionNumberType:
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> SetupSubmissionNumberType:
         if "latest" == value:
             return "latest"
 
@@ -37,7 +37,7 @@ def setup(
     *,
     clone_token: str,
     competition_name: str,
-    project_name: Optional[str],
+    project_name: str | None,
     submission_number: SetupSubmissionNumberType,
     directory: str,
     model_directory: str,

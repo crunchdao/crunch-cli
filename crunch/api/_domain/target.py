@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -15,9 +15,9 @@ class Target(Model[int]):
     def __init__(
         self,
         competition: "Competition",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["TargetCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "TargetCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -69,7 +69,7 @@ class TargetCollection(Collection[Target]):
     def __init__(
         self,
         competition: "Competition",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -88,9 +88,9 @@ class TargetCollection(Collection[Target]):
 
     def list(
         self,
-        name: Optional[str] = None,
-        virtual: Optional[bool] = None,
-    ) -> List[Target]:
+        name: str | None = None,
+        virtual: bool | None = None,
+    ) -> list[Target]:
         return self.prepare_models(
             self._checked_client.api.list_targets(
                 self.competition.id,
@@ -100,7 +100,7 @@ class TargetCollection(Collection[Target]):
         )
 
     @property
-    def primary(self) -> Optional[Target]:
+    def primary(self) -> Target | None:
         return next(
             (
                 target
@@ -110,7 +110,7 @@ class TargetCollection(Collection[Target]):
             None
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Target], *args: Any) -> Target:
+    def prepare_model(self, attrs: "JsonValue | Target", *args: Any) -> Target:
         return super().prepare_model(
             attrs,
             self.competition,
@@ -135,8 +135,8 @@ class TargetEndpointMixin(EndpointMixin):
     def list_targets(
         self,
         competition_identifier: "CompetitionIdentifierType",
-        name: Optional[str],
-        virtual: Optional[bool],
+        name: str | None,
+        virtual: bool | None,
     ):
         return self._result(
             self.get(

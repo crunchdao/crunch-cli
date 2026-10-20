@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from types import GeneratorType
-from typing import Any, Callable, Generator, Iterator, List, Optional
+from typing import Any, Callable, Generator, Iterator
 
 
 class GeneratorWrapper:
@@ -17,8 +17,8 @@ class GeneratorWrapper:
         iterator: Iterator,
         consumer_factory: Callable[[Iterator], Generator],
         *,
-        element_wrapper_factory: Optional[Callable[[Any], Any]] = None,
-        post_processor: Optional[Callable[[Any], Any]] = None,
+        element_wrapper_factory: Callable[[Any], Any] | None = None,
+        post_processor: Callable[[Any], Any] | None = None,
     ):
         self.element_wrapper_factory = element_wrapper_factory or (lambda x: x)
         self.post_processor = post_processor or (lambda x: x)
@@ -55,8 +55,8 @@ class GeneratorWrapper:
         self,
         expected_size: int
     ):
-        values: List[Any] = []
-        durations: List[timedelta] = []
+        values: list[Any] = []
+        durations: list[timedelta] = []
 
         sentinel = object()
 

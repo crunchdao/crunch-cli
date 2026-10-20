@@ -4,14 +4,14 @@ import os
 import queue
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Literal, Optional, Tuple, overload
+from typing import TYPE_CHECKING, Any, Iterator, Literal, TypeAlias, overload
 
 import psutil
 
 if TYPE_CHECKING:
     from jupyter_client import BlockingKernelClient  # pyright: ignore[reportPrivateImportUsage]
 
-IPyNb = Dict[str, Any]
+IPyNb: TypeAlias = dict[str, Any]
 
 
 class IPyNbNotAvailableError(Exception):
@@ -30,7 +30,7 @@ class NotebookEnvironment(ABC):
         pass
 
     @abstractmethod
-    def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
+    def display_name_and_gif(self, have_runs: bool) -> tuple[str, str]:
         pass
 
     @abstractmethod
@@ -48,11 +48,11 @@ class NotebookEnvironment(ABC):
 
     @staticmethod
     @overload
-    def detect(none_if_not_found: Literal[True]) -> Optional["NotebookEnvironment"]:
+    def detect(none_if_not_found: Literal[True]) -> "NotebookEnvironment | None":
         ...
 
     @staticmethod
-    def detect(none_if_not_found: bool = False) -> Optional["NotebookEnvironment"]:
+    def detect(none_if_not_found: bool = False) -> "NotebookEnvironment | None":
         if Kaggle.ENVVAR in os.environ:
             return Kaggle()
 
@@ -92,7 +92,7 @@ class _Jupyter(NotebookEnvironment):
     CONTROL_REPLY_TIMEOUT_SECONDS = 60
 
     @staticmethod
-    def _extract_connection_file_path(arguments: List[str]) -> Optional[str]:
+    def _extract_connection_file_path(arguments: list[str]) -> str | None:
         for index, argument in enumerate(arguments):
             if argument == "-f" and index + 1 < len(arguments):
                 return arguments[index + 1]
@@ -103,7 +103,7 @@ class _Jupyter(NotebookEnvironment):
         return None
 
     @classmethod
-    def _find_connection_file_path(cls) -> Optional[str]:
+    def _find_connection_file_path(cls) -> str | None:
         current_process = psutil.Process()
 
         for process in [current_process, *current_process.parents()]:
@@ -137,9 +137,9 @@ class _Jupyter(NotebookEnvironment):
     def _execute_on_control_channel(
         self,
         code: str,
-        user_expressions: Optional[Dict[str, str]] = None,
+        user_expressions: dict[str, str] | None = None,
         silent: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         with self._connect_to_kernel() as kernel_client:
             request = kernel_client.session.msg("execute_request", {
                 "code": code,
@@ -187,7 +187,7 @@ class Colab(_Jupyter):
     def name(self) -> str:
         return "colab"
 
-    def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
+    def display_name_and_gif(self, have_runs: bool) -> tuple[str, str]:
         return "Colab", _colab_gif(have_runs)
 
     def extract_ipynb(self) -> IPyNb:
@@ -250,7 +250,7 @@ class Kaggle(_Jupyter):
     def name(self) -> str:
         return "kaggle"
 
-    def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
+    def display_name_and_gif(self, have_runs: bool) -> tuple[str, str]:
         # TODO Record separate GIFs for deployments from Kaggle
         return "Kaggle", "download-and-submit-notebook-on-kaggle.gif"
 
@@ -304,7 +304,7 @@ class Generic(NotebookEnvironment):
     def name(self) -> str:
         return "generic"
 
-    def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
+    def display_name_and_gif(self, have_runs: bool) -> tuple[str, str]:
         return "your current environment", _colab_gif(have_runs)
 
     def extract_ipynb(self) -> IPyNb:
@@ -327,7 +327,7 @@ class _Debugging(NotebookEnvironment):
     def name(self) -> str:
         return "debugging"
 
-    def display_name_and_gif(self, have_runs: bool) -> Tuple[str, str]:
+    def display_name_and_gif(self, have_runs: bool) -> tuple[str, str]:
         return "your debugging environment", _colab_gif(have_runs)
 
     def extract_ipynb(self) -> IPyNb:

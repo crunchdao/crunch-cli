@@ -4,7 +4,7 @@ import traceback
 from functools import cached_property
 from time import sleep
 from types import ModuleType
-from typing import Any, List, Tuple
+from typing import Any
 
 import requests
 
@@ -26,7 +26,7 @@ class SandboxExecutor:
         model_directory_path: str,
         prediction_directory_path: str,
         trace_path: str,
-        ping_urls: List[str],
+        ping_urls: list[str],
         # ---
         train: bool,
         gpu: bool,
@@ -90,7 +90,7 @@ class SandboxExecutor:
             self.write_trace(sys.exc_info())
             raise
 
-    def _ping(self, urls: List[str]):
+    def _ping(self, urls: list[str]):
         for url in urls:
             try:
                 requests.get(url)
@@ -132,7 +132,7 @@ class SandboxExecutor:
             self.parameters,
         )
 
-    def write_trace(self, exc_info: Tuple[Any, ...]):
+    def write_trace(self, exc_info: tuple[Any, ...]):
         try:
             with open(self.trace_path, "w") as fd:
                 traceback.print_exception(*exc_info, file=fd)

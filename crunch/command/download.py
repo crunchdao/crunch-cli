@@ -1,5 +1,4 @@
 import os
-import typing
 
 import crunch.downloader as downloader
 from crunch.api import Round, RoundIdentifierType, RoundNotFoundException, SizeVariant
@@ -10,7 +9,7 @@ def _get_data_urls(
     round: Round,
     data_directory_path: str,
     size_variant: SizeVariant,
-) -> typing.Dict[str, downloader.PreparedDataFile]:
+) -> dict[str, downloader.PreparedDataFile]:
     data_release = round.phases.get_submission().get_data_release(size_variant=size_variant)
     data_files = data_release.data_files
 
@@ -21,7 +20,7 @@ def download(
     repository: Repository,
     round_number: RoundIdentifierType = "@current",
     force: bool = False,
-    size_variant: typing.Optional[SizeVariant] = None,
+    size_variant: SizeVariant | None = None,
 ):
     _, project = repository.create_client()
 

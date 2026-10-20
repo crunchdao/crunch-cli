@@ -1,7 +1,7 @@
 import json
 import random
 import traceback
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, TypeVar, cast
+from typing import TYPE_CHECKING, Callable, TypeVar, cast
 
 import click
 
@@ -45,10 +45,10 @@ def leaderboard_group():
 @click.pass_context
 def leaderboard_rank(
     context: click.Context,
-    score_file_path: Optional[str],
+    score_file_path: str | None,
     scores_from_api: bool,
     rank_pass_string: str,
-    target_name: Optional[str],
+    target_name: str | None,
     shuffle: bool,
 ):
     from crunch.unstructured import LeaderboardModule, RankableProject, RankPass
@@ -59,7 +59,7 @@ def leaderboard_rank(
 
     target, metrics = _find_target(competition, target_name)
 
-    projects: List[RankableProject] = (
+    projects: list[RankableProject] = (
         _load_projects_from_api(competition, target, RankableProject.from_dict)  # type: ignore
         if scores_from_api else
         _load_projects_from_file(score_file_path, RankableProject.from_dict)  # type: ignore
@@ -136,14 +136,14 @@ def leaderboard_rank(
 @click.pass_context
 def leaderboard_compare(
     context: click.Context,
-    prediction_directory_paths: List[Tuple[int, str]],
+    prediction_directory_paths: list[tuple[int, str]],
     data_directory_path: str,
 ):
     from crunch.unstructured import LeaderboardModule
 
     competition, module = _load_code(context, "leaderboard", LeaderboardModule.load)
 
-    prediction_directory_path_by_id: Dict[int, str] = {}
+    prediction_directory_path_by_id: dict[int, str] = {}
     for prediction_id, prediction_file_path in prediction_directory_paths:
         if prediction_id in prediction_directory_path_by_id:
             print(f"prediction id {prediction_id} specified multiple time")
@@ -207,9 +207,9 @@ def reward_group():
 @click.pass_context
 def reward_compute_bounties(
     context: click.Context,
-    score_file_path: Optional[str],
+    score_file_path: str | None,
     scores_from_api: bool,
-    target_name: Optional[str],
+    target_name: str | None,
     granted_amount: float,
     shuffle: bool,
 ):
@@ -219,7 +219,7 @@ def reward_compute_bounties(
 
     target, metrics = _find_target(competition, target_name)
 
-    projects: List[RewardableProject] = (
+    projects: list[RewardableProject] = (
         _load_projects_from_api(competition, target, RewardableProject.from_dict)  # type: ignore
         if scores_from_api else
         _load_projects_from_file(score_file_path, RewardableProject.from_dict)  # type: ignore
@@ -285,7 +285,7 @@ def scoring_check(
     data_directory_path: str,
     prediction_directory_path: str,
     phase_type_string: str,
-    chain_height: Optional[int],
+    chain_height: int | None,
 ):
     from crunch.unstructured import ParticipantVisibleError, ScoringModule
 
@@ -442,11 +442,11 @@ def submission_check(
 T = TypeVar("T")
 
 
-def _load_code(context: click.Context, file_name: "ModuleFileName", module_loader: Callable[["CodeLoader"], Optional[T]]) -> Tuple[Competition, T]:
+def _load_code(context: click.Context, file_name: "ModuleFileName", module_loader: Callable[["CodeLoader"], T | None]) -> tuple[Competition, T]:
     from . import CodeLoader
 
     competition, load_code = cast(
-        Tuple[
+        tuple[
             Competition,
             Callable[["ModuleFileName"], CodeLoader],
         ],
@@ -464,7 +464,7 @@ def _load_code(context: click.Context, file_name: "ModuleFileName", module_loade
     return competition, module
 
 
-def _find_target(competition: Competition, name_candidate: Optional[str]):
+def _find_target(competition: Competition, name_candidate: str | None):
     if name_candidate is None:
         target = next(
             (
@@ -489,9 +489,9 @@ def _find_target(competition: Competition, name_candidate: Optional[str]):
 
 
 def _load_projects_from_file(
-    score_file_path: Optional[str],
+    score_file_path: str | None,
     project_type: Callable[..., T],
-) -> List[T]:
+) -> list[T]:
     if score_file_path is None:
         raise ValueError("score file path must be specified")
 
@@ -500,7 +500,7 @@ def _load_projects_from_file(
         if not isinstance(root, list):
             raise ValueError("root must be a list")
 
-        projects: List[T] = []
+        projects: list[T] = []
         for index, item in enumerate(root):  # type: ignore
             if not isinstance(item, dict):
                 raise ValueError(f"root[{index}] must be a dict: {item}")
@@ -514,7 +514,7 @@ def _load_projects_from_api(
     competition: Competition,
     target: Target,
     mapper: Callable[..., T],
-) -> List[T]:
+) -> list[T]:
     default_leaderboard = competition.leaderboards.default
 
     for target_leaderboard in default_leaderboard._attrs.get("targets") or []:  # type: ignore
@@ -528,7 +528,7 @@ def _load_projects_from_api(
         print(f"leaderboard: target {target.name} not found, returning empty list")
         return []
 
-    projects: List[T] = []
+    projects: list[T] = []
     for position in positions:  # type: ignore
         user = position["user"]  # type: ignore
         project = position["project"]  # type: ignore

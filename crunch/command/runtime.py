@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import click
 
@@ -31,7 +31,7 @@ def runtime_list(
     if submission is not None:
         has_one_requestable = False
 
-        rows: List[Sequence[Any]] = []
+        rows: list[Sequence[Any]] = []
         for option in submission.runtime_options:
             rows.append(
                 (

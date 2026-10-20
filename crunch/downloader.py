@@ -4,7 +4,7 @@ import subprocess
 import zipfile
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable
 
 import click
 
@@ -40,14 +40,14 @@ class PreparedDataFile:
 
 def delete_other_uncompressed_markers(
     data_directory_path: str,
-    data_files: List[PreparedDataFile],
+    data_files: list[PreparedDataFile],
 ):
     expected_markers = {
         data_file.uncompressed_marker_path
         for data_file in data_files
     }
 
-    found_markers: Set[str] = set()
+    found_markers: set[str] = set()
     for root, _, files in os.walk(data_directory_path, topdown=False):
         for file in files:
             if file.startswith(".") and file.endswith(".uncompressed"):
@@ -90,7 +90,7 @@ def prepare_one(
 
 
 def save_one(
-    data_file: Optional[PreparedDataFile],
+    data_file: PreparedDataFile | None,
     force: bool,
     print: Callable[[Any], None] = print,
     progress_bar: bool = True,
@@ -170,7 +170,7 @@ def save_one(
 
 
 def save_all(
-    data_files: Dict[str, PreparedDataFile],
+    data_files: dict[str, PreparedDataFile],
     force: bool,
     print: Callable[[str], Any] = print,
     progress_bar: bool = True,

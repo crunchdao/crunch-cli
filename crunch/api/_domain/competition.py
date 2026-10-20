@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional
+from typing import TYPE_CHECKING, Any, Iterator
 
 from crunch.api._domain.enum_ import SplitKeyType
 from crunch.api._resource import Collection, EndpointMixin, Model
@@ -68,7 +68,7 @@ class Competition(Model[int]):
         return datetime.fromisoformat(self._attrs["start"])
 
     @property
-    def end(self) -> Optional[datetime]:
+    def end(self) -> datetime | None:
         end_string = self._attrs["end"]
         return datetime.fromisoformat(end_string) if end_string else None
 
@@ -97,7 +97,7 @@ class Competition(Model[int]):
         return self._attrs["documentationUrl"]
 
     @property
-    def notebook_url(self) -> Optional[str]:
+    def notebook_url(self) -> str | None:
         return self._attrs["notebookUrl"]
 
     @property
@@ -129,7 +129,7 @@ class Competition(Model[int]):
         return self._attrs["encryptSubmissions"]
 
     @property
-    def phala_key_url(self) -> Optional[str]:
+    def phala_key_url(self) -> str | None:
         return self._attrs["phalaKeyUrl"]
 
     @property
@@ -237,14 +237,14 @@ class CompetitionCollection(Collection[Competition]):
     def list(
         self,
         *,
-        format: Optional[CompetitionFormat] = None,
-        mode: Optional[CompetitionMode] = None,
-        status: Optional[CompetitionStatus] = None,
-        continuous: Optional[bool] = None,
-        external: Optional[bool] = None,
-        featured: Optional[bool] = None,
-        organizer_name: Optional[str] = None,
-        team_based: Optional[bool] = None,
+        format: CompetitionFormat | None = None,
+        mode: CompetitionMode | None = None,
+        status: CompetitionStatus | None = None,
+        continuous: bool | None = None,
+        external: bool | None = None,
+        featured: bool | None = None,
+        organizer_name: str | None = None,
+        team_based: bool | None = None,
     ) -> Iterator[Competition]:
         return self.prepare_models(
             self._checked_client.api.list_competitions_v2(
@@ -264,16 +264,16 @@ class CompetitionEndpointMixin(EndpointMixin):
 
     def list_competitions_v2(
         self,
-        format: Optional[CompetitionFormat],
-        mode: Optional[CompetitionMode],
-        status: Optional[CompetitionStatus],
-        continuous: Optional[bool],
-        external: Optional[bool],
-        featured: Optional[bool],
-        organizer_name: Optional[str],
-        team_based: Optional[bool],
+        format: CompetitionFormat | None,
+        mode: CompetitionMode | None,
+        status: CompetitionStatus | None,
+        continuous: bool | None,
+        external: bool | None,
+        featured: bool | None,
+        organizer_name: str | None,
+        team_based: bool | None,
     ) -> Iterator["JsonValue"]:
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
 
         if format is not None:
             params["format"] = format.name

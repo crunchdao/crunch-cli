@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin
 from crunch.api._resource import Model as BaseModel
@@ -17,9 +17,9 @@ class Model(BaseModel[int]):
     def __init__(
         self,
         project: "Project",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["ModelCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "ModelCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -51,7 +51,7 @@ class ModelCollection(Collection[Model]):
     def __init__(
         self,
         project: "Project",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -72,7 +72,7 @@ class ModelCollection(Collection[Model]):
 
     def list(
         self
-    ) -> List[Model]:
+    ) -> list[Model]:
         return self.prepare_models(
             self._checked_client.api.list_models(
                 self.project.competition.id,
@@ -81,7 +81,7 @@ class ModelCollection(Collection[Model]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Model], *args: Any) -> Model:
+    def prepare_model(self, attrs: "JsonValue | Model", *args: Any) -> Model:
         return super().prepare_model(
             attrs,
             self.project,

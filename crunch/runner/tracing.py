@@ -7,7 +7,7 @@ from enum import Enum
 from queue import Empty as QueueEmpty
 from queue import Queue
 from threading import Event, Thread
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, TypeAlias
 
 from retry import retry
 
@@ -19,27 +19,27 @@ from crunch.runner.types import KwargsLike
 class TraceExporter(ABC):
 
     @abstractmethod
-    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
+    def push(self, spans: list[RunnerRunSpan], metrics: list[RunnerRunMetric]):
         ...
 
 
 class VoidTraceExporter(TraceExporter):
 
-    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
+    def push(self, spans: list[RunnerRunSpan], metrics: list[RunnerRunMetric]):
         pass
 
 
 class LocalTraceExporter(TraceExporter):
 
     def __init__(self):
-        self.span_by_id: Dict[int, LocalSpan] = {}
-        self.metrics: List[RunnerRunMetric] = []
+        self.span_by_id: dict[int, LocalSpan] = {}
+        self.metrics: list[RunnerRunMetric] = []
 
     def reset(self):
         self.span_by_id.clear()
         self.metrics.clear()
 
-    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
+    def push(self, spans: list[RunnerRunSpan], metrics: list[RunnerRunMetric]):
         for span in spans:
             if isinstance(span, StartedRunnerRunSpan):
                 self.span_by_id[span.id] = LocalSpan(
@@ -67,13 +67,13 @@ class LocalTraceExporter(TraceExporter):
 class LocalSpan:
 
     id: int
-    parent_id: Optional[int]
+    parent_id: int | None
     description: str
     status: RunnerRunSpanStatus
-    attributes: Optional[Dict[str, Any]]
+    attributes: dict[str, Any] | None
     started_at: datetime
-    ended_at: Optional[datetime]
-    error: Optional[str]
+    ended_at: datetime | None
+    error: str | None
 
 
 class RemoteTraceExporter(TraceExporter):
@@ -82,7 +82,7 @@ class RemoteTraceExporter(TraceExporter):
         self.run = run
 
     @retry(tries=3, delay=10, backoff=5, jitter=(1, 5), logger=None)
-    def push(self, spans: List[RunnerRunSpan], metrics: List[RunnerRunMetric]):
+    def push(self, spans: list[RunnerRunSpan], metrics: list[RunnerRunMetric]):
         self.run.report_traces(
             spans=spans,
             metrics=metrics
@@ -95,7 +95,7 @@ class GpuPresence(Enum):
     AUTO_DETECT = "AUTO_DETECT"
 
 
-Attributes = Dict[str, Any]
+Attributes: TypeAlias = dict[str, Any]
 
 
 def _now_utc() -> datetime:
@@ -118,9 +118,9 @@ class RunnerTracer:
         self.metrics_delay = metrics_delay
 
         self._span_counter = 0
-        self._current_parent_id: Optional[int] = None
+        self._current_parent_id: int | None = None
 
-        self._queue: Queue[Union[RunnerRunSpan, RunnerRunMetric]] = Queue()
+        self._queue: Queue[RunnerRunSpan | RunnerRunMetric] = Queue()
         self._stop_event = Event()
 
         self._worker_thread = Thread(target=self._worker_loop, daemon=True)
@@ -130,17 +130,17 @@ class RunnerTracer:
         self._span_counter += 1
         return self._span_counter
 
-    def emit(self, item: Union[RunnerRunSpan, RunnerRunMetric]):
+    def emit(self, item: RunnerRunSpan | RunnerRunMetric):
         if not self._stop_event.is_set():
             self._queue.put(item)
 
-    def _get_batch(self) -> Optional[List[Union[RunnerRunSpan, RunnerRunMetric]]]:
+    def _get_batch(self) -> list[RunnerRunSpan | RunnerRunMetric] | None:
         try:
             item = self._queue.get(timeout=0.5)
         except QueueEmpty:
             return None
 
-        batch: List[Union[RunnerRunSpan, RunnerRunMetric]] = [item]
+        batch: list[RunnerRunSpan | RunnerRunMetric] = [item]
 
         while True:
             try:
@@ -217,7 +217,7 @@ class RunnerTracer:
     def span(
         self,
         description: str,
-        attributes: Optional[Attributes] = None,
+        attributes: Attributes | None = None,
         skip: bool = False,
     ):
         if skip:
@@ -264,11 +264,11 @@ class RunnerTracer:
 
 def to_execute_span_attributes(
     command: str,
-    parameters: Optional[KwargsLike],
-    span_hidden_parameters: Optional[List[str]] = None,
-    span_attributes: Optional[KwargsLike] = None,
-) -> Dict[str, Any]:
-    attributes: Dict[str, Any] = {
+    parameters: KwargsLike | None,
+    span_hidden_parameters: list[str] | None = None,
+    span_attributes: KwargsLike | None = None,
+) -> dict[str, Any]:
+    attributes: dict[str, Any] = {
         "command": command,
     }
 

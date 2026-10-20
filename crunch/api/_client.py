@@ -1,6 +1,6 @@
 import os
 import urllib.parse
-from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Tuple, cast
+from typing import Any, Callable, Iterable, Iterator, cast
 
 import requests
 from tqdm.auto import tqdm
@@ -65,7 +65,7 @@ class EndpointClient(
     def __init__(
         self,
         base_url: str,
-        auth: Optional[Auth],
+        auth: Auth | None,
         show_progress: bool,
     ):
         super().__init__()
@@ -82,11 +82,11 @@ class EndpointClient(
             self.headers["Authorization"] = auth.header_value
 
     def request(self, method: str, url: str, *args: Any, **kwargs: Any):
-        headers: Dict[str, str] = kwargs.pop("headers", None) or {}
+        headers: dict[str, str] = kwargs.pop("headers", None) or {}
         data: Any = kwargs.pop("data", None)
         files: Any = kwargs.pop("files", None)
 
-        progress: Optional[tqdm] = None
+        progress: tqdm | None = None
 
         if files is not None:
             import requests_toolbelt
@@ -98,12 +98,12 @@ class EndpointClient(
             if isinstance(data, dict):
                 fields.extend((
                     (key, str(value))
-                    for key, value in cast(Dict[str, Any], data).items()
+                    for key, value in cast(dict[str, Any], data).items()
                     if value is not None
                 ))
             elif isinstance(data, (list, tuple)):
                 # TODO Filter `None`s?
-                fields.extend(cast(Iterable[Tuple[str, Any]], data))
+                fields.extend(cast(Iterable[tuple[str, Any]], data))
             elif data is not None:
                 raise ValueError(f"unsupported data: {data}")
 
@@ -198,7 +198,7 @@ class EndpointClient(
     def _paginated(
         self,
         requester: Callable[[PageRequest], requests.Response],
-        page_size: Optional[int] = None
+        page_size: int | None = None
     ) -> Iterator[JsonValue]:
         if not page_size:
             page_size = self.page_size
@@ -209,7 +209,7 @@ class EndpointClient(
             self._raise_for_status(response)
 
             try:
-                json: Dict[str, Any] = response.json()
+                json: dict[str, Any] = response.json()
             except requests.exceptions.JSONDecodeError as json_error:
                 raise ValueError(f"could not parse json: `{response.text}`") from json_error
 
@@ -228,7 +228,7 @@ class Client:
     def __init__(
         self,
         api_base_url: str,
-        auth: Optional[Auth],
+        auth: Auth | None,
         *,
         show_progress: bool = True,
     ):
@@ -265,7 +265,7 @@ class Client:
 
     @staticmethod
     def from_env(
-        auth: Optional[Auth] = None,
+        auth: Auth | None = None,
         *,
         show_progress: bool = True,
     ):

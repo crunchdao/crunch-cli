@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable
 
 from dataclasses_json import DataClassJsonMixin
 
@@ -17,19 +17,19 @@ __all__ = [
 
 @dataclass
 class ScoredMetricDetail(DataClassJsonMixin):
-    key: Union[str, int]
+    key: str | int
     value: float
     reduced: bool
 
 
-def _detail_list_factory() -> List[ScoredMetricDetail]:
+def _detail_list_factory() -> list[ScoredMetricDetail]:
     return []
 
 
 @dataclass
 class ScoredMetric(DataClassJsonMixin):
-    value: Optional[float]
-    details: List[ScoredMetricDetail] = field(default_factory=_detail_list_factory)
+    value: float | None
+    details: list[ScoredMetricDetail] = field(default_factory=_detail_list_factory)
 
 
 class ScoringModule(ModuleWrapper):
@@ -49,10 +49,10 @@ class ScoringModule(ModuleWrapper):
         *,
         phase_type: PhaseType,
         chain_height: int,
-        metrics: List[Metric],
+        metrics: list[Metric],
         prediction_directory_path: str,
         data_directory_path: str,
-        print: Optional[Callable[[Any], None]] = None,
+        print: Callable[[Any], None] | None = None,
     ):
         (
             target_and_metrics,
@@ -76,7 +76,7 @@ class ScoringModule(ModuleWrapper):
         self,
         *,
         ensure: bool = True
-    ) -> Callable[..., Dict[int, ScoredMetric]]:
+    ) -> Callable[..., dict[int, ScoredMetric]]:
         return self._get_function(
             name="score",
             ensure=ensure,
@@ -87,11 +87,11 @@ class ScoringModule(ModuleWrapper):
         *,
         phase_type: PhaseType,
         chain_height: int,
-        metrics: List[Metric],
+        metrics: list[Metric],
         prediction_directory_path: str,
         data_directory_path: str,
-        print: Optional[Callable[[Any], None]] = None,
-    ) -> Dict[int, ScoredMetric]:
+        print: Callable[[Any], None] | None = None,
+    ) -> dict[int, ScoredMetric]:
         (
             target_and_metrics,
             target_names,
@@ -133,7 +133,7 @@ class ScoringModule(ModuleWrapper):
 
     def _prepare_target_and_metrics(
         self,
-        metrics: List[Metric],
+        metrics: list[Metric],
     ):
         target_and_metrics = group_metrics_by_target(metrics)
 

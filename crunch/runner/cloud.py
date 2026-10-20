@@ -10,7 +10,7 @@ import sys
 from datetime import timedelta
 from multiprocessing import Lock
 from time import sleep
-from typing import Any, Callable, Dict, Generator, Iterable, List, Literal, Optional, Tuple
+from typing import Any, Callable, Generator, Iterable, Literal, TypeAlias
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -27,8 +27,8 @@ from crunch.runner.unstructured import DEFAULT_LOG_LIMITS, RunnerContext
 from crunch.unstructured import LocalCodeLoader, RunnerModule, deduce_code_loader
 from crunch.utils import download
 
-UploadedFiles = Dict[str, Upload]
-LastModifications = Dict[str, int]
+UploadedFiles: TypeAlias = dict[str, Upload]
+LastModifications: TypeAlias = dict[str, int]
 
 PACKAGES_WITH_PRIORITY = [
     "torch"
@@ -319,7 +319,7 @@ class CloudRunner(Runner):
         constraints_txt_path = self._download_constraints(Language.PYTHON)
         constraints_args: Iterable[str] = ("-c", constraints_txt_path) if constraints_txt_path else []
 
-        priority_packages: List[str] = []
+        priority_packages: list[str] = []
         with open(requirements_txt_path) as fd:
             for line in fd:
                 line = line.strip()
@@ -344,7 +344,7 @@ class CloudRunner(Runner):
             *constraints_args
         ])
 
-    def _download_constraints(self, language: Language) -> Optional[str]:
+    def _download_constraints(self, language: Language) -> str | None:
         lower = language.name.lower()
         txt_path = os.path.join(self.context_directory, f"{lower}-constraints.txt")
 
@@ -494,8 +494,8 @@ class CloudRunner(Runner):
 
     def do_bash(
         self,
-        arguments: List[str],
-        env_vars: Optional[Dict[str, Optional[str]]] = None
+        arguments: list[str],
+        env_vars: dict[str, str | None] | None = None
     ) -> int:
         env = None
         if env_vars:
@@ -518,8 +518,8 @@ class CloudRunner(Runner):
     def bash(
         self,
         prefix: str,
-        arguments: List[str],
-        env: Optional[Dict[str, Optional[str]]] = None
+        arguments: list[str],
+        env: dict[str, str | None] | None = None
     ):
         arguments = [
             "prefix",
@@ -535,13 +535,13 @@ class CloudRunner(Runner):
 
     def bash2(
         self,
-        arguments: List[str],
+        arguments: list[str],
     ):
         self.bash(arguments[0], arguments)
 
     def pip(
         self,
-        arguments: List[str],
+        arguments: list[str],
     ):
         self.bash(
             "pip",
@@ -561,7 +561,7 @@ class CloudRunner(Runner):
     def recursive_bash(
         self,
         directory_path: str,
-        commands: List[str],
+        commands: list[str],
     ):
         self.bash(
             f"recursive-{commands[0]}",
@@ -647,7 +647,7 @@ class CloudRunner(Runner):
         }
 
         # TODO move to a dedicated function
-        args: List[str] = []
+        args: list[str] = []
 
         def append_value(value: Any):
             if isinstance(value, tuple):
@@ -760,7 +760,7 @@ class CloudRunner(Runner):
         signal.signal(FUSE_SIGNAL, on_signal)
 
     @property
-    def venv_env(self) -> Dict[str, Optional[str]]:
+    def venv_env(self) -> dict[str, str | None]:
         venv_bin = os.path.join(self.venv_directory, "bin")
 
         return {
@@ -803,7 +803,7 @@ class CloudRunner(Runner):
 
 def _download_files(
     *,
-    file_urls: Dict[str, str],
+    file_urls: dict[str, str],
     directory_path: str,
     print: Callable[[str], Any],
 ) -> LastModifications:
@@ -826,7 +826,7 @@ def _download_files(
 
 def _find_files(
     directory_path: str,
-) -> Generator[Tuple[str, str], None, None]:
+) -> Generator[tuple[str, str], None, None]:
     """
     Recursively finds all files in the given directory and yields their absolute paths and relative names.
     """
@@ -849,7 +849,7 @@ def _upload_files(
     uploads: UploadedFiles,
     client: Client,
     log: Callable[[str], None],
-    pre_modifications: Optional[LastModifications] = None,
+    pre_modifications: LastModifications | None = None,
 ) -> bool:
     """
     Uploads files from the given directory.
@@ -860,7 +860,7 @@ def _upload_files(
         Always True if `pre_modifications` is None.
     """
 
-    files: List[Tuple[str, str]] = []
+    files: list[tuple[str, str]] = []
     total_size = 0
     post_modifications: LastModifications = {}
 
@@ -967,12 +967,12 @@ class CloudRunnerContext(RunnerContext):
         self,
         *,
         command: str,
-        parameters: Optional[KwargsLike] = None,
+        parameters: KwargsLike | None = None,
         trace: bool = True,
-        span_hidden_parameters: Optional[List[str]] = None,
-        span_attributes: Optional[KwargsLike] = None,
+        span_hidden_parameters: list[str] | None = None,
+        span_attributes: KwargsLike | None = None,
         install_data_fuse: bool = True,
-        log_limits: Tuple[int, int] = DEFAULT_LOG_LIMITS,
+        log_limits: tuple[int, int] = DEFAULT_LOG_LIMITS,
     ) -> None:
         self.log(f"executing - command={command}")
 

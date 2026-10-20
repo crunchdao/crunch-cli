@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import IntEnum
 from time import sleep
 from time import time as current_time
-from typing import TYPE_CHECKING, Any, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import click
 
@@ -20,8 +20,8 @@ def run_create(
     repository: Repository,
     *,
     submission_identifier: "SubmissionIdentifierType",
-    train_frequency: Optional[int],
-    force_first_train: Optional[bool],
+    train_frequency: int | None,
+    force_first_train: bool | None,
     runtime_definition_name: str,
 ):
     project = get_project(repository)
@@ -112,7 +112,7 @@ def run_create(
 def run_list(
     repository: Repository,
     *,
-    limit: Optional[int],
+    limit: int | None,
 ):
     project = get_project(repository)
     runs = project.runs.list()
@@ -121,7 +121,7 @@ def run_list(
 
     reached_limit = limit is not None and len(runs) > limit
 
-    rows: List[Sequence[Any]] = []
+    rows: list[Sequence[Any]] = []
     for run in reversed(runs):
         rows.append(
             (
@@ -217,13 +217,13 @@ def run_logs(
     repository: Repository,
     *,
     run_id: int,
-    tail: Optional[int],
+    tail: int | None,
     follow: bool,
     debug: bool,
 ):
     run = _get_run(repository, run_id)
 
-    in_package_installer: Optional[str] = None
+    in_package_installer: str | None = None
 
     def _print_log(log: RunLog, debug: bool):
         nonlocal in_package_installer
@@ -303,7 +303,7 @@ def run_wait(
     repository: Repository,
     *,
     run_id: int,
-    timeout: Optional[int],
+    timeout: int | None,
     poll_interval: int,
 ) -> RunWaitExitCode:
     run = _get_run(repository, run_id)
@@ -345,14 +345,14 @@ SELECTION_ORIGIN_STATUSES = {
 }
 
 
-def _get_selection(project: Project) -> Optional[ProjectSelection]:
+def _get_selection(project: Project) -> ProjectSelection | None:
     try:
         return project.selection
     except CurrentRoundNotFoundException:
         return None
 
 
-def _to_selection_status(run: Run, selection: Optional[ProjectSelection]) -> str:
+def _to_selection_status(run: Run, selection: ProjectSelection | None) -> str:
     if selection is not None and selection.run_id == run.id:
         return SELECTION_ORIGIN_STATUSES[selection.origin]
 
@@ -362,7 +362,7 @@ def _to_selection_status(run: Run, selection: Optional[ProjectSelection]) -> str
     return "selectable"
 
 
-def _is_explicitly_selected(run: Run, selection: Optional[ProjectSelection]) -> bool:
+def _is_explicitly_selected(run: Run, selection: ProjectSelection | None) -> bool:
     return selection is not None and selection.run_id == run.id and selection.origin == ProjectSelectionOrigin.SELECTION
 
 
@@ -435,7 +435,7 @@ def _is_running(run: "Run") -> bool:
     return run.status != RunStatus.COMPLETED
 
 
-def _format_primary_score(prediction: Optional[Prediction]) -> str:
+def _format_primary_score(prediction: Prediction | None) -> str:
     if prediction is None:
         return "(none)"
 
@@ -466,7 +466,7 @@ def _get_run(repository: Repository, id: int):
         raise click.Abort()
 
 
-def _to_prediction_status(prediction: Optional[Prediction]):
+def _to_prediction_status(prediction: Prediction | None):
     if prediction is None:
         return "(missing)"
 

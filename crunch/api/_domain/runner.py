@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from dataclasses_json import LetterCase, Undefined, config, dataclass_json
 
@@ -33,10 +33,10 @@ _status_config = config(
 class RunnerRunSpan:
 
     id: int
-    parent_id: Optional[int]
+    parent_id: int | None
     description: str
     started_at: datetime = field(metadata=_datetime_config)
-    attributes: Optional[Dict[str, Any]]
+    attributes: dict[str, Any] | None
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
@@ -61,7 +61,7 @@ class EndedRunnerRunSpan(RunnerRunSpan):
         metadata=_datetime_config,
     )
 
-    error: Optional[str]
+    error: str | None
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
@@ -75,8 +75,8 @@ class RunnerRunMetric:
     cpu: float   # % 0–100
     ram: int   # bytes used
     disk: int  # bytes used
-    gpu: Optional[float]  # % 0–100
-    vram: Optional[int]  # bytes used
+    gpu: float | None  # % 0–100
+    vram: int | None  # bytes used
 
 
 class RunnerRun(Model[int]):
@@ -84,20 +84,20 @@ class RunnerRun(Model[int]):
     def __init__(
         self,
         run_id: int,
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(attrs={}, client=client, collection=None)
 
         self._run_id = run_id
 
     @property
-    def code(self) -> Dict[str, str]:
+    def code(self) -> dict[str, str]:
         return self._checked_client.api.get_runner_run_code(
             self._run_id
         )
 
     @property
-    def model(self) -> Dict[str, str]:
+    def model(self) -> dict[str, str]:
         return self._checked_client.api.get_runner_run_model(
             self._run_id
         )
@@ -123,8 +123,8 @@ class RunnerRun(Model[int]):
 
     def report_traces(
         self,
-        spans: List[RunnerRunSpan],
-        metrics: List[RunnerRunMetric],
+        spans: list[RunnerRunSpan],
+        metrics: list[RunnerRunMetric],
     ):
         self._checked_client.api.report_runner_run_traces(
             self._run_id,
@@ -141,9 +141,9 @@ class RunnerRun(Model[int]):
     def submit_result(
         self,
         use_initial_model: bool,
-        deterministic: Optional[bool],
-        prediction_files: Dict[str, str],
-        model_files: Dict[str, str],
+        deterministic: bool | None,
+        prediction_files: dict[str, str],
+        model_files: dict[str, str],
     ):
         self._checked_client.api.submit_runner_run_result(
             self._run_id,
@@ -192,8 +192,8 @@ class RunnerRunEndpointMixin(EndpointMixin):
     def report_runner_run_traces(
         self,
         run_id: int,
-        spans: List[Dict[str, Any]],
-        metrics: List[Dict[str, Any]],
+        spans: list[dict[str, Any]],
+        metrics: list[dict[str, Any]],
     ):
         return self._result(
             self.post(
@@ -223,9 +223,9 @@ class RunnerRunEndpointMixin(EndpointMixin):
         self,
         run_id: int,
         use_initial_model: bool,
-        deterministic: Optional[bool],
-        prediction_files: Dict[str, str],
-        model_files: Dict[str, str],
+        deterministic: bool | None,
+        prediction_files: dict[str, str],
+        model_files: dict[str, str],
     ):
         return self._result(
             self.post(

@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import crunch.tester as tester
 from crunch.api import CompetitionFormat, RoundIdentifierType
@@ -48,7 +48,7 @@ def test(
     train_frequency: int,
     round_number: RoundIdentifierType,
     has_gpu: bool,
-    no_determinism_check: Optional[bool],
+    no_determinism_check: bool | None,
 ):
     _, project = repository.create_client()
     competition = project.competition.reload()

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 from crunch.api import SubmissionType
 from crunch.unstructured._code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
@@ -16,8 +16,8 @@ __all__ = [
 
 def _load_requirements(
     language: "RequirementLanguage",
-    submission_files: List[File],
-) -> Optional[List["NamedRequirement"]]:
+    submission_files: list[File],
+) -> list["NamedRequirement"] | None:
     from crunch_convert.requirements_txt import RequirementParseError, parse_from_file
 
     requirements_file = find_file_by_path(submission_files, language.txt_file_name)
@@ -53,9 +53,9 @@ class SubmissionModule(ModuleWrapper):
         self,
         *,
         submission_type: SubmissionType,
-        submission_files: List[File],
-        model_files: List[File],
-        print: Optional[Callable[[Any], None]] = None,
+        submission_files: list[File],
+        model_files: list[File],
+        print: Callable[[Any], None] | None = None,
     ):
         from crunch_convert.requirements_txt import RequirementLanguage
 

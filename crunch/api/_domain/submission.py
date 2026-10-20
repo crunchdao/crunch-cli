@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin
 from crunch.api._resource import Model as BaseModel
@@ -29,9 +29,9 @@ class Submission(BaseModel[int]):
     def __init__(
         self,
         project: "Project",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["SubmissionCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "SubmissionCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -70,7 +70,7 @@ class Submission(BaseModel[int]):
         return self._attrs["totalSize"]
 
     @property
-    def model(self) -> Optional["Model"]:
+    def model(self) -> "Model | None":
         from crunch.api._domain.model import Model
 
         model_attrs = self._attrs.get("model")
@@ -109,7 +109,7 @@ class SubmissionCollection(Collection[Submission]):
     def __init__(
         self,
         project: "Project",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -130,7 +130,7 @@ class SubmissionCollection(Collection[Submission]):
 
     def list(
         self
-    ) -> List[Submission]:
+    ) -> list[Submission]:
         return self.prepare_models(
             self._checked_client.api.list_submissions(
                 self.project.competition.id,
@@ -146,8 +146,8 @@ class SubmissionCollection(Collection[Submission]):
         main_file_path: str,
         model_directory_path: str,
         type: SubmissionType,
-        code_files: Dict[str, str],
-        model_files: Dict[str, str],
+        code_files: dict[str, str],
+        model_files: dict[str, str],
         submitter_imprint: str,
     ) -> Submission:
         return self.prepare_model(
@@ -165,7 +165,7 @@ class SubmissionCollection(Collection[Submission]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Submission], *args: Any) -> Submission:
+    def prepare_model(self, attrs: "JsonValue | Submission", *args: Any) -> Submission:
         return super().prepare_model(
             attrs,
             self.project,
@@ -211,8 +211,8 @@ class SubmissionEndpointMixin(EndpointMixin):
         main_file_path: str,
         model_directory_path: str,
         type: str,
-        code_files: Dict[str, str],
-        model_files: Dict[str, str],
+        code_files: dict[str, str],
+        model_files: dict[str, str],
         submitter_imprint: str,
     ):
         return self._result(

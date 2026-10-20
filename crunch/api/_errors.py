@@ -1,7 +1,7 @@
 import json
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from dataclasses_json import DataClassJsonMixin
 
@@ -13,7 +13,7 @@ from crunch.external.inflection import camelize, underscore
 from crunch.utils import smart_call
 
 
-def _try_get_competition_name() -> Optional[str]:
+def _try_get_competition_name() -> str | None:
     from crunch.repository import Repository
 
     repository = Repository.try_open()
@@ -24,7 +24,7 @@ def _try_get_competition_name() -> Optional[str]:
 
 
 def _print_contact(
-    and_: Optional[str] = None
+    and_: str | None = None
 ):
     message = "If you think that is an error"
     if and_:
@@ -89,7 +89,7 @@ class ValidationFailedException(ApiException):
     def __init__(
         self,
         message: str,
-        field_errors: List[Any],
+        field_errors: list[Any],
     ):
         super().__init__(message)
 
@@ -144,7 +144,7 @@ class CrunchNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        phase_type: Optional[Union[str, PhaseType]],
+        phase_type: str | PhaseType | None,
         round_number: int,
         competition_name: str
     ):
@@ -236,7 +236,7 @@ class ForbiddenLibraryException(ApiException):
     def __init__(
         self,
         message: str,
-        requirements: List[dict[str, Any]]
+        requirements: list[dict[str, Any]]
     ):
         super().__init__(message)
 
@@ -247,7 +247,7 @@ class ForbiddenLibraryException(ApiException):
 
     def print_helper(
         self,
-        competition_name: Optional[str] = None,
+        competition_name: str | None = None,
         **kwargs: Any,
     ) -> None:
         print("Forbidden packages has been found and the server is unable to accept your work.")
@@ -293,7 +293,7 @@ class InvalidProjectTokenException(ApiException):
 
     def print_helper(
         self,
-        competition_name: Optional[str] = None,
+        competition_name: str | None = None,
         **kwargs: Any,
     ) -> None:
         print("Your token seems to have expired or is invalid.")
@@ -333,7 +333,7 @@ class MissingPhaseDataException(ApiException):
         self,
         message: str,
         phase_id: int,
-        phase_type: Union[str, PhaseType],
+        phase_type: str | PhaseType,
     ):
         super().__init__(message)
 
@@ -355,7 +355,7 @@ class ModelTooBigException(ApiException):
     def __init__(
         self,
         message: str,
-        size: Optional[int],
+        size: int | None,
         maximum_size: int,
     ):
         super().__init__(message)
@@ -454,7 +454,7 @@ class ProjectNotFoundException(ApiException):
 
     def print_helper(
         self,
-        competition_name: Optional[str] = None,
+        competition_name: str | None = None,
         **kwargs: Any,
     ) -> None:
         print("Project not found.")
@@ -479,7 +479,7 @@ class RunNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        run_id: Optional[int],
+        run_id: int | None,
     ):
         super().__init__(message)
 
@@ -559,7 +559,7 @@ class RoundNotFoundException(ApiException):
     def __init__(
         self,
         message: str,
-        round_number: Optional[int],
+        round_number: int | None,
     ):
         super().__init__(message)
 
@@ -583,7 +583,7 @@ class PhaseNotFoundException(ApiException):
         message: str,
         competition_name: str,
         round_number: int,
-        phase_type: Union[str, PhaseType],
+        phase_type: str | PhaseType,
     ):
         super().__init__(message)
 
@@ -676,7 +676,7 @@ class CannotParticipateException(ApiException):
 
     def print_helper(
         self,
-        competition_name: Optional[str] = None,
+        competition_name: str | None = None,
         **kwargs: Any,
     ) -> None:
         print(f"You cannot participate in the competition yet for the following reason(s):")
@@ -807,7 +807,7 @@ class InvalidRunTokenException(ApiException):
 
 
 def convert_error(
-    response: Dict[str, Any]
+    response: dict[str, Any]
 ):
     code = response.pop("code", "")
     message = response.pop("message", "")

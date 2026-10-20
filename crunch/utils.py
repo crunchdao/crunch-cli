@@ -6,7 +6,7 @@ import shutil
 import time
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
-from typing import Any, BinaryIO, Callable, Dict, Generic, Iterable, List, Optional, Sequence, Set, Type, TypeVar, Union, cast
+from typing import Any, BinaryIO, Callable, Generic, Iterable, Sequence, TypeVar, cast
 
 import requests
 from tqdm.auto import tqdm
@@ -23,7 +23,7 @@ class _undefined:
     pass
 
 
-_smart_call_ignore: Set[str] = set()
+_smart_call_ignore: set[str] = set()
 _T = TypeVar("_T")
 
 
@@ -31,7 +31,7 @@ class LazyValue(Generic[_T]):
 
     def __init__(self, factory: Callable[[], _T]):
         self._factory = factory
-        self._value: Union[Type[_undefined], _T] = _undefined
+        self._value: type[_undefined] | _T = _undefined
 
     @property
     def value(self) -> _T:
@@ -43,8 +43,8 @@ class LazyValue(Generic[_T]):
 
 def smart_call(
     function: Callable[..., _T],
-    default_values: Dict[str, Any],
-    specific_values: Dict[str, Any] = {},
+    default_values: dict[str, Any],
+    specific_values: dict[str, Any] = {},
     log: bool = True,
     logger: logging.Logger = logging.getLogger(),
 ) -> _T:
@@ -90,7 +90,7 @@ def smart_call(
     return function(**arguments)
 
 
-def split_into_chunks(items: List[_T], chunk_size: int) -> Iterable[List[_T]]:
+def split_into_chunks(items: list[_T], chunk_size: int) -> Iterable[list[_T]]:
     for start_index in range(0, len(items), chunk_size):
         yield items[start_index:start_index + chunk_size]
 
@@ -149,7 +149,7 @@ def _download_head(
     print: Callable[[str], None],
 ):
     logged = False
-    response: Optional[requests.Response] = None
+    response: requests.Response | None = None
 
     try:
         response = session.get(url, stream=True)
@@ -188,7 +188,7 @@ def download(
     print: Callable[[str], Any] = print,
     progress_bar: bool = True,
     max_retry: int = 10,
-    session: Optional[requests.Session] = None,
+    session: requests.Session | None = None,
 ):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
@@ -281,7 +281,7 @@ class Tracer:
     def loop(
         self,
         iterable: Iterable[_T],
-        action: Union[str, Callable[[_T], str]],
+        action: str | Callable[[_T], str],
         value_placeholder: str = "{value}",
     ):
         has_value_placeholder = False
@@ -329,7 +329,7 @@ class LimitedSizeIO:
         self,
         underlying_io: BinaryIO,
         limit: int,
-        callback: Optional[Callable[[int], None]] = None
+        callback: Callable[[int], None] | None = None
     ):
         self.underlying_io = underlying_io
         self.limit = limit
@@ -401,7 +401,7 @@ def build_user_agent() -> str:
 def ascii_table(
     *,
     headers: Sequence[str],
-    values: List[Sequence[Any]],
+    values: list[Sequence[Any]],
     spacing: int = 3,
 ):
     rows = [

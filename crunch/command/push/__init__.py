@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timezone
 from enum import Enum, auto
 from io import BytesIO
-from typing import BinaryIO, Callable, Dict, List, Literal, Optional, Tuple, overload
+from typing import BinaryIO, Callable, Literal, overload
 
 import click
 
@@ -31,12 +31,12 @@ class RequirementsMode(Enum):
 
 def _build_gitignore(
     directory_path: str,
-    ignored_paths: List[str],
+    ignored_paths: list[str],
     use_parent_gitignore: bool,
-) -> Callable[[str], Tuple[bool, bool]]:
+) -> Callable[[str], tuple[bool, bool]]:
     from crunch.external import gitignorefile
 
-    rules: List[gitignorefile._IgnoreRule] = []  # type: ignore
+    rules: list[gitignorefile._IgnoreRule] = []  # type: ignore
     for line in ignored_paths:
         line = line.rstrip("\r\n")
         rule = gitignorefile._rule_from_pattern(line)  # type: ignore
@@ -62,10 +62,10 @@ def _build_gitignore(
 
 def _list_files(
     directory_path: str,
-    ignored_paths: List[str],
+    ignored_paths: list[str],
     *,
     use_parent_gitignore: bool = False,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     directory_path = to_unix_path(directory_path)
     directory_path_prefix = (
         len(directory_path)
@@ -73,7 +73,7 @@ def _list_files(
     )
 
     is_ignored = _build_gitignore(directory_path, ignored_paths, use_parent_gitignore)
-    found_files: Dict[str, str] = {}
+    found_files: dict[str, str] = {}
 
     for root, _, files in os.walk(directory_path, topdown=False):
         root = to_unix_path(root)
@@ -130,8 +130,8 @@ def list_model_files(
 def _upload_files(
     *,
     group_name: str,
-    storage: Dict[str, Upload],
-    found_files: Dict[str, str],
+    storage: dict[str, Upload],
+    found_files: dict[str, str],
     dry: bool,
     client: Client,
     preferred_chunk_size: int,
@@ -151,7 +151,7 @@ def _upload_files(
         *,
         data: bytes,
         name: str,
-        log_action: Optional[str] = None,
+        log_action: str | None = None,
     ):
         checksum, reused_upload = upload_cache.try_reuse_bytes(data=data)
         if reused_upload is not None:
@@ -209,8 +209,8 @@ def _upload_files(
         io: BinaryIO,
         name: str,
         size: int,
-        log_action: Optional[str] = None,
-    ) -> Optional[Upload]:
+        log_action: str | None = None,
+    ) -> Upload | None:
         if log_action:
             print(f"{log_action}: {name} ({format_size(size)})")
         else:
@@ -253,7 +253,7 @@ def _upload_files(
             )
         )
 
-        forbidden_names: List[str] = []
+        forbidden_names: list[str] = []
         for requirement in requirements:
             library = whitelist.find_library(
                 language=requirement.language,
@@ -348,7 +348,7 @@ def push(
     include_installed_packages_version: bool,
     no_afterword: bool,
     dry: Literal[True],
-    fallback_submitter_imprint: Optional[str] = None,
+    fallback_submitter_imprint: str | None = None,
 ) -> None:
     ...
 
@@ -363,7 +363,7 @@ def push(
     include_installed_packages_version: bool,
     no_afterword: bool,
     dry: Literal[False],
-    fallback_submitter_imprint: Optional[str] = None,
+    fallback_submitter_imprint: str | None = None,
 ) -> Submission:
     ...
 
@@ -377,8 +377,8 @@ def push(
     include_installed_packages_version: bool,
     no_afterword: bool,
     dry: bool,
-    fallback_submitter_imprint: Optional[str] = None,
-) -> Optional[Submission]:
+    fallback_submitter_imprint: str | None = None,
+) -> Submission | None:
     message_length = len(message)
     if message_length > SUBMISSION_MESSAGE_LENGTH:
         print(f"submission: message too long: {message_length}/{SUBMISSION_MESSAGE_LENGTH}", file=sys.stderr)
@@ -403,8 +403,8 @@ def push(
         else NoUploadCache()
     )
 
-    code_files: Dict[str, Upload] = {}
-    model_files: Dict[str, Upload] = {}
+    code_files: dict[str, Upload] = {}
+    model_files: dict[str, Upload] = {}
 
     try:
         _upload_files(
@@ -455,7 +455,7 @@ def push(
         _cleanup(client, model_files, keep_cached)
 
 
-def _to_upload_ids(uploads: Optional[Dict[str, Upload]]) -> Dict[str, str]:
+def _to_upload_ids(uploads: dict[str, Upload] | None) -> dict[str, str]:
     if uploads is None:
         return {}
 
@@ -467,7 +467,7 @@ def _to_upload_ids(uploads: Optional[Dict[str, Upload]]) -> Dict[str, str]:
 
 def _cleanup(
     client: Client,
-    files: Dict[str, Upload],
+    files: dict[str, Upload],
     keep_cached: bool,
 ):
     upload_ids_to_delete = [
@@ -501,7 +501,7 @@ def _print_success(
     print(f"find it on your dashboard: {url}")
 
 
-def _get_submitter_imprint(fallback: Optional[str] = None) -> str:
+def _get_submitter_imprint(fallback: str | None = None) -> str:
     try:
         from detect_agent import determine_agent
 

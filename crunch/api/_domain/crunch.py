@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -15,9 +15,9 @@ class Crunch(Model[int]):
     def __init__(
         self,
         phase: "Phase",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["CrunchCollection"] = None
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "CrunchCollection | None" = None
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -47,7 +47,7 @@ class CrunchCollection(Collection[Crunch]):
     def __init__(
         self,
         phase: "Phase",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -78,7 +78,7 @@ class CrunchCollection(Collection[Crunch]):
 
     def list(
         self
-    ) -> List[Crunch]:
+    ) -> list[Crunch]:
         return self.prepare_models(
             self._checked_client.api.list_crunches(
                 self.phase.round.competition.resource_identifier,
@@ -87,7 +87,7 @@ class CrunchCollection(Collection[Crunch]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Crunch], *args: Any) -> Crunch:
+    def prepare_model(self, attrs: "JsonValue | Crunch", *args: Any) -> Crunch:
         return super().prepare_model(
             attrs,
             self.phase,

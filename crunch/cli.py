@@ -3,7 +3,7 @@ import json
 import os
 import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import click
 
@@ -86,10 +86,10 @@ class _CliGroup(click.Group):
 @click.option("--hide-tips", "hide_tips", is_flag=True, help="Hide tips.")
 def cli(
     debug: bool,
-    api_base_url: Optional[str],
-    web_base_url: Optional[str],
-    competitions_source: Optional[str],
-    environment_name: Optional[str],
+    api_base_url: str | None,
+    web_base_url: str | None,
+    competitions_source: str | None,
+    environment_name: str | None,
     hide_tips: bool,
 ):
     constants.RUN_VIA_CLI = True
@@ -125,14 +125,14 @@ def ping():
 @click.option("--organizer-name", required=False, type=str, help="Filter competitions by their organizer's name.")
 @click.option("--team-based", required=False, type=bool, help="Filter team based competitions.")
 def list_competitions(
-    format_raw: Optional[str],
-    status_raw: Optional[str],
-    mode_raw: Optional[str],
-    continuous: Optional[bool],
-    external: Optional[bool],
-    featured: Optional[bool],
-    organizer_name: Optional[str],
-    team_based: Optional[bool],
+    format_raw: str | None,
+    status_raw: str | None,
+    mode_raw: str | None,
+    continuous: bool | None,
+    external: bool | None,
+    featured: bool | None,
+    organizer_name: str | None,
+    team_based: bool | None,
 ):
     format = CompetitionFormat[format_raw.upper()] if format_raw else None
     mode = CompetitionMode[mode_raw.upper()] if mode_raw else None
@@ -277,7 +277,7 @@ def setup_notebook(
     data_size_variant_raw: str,
     competition_name: str,
     clone_token: str,
-    project_name: Optional[str],
+    project_name: str | None,
 ):
     _remember_competition_name(competition_name)
 
@@ -370,7 +370,7 @@ def push(
 
 
 def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
-    options: List[Callable[..., Callable[..., Any]]] = [
+    options: list[Callable[..., Callable[..., Any]]] = [
         click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
         click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored."),
         click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop."),
@@ -401,7 +401,7 @@ def test(
 def download(
     round_number: "RoundIdentifierType",
     force: bool,
-    size_variant_raw: Optional[str],
+    size_variant_raw: str | None,
 ):
     repository = _open_repository()
 
@@ -640,8 +640,8 @@ def run_group():
 @click.option("--runtime", type=str, required=True)
 def run_create(
     submission: "SubmissionIdentifierType",
-    train_frequency: Optional[int],
-    force_first_train: Optional[bool],
+    train_frequency: int | None,
+    force_first_train: bool | None,
     runtime: str,
 ):
     repository = _open_repository()
@@ -658,7 +658,10 @@ def run_create(
 @run_group.command(name="list", help="List runs.")
 @click.option("--limit", type=int, default=10)
 @click.option("--all", is_flag=True)
-def run_list(limit: int, all: bool):
+def run_list(
+    limit: int,
+    all: bool,
+):
     repository = _open_repository()
 
     command.run_list(
@@ -669,7 +672,9 @@ def run_list(limit: int, all: bool):
 
 @run_group.command(name="show", help="Show a run.")
 @click.argument("run_id", type=int, required=True)
-def run_show(run_id: int):
+def run_show(
+    run_id: int,
+):
     repository = _open_repository()
 
     command.run_show(
@@ -683,7 +688,12 @@ def run_show(run_id: int):
 @click.option("--follow", is_flag=True)
 @click.option("--debug", is_flag=True)
 @click.argument("run_id", type=int, required=True)
-def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
+def run_logs(
+    run_id: int,
+    tail: int | None,
+    follow: bool,
+    debug: bool,
+):
     repository = _open_repository()
 
     command.run_logs(
@@ -699,7 +709,11 @@ def run_logs(run_id: int, tail: Optional[int], follow: bool, debug: bool):
 @click.option("--timeout", type=int, required=False)
 @click.option("--poll-interval", type=int, default=10)
 @click.argument("run_id", type=int, required=True)
-def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
+def run_wait(
+    run_id: int,
+    timeout: int | None,
+    poll_interval: int,
+):
     repository = _open_repository()
 
     exit(command.run_wait(
@@ -712,7 +726,9 @@ def run_wait(run_id: int, timeout: Optional[int], poll_interval: int):
 
 @run_group.command(name="select", help="Select a run for the Out-of-Sample.")
 @click.argument("run_id", type=int, required=True)
-def run_select(run_id: int):
+def run_select(
+    run_id: int,
+):
     repository = _open_repository()
 
     command.run_select(
@@ -744,7 +760,7 @@ def whitelist_group():
 @click.option("--all", is_flag=True)
 def whitelist_search(
     query: str,
-    language: Optional["RequirementLanguage"],
+    language: "RequirementLanguage | None",
     limit: int,
     all: bool,
 ):
@@ -759,8 +775,8 @@ def whitelist_search(
 @click.option("--language", type=ProgrammingLanguageClickType())
 @click.argument("requirements_txt_file_path", type=str, required=False)
 def whitelist_validate(
-    requirements_txt_file_path: Optional[str],
-    language: Optional["RequirementLanguage"],
+    requirements_txt_file_path: str | None,
+    language: "RequirementLanguage | None",
 ):
     if language is None:
         from crunch_convert import RequirementLanguage
@@ -782,11 +798,11 @@ def whitelist_validate(
 @click.option("--gpu", "gpu_requirement", type=GpuRequirementClickType())
 @click.option("--additional-details", type=str)
 def whitelist_request(
-    name: Optional[str],
-    alias: Optional[str],
-    language: Optional["RequirementLanguage"],
-    gpu_requirement: Optional["GpuRequirement"],
-    additional_details: Optional[str],
+    name: str | None,
+    alias: str | None,
+    language: "RequirementLanguage | None",
+    gpu_requirement: "GpuRequirement | None",
+    additional_details: str | None,
 ):
     if not name and not alias:
         raise click.UsageError("at least one of `--name` or `--alias` must be provided")
@@ -818,7 +834,7 @@ def local(
     skip_library_check: bool,
     round_number: RoundIdentifierType,
     has_gpu: bool,
-    no_determinism_check: Optional[bool],
+    no_determinism_check: bool | None,
 ):
     from . import library, tester
 
@@ -985,7 +1001,7 @@ def cloud_executor(
     model_directory_path: str,
     prediction_directory_path: str,
     trace_path: str,
-    ping_urls: List[str],
+    ping_urls: list[str],
     # ---
     train: bool,
     gpu: bool,

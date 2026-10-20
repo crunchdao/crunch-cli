@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -40,7 +40,7 @@ class UserCollection(Collection[User]):
 
     def list(
         self
-    ) -> List[User]:
+    ) -> list[User]:
         return self.prepare_models(
             self._checked_client.api.list_users()
         )

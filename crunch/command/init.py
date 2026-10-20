@@ -1,6 +1,5 @@
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 import click
 
@@ -16,7 +15,7 @@ API_KEY_CLONE_TOKEN = "@api-key"
 @dataclass(frozen=True)
 class ProjectAccess:
     project: Project
-    project_token: Optional[str]
+    project_token: str | None
 
 
 def exchange_clone_token(clone_token: str) -> ProjectAccess:
@@ -50,7 +49,7 @@ def resolve_project_access(
     *,
     clone_token: str,
     competition_name: str,
-    project_name: Optional[str],
+    project_name: str | None,
 ) -> ProjectAccess:
     if clone_token != API_KEY_CLONE_TOKEN:
         return exchange_clone_token(clone_token)
@@ -83,7 +82,7 @@ def init(
     *,
     clone_token: str,
     competition_name: str,
-    project_name: Optional[str],
+    project_name: str | None,
     directory: str,
     model_directory: str,
     force: bool,

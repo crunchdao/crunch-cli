@@ -3,7 +3,7 @@ import os
 import shutil
 import tempfile
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import crunch.store as store
 from crunch.api import Auth, Client, Project, SizeVariant
@@ -64,7 +64,7 @@ class ProjectInfo:
     user_id: int
     size_variant: SizeVariant
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "competitionName": self.competition_name,
             "projectName": self.project_name,
@@ -73,7 +73,7 @@ class ProjectInfo:
         }
 
     @staticmethod
-    def from_dict(root: Dict[str, Any]) -> "ProjectInfo":
+    def from_dict(root: dict[str, Any]) -> "ProjectInfo":
         try:
             size_variant = SizeVariant[root["sizeVariant"]]
         except (KeyError, TypeError):
@@ -93,7 +93,7 @@ class Repository:
         self,
         root_directory_path: str,
         project: ProjectInfo,
-        project_token: Optional[str],
+        project_token: str | None,
     ):
         self._root_directory_path = os.path.abspath(root_directory_path)
         self._project = project
@@ -138,9 +138,9 @@ class Repository:
     def update_project(
         self,
         *,
-        project_name: Optional[str] = None,
-        user_id: Optional[int] = None,
-        size_variant: Optional[SizeVariant] = None,
+        project_name: str | None = None,
+        user_id: int | None = None,
+        size_variant: SizeVariant | None = None,
     ) -> ProjectInfo:
         current = self._project
 
@@ -155,10 +155,10 @@ class Repository:
 
         return project
 
-    def get_project_token(self) -> Optional[str]:
+    def get_project_token(self) -> str | None:
         return self._project_token
 
-    def write_project_token(self, project_token: Optional[str]) -> None:
+    def write_project_token(self, project_token: str | None) -> None:
         if project_token is not None:
             _write_file_atomically(self.project_token_file_path, project_token)
         elif os.path.exists(self.project_token_file_path):
@@ -166,7 +166,7 @@ class Repository:
 
         self._project_token = project_token
 
-    def read_upload_cache(self) -> Optional[Any]:
+    def read_upload_cache(self) -> Any | None:
         path = self.upload_cache_file_path
         if not os.path.exists(path):
             return None
@@ -181,7 +181,7 @@ class Repository:
         self,
         *,
         show_progress: bool = True,
-    ) -> Tuple[Client, Project]:
+    ) -> tuple[Client, Project]:
         auth = (
             Auth.project_token(self._project_token)
             if self._project_token is not None
@@ -225,7 +225,7 @@ class Repository:
         directory_path: str = ".",
         *,
         search_parents: bool = True,
-    ) -> Optional["Repository"]:
+    ) -> "Repository | None":
         try:
             return Repository.open(directory_path, search_parents=search_parents)
         except RepositoryError:
@@ -236,7 +236,7 @@ class Repository:
         directory_path: str,
         *,
         project: ProjectInfo,
-        project_token: Optional[str],
+        project_token: str | None,
         overwrite: bool = False,
     ) -> "Repository":
         repository = Repository(directory_path, project, project_token)

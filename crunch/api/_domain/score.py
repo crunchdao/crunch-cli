@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from dataclasses_json import LetterCase, Undefined, dataclass_json
 
@@ -17,13 +17,13 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class ScoreDetail:
 
-    key: Union[str, int]
-    value: Optional[float]
+    key: str | int
+    value: float | None
 
     @staticmethod
     def from_dict_array(
-        input: List[Dict[str, Any]]
-    ) -> List["ScoreDetail"]:
+        input: list[dict[str, Any]]
+    ) -> list["ScoreDetail"]:
         return [
             ScoreDetail.from_dict(x)  # type: ignore[attr-defined]
             for x in input
@@ -35,9 +35,9 @@ class Score(Model[int]):
     def __init__(
         self,
         prediction: "Prediction",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["ScoreCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "ScoreCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -62,7 +62,7 @@ class Score(Model[int]):
         return self._attrs["value"]
 
     @property
-    def details(self) -> List[ScoreDetail]:
+    def details(self) -> list[ScoreDetail]:
         return ScoreDetail.from_dict_array(self._attrs.get("details") or [])
 
 
@@ -73,7 +73,7 @@ class ScoreCollection(Collection[Score]):
     def __init__(
         self,
         prediction: "Prediction",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -81,7 +81,7 @@ class ScoreCollection(Collection[Score]):
 
     def list(
         self
-    ) -> List[Score]:
+    ) -> list[Score]:
         return self.prepare_models(
             self._checked_client.api.list_scores(
                 self.prediction.project.competition.id,
@@ -91,7 +91,7 @@ class ScoreCollection(Collection[Score]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Score], *args: Any) -> Score:
+    def prepare_model(self, attrs: "JsonValue | Score", *args: Any) -> Score:
         return super().prepare_model(
             attrs,
             self.prediction,

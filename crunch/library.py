@@ -3,7 +3,7 @@ import os
 import warnings
 from collections import defaultdict
 from types import ModuleType
-from typing import Any, Dict, List, NamedTuple, Optional, Set, overload
+from typing import Any, NamedTuple, overload
 
 import click
 from crunch_convert import RequirementLanguage
@@ -28,7 +28,7 @@ def extract_from_requirements(
     *,
     language: RequirementLanguage = RequirementLanguage.PYTHON,
     file_path: str,
-) -> Set[str]:
+) -> set[str]:
     """
     Extracts package names from a requirements file.
     Does nothing if the file does not exist.
@@ -59,13 +59,13 @@ def extract_from_requirements(
 def extract_from_notebook_modules(
     *,
     module: ModuleType
-) -> Dict[RequirementLanguage, Set[str]]:
+) -> dict[RequirementLanguage, set[str]]:
     """
     Extracts package names from a Jupyter notebook module.
     """
 
     cells = getattr(module, "In", [])
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         {
             "metadata": {},
             "cell_type": "code",
@@ -81,7 +81,7 @@ def extract_from_notebook_modules(
         bad_cell_handling=BadCellHandling.IGNORE,
     )
 
-    packages: Dict[RequirementLanguage, Set[str]] = defaultdict(set)
+    packages: dict[RequirementLanguage, set[str]] = defaultdict(set)
     for requirement in flatten.requirements:
         packages[requirement.language].add(requirement.alias)
 
@@ -92,24 +92,24 @@ _AliasCollision = NamedTuple(
     "_AliasCollision",
     [
         ("alias", str),
-        ("names", Set[str]),
+        ("names", set[str]),
     ],
 )
 
 _Problems = NamedTuple(
     "_Problems",
     [
-        ("forbidden", Set[str]),
-        ("alias_collisions", List[_AliasCollision]),
+        ("forbidden", set[str]),
+        ("alias_collisions", list[_AliasCollision]),
     ],
 )
 
 
 def find_forbidden(
     *,
-    packages: Dict[RequirementLanguage, Set[str]],
+    packages: dict[RequirementLanguage, set[str]],
     is_alias: bool,
-    whitelist: Optional[Whitelist] = None,
+    whitelist: Whitelist | None = None,
 ):
     warnings.warn(
         "find_forbidden(...) is deprecated, use find_problematic(...) instead",
@@ -130,9 +130,9 @@ def find_forbidden(
 
 def find_problematic(
     *,
-    packages: Dict[RequirementLanguage, Set[str]],
+    packages: dict[RequirementLanguage, set[str]],
     is_alias: bool,
-    whitelist: Optional[Whitelist] = None,
+    whitelist: Whitelist | None = None,
 ):
     """
     Finds forbidden libraries by querying the API.
@@ -159,12 +159,12 @@ def find_problematic(
 def _find_problematic(
     *,
     language: RequirementLanguage,
-    packages: Set[str],
+    packages: set[str],
     is_alias: bool,
     whitelist: Whitelist,
 ):
-    forbidden: Set[str] = set()
-    alias_collisions: List[_AliasCollision] = []
+    forbidden: set[str] = set()
+    alias_collisions: list[_AliasCollision] = []
 
     for package in packages:
         if is_alias:
@@ -201,7 +201,7 @@ def _find_problematic(
 def scan(
     *,
     module: ModuleType,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
 ) -> None:
     """
     Scans a module for forbidden libraries.
@@ -211,9 +211,9 @@ def scan(
 @overload
 def scan(
     *,
-    requirements_file: Optional[str] = None,
-    requirements_r_file: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
+    requirements_file: str | None = None,
+    requirements_r_file: str | None = None,
+    logger: logging.Logger | None = None,
 ) -> None:
     """
     Scans requirements files for forbidden libraries.
@@ -223,10 +223,10 @@ def scan(
 
 
 def scan(
-    module: Optional[ModuleType] = None,
-    requirements_file: Optional[str] = None,
-    requirements_r_file: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
+    module: ModuleType | None = None,
+    requirements_file: str | None = None,
+    requirements_r_file: str | None = None,
+    logger: logging.Logger | None = None,
 ):
     if module is not None:
         packages = extract_from_notebook_modules(
@@ -276,8 +276,8 @@ def scan(
 
 def _log_problems(
     *,
-    problems_by_language: Dict[RequirementLanguage, _Problems],
-    logger: Optional[logging.Logger],
+    problems_by_language: dict[RequirementLanguage, _Problems],
+    logger: logging.Logger | None,
     is_alias: bool,
 ):
     if logger is None:

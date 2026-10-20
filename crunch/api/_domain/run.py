@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from crunch.api._resource import Collection, EndpointMixin
 from crunch.api._resource import Model as BaseModel
@@ -40,9 +40,9 @@ class Run(BaseModel[int]):
     def __init__(
         self,
         project: "Project",
-        attrs: Optional["Attrs"] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["RunCollection"] = None,
+        attrs: "Attrs | None" = None,
+        client: "Client | None" = None,
+        collection: "RunCollection | None" = None,
     ):
         super().__init__(attrs=attrs, client=client, collection=collection)
 
@@ -61,19 +61,19 @@ class Run(BaseModel[int]):
         return self._attrs["terminated"]
 
     @property
-    def error_message(self) -> Optional[str]:
+    def error_message(self) -> str | None:
         return self._attrs["errorMessage"]
 
     @property
-    def error_trace(self) -> Optional[str]:
+    def error_trace(self) -> str | None:
         return self._attrs["errorTrace"]
 
     @property
-    def status(self) -> Optional[RunStatus]:
+    def status(self) -> RunStatus | None:
         return RunStatus(self._attrs["status"])
 
     @property
-    def duration(self) -> Optional[timedelta]:
+    def duration(self) -> timedelta | None:
         value = self._attrs["duration"]
         if value is None:
             return None
@@ -87,7 +87,7 @@ class Run(BaseModel[int]):
         return Submission(self._project, self._attrs["submission"], self._client)
 
     @property
-    def prediction(self) -> Optional["Prediction"]:
+    def prediction(self) -> "Prediction | None":
         from crunch.api._domain.prediction import Prediction
 
         prediction_attrs = self._attrs["prediction"]
@@ -97,7 +97,7 @@ class Run(BaseModel[int]):
         return Prediction(self._project, prediction_attrs, self._client)
 
     @property
-    def started_at(self) -> Optional[datetime]:
+    def started_at(self) -> datetime | None:
         value = self._attrs["startedAt"]
         if value is None:
             return None
@@ -105,7 +105,7 @@ class Run(BaseModel[int]):
         return datetime.fromisoformat(value)
 
     @property
-    def ended_at(self) -> Optional[datetime]:
+    def ended_at(self) -> datetime | None:
         value = self._attrs["endedAt"]
         if value is None:
             return None
@@ -113,11 +113,11 @@ class Run(BaseModel[int]):
         return datetime.fromisoformat(value)
 
     @property
-    def exit_code(self) -> Optional[int]:
+    def exit_code(self) -> int | None:
         return self._attrs["exitCode"]
 
     @property
-    def exit_reason(self) -> Optional[str]:
+    def exit_reason(self) -> str | None:
         return self._attrs["exitReason"]
 
     @property
@@ -125,7 +125,7 @@ class Run(BaseModel[int]):
         return datetime.fromisoformat(self._attrs["createdAt"])
 
     @property
-    def logs(self) -> List["RunLog"]:
+    def logs(self) -> list["RunLog"]:
         return self._checked_client.api.get_run_logs(
             self._project.competition.id,
             self._project.user_id,
@@ -165,7 +165,7 @@ class RunCollection(Collection[Run]):
     def __init__(
         self,
         project: "Project",
-        client: Optional["Client"] = None
+        client: "Client | None" = None
     ):
         super().__init__(client)
 
@@ -188,9 +188,9 @@ class RunCollection(Collection[Run]):
         self,
         *,
         submission: "Submission",
-        train_frequency: Optional[int] = None,
-        force_first_train: Optional[bool] = None,
-        runtime_definition_name: Optional[str] = None,
+        train_frequency: int | None = None,
+        force_first_train: bool | None = None,
+        runtime_definition_name: str | None = None,
     ) -> Run:
         return self.prepare_model(
             self._checked_client.api.create_run(
@@ -206,10 +206,10 @@ class RunCollection(Collection[Run]):
 
     def list(
         self,
-        managed: Optional[bool] = None,
-        submission: Optional["Submission"] = None,
-        submission_number: Optional[int] = None
-    ) -> List[Run]:
+        managed: bool | None = None,
+        submission: "Submission | None" = None,
+        submission_number: int | None = None
+    ) -> list[Run]:
         assert not ((submission is not None) and (submission_number is not None))
 
         return self.prepare_models(
@@ -222,7 +222,7 @@ class RunCollection(Collection[Run]):
             )
         )
 
-    def prepare_model(self, attrs: Union["JsonValue", Run], *args: Any) -> Run:
+    def prepare_model(self, attrs: "JsonValue | Run", *args: Any) -> Run:
         return super().prepare_model(
             attrs,
             self.project,
@@ -238,9 +238,9 @@ class RunEndpointMixin(EndpointMixin):
         user_identifier: "UserIdentifierType",
         project_identifier: "ProjectIdentifierType",
         submission_id: int,
-        train_frequency: Optional[int] = None,
-        force_first_train: Optional[bool] = None,
-        runtime_definition_name: Optional[str] = None,
+        train_frequency: int | None = None,
+        force_first_train: bool | None = None,
+        runtime_definition_name: str | None = None,
     ):
         return self._result(
             self.post(
@@ -260,10 +260,10 @@ class RunEndpointMixin(EndpointMixin):
         competition_identifier: "CompetitionIdentifierType",
         user_identifier: "UserIdentifierType",
         project_identifier: "ProjectIdentifierType",
-        managed: Optional[bool],
-        submission_number: Optional[int]
+        managed: bool | None,
+        submission_number: int | None
     ):
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
 
         if managed is not None:
             params["managed"] = managed

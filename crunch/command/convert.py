@@ -1,4 +1,3 @@
-from typing import List
 
 
 def convert(
@@ -13,7 +12,7 @@ def convert(
 ):
     from crunch_convert.cli import cli
 
-    options: List[str] = []
+    options: list[str] = []
 
     if overwrite:
         options.append("--override")

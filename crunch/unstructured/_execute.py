@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 from crunch.utils import LazyValue, smart_call
 
@@ -11,10 +11,10 @@ class ParticipantVisibleError(Exception):
 
 def call_function(
     function: Callable[..., _T],
-    kwargs: Dict[str, Any] = {},
+    kwargs: dict[str, Any] = {},
     *,
-    lazy_kwargs: Dict[str, Callable[[], Any]] = {},
-    print: Optional[Callable[..., None]] = None,
+    lazy_kwargs: dict[str, Callable[[], Any]] = {},
+    print: Callable[..., None] | None = None,
 ) -> _T:
     try:
         if print:

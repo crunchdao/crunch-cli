@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from types import ModuleType
-from typing import Any, Callable, List, Literal, Optional, Tuple
+from typing import Any, Callable, Literal
 
 from crunch.runner.types import KwargsLike
 
-DEFAULT_LOG_LIMITS: Tuple[int, int] = (1000, 500)
+DEFAULT_LOG_LIMITS: tuple[int, int] = (1000, 500)
 
 
 class RunnerContext(ABC):
@@ -17,11 +17,11 @@ class RunnerContext(ABC):
 
     @property
     @abstractmethod
-    def timeout(self) -> Optional[timedelta]:
+    def timeout(self) -> timedelta | None:
         pass  # pragma: no cover
 
     @property
-    def remaining_duration_before_timeout(self) -> Optional[timedelta]:
+    def remaining_duration_before_timeout(self) -> timedelta | None:
         timeout = self.timeout
         if timeout is None:
             return None
@@ -99,12 +99,12 @@ class RunnerContext(ABC):
         self,
         *,
         command: str,
-        parameters: Optional[KwargsLike] = None,
+        parameters: KwargsLike | None = None,
         trace: bool = True,
-        span_hidden_parameters: Optional[List[str]] = None,
-        span_attributes: Optional[KwargsLike] = None,
+        span_hidden_parameters: list[str] | None = None,
+        span_attributes: KwargsLike | None = None,
         install_data_fuse: bool = True,
-        log_limits: Tuple[int, int] = DEFAULT_LOG_LIMITS,
+        log_limits: tuple[int, int] = DEFAULT_LOG_LIMITS,
     ) -> None:
         """
         Execute a command.
@@ -158,8 +158,8 @@ class UserModule(ABC):
         self,
         name: str,
         *,
-        default: Optional[Any] = _sentinel,
-    ) -> Optional[Any]:
+        default: Any | None = _sentinel,
+    ) -> Any | None:
         value = getattr(self.module, name, default)
 
         if value is _sentinel and default is _sentinel:

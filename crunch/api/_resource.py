@@ -2,9 +2,10 @@
 Heavily inspired (copied) from https://github.com/docker/docker-py/blob/main/docker/models/resource.py.
 """
 
+import builtins
 from abc import ABC
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Iterable, Iterator, List, Literal, Optional, Type, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterable, Iterator, Literal, TypeAlias, TypeVar, cast, overload
 
 import requests
 
@@ -22,11 +23,11 @@ class Model(Generic[ID]):
     def __init__(
         self,
         *,
-        attrs: Optional[Dict[str, Any]] = None,
-        client: Optional["Client"] = None,
-        collection: Optional["Collection[Any]"] = None
+        attrs: dict[str, Any] | None = None,
+        client: "Client | None" = None,
+        collection: "Collection[Any] | None" = None
     ):
-        self._attrs: Dict[str, Any] = attrs or {}
+        self._attrs: dict[str, Any] = attrs or {}
         self._client = client
         self._collection = collection
 
@@ -94,7 +95,7 @@ class Model(Generic[ID]):
     @classmethod
     def from_dict_array(
         cls,
-        input: List[dict],
+        input: list[dict],
         *args
     ):
         return [
@@ -108,9 +109,9 @@ T = TypeVar('T', bound=Model)
 
 class Collection(Generic[T]):
 
-    model: Type[T]
+    model: type[T]
 
-    def __init__(self, client: Optional["Client"] = None):
+    def __init__(self, client: "Client | None" = None):
         self._client = client
 
     @property
@@ -126,7 +127,7 @@ class Collection(Generic[T]):
     def __iter__(self) -> Iterator[T]:
         return iter(self.list())
 
-    def get_reference(self, id: Optional[Any] = None, **attrs: Any) -> T:
+    def get_reference(self, id: Any | None = None, **attrs: Any) -> T:
         """
         Builds a lazy, unfetched model from just enough attrs to compute its
         `resource_identifier` (e.g. `id=123`, or `user_id=1, name="foo"` for
@@ -138,7 +139,7 @@ class Collection(Generic[T]):
 
         return self.prepare_model(attrs)
 
-    def prepare_model(self, attrs: Union["JsonValue", T], *args: Any) -> T:
+    def prepare_model(self, attrs: "JsonValue | T", *args: Any) -> T:
         if isinstance(attrs, self.model):
             attrs._client = self._client  # pyright: ignore[reportPrivateUsage]
             attrs._collection = self  # pyright: ignore[reportPrivateUsage]
@@ -155,14 +156,14 @@ class Collection(Generic[T]):
         raise Exception(f"can't create {self.model.__name__} from {attrs}")
 
     @overload
-    def prepare_models(self, attrs_list: Union["JsonValue", T], *args: Any) -> List[T]:
+    def prepare_models(self, attrs_list: "JsonValue | T", *args: Any) -> builtins.list[T]:
         ...
 
     @overload
-    def prepare_models(self, attrs_list: Iterator[Union["JsonValue", T]], *args: Any) -> Iterator[T]:
+    def prepare_models(self, attrs_list: Iterator["JsonValue | T"], *args: Any) -> Iterator[T]:
         ...
 
-    def prepare_models(self, attrs_list: Union["JsonValue", T, Iterator[Union["JsonValue", T]]], *args: Any) -> Union[List[T], Iterator[T]]:
+    def prepare_models(self, attrs_list: "JsonValue | T | Iterator[JsonValue | T]", *args: Any) -> builtins.list[T] | Iterator[T]:
         if isinstance(attrs_list, GeneratorType):
             return self._prepare_models_with_yield(attrs_list, args)
 
@@ -174,14 +175,14 @@ class Collection(Generic[T]):
 
         raise Exception(f"can't create {self.model.__name__} list from {attrs_list}")
 
-    def _prepare_models_with_yield(self, attrs_list: Iterator[Union["JsonValue", T]], args: Any):
+    def _prepare_models_with_yield(self, attrs_list: Iterator["JsonValue | T"], args: Any):
         for attrs in attrs_list:
             yield self.prepare_model(attrs, *args)
 
         return GeneratorExit
 
 
-JsonValue = Union[str, int, float, bool, None, dict[str, "JsonValue"], list["JsonValue"]]
+JsonValue: TypeAlias = str | int | float | bool | None | dict[str, "JsonValue"] | list["JsonValue"]
 
 
 class EndpointMixin(ABC):
@@ -196,7 +197,7 @@ class EndpointMixin(ABC):
         def _paginated(
             self,
             requester: Callable[["PageRequest"], requests.Response],
-            page_size: Optional[int] = None,
+            page_size: int | None = None,
         ) -> Iterator[JsonValue]:
             ...
 
@@ -232,5 +233,5 @@ class EndpointMixin(ABC):
         response: requests.Response,
         json: bool = False,
         binary: bool = False,
-    ) -> Union[JsonValue, bytes, str]:
+    ) -> JsonValue | bytes | str:
         ...
