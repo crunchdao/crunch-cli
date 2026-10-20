@@ -11,12 +11,10 @@ class Client:
         self,
         api_base_url: str,
         auth: Auth | None,
-        *,
-        show_progress: bool = True,
     ):
         from crunch.api._endpoint import EndpointClient
 
-        self.api = EndpointClient(api_base_url, auth, show_progress)
+        self.api = EndpointClient(api_base_url, auth)
 
     @property
     def competitions(self):
@@ -50,8 +48,6 @@ class Client:
     @staticmethod
     def from_env(
         auth: Auth | None = None,
-        *,
-        show_progress: bool = True,
     ):
         if auth is None:
             api_key = os.getenv(API_KEY_ENV_VAR)
@@ -61,5 +57,4 @@ class Client:
         return Client(
             store.api_base_url,
             auth,
-            show_progress=show_progress,
         )

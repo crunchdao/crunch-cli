@@ -177,11 +177,7 @@ class Repository:
     def write_upload_cache(self, content: Any) -> None:
         _write_file_atomically(self.upload_cache_file_path, json.dumps(content))
 
-    def create_client(
-        self,
-        *,
-        show_progress: bool = True,
-    ) -> tuple[Client, ProjectReference]:
+    def create_client(self) -> tuple[Client, ProjectReference]:
         auth = (
             Auth.project_token(self._project_token)
             if self._project_token is not None
@@ -191,7 +187,6 @@ class Repository:
         client = Client(
             store.api_base_url,
             auth,
-            show_progress=show_progress,
         )
 
         competition = client.competitions.get(self._project.competition_name)

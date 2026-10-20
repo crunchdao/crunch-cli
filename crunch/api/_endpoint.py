@@ -1,8 +1,7 @@
 import urllib.parse
-from typing import Any, Callable, Iterable, Iterator, Literal, Sequence, cast, overload
+from typing import Any, Callable, Iterator, Literal, Sequence, cast, overload
 
 import requests
-from tqdm.auto import tqdm
 
 from crunch.api._auth import Auth
 from crunch.api._errors import ApiException, convert_error
@@ -17,12 +16,10 @@ class EndpointClient(requests.Session):
         self,
         base_url: str,
         auth: Auth | None,
-        show_progress: bool,
     ):
         super().__init__()
 
         self.base_url = base_url
-        self.show_progress = show_progress
         self.page_size = 100
 
         self.headers.update({
@@ -33,66 +30,12 @@ class EndpointClient(requests.Session):
             self.headers["Authorization"] = auth.header_value
 
     def request(self, method: str, url: str, *args: Any, **kwargs: Any):
-        headers: dict[str, str] = kwargs.pop("headers", None) or {}
-        data: Any = kwargs.pop("data", None)
-        files: Any = kwargs.pop("files", None)
-
-        progress: tqdm | None = None
-
-        if files is not None:
-            import requests_toolbelt
-
-            fields = [
-                *files
-            ]
-
-            if isinstance(data, dict):
-                fields.extend((
-                    (key, str(value))
-                    for key, value in cast(dict[str, Any], data).items()
-                    if value is not None
-                ))
-            elif isinstance(data, (list, tuple)):
-                # TODO Filter `None`s?
-                fields.extend(cast(Iterable[tuple[str, Any]], data))
-            elif data is not None:
-                raise ValueError(f"unsupported data: {data}")
-
-            encoder = requests_toolbelt.MultipartEncoder(fields)
-            headers["Content-Type"] = encoder.content_type
-            files = None
-
-            if not self.show_progress:
-                data = encoder
-            else:
-                progress = tqdm(
-                    desc="upload",
-                    unit="B",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                    total=encoder.len,  # type: ignore
-                )
-
-                def callback(monitor: requests_toolbelt.MultipartEncoderMonitor):
-                    progress.update(monitor.bytes_read - progress.n)
-                    if progress.total == progress.n:
-                        progress.refresh(progress.lock_args)
-
-                data = requests_toolbelt.MultipartEncoderMonitor(encoder, callback)
-
-        try:
-            return super().request(
-                method,
-                urllib.parse.urljoin(self.base_url, url),
-                *args,
-                headers=headers,
-                data=data,
-                files=files,
-                **kwargs,
-            )
-        finally:
-            if progress is not None:
-                progress.close()
+        return super().request(
+            method,
+            urllib.parse.urljoin(self.base_url, url),
+            *args,
+            **kwargs,
+        )
 
     def _raise_for_status(
         self,
