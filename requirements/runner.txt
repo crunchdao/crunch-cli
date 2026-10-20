@@ -2,8 +2,6 @@ click
 
 
 
-
-joblib
 mashumaro>=3.10
 nvidia-ml-py
 pandas

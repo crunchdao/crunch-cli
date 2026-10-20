@@ -2,8 +2,6 @@ click
 crunch-convert>=0.12.1
 coloredlogs
 detect_agent
-inquirer
-joblib
 mashumaro>=3.10
 nvidia-ml-py
 pandas
