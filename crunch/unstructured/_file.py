@@ -2,8 +2,6 @@ import os
 from dataclasses import dataclass
 from functools import cached_property
 
-import requests
-
 from crunch.api._serialization import JsonDataClassMixin
 from crunch.constants import TEXT_FILE_EXTENSIONS
 
@@ -28,6 +26,8 @@ class File(JsonDataClassMixin):
             return None
 
         if self.uri.startswith("http:") or self.uri.startswith("https:"):
+            import requests
+
             return requests.get(self.uri).text
 
         with open(self.uri) as fd:

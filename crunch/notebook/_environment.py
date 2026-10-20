@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Iterator, Literal, TypeAlias, overload
 
-import psutil
-
 if TYPE_CHECKING:
     from jupyter_client import BlockingKernelClient  # pyright: ignore[reportPrivateImportUsage]
 
@@ -104,6 +102,8 @@ class _Jupyter(NotebookEnvironment):
 
     @classmethod
     def _find_connection_file_path(cls) -> str | None:
+        import psutil
+
         current_process = psutil.Process()
 
         for process in [current_process, *current_process.parents()]:

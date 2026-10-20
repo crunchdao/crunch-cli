@@ -6,7 +6,6 @@ from types import ModuleType
 from typing import Any, Callable, Literal, TypeAlias
 from urllib.parse import parse_qs, urlencode
 
-import requests
 from retry import retry
 
 import crunch.store as store
@@ -102,24 +101,29 @@ class HttpCodeLoader(CodeLoader):
             content=self._fetch(),
         )
 
-    @retry(requests.RequestException, tries=3, delay=2, logger=None)
     def _fetch(self):
-        try:
-            response = requests.get(
-                self._url,
-                headers={
-                    "User-Agent": self._user_agent,
-                }
-            )
+        import requests
 
-            response.raise_for_status()
-        except requests.RequestException as error:
-            if error.response is not None and error.response.status_code == 404:
-                raise NoCodeFoundError(f"no code found at url: {self._url}") from error
+        @retry(requests.RequestException, tries=3, delay=2, logger=None)
+        def fetch():
+            try:
+                response = requests.get(
+                    self._url,
+                    headers={
+                        "User-Agent": self._user_agent,
+                    }
+                )
 
-            raise
+                response.raise_for_status()
+            except requests.RequestException as error:
+                if error.response is not None and error.response.status_code == 404:
+                    raise NoCodeFoundError(f"no code found at url: {self._url}") from error
 
-        return response.text
+                raise
+
+            return response.text
+
+        return fetch()
 
     def __str__(self) -> str:
         return f'HttpCodeLoader(url="{self._url}")'

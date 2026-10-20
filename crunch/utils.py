@@ -7,10 +7,10 @@ import sys
 import time
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
-from typing import Any, BinaryIO, Callable, Generic, Iterable, Sequence, TypeVar, cast
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Generic, Iterable, Sequence, TypeVar, cast
 
-import requests
-from tqdm.auto import tqdm
+if TYPE_CHECKING:
+    import requests
 
 
 def get_process_memory() -> int:
@@ -134,8 +134,10 @@ def cut_url(url: str):
 
 
 # copied from requests.models.Response.raise_for_status
-def _safely_raise_for_status(self: requests.Response):
+def _safely_raise_for_status(self: "requests.Response"):
     """Raises :class:`HTTPError`, if one occurred."""
+
+    import requests
 
     http_error_msg = ""
     if isinstance(self.reason, bytes):
@@ -168,7 +170,7 @@ def _safely_raise_for_status(self: requests.Response):
 
 
 def _download_head(
-    session: requests.Session,
+    session: "requests.Session",
     url: str,
     path: str,
     log: bool,
@@ -214,8 +216,11 @@ def download(
     print: Callable[[str], Any] = print,
     progress_bar: bool = True,
     max_retry: int = 10,
-    session: requests.Session | None = None,
+    session: "requests.Session | None" = None,
 ):
+    import requests
+    from tqdm.auto import tqdm
+
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
     if session is None:

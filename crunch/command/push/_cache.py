@@ -5,8 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, NewType, cast
 
-from mashumaro import field_options
-
 from crunch.api import ApiException, Client, Upload, UploadStatus
 from crunch.api._serialization import JsonDataClassMixin
 from crunch.constants import UPLOAD_CACHE_VERSION
@@ -40,7 +38,7 @@ class UploadCacheEntry(JsonDataClassMixin):
     upload: Upload | None = field(
         default=None,
         init=False,
-        metadata=field_options(serialize="omit"),
+        metadata={"serialize": "omit"},
     )
 
     def find_known_location(self, relative_path: str) -> KnownLocation | None:

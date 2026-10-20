@@ -3,7 +3,7 @@ from typing import Any, Literal, TypeAlias
 import click
 
 import crunch.api as api
-import crunch.command as command
+from crunch.command.init import init
 from crunch.repository import Repository
 from crunch.utils import download
 
@@ -45,7 +45,7 @@ def setup(
     no_model: bool,
     data_size_variant: api.SizeVariant,
 ) -> Repository:
-    repository = command.init(
+    repository = init(
         clone_token=clone_token,
         competition_name=competition_name,
         project_name=project_name,

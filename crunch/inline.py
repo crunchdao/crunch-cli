@@ -8,19 +8,13 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
 import click
-import psutil
 
-import crunch.tester as tester
 from crunch.__version__ import __version__
 from crunch.api import ApiException, Competition, CompetitionFormat, CompetitionMode, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType, WebUrlFormatter
-from crunch.command.convert import convert
-from crunch.command.download import download, download_no_data_available
-from crunch.command.push import push
 from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY
 from crunch.notebook import IPyNbNotAvailableError, NotebookEnvironment, NotebookSecretNotAccessibleError
 from crunch.repository import Repository
 from crunch.runner import is_inside
-from crunch.runner.tracing import LocalTraceExporter
 from crunch.runner.types import KwargsLike
 from crunch.unstructured import RunnerModule, deduce_code_loader
 from crunch.utils import is_running_inside_notebook
@@ -42,6 +36,10 @@ class _Inline:
         logger: logging.Logger,
         has_gpu: bool = False,
     ):
+        import psutil
+
+        from crunch.runner.tracing import LocalTraceExporter
+
         self.user_module = user_module
         self.model_directory_path = model_directory_path
         self.logger = logger
@@ -98,6 +96,8 @@ class _Inline:
         force: bool = False,
         **kwargs: KwargsLike,
     ) -> tuple["pandas.DataFrame | None", "pandas.DataFrame | None", "pandas.DataFrame | None"]:
+        from crunch.command.download import download, download_no_data_available
+
         if self._competition.format == CompetitionFormat.STREAM:
             self.load_streams()
 
@@ -293,6 +293,9 @@ class _Inline:
     ):
         from IPython.display import Markdown, display  # type: ignore
 
+        from crunch.command.convert import convert
+        from crunch.command.push import push
+
         with open(notebook_file_name, "w") as fd:
             json.dump(ipynb, fd)
 
@@ -385,6 +388,8 @@ def load(
     module_name_or_module: ModuleType | str = "__main__",
     model_directory_path: str = DEFAULT_MODEL_DIRECTORY,
 ):
+    import crunch.tester as tester
+
     if isinstance(module_name_or_module, str):
         module = sys.modules[module_name_or_module]
     else:

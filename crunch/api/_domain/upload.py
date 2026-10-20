@@ -5,9 +5,6 @@ from datetime import datetime
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable
 
-import requests
-from tqdm.auto import tqdm
-
 from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
 from crunch.api._serialization import JsonDataClassMixin
 from crunch.utils import split_into_chunks
@@ -74,6 +71,8 @@ class UploadChunk(ApiModel):
         byte_callback: Callable[[int], None] | None = None,
         retry_callback: Callable[[], None] | None = None,
     ):
+        import requests
+
         from crunch.utils import LimitedSizeIO
 
         seek_back_to = self.offset
@@ -242,6 +241,8 @@ class UploadCollection(ApiCollection[Upload]):
         progress_bar: bool = False,
         max_retry: int = 10,
     ) -> Upload:
+        from tqdm.auto import tqdm
+
         upload = self.create(
             name=name,
             size=size,

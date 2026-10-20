@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence
 import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
-from crunch.command import SetupSubmissionNumberClickType, SetupSubmissionNumberType
+from crunch.command.setup import SetupSubmissionNumberClickType, SetupSubmissionNumberType
 from crunch.command.init import API_KEY_CLONE_TOKEN, format_directory
 from crunch.command.submission import SubmissionIdentifierClickType
 from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
@@ -18,7 +18,7 @@ from crunch.repository import Repository, RepositoryError
 from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
 
-from . import __version__, api, command, constants, store
+from . import __version__, api, constants, store
 
 if TYPE_CHECKING:
     from crunch_convert import RequirementLanguage
@@ -178,12 +178,15 @@ def init(
     directory: str,
     model_directory_path: str,
 ):
+    from crunch.command.download import download, download_no_data_available
+    from crunch.command.init import init
+
     _remember_competition_name(competition_name)
 
     directory = format_directory(directory, competition_name, project_name)
 
     try:
-        repository = command.init(
+        repository = init(
             clone_token=clone_token,
             competition_name=competition_name,
             project_name=project_name,
@@ -193,9 +196,9 @@ def init(
         )
 
         if not no_data:
-            command.download(repository, force=True)
+            download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-        command.download_no_data_available()
+        download_no_data_available()
 
     print("\n---")
     print(f"Success! Your environment has been correctly initialized.")
@@ -224,6 +227,9 @@ def setup(
     model_directory_path: str,
     data_size_variant_raw: str,
 ):
+    from crunch.command.download import download, download_no_data_available
+    from crunch.command.setup import setup
+
     _remember_competition_name(competition_name)
 
     _echo_version()
@@ -233,7 +239,7 @@ def setup(
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        repository = command.setup(
+        repository = setup(
             clone_token=clone_token,
             competition_name=competition_name,
             project_name=project_name,
@@ -246,9 +252,9 @@ def setup(
         )
 
         if not no_data:
-            command.download(repository, force=True)
+            download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-        command.download_no_data_available()
+        download_no_data_available()
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -279,6 +285,9 @@ def setup_notebook(
     clone_token: str,
     project_name: str | None,
 ):
+    from crunch.command.download import download, download_no_data_available
+    from crunch.command.setup import setup
+
     _remember_competition_name(competition_name)
 
     _echo_version()
@@ -286,7 +295,7 @@ def setup_notebook(
     data_size_variant = api.SizeVariant[data_size_variant_raw.upper()]
 
     try:
-        repository = command.setup(
+        repository = setup(
             clone_token=clone_token,
             competition_name=competition_name,
             project_name=project_name,
@@ -299,9 +308,9 @@ def setup_notebook(
         )
 
         if not no_data:
-            command.download(repository, force=True)
+            download(repository, force=True)
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-        command.download_no_data_available()
+        download_no_data_available()
 
     print("\n---")
     print(f"Success! Your environment has been correctly setup.")
@@ -316,6 +325,8 @@ def setup_notebook(
 def convert_if_necessary(
     main_file_path: str
 ):
+    from crunch.command.convert import convert
+
     converted = False
     if not os.path.exists(main_file_path):
         print(f"missing {main_file_path}")
@@ -328,7 +339,7 @@ def convert_if_necessary(
         if not os.path.exists(notebook_file_path):
             raise click.Abort()
 
-        command.convert(
+        convert(
             notebook_file_path,
             main_file_path,
             write_requirements=not os.path.exists(REQUIREMENTS_TXT),
@@ -355,10 +366,12 @@ def push(
     no_pip_freeze: bool,
     dry: bool,
 ):
+    from crunch.command.push import push
+
     repository = _open_repository()
 
     with convert_if_necessary(main_file_path):
-        command.push(
+        push(
             repository=repository,
             message=message,
             main_file_path=main_file_path,
@@ -403,6 +416,8 @@ def download(
     force: bool,
     size_variant_raw: str | None,
 ):
+    from crunch.command.download import download, download_no_data_available
+
     repository = _open_repository()
 
     size_variant = (
@@ -412,14 +427,14 @@ def download(
     )
 
     try:
-        command.download(
+        download(
             repository,
             round_number,
             force,
             size_variant,
         )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
-        command.download_no_data_available()
+        download_no_data_available()
 
 
 @cli.command(help="Convert a notebook to a python script.")
@@ -439,7 +454,9 @@ def convert(
     notebook_file_path: str,
     python_file_path: str,
 ):
-    command.convert(
+    from crunch.command.convert import convert
+
+    convert(
         notebook_file_path=notebook_file_path,
         python_file_path=python_file_path,
         overwrite=overwrite,
@@ -455,12 +472,14 @@ def convert(
 def update_token(
     clone_token: str,
 ):
+    from crunch.command.update_token import update_token
+
     if not clone_token:
         clone_token = click.prompt("Clone Token", hide_input=True)
 
     repository = _open_repository()
 
-    command.update_token(
+    update_token(
         repository,
         clone_token=clone_token
     )
@@ -468,27 +487,33 @@ def update_token(
 
 @cli.command(help="Show information on the competition.")
 def status():
+    from crunch.command.status import status
+
     repository = _open_repository()
 
-    command.status(
+    status(
         repository,
     )
 
 
 @cli.command(help="Show the project's rank on the leaderboard.")
 def leaderboard():
+    from crunch.command.leaderboard import leaderboard
+
     repository = _open_repository()
 
-    command.leaderboard(
+    leaderboard(
         repository,
     )
 
 
 @cli.command(help="Show the project's quota.")
 def quota():
+    from crunch.command.quota import quota
+
     repository = _open_repository()
 
-    command.quota(
+    quota(
         repository,
     )
 
@@ -500,9 +525,11 @@ def quickstarter_group():
 
 @quickstarter_group.command(name="list", help="List available quickstarters.")
 def quickstarter_list():
+    from crunch.command.quickstarter import quickstarter_list
+
     repository = _open_repository()
 
-    command.quickstarter_list(
+    quickstarter_list(
         repository,
     )
 
@@ -512,9 +539,11 @@ def quickstarter_list():
 def quickstarter_show(
     quickstarter_name: str,
 ):
+    from crunch.command.quickstarter import quickstarter_show
+
     repository = _open_repository()
 
-    command.quickstarter_show(
+    quickstarter_show(
         repository,
         quickstarter_name=quickstarter_name,
     )
@@ -527,9 +556,11 @@ def quickstarter_apply(
     quickstarter_name: str,
     overwrite: bool,
 ):
+    from crunch.command.quickstarter import quickstarter_apply
+
     repository = _open_repository()
 
-    command.quickstarter_apply(
+    quickstarter_apply(
         repository,
         quickstarter_name=quickstarter_name,
         overwrite=overwrite,
@@ -548,9 +579,11 @@ def submission_list(
     limit: int,
     all: bool,
 ):
+    from crunch.command.submission import submission_list
+
     repository = _open_repository()
 
-    command.submission_list(
+    submission_list(
         repository,
         limit=limit if not all else None,
     )
@@ -561,9 +594,11 @@ def submission_list(
 def submission_show(
     submission: "SubmissionIdentifierType",
 ):
+    from crunch.command.submission import submission_show
+
     repository = _open_repository()
 
-    command.submission_show(
+    submission_show(
         repository,
         submission_identifier=submission,
     )
@@ -577,6 +612,8 @@ def submission_checkout(
     files: Sequence[str],
 ):
     # resolve before chdir
+    from crunch.command.submission import submission_checkout
+
     absolute_files = [
         os.path.abspath(file)
         for file in files
@@ -584,7 +621,7 @@ def submission_checkout(
 
     repository = _open_repository()
 
-    command.submission_checkout(
+    submission_checkout(
         repository,
         submission_identifier=submission,
         files=absolute_files if len(absolute_files) else None,
@@ -601,9 +638,11 @@ def runtime_group():
 def runtime_list(
     submission: "SubmissionIdentifierType",
 ):
+    from crunch.command.runtime import runtime_list
+
     repository = _open_repository()
 
-    command.runtime_list(
+    runtime_list(
         repository,
         submission_identifier=submission,
     )
@@ -618,9 +657,11 @@ def runtime_request(
     submission: "SubmissionIdentifierType",
     justification: str,
 ):
+    from crunch.command.runtime import runtime_request
+
     repository = _open_repository()
 
-    command.runtime_request(
+    runtime_request(
         repository,
         runtime_option_name=runtime,
         submission_identifier=submission,
@@ -644,9 +685,11 @@ def run_create(
     force_first_train: bool | None,
     runtime: str,
 ):
+    from crunch.command.run import run_create
+
     repository = _open_repository()
 
-    command.run_create(
+    run_create(
         repository,
         submission_identifier=submission,
         train_frequency=train_frequency,
@@ -662,9 +705,11 @@ def run_list(
     limit: int,
     all: bool,
 ):
+    from crunch.command.run import run_list
+
     repository = _open_repository()
 
-    command.run_list(
+    run_list(
         repository,
         limit=limit if not all else None,
     )
@@ -675,9 +720,11 @@ def run_list(
 def run_show(
     run_id: int,
 ):
+    from crunch.command.run import run_show
+
     repository = _open_repository()
 
-    command.run_show(
+    run_show(
         repository,
         run_id=run_id,
     )
@@ -694,9 +741,11 @@ def run_logs(
     follow: bool,
     debug: bool,
 ):
+    from crunch.command.run import run_logs
+
     repository = _open_repository()
 
-    command.run_logs(
+    run_logs(
         repository,
         run_id=run_id,
         tail=tail,
@@ -714,9 +763,11 @@ def run_wait(
     timeout: int | None,
     poll_interval: int,
 ):
+    from crunch.command.run import run_wait
+
     repository = _open_repository()
 
-    exit(command.run_wait(
+    exit(run_wait(
         repository,
         run_id=run_id,
         timeout=timeout,
@@ -729,9 +780,11 @@ def run_wait(
 def run_select(
     run_id: int,
 ):
+    from crunch.command.run import run_select
+
     repository = _open_repository()
 
-    command.run_select(
+    run_select(
         repository,
         run_id=run_id,
     )
@@ -740,9 +793,11 @@ def run_select(
 @run_group.command(name="terminate", help="Terminate a run.")
 @click.argument("run_id", type=int, required=True)
 def run_terminate(run_id: int):
+    from crunch.command.run import run_terminate
+
     repository = _open_repository()
 
-    command.run_terminate(
+    run_terminate(
         repository,
         run_id=run_id,
     )
@@ -764,7 +819,9 @@ def whitelist_search(
     limit: int,
     all: bool,
 ):
-    exit(command.whitelist_search(
+    from crunch.command.whitelist import whitelist_search
+
+    exit(whitelist_search(
         query=query,
         language=language,
         limit=limit if not all else None,
@@ -778,6 +835,8 @@ def whitelist_validate(
     requirements_txt_file_path: str | None,
     language: "RequirementLanguage | None",
 ):
+    from crunch.command.whitelist import whitelist_validate
+
     if language is None:
         from crunch_convert import RequirementLanguage
         language = RequirementLanguage.PYTHON
@@ -785,7 +844,7 @@ def whitelist_validate(
     if requirements_txt_file_path is None:
         requirements_txt_file_path = language.txt_file_name
 
-    exit(command.whitelist_validate(
+    exit(whitelist_validate(
         requirements_txt_file_path=requirements_txt_file_path,
         language=language,
     ))
@@ -804,12 +863,14 @@ def whitelist_request(
     gpu_requirement: "GpuRequirement | None",
     additional_details: str | None,
 ):
+    from crunch.command.whitelist import whitelist_request
+
     if not name and not alias:
         raise click.UsageError("at least one of `--name` or `--alias` must be provided")
 
     repository = _open_repository()
 
-    command.whitelist_request(
+    whitelist_request(
         repository,
         name=name,
         alias=alias,
@@ -836,6 +897,8 @@ def local(
     has_gpu: bool,
     no_determinism_check: bool | None,
 ):
+    from crunch.command.test import test
+
     from . import library, tester
 
     repository = _open_repository()
@@ -850,7 +913,7 @@ def local(
         no_determinism_check = None
 
     with convert_if_necessary(main_file_path):
-        command.test(
+        test(
             repository,
             main_file_path,
             model_directory_path,

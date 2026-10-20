@@ -8,7 +8,7 @@ import click
 import crunch.monkey_patches as monkey_patches
 import crunch.tester as tester
 from crunch.api import Competition, CrunchNotFoundException, MissingPhaseDataException, RoundIdentifierType
-from crunch.command import download, download_no_data_available
+from crunch.command.download import download, download_no_data_available
 from crunch.external.humanfriendly import format_size
 from crunch.runner.runner import Runner
 from crunch.runner.tracing import LocalTraceExporter, RunnerTracer, VoidTraceExporter, to_execute_span_attributes
