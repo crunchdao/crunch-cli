@@ -5,7 +5,7 @@ import sys
 from functools import cached_property
 from textwrap import dedent
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import click
 import psutil
@@ -17,7 +17,7 @@ from crunch.command.convert import convert
 from crunch.command.download import download, download_no_data_available
 from crunch.command.push import push
 from crunch.constants import DEFAULT_MAIN_FILE_PATH, DEFAULT_MODEL_DIRECTORY
-from crunch.notebook import IPyNbNotAvailableError, NotebookEnvironment
+from crunch.notebook import IPyNbNotAvailableError, NotebookEnvironment, NotebookSecretNotAccessibleError
 from crunch.repository import Repository
 from crunch.runner import is_inside
 from crunch.runner.tracing import LocalTraceExporter
@@ -47,15 +47,15 @@ class _Inline:
         self.logger = logger
         self.has_gpu = has_gpu
 
+        if is_inside:
+            raise RuntimeError("doing `crunch.load_notebook()` in the cloud environment is not supported, see: https://crnch.me/cloud-load-notebook")
+
         self._trace_exporter = LocalTraceExporter()
         self._notebook_environment = NotebookEnvironment.detect()
 
         print(f"loaded crunch tools for module: {user_module}")
 
-        from . import is_inside_runner
-        if is_inside_runner:
-            print(f"[warning] doing `crunch.load_notebook()` in the cloud environment is not supported, see: https://crnch.me/cloud-load-notebook", file=sys.stderr)
-        elif not is_running_inside_notebook():
+        if not is_running_inside_notebook():
             print(f"[warning] doing `crunch.load_notebook()` outside a notebook is not the intended usage, see: https://crnch.me/python-load-notebook", file=sys.stderr)
 
         print()
@@ -68,6 +68,16 @@ class _Inline:
 
         cpu_count = psutil.cpu_count()
         print(f"available cpu: {cpu_count} core")
+
+        try:
+            competition = self._competition
+            print(f"competition: {competition.name}")
+        except NotebookSecretNotAccessibleError as error:
+            print(f"[warning] could not authenticate with the notebook secret: {error}", file=sys.stderr)
+            raise click.Abort()
+        except Exception as error:
+            print(f"[warning] could not load the competition: {error}", file=sys.stderr)
+            raise click.Abort() from error
 
         print(f"----")
 
@@ -419,7 +429,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
 
     figure = go.Figure()
 
-    figure.add_trace(go.Scatter(
+    figure.add_trace(go.Scatter(  # pyright: ignore[reportUnknownMemberType]
         x=metrics["timestamp"],
         y=metrics["cpu"],
         name="CPU",
@@ -429,7 +439,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
         yaxis="y",
     ))
 
-    figure.add_trace(go.Scatter(
+    figure.add_trace(go.Scatter(  # pyright: ignore[reportUnknownMemberType]
         x=metrics["timestamp"],
         y=metrics["ram_gb"],
         name="RAM",
@@ -439,7 +449,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
         yaxis="y2",
     ))
 
-    figure.add_trace(go.Scatter(
+    figure.add_trace(go.Scatter(  # pyright: ignore[reportUnknownMemberType]
         x=metrics["timestamp"],
         y=metrics["disk_gb"],
         name="Disk",
@@ -450,7 +460,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
     ))
 
     if has_gpu:
-        figure.add_trace(go.Scatter(
+        figure.add_trace(go.Scatter(  # pyright: ignore[reportUnknownMemberType]
             x=metrics["timestamp"],
             y=metrics["gpu"],
             name="GPU",
@@ -460,7 +470,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
             yaxis="y",
         ))
 
-        figure.add_trace(go.Scatter(
+        figure.add_trace(go.Scatter(  # pyright: ignore[reportUnknownMemberType]
             x=metrics["timestamp"],
             y=metrics["vram_gb"],
             name="VRAM",
@@ -470,7 +480,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
             yaxis="y4",
         ))
 
-    def axis_color_style(title: str, color: str) -> dict:
+    def axis_color_style(title: str, color: str) -> dict:  # pyright: ignore[reportUnknownParameterType, reportMissingTypeArgument]
         return dict(
             linecolor=color,
             tickcolor=color,
@@ -478,7 +488,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
             title=dict(text=title, font=dict(color=color)),
         )
 
-    figure.update_layout(
+    figure.update_layout(  # pyright: ignore[reportUnknownMemberType]
         height=400,
         legend=dict(
             orientation="h",
@@ -502,7 +512,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
             range=[0, 100],
             ticksuffix="%",
             side="left",
-            **axis_color_style("Usage (%)", "#000"),
+            **axis_color_style("Usage (%)", "#000"),  # pyright: ignore[reportUnknownArgumentType]
         ),
 
         # RAM (GB)
@@ -510,7 +520,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
             ticksuffix=" GB",
             overlaying="y",
             side="right",
-            **axis_color_style("RAM (GB)", LINE_COLORS["ram"]),
+            **axis_color_style("RAM (GB)", LINE_COLORS["ram"]),  # pyright: ignore[reportUnknownArgumentType]
         ),
 
         # Disk (GB)
@@ -520,7 +530,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
             anchor="free",
             side="right",
             autoshift=True,
-            **axis_color_style("Disk (GB)", LINE_COLORS["disk"]),
+            **axis_color_style("Disk (GB)", LINE_COLORS["disk"]),  # pyright: ignore[reportUnknownArgumentType]
         ),
 
         # VRAM (GB)
@@ -531,7 +541,7 @@ def _create_usage_figure(metric_objects: List["RunnerRunMetric"]):
                 anchor="free",
                 side="right",
                 autoshift=True,
-                **axis_color_style("VRAM (GB)", LINE_COLORS["vram"]),
+                **axis_color_style("VRAM (GB)", LINE_COLORS["vram"]),  # pyright: ignore[reportUnknownArgumentType]
             )
             if has_gpu else {}
         ),
@@ -552,7 +562,7 @@ def _create_timeline_figure(span_objects: List["LocalSpan"]):
         RunnerRunSpanStatus.FAILED: "#ef4343",
     }
 
-    span_dicts = []
+    span_dicts: List[Dict[str, Any]] = []
     for span in span_objects:
         description = span.description
         attributes = span.attributes
@@ -568,7 +578,7 @@ def _create_timeline_figure(span_objects: List["LocalSpan"]):
             "parent_id": str(span.parent_id) if span.parent_id is not None else "",
             "description": description,
             "started_at": pandas.to_datetime(span.started_at),
-            "ended_at": pandas.to_datetime(span.ended_at),
+            "ended_at": pandas.to_datetime(span.ended_at) if span.ended_at is not None else None,
             "duration": -1,
             "offset": -1,
             "status": span.status,
@@ -599,7 +609,7 @@ def _create_timeline_figure(span_objects: List["LocalSpan"]):
         if error:
             hovertemplate += "Error: %{customdata[3]}<br>"
 
-        figure.add_trace(go.Bar(
+        figure.add_trace(go.Bar(  # pyright: ignore[reportUnknownMemberType]
             orientation="h",
             x=[row["duration"]],
             y=[row["description"]],
@@ -610,7 +620,7 @@ def _create_timeline_figure(span_objects: List["LocalSpan"]):
             showlegend=False,
         ))
 
-    figure.update_layout(
+    figure.update_layout(  # pyright: ignore[reportUnknownMemberType]
         height=max(300, len(spans) * 40),
         barmode="overlay",
         xaxis=dict(
