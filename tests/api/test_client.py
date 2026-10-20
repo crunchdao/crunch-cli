@@ -13,24 +13,28 @@ class ClientTest(unittest.TestCase):
         cls.client = api.Client.from_env()
 
     def test_competitions(self):
-        for competition in islice(self.client.competitions.list(), 2):
+        for competition in islice(self.client.competitions.iter(), 2):
             print(competition.reload())
 
     def test_libraries(self):
-        for library in islice(self.client.libraries.list(), 2):
+        for library in islice(self.client.libraries.iter(), 2):
             print(library)
 
     def test_quickstarters(self):
-        first_competition = next(islice(self.client.competitions.list(), 1))
+        first_competition = next(islice(self.client.competitions.iter(), 1))
         for quickstarter in islice(first_competition.quickstarters.list(), 2):
             print(quickstarter.reload())
             print(quickstarter.authors)
+
+            assert quickstarter.files is not None, "the detailed quickstarter has its files"
             print(quickstarter.files[0])
 
         adialab = self.client.competitions.get("adialab")
         for quickstarter in islice(adialab.quickstarters.list(), 2):
             print(quickstarter.reload())
             print(quickstarter.authors)
+
+            assert quickstarter.files is not None, "the detailed quickstarter has its files"
             print(quickstarter.files[0])
 
     def test_users(self):
@@ -43,28 +47,28 @@ class ClientTest(unittest.TestCase):
             print(project)
 
     def test_submissions(self):
-        adialab = self.client.competitions.get_reference("adialab")
+        adialab = self.client.competitions.get("adialab")
         project = adialab.projects.get("@me", "@first")
 
         for submission in islice(project.submissions.list(), 2):
             print(submission)
 
     def test_runs(self):
-        adialab = self.client.competitions.get_reference("adialab")
+        adialab = self.client.competitions.get("adialab")
         project = adialab.projects.get("@me", "@first")
 
         for run in islice(project.submissions.list(), 2):
             print(run)
 
     def test_predictions(self):
-        adialab = self.client.competitions.get_reference("adialab")
+        adialab = self.client.competitions.get("adialab")
         project = adialab.projects.get("@me", "@first")
 
         for prediction in islice(project.predictions.list(), 2):
             print(prediction)
 
     def test_scores(self):
-        adialab = self.client.competitions.get_reference("adialab")
+        adialab = self.client.competitions.get("adialab")
         project = adialab.projects.get("@me", "@first")
         prediction = next(islice(project.predictions.list(), 1))
 

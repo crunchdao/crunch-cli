@@ -1,15 +1,12 @@
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
-from crunch.api._identifiers import ProjectIdentifierType, UserIdentifierType
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiModel, Parent
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
     from crunch.api._domain.crunch import Crunch
-    from crunch.api._identifiers import CompetitionIdentifierType, LeaderboardIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
+    from crunch.api._identifiers import LeaderboardIdentifierType, ProjectIdentifierType, UserIdentifierType
 
 
 class LeaderboardChangeValue(TypedDict):
@@ -35,86 +32,96 @@ class LeaderboardChange(TypedDict):
     targets: list[LeaderboardChangeTarget]
 
 
-class Leaderboard(Model[int]):
+@dataclass
+class Leaderboard(ApiModel):
+    id: int
+    name: str
+    display_name: str
+    default: bool
 
-    def __init__(
-        self,
-        competition: "Competition",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "LeaderboardCollection | None" = None
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
+    # only in the detailed response, raw: used to build the dataframe
+    targets: list[dict[str, Any]] | None = None
 
-        self._competition = competition
+    # only in the detailed response, extracted from the `crunch` object
+    crunch_id: int | None = None
 
-    @property
-    def resource_identifier(self) -> str:
-        return self.name
+    competition = Parent["Competition"]()
 
-    @property
-    def name(self):
-        return self._attrs["name"]
+    @classmethod
+    def __pre_deserialize__(cls, d: dict[Any, Any]) -> dict[Any, Any]:
+        crunch = d.get("crunch")
+        if crunch is not None:
+            d = {**d, "crunchId": crunch["id"]}
+
+        return super().__pre_deserialize__(d)
+
+    def reload(self) -> "Leaderboard":
+        return self._update_from(self.competition.leaderboards.get(
+            self.name,
+            crunch=self.crunch_id
+        ))
 
     def as_dataframe(self):
-        if "targets" not in self._attrs:
+        if self.targets is None:
             self.reload()
 
         rows: list[dict[str, Any]] = []
 
-        for target in self._attrs.get("targets") or []:  # pyright: ignore[reportUnknownVariableType]
-            crunch = target.get("crunch")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        for target in self.targets or []:
+            crunch: dict[str, Any] = target["crunch"]
 
             target_row: dict[str, Any] = {
-                "target.id": target.get("id"),  # pyright: ignore[reportUnknownMemberType]
-                "target.name": target.get("name"),  # pyright: ignore[reportUnknownMemberType]
-                "crunch.id": crunch.get("id"),  # pyright: ignore[reportUnknownMemberType]
-                "crunch.number": crunch.get("number"),  # pyright: ignore[reportUnknownMemberType]
+                "target.id": target.get("id"),
+                "target.name": target.get("name"),
+                "crunch.id": crunch.get("id"),
+                "crunch.number": crunch.get("number"),
             }
 
-            metrics_by_id = {  # pyright: ignore[reportUnknownVariableType]
-                metric.get("id"): metric  # pyright: ignore[reportUnknownMemberType]
-                for metric in target.get("metrics") or []  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            metrics: list[dict[str, Any]] = target.get("metrics") or []
+            metrics_by_id = {
+                metric["id"]: metric
+                for metric in metrics
             }
 
-            for position in target.get("positions") or []:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                user = position.get("user")  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-                project = position.get("project")  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-                team = position.get("team") or {}  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+            positions: list[dict[str, Any]] = target.get("positions") or []
+            for position in positions:
+                user: dict[str, Any] = position["user"]
+                project: dict[str, Any] = position["project"]
+                team: dict[str, Any] = position.get("team") or {}
 
                 row: dict[str, Any] = {
                     **target_row,
-                    "user.id": user.get("id"),  # pyright: ignore[reportUnknownMemberType]
-                    "user.login": user.get("login"),  # pyright: ignore[reportUnknownMemberType]
-                    "project.id": project.get("id"),  # pyright: ignore[reportUnknownMemberType]
-                    "project.name": project.get("name"),  # pyright: ignore[reportUnknownMemberType]
-                    "team.id": team.get("id"),  # pyright: ignore[reportUnknownMemberType]
-                    "team.name": team.get("name"),  # pyright: ignore[reportUnknownMemberType]
-                    "mean": position.get("mean"),  # pyright: ignore[reportUnknownMemberType]
-                    "best": position.get("best"),  # pyright: ignore[reportUnknownMemberType]
-                    "rank": position.get("rank"),  # pyright: ignore[reportUnknownMemberType]
-                    "reward_rank": position.get("rewardRank"),  # pyright: ignore[reportUnknownMemberType]
-                    "successful_run_count": position.get("successfulRunCount"),  # pyright: ignore[reportUnknownMemberType]
-                    "unsuccessful_run_count": position.get("unsuccessfulRunCount"),  # pyright: ignore[reportUnknownMemberType]
-                    "duplicate": position.get("duplicate"),  # pyright: ignore[reportUnknownMemberType]
-                    "deterministic": position.get("deterministic"),  # pyright: ignore[reportUnknownMemberType]
-                    "out_of_range": position.get("outOfRange"),  # pyright: ignore[reportUnknownMemberType]
-                    "team_leader": position.get("teamLeader"),  # pyright: ignore[reportUnknownMemberType]
-                    "round_change": position.get("roundChange"),  # pyright: ignore[reportUnknownMemberType]
-                    "phase_change": position.get("phaseChange"),  # pyright: ignore[reportUnknownMemberType]
-                    "crunch_change": position.get("crunchChange"),  # pyright: ignore[reportUnknownMemberType]
-                    "committed_rewards": position.get("committedRewards"),  # pyright: ignore[reportUnknownMemberType]
-                    "projected_rewards": position.get("projectedRewards"),  # pyright: ignore[reportUnknownMemberType]
-                    "bounty_rewards": position.get("bountyRewards"),  # pyright: ignore[reportUnknownMemberType]
+                    "user.id": user.get("id"),
+                    "user.login": user.get("login"),
+                    "project.id": project.get("id"),
+                    "project.name": project.get("name"),
+                    "team.id": team.get("id"),
+                    "team.name": team.get("name"),
+                    "mean": position.get("mean"),
+                    "best": position.get("best"),
+                    "rank": position.get("rank"),
+                    "reward_rank": position.get("rewardRank"),
+                    "successful_run_count": position.get("successfulRunCount"),
+                    "unsuccessful_run_count": position.get("unsuccessfulRunCount"),
+                    "duplicate": position.get("duplicate"),
+                    "deterministic": position.get("deterministic"),
+                    "out_of_range": position.get("outOfRange"),
+                    "team_leader": position.get("teamLeader"),
+                    "round_change": position.get("roundChange"),
+                    "phase_change": position.get("phaseChange"),
+                    "crunch_change": position.get("crunchChange"),
+                    "committed_rewards": position.get("committedRewards"),
+                    "projected_rewards": position.get("projectedRewards"),
+                    "bounty_rewards": position.get("bountyRewards"),
                 }
 
-                for position_metric in position.get("metrics"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-                    metric_id = position_metric.get("metricId")  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-                    metric = metrics_by_id[metric_id]  # pyright: ignore[reportUnknownVariableType]
-                    key = f"metric.{metric['name']}"  # pyright: ignore[reportUnknownMemberType]
+                position_metrics: list[dict[str, Any]] = position.get("metrics") or []
+                for position_metric in position_metrics:
+                    metric = metrics_by_id[position_metric["metricId"]]
+                    key = f"metric.{metric['name']}"
 
-                    row[f"{key}.score"] = position_metric.get("score")  # pyright: ignore[reportUnknownMemberType]
-                    row[f"{key}.best"] = position_metric.get("best")  # pyright: ignore[reportUnknownMemberType]
+                    row[f"{key}.score"] = position_metric.get("score")
+                    row[f"{key}.best"] = position_metric.get("best")
 
                 rows.append(row)
 
@@ -127,117 +134,55 @@ class Leaderboard(Model[int]):
         project_identifier: "ProjectIdentifierType | None" = None,
         crunch: "Crunch | None" = None,
     ) -> LeaderboardChange:
-        return cast(LeaderboardChange, self._checked_client.api.get_leaderboard_changes(
-            self._competition.resource_identifier,
-            self.resource_identifier,
-            user_identifier,
-            project_identifier=project_identifier,
-            crunch_id=crunch.id if crunch else None
-        ))
+        return self.competition.client.api.get_json(
+            ["v3", "competitions", self.competition.name, "leaderboards", self.name, "changes", "users", user_identifier],
+            params={
+                "projectIdentifier": project_identifier,
+                "crunchId": crunch.id if crunch is not None else None,
+            },
+        )
 
 
-class LeaderboardCollection(Collection[Leaderboard]):
+class LeaderboardCollection(ApiCollection[Leaderboard]):
 
     model = Leaderboard
 
-    def __init__(
-        self,
-        competition: "Competition",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, competition: "Competition"):
+        super().__init__(competition.client)
 
-        self._competition = competition
+        self.competition = competition
+
+    def _attach(self, leaderboard: Leaderboard) -> Leaderboard:
+        leaderboard.competition = self.competition
+        return leaderboard
 
     def get(
         self,
         identifier: "LeaderboardIdentifierType",
         *,
-        crunch: "Crunch | None" = None
+        crunch: "Crunch | int | None" = None,
     ) -> Leaderboard:
-        return self.prepare_model(
-            self._checked_client.api.get_leaderboard(
-                self._competition.resource_identifier,
-                identifier,
-                crunch_id=crunch.id if crunch else None
-            )
-        )
+        crunch_id = crunch if isinstance(crunch, int) or crunch is None else crunch.id
+
+        return self.from_dict(self.client.api.get_json(
+            ["v2", "competitions", self.competition.name, "leaderboards", identifier],
+            params={
+                "crunchId": crunch_id,
+            },
+        ))
 
     def get_default(
         self,
         *,
-        crunch: "Crunch | None" = None,
-    ):
-        return self.get(
-            "@default",
-            crunch=crunch
-        )
+        crunch: "Crunch | int | None" = None,
+    ) -> Leaderboard:
+        return self.get("@default", crunch=crunch)
 
     @property
-    def default(self):
+    def default(self) -> Leaderboard:
         return self.get_default()
 
-    def list(
-        self
-    ) -> list[Leaderboard]:
-        return self.prepare_models(
-            self._checked_client.api.list_leaderboards(
-                self._competition.resource_identifier,
-            )
-        )
-
-    def prepare_model(self, attrs: "JsonValue | Leaderboard", *args: Any) -> Leaderboard:
-        return super().prepare_model(
-            attrs,
-            self._competition,
-            *args
-        )
-
-
-class LeaderboardEndpointMixin(EndpointMixin):
-
-    def list_leaderboards(
-        self,
-        competition_identifier: "CompetitionIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/leaderboards"
-            ),
-            json=True
-        )
-
-    def get_leaderboard(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        leaderboard_identifier: "LeaderboardIdentifierType",
-        crunch_id: int | None = None,
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/leaderboards/{leaderboard_identifier}",
-                params={
-                    "crunchId": crunch_id
-                }
-            ),
-            json=True
-        )
-
-    def get_leaderboard_changes(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        leaderboard_identifier: "LeaderboardIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType | None" = None,
-        crunch_id: int | None = None,
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/leaderboards/{leaderboard_identifier}/changes/users/{user_identifier}",
-                params={
-                    "projectIdentifier": project_identifier,
-                    "crunchId": crunch_id
-                }
-            ),
-            json=True
-        )
+    def list(self) -> list[Leaderboard]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v2", "competitions", self.competition.name, "leaderboards"
+        ]))

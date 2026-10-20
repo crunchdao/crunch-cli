@@ -1,103 +1,59 @@
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiModel, Parent
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
-    from crunch.api._identifiers import CompetitionIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
 
 
-class Target(Model[int]):
+@dataclass
+class Target(ApiModel):
+    id: int
+    name: str
+    display_name: str
+    virtual: bool
+    primary: bool
 
-    def __init__(
-        self,
-        competition: "Competition",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "TargetCollection | None" = None,
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._competition = competition
-
-    @property
-    def id(self) -> int:
-        return self._attrs["id"]
-
-    @property
-    def resource_identifier(self) -> str:
-        return self.name
-
-    @property
-    def competition(self):
-        return self._competition
+    competition = Parent["Competition"]()
 
     @property
     def metrics(self):
         from crunch.api._domain.metric import MetricCollection
-
-        return MetricCollection(
-            competition=self._competition,
-            target=self,
-            client=self._client
-        )
-
-    @property
-    def name(self) -> str:
-        return self._attrs["name"]
-
-    @property
-    def display_name(self) -> str:
-        return self._attrs["displayName"]
-
-    @property
-    def virtual(self) -> bool:
-        return self._attrs["virtual"]
-
-    @property
-    def primary(self) -> bool:
-        return self._attrs["primary"]
+        return MetricCollection(self)
 
 
-class TargetCollection(Collection[Target]):
+class TargetCollection(ApiCollection[Target]):
 
     model = Target
 
-    def __init__(
-        self,
-        competition: "Competition",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, competition: "Competition"):
+        super().__init__(competition.client)
 
         self.competition = competition
 
-    def get(
-        self,
-        name: str,
-    ) -> Target:
-        return self.prepare_model(
-            self._checked_client.api.get_target(
-                self.competition.id,
-                name
-            )
-        )
+    def _attach(self, target: Target) -> Target:
+        target.competition = self.competition
+        return target
+
+    def get(self, /, name: str) -> Target:
+        return self.from_dict(self.client.api.get_json([
+            "v1", "competitions", self.competition.id, "targets", name
+        ]))
 
     def list(
         self,
+        *,
         name: str | None = None,
         virtual: bool | None = None,
     ) -> list[Target]:
-        return self.prepare_models(
-            self._checked_client.api.list_targets(
-                self.competition.id,
-                name,
-                virtual,
-            )
-        )
+        return self.from_dict_array(self.client.api.get_json(
+            ["v1", "competitions", self.competition.id, "targets"],
+            params={
+                "name": name,
+                "virtual": virtual,
+            },
+        ))
 
     @property
     def primary(self) -> Target | None:
@@ -108,43 +64,4 @@ class TargetCollection(Collection[Target]):
                 if target.primary
             ),
             None
-        )
-
-    def prepare_model(self, attrs: "JsonValue | Target", *args: Any) -> Target:
-        return super().prepare_model(
-            attrs,
-            self.competition,
-            *args
-        )
-
-
-class TargetEndpointMixin(EndpointMixin):
-
-    def get_target(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        name: str
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/targets/{name}"
-            ),
-            json=True
-        )
-
-    def list_targets(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        name: str | None,
-        virtual: bool | None,
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/targets",
-                params={
-                    "name": name,
-                    "virtual": virtual,
-                }
-            ),
-            json=True
         )

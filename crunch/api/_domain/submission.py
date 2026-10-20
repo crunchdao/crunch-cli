@@ -1,143 +1,85 @@
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin
-from crunch.api._resource import Model as BaseModel
+from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
+from crunch.api._domain.model import Model
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
-    from crunch.api._domain.model import Model
-    from crunch.api._domain.project import Project
-    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, SubmissionIdentifierType, UserIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
+    from crunch.api._domain.project import ProjectReference
+    from crunch.api._identifiers import SubmissionIdentifierType
 
 
-class SubmissionType(Enum):
-
+class SubmissionType(ApiEnum):
     CODE = "CODE"
     NOTEBOOK = "NOTEBOOK"
     PREDICTION = "PREDICTION"
 
-    def __repr__(self):
-        return self.name
 
+@dataclass
+class Submission(ApiModel):
+    id: int
+    number: int
+    type: SubmissionType
+    message: str
+    main_file_path: str
+    model_directory_path: str
+    total_size: int
+    created_at: datetime
+    model: Model | None = None
 
-class Submission(BaseModel[int]):
-
-    def __init__(
-        self,
-        project: "Project",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "SubmissionCollection | None" = None,
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._project = project
+    project = Parent["ProjectReference"]()
 
     @property
-    def resource_identifier(self) -> int:
-        return self.number
+    def files(self) -> list["SubmissionFile"]:
+        project = self.project
 
-    @property
-    def project(self):
-        return self._project
+        files = SubmissionFile.from_dict_array(self.project.client.api.get_json([
+            "v3", "competitions", project.competition.id, "projects", project.user_id, project.name, "submissions", self.number, "files"
+        ]))
 
-    @property
-    def name(self) -> str:
-        return self._attrs["name"]
+        for file in files:
+            file.submission = self
 
-    @property
-    def number(self) -> int:
-        return self._attrs["number"]
-
-    @property
-    def message(self) -> str:
-        return self._attrs["message"]
-
-    @property
-    def main_file_path(self) -> str:
-        return self._attrs["mainFilePath"]
-
-    @property
-    def model_directory_path(self) -> str:
-        return self._attrs["modelDirectoryPath"]
-
-    @property
-    def total_size(self) -> int:
-        return self._attrs["totalSize"]
-
-    @property
-    def model(self) -> "Model | None":
-        from crunch.api._domain.model import Model
-
-        model_attrs = self._attrs.get("model")
-        if model_attrs is None:
-            return None
-
-        return Model(self.project, model_attrs, self._client)
-
-    @property
-    def created_at(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["createdAt"])
-
-    @property
-    def files(self):
-        from crunch.api._domain.submission_file import SubmissionFileCollection
-
-        return SubmissionFileCollection(self, self._client)
+        return files
 
     @property
     def runtime_options(self):
         from crunch.api._domain.runtime import RuntimeOptionCollection
-
-        return RuntimeOptionCollection(self, self._client)
+        return RuntimeOptionCollection(self)
 
     @property
     def runtime_access_requests(self):
         from crunch.api._domain.runtime import RuntimeAccessRequestCollection
+        return RuntimeAccessRequestCollection(self)
 
-        return RuntimeAccessRequestCollection(self, self._client)
 
-
-class SubmissionCollection(Collection[Submission]):
+class SubmissionCollection(ApiCollection[Submission]):
 
     model = Submission
 
-    def __init__(
-        self,
-        project: "Project",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, project: "ProjectReference"):
+        super().__init__(project.client)
 
         self.project = project
 
-    def get(
-        self,
-        number: "SubmissionIdentifierType",
-    ) -> Submission:
-        return self.prepare_model(
-            self._checked_client.api.get_submission(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-                number
-            )
-        )
+    def _attach(self, submission: Submission) -> Submission:
+        submission.project = self.project
 
-    def list(
-        self
-    ) -> list[Submission]:
-        return self.prepare_models(
-            self._checked_client.api.list_submissions(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-            )
-        )
+        if submission.model is not None:
+            submission.model.project = self.project
+
+        return submission
+
+    def get(self, /, identifier: "SubmissionIdentifierType") -> Submission:
+        return self.from_dict(self.client.api.get_json([
+            "v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "submissions", identifier
+        ]))
+
+    def list(self) -> list[Submission]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "submissions"
+        ]))
 
     def create(
         self,
@@ -150,83 +92,24 @@ class SubmissionCollection(Collection[Submission]):
         model_files: dict[str, str],
         submitter_imprint: str,
     ) -> Submission:
-        return self.prepare_model(
-            self._checked_client.api.create_submission(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-                message,
-                main_file_path,
-                model_directory_path,
-                type.name,
-                code_files,
-                model_files,
-                submitter_imprint,
-            )
-        )
-
-    def prepare_model(self, attrs: "JsonValue | Submission", *args: Any) -> Submission:
-        return super().prepare_model(
-            attrs,
-            self.project,
-            *args
-        )
+        return self.from_dict(self.client.api.post_json(
+            ["v4", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "submissions"],
+            json={
+                "message": message,
+                "mainFilePath": main_file_path,
+                "modelDirectoryPath": model_directory_path,
+                "type": type.name,
+                "codeFiles": code_files,
+                "modelFiles": model_files,
+                "submitterImprint": submitter_imprint,
+            },
+        ))
 
 
-class SubmissionEndpointMixin(EndpointMixin):
+@dataclass
+class SubmissionFile(ApiModel):
+    name: str
+    size: int
+    mime_type: str
 
-    def list_submissions(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions"
-            ),
-            json=True
-        )
-
-    def get_submission(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        submission_number: "SubmissionIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions/{submission_number}"
-            ),
-            json=True
-        )
-
-    def create_submission(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        message: str,
-        main_file_path: str,
-        model_directory_path: str,
-        type: str,
-        code_files: dict[str, str],
-        model_files: dict[str, str],
-        submitter_imprint: str,
-    ):
-        return self._result(
-            self.post(
-                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/submissions",
-                json={
-                    "message": message,
-                    "mainFilePath": main_file_path,
-                    "modelDirectoryPath": model_directory_path,
-                    "type": type,
-                    "codeFiles": code_files,
-                    "modelFiles": model_files,
-                    "submitterImprint": submitter_imprint,
-                },
-            ),
-            json=True,
-        )
+    submission = Parent[Submission]()

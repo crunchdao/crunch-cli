@@ -10,12 +10,7 @@ from crunch.api._domain.crunch import Crunch as Crunch
 from crunch.api._domain.data_release import DataFile as DataFile
 from crunch.api._domain.data_release import DataFiles as DataFiles
 from crunch.api._domain.data_release import DataRelease as DataRelease
-from crunch.api._domain.data_release import DataReleaseSplit as DataReleaseSplit
-from crunch.api._domain.data_release import DataReleaseSplitGroup as DataReleaseSplitGroup
-from crunch.api._domain.data_release import DataReleaseSplitReduced as DataReleaseSplitReduced
-from crunch.api._domain.data_release import DataReleaseTargetResolution as DataReleaseTargetResolution
 from crunch.api._domain.data_release import SizeVariant as SizeVariant
-from crunch.api._domain.data_release import SplitKeyPythonType as SplitKeyPythonType
 from crunch.api._domain.enum_ import Language as Language
 from crunch.api._domain.enum_ import SplitKeyType as SplitKeyType
 from crunch.api._domain.leaderboard import Leaderboard as Leaderboard
@@ -26,8 +21,6 @@ from crunch.api._domain.library import Library as Library
 from crunch.api._domain.library import LibraryRequest as LibraryRequest
 from crunch.api._domain.library import LibraryRequestVerdict as LibraryRequestVerdict
 from crunch.api._domain.metric import Metric as Metric
-from crunch.api._domain.metric import ReducerFunction as ReducerFunction
-from crunch.api._domain.metric import ScorerFunction as ScorerFunction
 from crunch.api._domain.metric import Unit as Unit
 from crunch.api._domain.phase import Phase as Phase
 from crunch.api._domain.phase import PhaseType as PhaseType
@@ -35,6 +28,7 @@ from crunch.api._domain.prediction import Prediction as Prediction
 from crunch.api._domain.project import Project as Project
 from crunch.api._domain.project import ProjectSelection as ProjectSelection
 from crunch.api._domain.project import ProjectSelectionOrigin as ProjectSelectionOrigin
+from crunch.api._domain.project import ProjectReference as ProjectReference
 from crunch.api._domain.project import ProjectToken as ProjectToken
 from crunch.api._domain.project import ProjectTokenType as ProjectTokenType
 from crunch.api._domain.quickstarter import Quickstarter as Quickstarter
@@ -51,7 +45,7 @@ from crunch.api._domain.runtime import RuntimeOptionStatus as RuntimeOptionStatu
 from crunch.api._domain.score import Score as Score
 from crunch.api._domain.submission import Submission as Submission
 from crunch.api._domain.submission import SubmissionType as SubmissionType
-from crunch.api._domain.submission_file import SubmissionFile as SubmissionFile
+from crunch.api._domain.submission import SubmissionFile as SubmissionFile
 from crunch.api._domain.target import Target as Target
 from crunch.api._domain.upload import DeleteUploadResult as DeleteUploadResult
 from crunch.api._domain.upload import Upload as Upload

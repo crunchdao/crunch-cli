@@ -1,32 +1,17 @@
-from dataclasses import dataclass
-from enum import Enum
-from typing import TYPE_CHECKING, Any, TypeAlias
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, TypeAlias
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
 from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
-    from crunch.api._identifiers import CompetitionIdentifierType
-    from crunch.api._resource import JsonValue
-
-
-class DataReleaseTargetResolution(Enum):
-
-    ALREADY = "ALREADY"
-    PENDING = "PENDING"
-    RESOLVED = "RESOLVED"
-
-    def __repr__(self):
-        return self.name
 
 
 @dataclass(frozen=True)
 class DataFile(JsonDataClassMixin):
-
     name: str
-    url: str
+    url: str = field(repr=False)
     size: int
     signed: bool
     compressed: bool
@@ -35,195 +20,49 @@ class DataFile(JsonDataClassMixin):
 DataFiles: TypeAlias = dict[str, DataFile]
 
 
-class DataReleaseSplitGroup(Enum):
-
-    TRAIN = "TRAIN"
-    TEST = "TEST"
-
-    def __repr__(self):
-        return self.name
-
-
-class DataReleaseSplitReduced(Enum):
-
-    X = "X"
-    XY = "XY"
-
-    def __repr__(self):
-        return self.name
-
-
-SplitKeyPythonType: TypeAlias = str | int
-
-
-@dataclass(frozen=True)
-class DataReleaseSplit(JsonDataClassMixin):
-
-    key: SplitKeyPythonType
-    group: DataReleaseSplitGroup
-    reduced: DataReleaseSplitReduced | None = None
-
-
-class SizeVariant(Enum):
-
+class SizeVariant(ApiEnum):
     DEFAULT = "DEFAULT"
     SMALL = "SMALL"
     LARGE = "LARGE"
 
-    def __repr__(self):
-        return self.name
+
+@dataclass
+class DataRelease(ApiModel):
+    id: int
+    number: int
+    name: str
+    embargo: int
+    number_of_features: int
+    hash: str | None
+
+    # only in the detailed response
+    data_files: DataFiles | None = None
+
+    competition = Parent["Competition"]()
+
+    def reload(self) -> "DataRelease":
+        return self._update_from(self.competition.data_releases.get(self.number))
 
 
-class DataRelease(Model[int]):
-
-    def __init__(
-        self,
-        competition: "Competition",
-        attrs: dict[str, Any] | None = None,
-        client: "Client | None" = None,
-        collection: "DataReleaseCollection | None" = None
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._competition = competition
-
-    @property
-    def resource_identifier(self) -> int:
-        return self.number
-
-    @property
-    def competition(self):
-        return self._competition
-
-    @property
-    def name(self) -> str | None:
-        return self._attrs["name"]
-
-    @property
-    def number(self) -> int:
-        return self._attrs["number"]
-
-    @property
-    def embargo(self) -> int:
-        return self._attrs["embargo"]
-
-    @property
-    def number_of_features(self) -> int:
-        return self._attrs["numberOfFeatures"]
-
-    @property
-    def hash(self) -> str | None:
-        return self._attrs["hash"]
-
-    @property
-    def target_resolution(self):
-        return DataReleaseTargetResolution[self._attrs["target_resolution"]]
-
-    @property
-    def data_files(self) -> DataFiles:
-        files = self._attrs.get("dataFiles")
-        if not files:
-            self.reload()
-            files = self._attrs["dataFiles"]
-
-        return {
-            key: DataFile.from_dict(value)
-            for key, value in files.items()
-        }
-
-    @property
-    def splits(self) -> list[DataReleaseSplit]:
-        splits = self._attrs.get("splits")
-        if splits is None:
-            self.reload(include_splits=True)
-            splits = self._attrs["splits"]
-
-        return DataReleaseSplit.from_dict_array(splits)
-
-    def reload(
-        self,
-        include_splits: bool = True,
-    ):
-        return super().reload(
-            include_splits=include_splits,
-        )
-
-
-class DataReleaseCollection(Collection[DataRelease]):
+class DataReleaseCollection(ApiCollection[DataRelease]):
 
     model = DataRelease
 
-    def __init__(
-        self,
-        competition: "Competition | None",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, competition: "Competition"):
+        super().__init__(competition.client)
 
         self.competition = competition
 
-    @property
-    def _checked_competition(self) -> "Competition":
-        if self.competition is None:
-            raise Exception("competition unavailable")
+    def _attach(self, data_release: DataRelease) -> DataRelease:
+        data_release.competition = self.competition
+        return data_release
 
-        return self.competition
+    def get(self, /, number: int) -> DataRelease:
+        return self.from_dict(self.client.api.get_json(
+            ["v1", "competitions", self.competition.id, "data-releases", number],
+        ))
 
-    def get(
-        self,
-        number: int | str,
-        include_splits: bool = True,
-    ) -> DataRelease:
-        return self.prepare_model(
-            self._checked_client.api.get_data_release(
-                self._checked_competition.id,
-                number,
-                include_splits=include_splits,
-            )
-        )
-
-    def list(
-        self
-    ) -> list[DataRelease]:
-        return self.prepare_models(
-            self._checked_client.api.list_data_releases(
-                self._checked_competition.id
-            )
-        )
-
-    def prepare_model(self, attrs: "JsonValue | DataRelease", *args: Any):
-        return super().prepare_model(
-            attrs,
-            self.competition,
-            *args,
-        )
-
-
-class DataReleaseEndpointMixin(EndpointMixin):
-
-    def list_data_releases(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/data-releases"
-            ),
-            json=True
-        )
-
-    def get_data_release(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        number: int | str,
-        include_splits: bool = False,
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/data-releases/{number}",
-                params={
-                    "includeSplits": include_splits,
-                }
-            ),
-            json=True
-        )
+    def list(self) -> list[DataRelease]:
+        return self.from_dict_array(self.client.api.get_json(
+            ["v1", "competitions", self.competition.id, "data-releases"]
+        ))

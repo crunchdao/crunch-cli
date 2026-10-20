@@ -1,119 +1,64 @@
+from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin
-from crunch.api._resource import Model as BaseModel
+from crunch.api._base import ApiCollection, ApiModel, Parent
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
-    from crunch.api._domain.project import Project
-    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
+    from crunch.api._domain.project import ProjectReference
 
 
-class Model(BaseModel[int]):
+@dataclass
+class Model(ApiModel):
+    id: int
+    name: str
+    total_size: int
+    created_at: datetime
 
-    def __init__(
-        self,
-        project: "Project",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "ModelCollection | None" = None,
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._project = project
+    project = Parent["ProjectReference"]()
 
     @property
-    def project(self):
-        return self._project
+    def files(self) -> list["ModelFile"]:
+        project = self.project
 
-    @property
-    def total_size(self) -> int:
-        return self._attrs["totalSize"]
+        files = ModelFile.from_dict_array(self.project.client.api.get_json([
+            "v3", "competitions", project.competition.id, "projects", project.user_id, project.name, "models", self.id, "files"
+        ]))
 
-    @property
-    def created_at(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["createdAt"])
+        for file in files:
+            file.model = self
 
-    @property
-    def files(self):
-        from crunch.api._domain.model_file import ModelFileCollection
-
-        return ModelFileCollection(self, self._client)
+        return files
 
 
-class ModelCollection(Collection[Model]):
+class ModelCollection(ApiCollection[Model]):
 
     model = Model
 
-    def __init__(
-        self,
-        project: "Project",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, project: "ProjectReference"):
+        super().__init__(project.client)
 
         self.project = project
 
-    def get(
-        self,
-        id: int,
-    ) -> Model:
-        return self.prepare_model(
-            self._checked_client.api.get_model(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-                id
-            )
-        )
+    def _attach(self, model: Model) -> Model:
+        model.project = self.project
+        return model
 
-    def list(
-        self
-    ) -> list[Model]:
-        return self.prepare_models(
-            self._checked_client.api.list_models(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-            )
-        )
+    def get(self, /, id: int) -> Model:
+        return self.from_dict(self.client.api.get_json([
+            "v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "models", id
+        ]))
 
-    def prepare_model(self, attrs: "JsonValue | Model", *args: Any) -> Model:
-        return super().prepare_model(
-            attrs,
-            self.project,
-            *args
-        )
+    def list(self) -> list[Model]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "models"
+        ]))
 
 
-class ModelEndpointMixin(EndpointMixin):
+@dataclass
+class ModelFile(ApiModel):
+    name: str
+    size: int
+    mime_type: str
 
-    def list_models(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/models"
-            ),
-            json=True
-        )
-
-    def get_model(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        model_id: int
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/models/{model_id}"
-            ),
-            json=True
-        )
+    model = Parent[Model]()

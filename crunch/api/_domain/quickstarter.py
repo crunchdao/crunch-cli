@@ -1,16 +1,12 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
+from crunch.api._base import ApiCollection, ApiModel, Parent
 from crunch.api._domain.enum_ import Language
-from crunch.api._resource import Collection, EndpointMixin, Model
 from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
-    from crunch.api._identifiers import CompetitionIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
 
 
 @dataclass(frozen=True)
@@ -24,122 +20,45 @@ class QuickstarterFile(JsonDataClassMixin):
     name: str
     url: str
     github_url: str
-    colab_url: str | None = None
 
 
-class Quickstarter(Model[int]):
+@dataclass
+class Quickstarter(ApiModel):
+    id: int
+    name: str
+    title: str
+    authors: list[QuickstarterAuthor]
+    language: Language
+    notebook: bool
 
-    def __init__(
-        self,
-        competition: "Competition",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "QuickstarterCollection | None" = None,
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
+    # only in the response of `get`, not of `list`
+    files: list[QuickstarterFile] | None = None
 
-        self._competition = competition
+    competition = Parent["Competition"]()
 
-    @property
-    def resource_identifier(self) -> str:
-        return self.name
-
-    @property
-    def competition(self):
-        return self._competition
-
-    @property
-    def name(self) -> str:
-        return self._attrs["name"]
-
-    @property
-    def title(self) -> str:
-        return self._attrs["title"]
-
-    @property
-    def authors(self) -> list[QuickstarterAuthor]:
-        return QuickstarterAuthor.from_dict_array(self._attrs["authors"])
-
-    @property
-    def language(self) -> Language:
-        return Language[self._attrs["language"]]
-
-    @property
-    def notebook(self) -> bool:
-        return self._attrs["notebook"]
-
-    @property
-    def files(self) -> list[QuickstarterFile]:
-        files = self._attrs.get("files")
-        if not files:
-            self.reload()
-            files = self._attrs["files"]
-
-        return QuickstarterFile.from_dict_array(files)
+    def reload(self) -> "Quickstarter":
+        return self._update_from(self.competition.quickstarters.get(self.name))
 
 
-class QuickstarterCollection(Collection[Quickstarter]):
+class QuickstarterCollection(ApiCollection[Quickstarter]):
 
     model = Quickstarter
 
-    def __init__(
-        self,
-        competition: "Competition",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, competition: "Competition"):
+        super().__init__(competition.client)
 
         self.competition = competition
 
-    def get(
-        self,
-        quickstarter_name: str
-    ) -> Quickstarter:
-        return self.prepare_model(
-            self._checked_client.api.get_quickstarter(
-                self.competition.resource_identifier,
-                quickstarter_name
-            )
-        )
+    def _attach(self, quickstarter: Quickstarter) -> Quickstarter:
+        quickstarter.competition = self.competition
+        return quickstarter
 
-    def list(
-        self
-    ) -> list[Quickstarter]:
-        return self.prepare_models(
-            self._checked_client.api.list_quickstarters(
-                self.competition.resource_identifier
-            )
-        )
+    def get(self, /, name: str) -> Quickstarter:
+        return self.from_dict(self.client.api.get_json([
+            "v2", "competitions", self.competition.name, "quickstarters", name
+        ]))
 
-    def prepare_model(self, attrs: "JsonValue | Quickstarter", *args: Any) -> Quickstarter:
-        return super().prepare_model(
-            attrs,
-            self.competition,
-            *args
-        )
-
-
-class QuickstarterEndpointMixin(EndpointMixin):
-
-    def list_quickstarters(
-        self,
-        competition_identifier: "CompetitionIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/quickstarters"
-            ),
-            json=True
-        )
-
-    def get_quickstarter(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        quickstarter_name: str
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/quickstarters/{quickstarter_name}"
-            ),
-            json=True
-        )
+    def list(self) -> list[Quickstarter]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v2", "competitions", self.competition.name, "quickstarters"
+        ]))

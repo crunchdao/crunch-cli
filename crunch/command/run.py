@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import IntEnum
 from time import sleep
 from time import time as current_time
@@ -7,10 +6,10 @@ from typing import TYPE_CHECKING, Any, Sequence
 import click
 
 from crunch import store
-from crunch.api import CurrentRoundNotFoundException, Prediction, Project, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, Score
+from crunch.api import CurrentRoundNotFoundException, Prediction, ProjectReference, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, Score
 from crunch.command._common import get_project, get_submission, reformat_datetime
 from crunch.repository import Repository
-from crunch.utils import ascii_table
+from crunch.utils import ascii_table, parse_datetime
 
 if TYPE_CHECKING:
     from crunch.api import SubmissionIdentifierType
@@ -27,7 +26,7 @@ def run_create(
     project = get_project(repository)
     submission = get_submission(project, submission_identifier)
 
-    runtime_options = list(submission.runtime_options.list())
+    runtime_options = list(submission.runtime_options.iter())
 
     runtime_option = next((x for x in runtime_options if x.definition.name == runtime_definition_name), None)
     if runtime_option is None:
@@ -199,7 +198,7 @@ def run_show(
         print(f"  status: {_to_prediction_status(prediction)}")
 
         print(f"  scores:")
-        for score in prediction.scores:
+        for score in prediction.scores.list():
             print(f"    {_format_score_value(score)}")
 
     if store.show_tips:
@@ -228,7 +227,7 @@ def run_logs(
     def _print_log(log: RunLog, debug: bool):
         nonlocal in_package_installer
 
-        created_at = str(datetime.fromisoformat(log['createdAt']).replace(microsecond=0))
+        created_at = str(parse_datetime(log['createdAt']).replace(microsecond=0))
         emitter = log["emitter"]
         content = log["content"]
 
@@ -345,7 +344,7 @@ SELECTION_ORIGIN_STATUSES = {
 }
 
 
-def _get_selection(project: Project) -> ProjectSelection | None:
+def _get_selection(project: ProjectReference) -> ProjectSelection | None:
     try:
         return project.selection
     except CurrentRoundNotFoundException:
@@ -452,10 +451,9 @@ def _format_primary_score(prediction: Prediction | None) -> str:
 
 def _format_score_value(score: Score) -> str:
     metric = score.metric
-    assert metric is not None
 
-    unit = metric.unit
-    return f"metric: {metric.display_name!r}: {unit.format_value(score.value)}"
+    value = metric.unit.format_value(score.value) if score.value is not None else "(none)"
+    return f"metric: {metric.display_name!r}: {value}"
 
 
 def _get_run(repository: Repository, id: int):
@@ -475,7 +473,7 @@ def _to_prediction_status(prediction: Prediction | None):
         return "checking"
 
     if not valid:
-        return "invalid: " + (prediction.error_message or "(no error message)")
+        return "invalid: " + (prediction.error or "(no error message)")
 
     success = prediction.success
     if success is None:

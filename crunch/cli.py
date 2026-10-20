@@ -140,7 +140,7 @@ def list_competitions(
 
     client = api.Client.from_env()
 
-    competitions = client.competitions.list(
+    competitions = list(client.competitions.iter(
         format=format,
         status=status,
         mode=mode,
@@ -149,7 +149,7 @@ def list_competitions(
         featured=featured,
         organizer_name=organizer_name,
         team_based=team_based,
-    )
+    ))
 
     if not competitions:
         print("No competitions found.")

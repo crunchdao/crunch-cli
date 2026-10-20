@@ -1,7 +1,7 @@
 import json
 import random
 import traceback
-from typing import TYPE_CHECKING, Callable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 import click
 
@@ -517,11 +517,11 @@ def _load_projects_from_api(
 ) -> list[T]:
     default_leaderboard = competition.leaderboards.default
 
-    for target_leaderboard in default_leaderboard._attrs.get("targets") or []:  # type: ignore
-        if target_leaderboard.get("id") != target.id:  # type: ignore
+    for target_leaderboard in default_leaderboard.targets or []:
+        if target_leaderboard.get("id") != target.id:
             continue
 
-        positions = target_leaderboard.get("positions") or []  # type: ignore
+        positions: list[dict[str, Any]] = target_leaderboard.get("positions") or []
         break
 
     else:
@@ -529,14 +529,14 @@ def _load_projects_from_api(
         return []
 
     projects: list[T] = []
-    for position in positions:  # type: ignore
-        user = position["user"]  # type: ignore
-        project = position["project"]  # type: ignore
+    for position in positions:
+        user = position["user"]
+        project = position["project"]
 
-        team = position.get("team")  # type: ignore
-        group = f"team-{team.get('name')}" if team else f"user-{user['login']}"  # type: ignore
+        team = position.get("team")
+        group = f"team-{team.get('name')}" if team else f"user-{user['login']}"
 
-        item = {  # type: ignore
+        item = {
             "id": project["id"],
             "group": group,
             "rewardable": all([  # TODO Should be moved to backend instead
@@ -550,10 +550,10 @@ def _load_projects_from_api(
                     "id": metric["metricId"],
                     "score": metric["score"],
                 }
-                for metric in position["metrics"]  # type: ignore
+                for metric in position["metrics"]
             ],
         }
 
-        projects.append(mapper(item))  # type: ignore
+        projects.append(mapper(item))
 
     return projects

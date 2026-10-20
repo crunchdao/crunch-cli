@@ -1,240 +1,127 @@
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Iterator
 
+from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
 from crunch.api._domain.enum_ import SplitKeyType
-from crunch.api._resource import Collection, EndpointMixin, Model
 
 if TYPE_CHECKING:
+    from crunch.api._client import Client
     from crunch.api._identifiers import CompetitionIdentifierType
-    from crunch.api._resource import JsonValue
 
 
-class CompetitionFormat(Enum):
-
+class CompetitionFormat(ApiEnum):
     TIMESERIES = "TIMESERIES"
     DAG = "DAG"
     STREAM = "STREAM"
     SPATIAL = "SPATIAL"
     UNSTRUCTURED = "UNSTRUCTURED"
 
-    def __repr__(self):
-        return self.name
-
     @property
     def unstructured(self):
         return self == CompetitionFormat.UNSTRUCTURED
 
 
-class CompetitionMode(Enum):
-
+class CompetitionMode(ApiEnum):
     OFFLINE = "OFFLINE"
     REAL_TIME = "REAL_TIME"
 
-    def __repr__(self):
-        return self.name
 
-
-class CompetitionStatus(Enum):
-
+class CompetitionStatus(ApiEnum):
     PENDING = "PENDING"
     OPEN = "OPEN"
     CLOSED = "CLOSED"
 
-    def __repr__(self):
-        return self.name
 
+@dataclass
+class Competition(ApiModel):
+    id: int
+    name: str
+    display_name: str
+    short_description: str
+    start: datetime
+    end: datetime | None
+    status: CompetitionStatus
+    format: CompetitionFormat
+    mode: CompetitionMode
+    split_key_type: SplitKeyType
+    external: bool
+    documentation_url: str | None
+    notebook_url: str | None
+    hosted_by_name: str
+    prize_pool_short_text: str
+    team_based: bool
+    only_team_leader: bool
+    max_team_size: int
+    project_creation_limit: int
+    encrypt_submissions: bool
+    phala_key_url: str | None
+    hide_train_frequency: bool
+    hide_force_first_train: bool
 
-class Competition(Model[int]):
+    client = Parent["Client"]()
 
-    @property
-    def resource_identifier(self) -> str:
-        return self.name
-
-    @property
-    def name(self) -> str:
-        return self._attrs["name"]
-
-    @property
-    def display_name(self) -> str:
-        return self._attrs["displayName"]
-
-    @property
-    def short_description(self) -> str:
-        return self._attrs["shortDescription"]
-
-    @property
-    def start(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["start"])
-
-    @property
-    def end(self) -> datetime | None:
-        end_string = self._attrs["end"]
-        return datetime.fromisoformat(end_string) if end_string else None
-
-    @property
-    def status(self):
-        return CompetitionStatus[self._attrs["status"]]
-
-    @property
-    def format(self):
-        return CompetitionFormat[self._attrs["format"]]
-
-    @property
-    def mode(self):
-        return CompetitionMode[self._attrs["mode"]]
-
-    @property
-    def split_key_type(self):
-        return SplitKeyType[self._attrs["splitKeyType"]]
-
-    @property
-    def external(self) -> bool:
-        return self._attrs["external"]
-
-    @property
-    def documentation_url(self) -> str:
-        return self._attrs["documentationUrl"]
-
-    @property
-    def notebook_url(self) -> str | None:
-        return self._attrs["notebookUrl"]
-
-    @property
-    def hosted_by_name(self) -> str:
-        return self._attrs["hostedByName"]
-
-    @property
-    def prize_pool_short_text(self) -> str:
-        return self._attrs["prizePoolShortText"]
-
-    @property
-    def team_based(self) -> bool:
-        return self._attrs["teamBased"]
-
-    @property
-    def only_team_leader(self) -> bool:
-        return self._attrs["onlyTeamLeader"]
-
-    @property
-    def max_team_size(self) -> int:
-        return self._attrs["maxTeamSize"]
-
-    @property
-    def project_creation_limit(self) -> int:
-        return self._attrs["projectCreationLimit"]
-
-    @property
-    def encrypt_submissions(self) -> bool:
-        return self._attrs["encryptSubmissions"]
-
-    @property
-    def phala_key_url(self) -> str | None:
-        return self._attrs["phalaKeyUrl"]
-
-    @property
-    def hide_train_frequency(self) -> bool:
-        return self._attrs["hideTrainFrequency"]
-
-    @property
-    def hide_force_first_train(self) -> bool:
-        return self._attrs["hideForceFirstTrain"]
-
-    @property
-    def data_releases(self):
-        from crunch.api._domain.data_release import DataReleaseCollection
-
-        return DataReleaseCollection(
-            competition=self,
-            client=self._client
-        )
-
-    @property
-    def metrics(self):
-        from crunch.api._domain.metric import MetricCollection
-
-        return MetricCollection(
-            competition=self,
-            target=None,
-            client=self._client
-        )
+    def reload(self) -> "Competition":
+        return self._update_from(self.client.competitions.get(self.name))
 
     @property
     def targets(self):
         from crunch.api._domain.target import TargetCollection
+        return TargetCollection(self)
 
-        return TargetCollection(
-            competition=self,
-            client=self._client
-        )
+    @property
+    def metrics(self):
+        from crunch.api._domain.metric import CompetitionMetricCollection
+        return CompetitionMetricCollection(self)
+
+    @property
+    def data_releases(self):
+        from crunch.api._domain.data_release import DataReleaseCollection
+        return DataReleaseCollection(self)
 
     @property
     def projects(self):
         from crunch.api._domain.project import ProjectCollection
-
-        return ProjectCollection(
-            competition=self,
-            client=self._client
-        )
+        return ProjectCollection(self)
 
     @property
     def quickstarters(self):
         from crunch.api._domain.quickstarter import QuickstarterCollection
-
-        return QuickstarterCollection(
-            competition=self,
-            client=self._client
-        )
+        return QuickstarterCollection(self)
 
     @property
     def rounds(self):
         from crunch.api._domain.round import RoundCollection
-
-        return RoundCollection(
-            competition=self,
-            client=self._client
-        )
+        return RoundCollection(self)
 
     @property
     def leaderboards(self):
         from crunch.api._domain.leaderboard import LeaderboardCollection
-
-        return LeaderboardCollection(
-            competition=self,
-            client=self._client
-        )
+        return LeaderboardCollection(self)
 
     @property
     def library_requests(self):
         from crunch.api._domain.library import LibraryRequestCollection
-
-        return LibraryRequestCollection(
-            competition=self,
-            client=self._client
-        )
+        return LibraryRequestCollection(self)
 
     @property
     def runtime_definitions(self):
         from crunch.api._domain.runtime import RuntimeDefinitionCollection
+        return RuntimeDefinitionCollection(self)
 
-        return RuntimeDefinitionCollection(self, self._client)
 
-
-class CompetitionCollection(Collection[Competition]):
+class CompetitionCollection(ApiCollection[Competition]):
 
     model = Competition
 
-    def get(
-        self,
-        id_or_name: "CompetitionIdentifierType"
-    ) -> Competition:
-        return self.prepare_model(
-            self._checked_client.api.get_competition(
-                id_or_name
-            )
-        )
+    def _attach(self, competition: Competition) -> Competition:
+        competition.client = self.client
+        return competition
 
-    def list(
+    def get(self, /, identifier: "CompetitionIdentifierType") -> Competition:
+        return self.from_dict(self.client.api.get_json(["v1", "competitions", identifier]))
+
+    def iter(
         self,
         *,
         format: CompetitionFormat | None = None,
@@ -246,78 +133,19 @@ class CompetitionCollection(Collection[Competition]):
         organizer_name: str | None = None,
         team_based: bool | None = None,
     ) -> Iterator[Competition]:
-        return self.prepare_models(
-            self._checked_client.api.list_competitions_v2(
-                format=format,
-                mode=mode,
-                status=status,
-                continuous=continuous,
-                external=external,
-                featured=featured,
-                organizer_name=organizer_name,
-                team_based=team_based,
-            )
-        )
+        filters: dict[str, Any] = {
+            "format": format.name if format is not None else None,
+            "mode": mode.name if mode is not None else None,
+            "status": status.name if status is not None else None,
+            "continuous": continuous,
+            "external": external,
+            "featured": featured,
+            "organizerName": organizer_name,
+            "teamBased": team_based,
+        }
 
-
-class CompetitionEndpointMixin(EndpointMixin):
-
-    def list_competitions_v2(
-        self,
-        format: CompetitionFormat | None,
-        mode: CompetitionMode | None,
-        status: CompetitionStatus | None,
-        continuous: bool | None,
-        external: bool | None,
-        featured: bool | None,
-        organizer_name: str | None,
-        team_based: bool | None,
-    ) -> Iterator["JsonValue"]:
-        params: dict[str, Any] = {}
-
-        if format is not None:
-            params["format"] = format.name
-
-        if mode is not None:
-            params["mode"] = mode.name
-
-        if status is not None:
-            params["status"] = status.name
-
-        if continuous is not None:
-            params["continuous"] = continuous
-
-        if external is not None:
-            params["external"] = external
-
-        if featured is not None:
-            params["featured"] = featured
-
-        if organizer_name is not None:
-            params["organizerName"] = organizer_name
-
-        if team_based is not None:
-            params["teamBased"] = team_based
-
-        return self._paginated(
-            lambda page_request: self.get(
-                "/v2/competitions",
-                params={
-                    **params,
-                    "page": page_request.number,
-                    "size": page_request.size,
-                },
-            ),
+        return self.from_dict_iterator(self.client.api.paginate_json(
+            ["v2", "competitions"],
+            params=filters,
             page_size=1000,
-        )
-
-    def get_competition(
-        self,
-        identifier: "CompetitionIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{identifier}"
-            ),
-            json=True
-        )
+        ))

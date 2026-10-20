@@ -1,4 +1,5 @@
 import sys
+from itertools import islice
 from typing import TYPE_CHECKING, Any, Sequence
 
 import click
@@ -77,11 +78,16 @@ def whitelist_search(
 ):
     client = Client.from_env()
 
-    libraries = list(client.libraries.list(
+    found = client.libraries.iter(
         standard=False,
         name=f"*{query}*".replace("*", "%"),
         language=language,
-    ))
+    )
+
+    if limit is not None:
+        found = islice(found, limit + 1)
+
+    libraries = list(found)
 
     if not libraries:
         print("search: no results found")
@@ -89,7 +95,7 @@ def whitelist_search(
 
     reached_limit = limit is not None and len(libraries) > limit
     if reached_limit:
-        libraries = libraries[:limit]  # TODO do it at iteration
+        libraries = libraries[:limit]
 
     rows: list[Sequence[Any]] = []
     for library in libraries:

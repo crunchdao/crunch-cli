@@ -1,9 +1,12 @@
 from dataclasses import fields
+from datetime import datetime
 from functools import cache
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, TypeVar
 
 from mashumaro.config import BaseConfig
 from mashumaro.mixins.json import DataClassJSONMixin
+
+from crunch.utils import parse_datetime
 
 __all__ = [
     "JsonDataClassMixin",
@@ -17,6 +20,12 @@ class JsonDataClassMixin(DataClassJSONMixin):
     class Config(BaseConfig):
         # compile on first use instead of at import time, keeps the cli startup fast
         lazy_compilation = True
+
+        serialization_strategy = {
+            datetime: {
+                "deserialize": parse_datetime,
+            },
+        }
 
     if TYPE_CHECKING:
         # mashumaro declares `d` as a bare `Mapping`, which is partially unknown in strict mode,

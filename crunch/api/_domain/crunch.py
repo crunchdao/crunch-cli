@@ -1,125 +1,66 @@
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiModel, Parent
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
     from crunch.api._domain.phase import Phase
-    from crunch.api._identifiers import CompetitionIdentifierType, CrunchIdentifierType, PhaseIdentifierType, RoundIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
+    from crunch.api._identifiers import CrunchIdentifierType
 
 
-class Crunch(Model[int]):
+@dataclass
+class Crunch(ApiModel):
+    id: int
+    number: int
+    published: bool
 
-    def __init__(
-        self,
-        phase: "Phase",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "CrunchCollection | None" = None
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._phase = phase
-
-    @property
-    def resource_identifier(self) -> int:
-        return self.number
-
-    @property
-    def phase(self):
-        return self._phase
-
-    @property
-    def number(self) -> int:
-        return self._attrs["number"]
-
-    @property
-    def published(self) -> bool:
-        return self._attrs["published"]
+    phase = Parent["Phase"]()
 
 
-class CrunchCollection(Collection[Crunch]):
+class CrunchCollection(ApiCollection[Crunch]):
 
     model = Crunch
 
-    def __init__(
-        self,
-        phase: "Phase",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, phase: "Phase"):
+        super().__init__(phase.round.competition.client)
 
         self.phase = phase
 
+    def _attach(self, crunch: Crunch) -> Crunch:
+        crunch.phase = self.phase
+        return crunch
 
-    def get(
-        self,
-        identifier: "CrunchIdentifierType"
-    ) -> Crunch:
-        return self.prepare_model(
-            self._checked_client.api.get_crunch(
-                self.phase.round.competition.resource_identifier,
-                self.phase.round.resource_identifier,
-                self.phase.resource_identifier,
-                identifier
-            )
-        )
+    def get(self, /, identifier: "CrunchIdentifierType") -> Crunch:
+        round = self.phase.round
 
-    def get_current(self):
+        return self.from_dict(self.client.api.get_json([
+            "v2", "competitions", round.competition.name, "rounds", round.number, "phases", self.phase.type.name, "crunches", identifier
+        ]))
+
+    def get_current(self) -> Crunch:
         return self.get("@current")
 
-    def get_next(self):
-        return self.get("@last")
+    def get_next(self) -> Crunch:
+        return self.get("@next")
 
-    def get_published(self):
+    def get_published(self) -> Crunch:
         return self.get("@published")
 
-    def list(
-        self
-    ) -> list[Crunch]:
-        return self.prepare_models(
-            self._checked_client.api.list_crunches(
-                self.phase.round.competition.resource_identifier,
-                self.phase.round.resource_identifier,
-                self.phase.resource_identifier,
-            )
-        )
+    @property
+    def current(self) -> Crunch:
+        return self.get_current()
 
-    def prepare_model(self, attrs: "JsonValue | Crunch", *args: Any) -> Crunch:
-        return super().prepare_model(
-            attrs,
-            self.phase,
-            *args
-        )
+    @property
+    def next(self) -> Crunch:
+        return self.get_next()
 
+    @property
+    def published(self) -> Crunch:
+        return self.get_published()
 
-class CrunchEndpointMixin(EndpointMixin):
+    def list(self) -> list[Crunch]:
+        round = self.phase.round
 
-    def list_crunches(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        round_identifier: "RoundIdentifierType",
-        phase_identifier: "PhaseIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/{phase_identifier}/crunches"
-            ),
-            json=True
-        )
-
-    def get_crunch(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        round_identifier: "RoundIdentifierType",
-        phase_identifier: "PhaseIdentifierType",
-        crunch_identifier: "CrunchIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/{phase_identifier}/crunches/{crunch_identifier}"
-            ),
-            json=True
-        )
+        return self.from_dict_array(self.client.api.get_json([
+            "v2", "competitions", round.competition.name, "rounds", round.number, "phases", self.phase.type.name, "crunches"
+        ]))

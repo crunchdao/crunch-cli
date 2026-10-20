@@ -1,19 +1,19 @@
-import enum
+from crunch.api._base import ApiEnum
 
 
-class Language(enum.Enum):
-
+class Language(ApiEnum):
     PYTHON = "PYTHON"
     R = "R"
 
-    def __repr__(self):
-        return self.name
+    def as_requirement_language(self):
+        from crunch_convert import RequirementLanguage
+
+        try:
+            return RequirementLanguage[self.name]
+        except KeyError:
+            raise ValueError(f"no requirement language for {self.name}") from None
 
 
-class SplitKeyType(enum.Enum):
-
+class SplitKeyType(ApiEnum):
     INTEGER = "INTEGER"
     STRING = "STRING"
-
-    def __repr__(self):
-        return self.name

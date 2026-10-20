@@ -774,6 +774,7 @@ class CloudRunner(Runner):
         data_release = self.run.data
 
         data_files = data_release.data_files
+        assert data_files is not None, "the data release of a run always has its data files"
 
         save_all(
             prepare_all(
@@ -791,7 +792,7 @@ class CloudRunner(Runner):
             return
 
         try:
-            self.run.report_error(trace_content)
+            self.run.report_error(trace=trace_content)
 
             self.log("[debug] error trace reported")
         except BaseException as ignored:

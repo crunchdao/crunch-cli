@@ -1,11 +1,7 @@
-from enum import Enum
+from crunch.api._base import ApiEnum
 
 
-class GpuRequirement(Enum):
-
+class GpuRequirement(ApiEnum):
     OPTIONAL = "OPTIONAL"
     RECOMMENDED = "RECOMMENDED"
     REQUIRED = "REQUIRED"
-
-    def __repr__(self):
-        return self.name

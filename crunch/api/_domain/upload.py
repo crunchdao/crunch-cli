@@ -1,26 +1,24 @@
-import enum
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable, cast
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable
 
 import requests
 from tqdm.auto import tqdm
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
 from crunch.api._serialization import JsonDataClassMixin
 from crunch.utils import split_into_chunks
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
-    from crunch.api._types import Attrs
 
 _MAXIMUM_BATCH_SIZE = 100
 
 
-class UploadStatus(enum.Enum):
+class UploadStatus(ApiEnum):
     PENDING = "PENDING"
     IN_PROGRESS = "IN_PROGRESS"
     SUCCEEDED = "SUCCEEDED"
@@ -28,146 +26,46 @@ class UploadStatus(enum.Enum):
     EXPIRED = "EXPIRED"
 
 
-class UploadProvider(enum.Enum):
+class UploadProvider(ApiEnum):
     AWS_S3 = "AWS_S3"
 
 
-class DeleteUploadResult(enum.Enum):
+class DeleteUploadResult(ApiEnum):
     DELETED = "DELETED"
     NOT_FOUND = "NOT_FOUND"
 
 
 @dataclass(frozen=True)
 class PresignedUploadRequest(JsonDataClassMixin):
-
     method: str
-    url: str
-    headers: dict[str, str]
+    url: str = field(repr=False)
+    headers: dict[str, str] = field(repr=False)
 
 
-class Upload(Model[str]):
+@dataclass
+class UploadChunk(ApiModel):
+    number: int
+    offset: int
+    size: int
+    last: bool
+    completed: bool
+    completed_at: datetime | None = None
 
-    @property
-    def id(self) -> str:
-        return self._attrs["id"]
-
-    @property
-    def size(self) -> int:
-        return self._attrs["size"]
-
-    @property
-    def encrypted(self) -> bool:
-        return self._attrs["encrypted"]
-
-    @property
-    def chunked(self) -> bool:
-        return self._attrs["chunked"]
-
-    @property
-    def status(self):
-        return UploadStatus[self._attrs["status"]]
-
-    @property
-    def status_message(self):
-        return self._attrs["statusMessage"]
-
-    @property
-    def provider(self):
-        return UploadProvider[self._attrs["provider"]]
-
-    @property
-    def expires_at(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["expiresAt"])
-
-    @property
-    def created_at(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["createdAt"])
-
-    @property
-    def chunks(self) -> list["UploadChunk"]:
-        return [
-            UploadChunk(self, chunk_attrs, self._client)
-            for chunk_attrs in self._attrs["chunks"]
-        ]
-
-    def complete(self):
-        self._attrs.update(
-            cast("Attrs", self._checked_client.api.complete_upload(
-                self.id,
-            ))
-        )
-
-    def abort(self):
-        self._attrs.update(
-            cast("Attrs", self._checked_client.api.abort_upload(
-                self.id,
-            ))
-        )
-
-    def delete(self):
-        self._checked_client.api.delete_upload(
-            self.id,
-        )
-
-
-class UploadChunk(Model[int]):
-
-    def __init__(
-        self,
-        upload: Upload,
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "Collection[UploadChunk] | None" = None
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._upload = upload
-
-    @property
-    def resource_identifier(self) -> int:
-        return self.number
-
-    @property
-    def upload(self):
-        return self._upload
-
-    @property
-    def number(self) -> int:
-        return self._attrs["number"]
-
-    @property
-    def offset(self) -> int:
-        return self._attrs["offset"]
-
-    @property
-    def size(self) -> int:
-        return self._attrs["size"]
-
-    @property
-    def last(self) -> bool:
-        return self._attrs["last"]
-
-    @property
-    def completed(self) -> bool:
-        return self._attrs["completed"]
+    upload = Parent["Upload"]()
 
     @property
     def request(self) -> PresignedUploadRequest:
-        return PresignedUploadRequest.from_dict(
-            cast("Attrs", self._checked_client.api.get_upload_chunk_request(
-                self.upload.id,
-                self.number,
-            ))
-        )
+        return PresignedUploadRequest.from_dict(self.upload.client.api.get_json([
+            "v1", "uploads", self.upload.id, "chunks", self.number, "request"
+        ]))
 
-    def confirm(self, hash: str):
-        self._attrs.update(
-            cast("Attrs", self._checked_client.api.confirm_upload_chunk(
-                self.upload.id,
-                self.number,
-                hash,
-            ))
-        )
+    def confirm(self, hash: str) -> "UploadChunk":
+        return self._update_from(UploadChunk.from_dict(self.upload.client.api.post_json(
+            ["v1", "uploads", self.upload.id, "chunks", self.number, "confirm"],
+            json={
+                "hash": hash
+            },
+        )))
 
     def send(
         self,
@@ -227,9 +125,71 @@ class UploadChunk(Model[int]):
         self.confirm(hash)
 
 
-class UploadCollection(Collection[Upload]):
+@dataclass
+class Upload(ApiModel):
+    id: str
+    name: str
+    size: int
+    encrypted: bool
+    media_type: str
+    chunked: bool
+    status: UploadStatus
+    provider: UploadProvider
+    expires_at: datetime
+    created_at: datetime
+    status_message: str | None = None
+    chunks: list[UploadChunk] = field(default_factory=list[UploadChunk])
+
+    client = Parent["Client"]()
+
+    def _update_from(self, other: ApiModel) -> "Upload":
+        super()._update_from(other)
+
+        # the new chunks still point to the other copy
+        for chunk in self.chunks:
+            chunk.upload = self
+
+        return self
+
+    def reload(self) -> "Upload":
+        return self._update_from(self.client.uploads.get(self.id))
+
+    def complete(self) -> "Upload":
+        return self._update_from(self.client.uploads.from_dict(self.client.api.post_json([
+            "v1", "uploads", self.id, "complete"],
+            json={}
+        )))
+
+    def abort(self) -> "Upload":
+        return self._update_from(self.client.uploads.from_dict(self.client.api.post_json([
+            "v1", "uploads", self.id, "abort"],
+            json={}
+        )))
+
+    def delete(self) -> None:
+        self.client.api.call(
+            "DELETE",
+            ["v1", "uploads", self.id]
+        )
+
+
+class UploadCollection(ApiCollection[Upload]):
 
     model = Upload
+
+    def _attach(self, upload: Upload) -> Upload:
+        upload.client = self.client
+
+        for chunk in upload.chunks:
+            chunk.upload = upload
+
+        return upload
+
+    def get(
+        self,
+        id: str,
+    ) -> Upload:
+        return self.from_dict(self.client.api.get_json(["v1", "uploads", id]))
 
     def create(
         self,
@@ -237,16 +197,17 @@ class UploadCollection(Collection[Upload]):
         name: str,
         size: int,
         encrypted: bool = False,
-        preferred_chunk_size: int | None = None
+        preferred_chunk_size: int | None = None,
     ) -> Upload:
-        return self.prepare_model(
-            self._checked_client.api.create_upload(
-                name,
-                size,
-                encrypted,
-                preferred_chunk_size,
-            )
-        )
+        return self.from_dict(self.client.api.post_json(
+            ["v1", "uploads"],
+            json={
+                "name": name,
+                "size": size,
+                "encrypted": encrypted,
+                "preferredChunkSize": preferred_chunk_size,
+            },
+        ))
 
     def send_from_file(
         self,
@@ -331,37 +292,21 @@ class UploadCollection(Collection[Upload]):
 
         return upload
 
-    def get(
-        self,
-        id: str
-    ) -> Upload:
-        return self.prepare_model(
-            self._checked_client.api.get_upload(
-                id,
-            )
-        )
-
     def batch_list(
         self,
         upload_ids: list[str],
     ) -> dict[str, Upload | None]:
-        if not upload_ids:
-            return {}
-
         results: dict[str, Upload | None] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
-            response = cast(dict[str, dict[str, "Attrs | None"]], self._checked_client.api.get_upload_batch(upload_ids_chunk))
-            uploads = response["uploads"]
+            uploads: dict[str, dict[str, Any] | None] = self.client.api.post_json(
+                ["v1", "uploads", "~", "list"],
+                json={"uploadIds": upload_ids_chunk}
+            )["uploads"]
 
             for upload_id in upload_ids_chunk:
-                upload_data = uploads.get(upload_id)
-
-                results[upload_id] = (
-                    self.prepare_model(upload_data)
-                    if upload_data is not None
-                    else None
-                )
+                payload = uploads.get(upload_id)
+                results[upload_id] = self.from_dict(payload) if payload is not None else None
 
         return results
 
@@ -369,141 +314,15 @@ class UploadCollection(Collection[Upload]):
         self,
         upload_ids: list[str],
     ) -> dict[str, DeleteUploadResult]:
-        if not upload_ids:
-            return {}
-
         results: dict[str, DeleteUploadResult] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
-            response = cast(dict[str, dict[str, str]], self._checked_client.api.delete_upload_batch(upload_ids_chunk))
-            uploads = response["uploads"]
+            uploads: dict[str, str] = self.client.api.post_json(
+                ["v1", "uploads", "~", "delete"],
+                json={"uploadIds": upload_ids_chunk}
+            )["uploads"]
 
             for upload_id in upload_ids_chunk:
-                results[upload_id] = DeleteUploadResult[uploads[upload_id]]
+                results[upload_id] = DeleteUploadResult(uploads[upload_id])
 
         return results
-
-
-class UploadEndpointMixin(EndpointMixin):
-
-    def create_upload(
-        self,
-        name: str,
-        size: int,
-        encrypted: bool,
-        preferred_chunk_size: int | None
-    ):
-        return self._result(
-            self.post(
-                "/v1/uploads",
-                json={
-                    "name": name,
-                    "size": size,
-                    "encrypted": encrypted,
-                    "preferredChunkSize": preferred_chunk_size
-                }
-            ),
-            json=True
-        )
-
-    def get_upload(
-        self,
-        id: str
-    ):
-        return self._result(
-            self.get(
-                f"/v1/uploads/{id}"
-            ),
-            json=True
-        )
-
-    def get_upload_chunk_request(
-        self,
-        id: str,
-        chunk_number: int
-    ):
-        return self._result(
-            self.get(
-                f"/v1/uploads/{id}/chunks/{chunk_number}/request",
-            ),
-            json=True
-        )
-
-    def confirm_upload_chunk(
-        self,
-        id: str,
-        chunk_number: int,
-        hash: str
-    ):
-        return self._result(
-            self.post(
-                f"/v1/uploads/{id}/chunks/{chunk_number}/confirm",
-                json={
-                    "hash": hash,
-                },
-            ),
-            json=True
-        )
-
-    def abort_upload(
-        self,
-        id: str
-    ):
-        return self._result(
-            self.post(
-                f"/v1/uploads/{id}/abort",
-                json={},
-            ),
-            json=True
-        )
-
-    def complete_upload(
-        self,
-        id: str
-    ):
-        return self._result(
-            self.post(
-                f"/v1/uploads/{id}/complete",
-                json={},
-            ),
-            json=True
-        )
-
-    def delete_upload(
-        self,
-        id: str
-    ) -> None:
-        self._result(
-            self.delete(
-                f"/v1/uploads/{id}",
-                json={},
-            )
-        )
-
-    def get_upload_batch(
-        self,
-        upload_ids: list[str],
-    ):
-        return self._result(
-            self.post(
-                "/v1/uploads/~/list",
-                json={
-                    "uploadIds": upload_ids,
-                }
-            ),
-            json=True
-        )
-
-    def delete_upload_batch(
-        self,
-        upload_ids: list[str],
-    ):
-        return self._result(
-            self.post(
-                "/v1/uploads/~/delete",
-                json={
-                    "uploadIds": upload_ids,
-                }
-            ),
-            json=True
-        )

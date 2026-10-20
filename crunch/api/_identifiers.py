@@ -7,7 +7,7 @@ CompetitionIdentifierType: TypeAlias = int | str
 
 RoundIdentifierType: TypeAlias = int | Literal["@current", "@last"]
 
-PhaseIdentifierType: TypeAlias = str | Literal["submission", "out-of-sample"] | "PhaseType" | Literal["@current"]
+PhaseIdentifierType: TypeAlias = Literal["submission", "out-of-sample"] | "PhaseType" | Literal["@current"]
 
 CrunchIdentifierType: TypeAlias = int | Literal["@current", "@next", "@last", "@published"]
 

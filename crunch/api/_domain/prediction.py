@@ -1,151 +1,55 @@
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiModel, Parent
+from crunch.api._domain.metric import Unit
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
-    from crunch.api._domain.metric import Unit
-    from crunch.api._domain.project import Project
-    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
+    from crunch.api._domain.project import ProjectReference
 
 
-class Prediction(Model[int]):
+@dataclass
+class Prediction(ApiModel):
+    id: int
+    name: str
+    valid: bool | None
+    success: bool | None
+    managed: bool
+    total_size: int
+    created_at: datetime
+    error: str | None = None
+    deterministic: bool | None = None
+    primary_mean: float | None = None
+    primary_unit: Unit | None = None
 
-    def __init__(
-        self,
-        project: "Project",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "PredictionCollection | None" = None,
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._project = project
-
-    @property
-    def project(self):
-        return self._project
-
-    @property
-    def name(self):
-        return self._attrs["name"]
-
-    @property
-    def valid(self) -> bool | None:
-        return self._attrs["valid"]
-
-    @property
-    def success(self) -> bool | None:
-        return self._attrs["success"]
-
-    @property
-    def error_message(self) -> str | None:
-        return self._attrs["error"]
-
-    @property
-    def managed(self) -> bool:
-        return self._attrs["managed"]
-
-    @property
-    def deterministic(self) -> bool:
-        return self._attrs["deterministic"]
-
-    @property
-    def primary_mean(self) -> float | None:
-        return self._attrs.get("primaryMean")
-
-    @property
-    def primary_unit(self) -> "Unit | None":
-        from crunch.api._domain.metric import Unit
-
-        unit_attrs = self._attrs.get("primaryUnit")
-        if unit_attrs is None:
-            return None
-
-        return Unit.from_dict(unit_attrs)
+    project = Parent["ProjectReference"]()
 
     @property
     def scores(self):
         from crunch.api._domain.score import ScoreCollection
-
-        return ScoreCollection(
-            prediction=self,
-            client=self._client
-        )
+        return ScoreCollection(self)
 
 
-class PredictionCollection(Collection[Prediction]):
+class PredictionCollection(ApiCollection[Prediction]):
 
     model = Prediction
 
-    def __init__(
-        self,
-        project: "Project",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, project: "ProjectReference"):
+        super().__init__(project.client)
 
         self.project = project
 
-    def get(
-        self,
-        id: int
-    ) -> Prediction:
-        return self.prepare_model(
-            self._checked_client.api.get_prediction(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-                id
-            )
-        )
+    def _attach(self, prediction: Prediction) -> Prediction:
+        prediction.project = self.project
+        return prediction
 
-    def list(
-        self
-    ) -> list[Prediction]:
-        return self.prepare_models(
-            self._checked_client.api.list_predictions(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-            )
-        )
+    def get(self, /, id: int) -> Prediction:
+        return self.from_dict(self.client.api.get_json([
+            "v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "predictions", id
+        ]))
 
-    def prepare_model(self, attrs: "JsonValue | Prediction", *args: Any) -> Prediction:
-        return super().prepare_model(
-            attrs,
-            self.project,
-            *args
-        )
-
-
-class PredictionEndpointMixin(EndpointMixin):
-
-    def list_predictions(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/predictions"
-            ),
-            json=True
-        )
-
-    def get_prediction(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        prediction_id: int
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/predictions/{prediction_id}"
-            ),
-            json=True
-        )
+    def list(self) -> list[Prediction]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "predictions"
+        ]))

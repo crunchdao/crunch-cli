@@ -1,134 +1,62 @@
+from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiModel, Parent
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
-    from crunch.api._identifiers import CompetitionIdentifierType, RoundIdentifierType
-    from crunch.api._resource import JsonValue
+    from crunch.api._identifiers import RoundIdentifierType
 
 
-class Round(Model[int]):
+@dataclass
+class Round(ApiModel):
+    id: int
+    number: int
+    start: datetime
+    end: datetime
 
-    def __init__(
-        self,
-        competition: "Competition",
-        attrs: dict[str, Any] | None = None,
-        client: "Client | None" = None,
-        collection: "RoundCollection | None" = None
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._competition = competition
-
-    @property
-    def resource_identifier(self) -> int:
-        return self.number
-
-    @property
-    def competition(self):
-        return self._competition
-
-    @property
-    def number(self) -> int:
-        return self._attrs["number"]
-
-    @property
-    def start(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["start"])
-
-    @property
-    def end(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["end"])
+    competition = Parent["Competition"]()
 
     @property
     def phases(self):
         from crunch.api._domain.phase import PhaseCollection
-
-        return PhaseCollection(
-            round=self,
-            client=self._client
-        )
+        return PhaseCollection(self)
 
 
-class RoundCollection(Collection[Round]):
+class RoundCollection(ApiCollection[Round]):
 
     model = Round
 
-    def __init__(
-        self,
-        competition: "Competition",
-        client: "Client | None" = None,
-    ):
-        super().__init__(client)
+    def __init__(self, competition: "Competition"):
+        super().__init__(competition.client)
 
         self.competition = competition
 
-    def get(
-        self,
-        identifier: "RoundIdentifierType",
-    ) -> Round:
-        return self.prepare_model(
-            self._checked_client.api.get_round(
-                self.competition.resource_identifier,
-                identifier
-            )
-        )
+    def _attach(self, round: Round) -> Round:
+        round.competition = self.competition
+        return round
 
-    def get_current(self):
+    def get(self, /, identifier: "RoundIdentifierType") -> Round:
+        return self.from_dict(self.client.api.get_json([
+            "v1", "competitions", self.competition.name, "rounds", identifier
+        ]))
+
+    def get_current(self) -> Round:
         return self.get("@current")
 
-    @property
-    def current(self):
-        return self.get_current()
-
-    def get_last(self):
+    def get_last(self) -> Round:
         return self.get("@last")
 
     @property
-    def last(self):
+    def current(self) -> Round:
+        return self.get_current()
+
+    @property
+    def last(self) -> Round:
         return self.get_last()
 
-    def list(
-        self
-    ) -> list[Round]:
-        return self.prepare_models(
-            self._checked_client.api.list_rounds(
-                self.competition.resource_identifier,
-            )
-        )
-
-    def prepare_model(self, attrs: "JsonValue | Round", *args: Any) -> Round:
-        return super().prepare_model(
-            attrs,
-            self.competition,
-            *args
-        )
-
-
-class RoundEndpointMixin(EndpointMixin):
-
-    def list_rounds(
-        self,
-        competition_identifier: "CompetitionIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/rounds"
-            ),
-            json=True
-        )
-
-    def get_round(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        round_identifier: "RoundIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/rounds/{round_identifier}"
-            ),
-            json=True
-        )
+    def list(self) -> list[Round]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v1", "competitions", self.competition.name, "rounds"
+        ]))

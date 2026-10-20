@@ -1,66 +1,20 @@
 import os
 import urllib.parse
-from typing import Any, Callable, Iterable, Iterator, Literal, cast, overload
+from typing import Any, Callable, Iterable, Iterator, Literal, Sequence, cast, overload
 
 import requests
 from tqdm.auto import tqdm
 
 import crunch.store as store
 from crunch.api._auth import Auth
-from crunch.api._domain.competition import CompetitionCollection, CompetitionEndpointMixin
-from crunch.api._domain.crunch import CrunchEndpointMixin
-from crunch.api._domain.data_release import DataReleaseEndpointMixin
-from crunch.api._domain.leaderboard import LeaderboardEndpointMixin
-from crunch.api._domain.library import LibraryCollection, LibraryEndpointMixin
-from crunch.api._domain.metric import MetricEndpointMixin
-from crunch.api._domain.model import ModelEndpointMixin
-from crunch.api._domain.model_file import ModelFileEndpointMixin
-from crunch.api._domain.phase import PhaseEndpointMixin
-from crunch.api._domain.prediction import PredictionEndpointMixin
-from crunch.api._domain.project import ProjectEndpointMixin, ProjectTokenCollection
-from crunch.api._domain.quickstarter import QuickstarterEndpointMixin
-from crunch.api._domain.round import RoundEndpointMixin
-from crunch.api._domain.run import RunEndpointMixin
-from crunch.api._domain.runner import RunnerRun, RunnerRunEndpointMixin
-from crunch.api._domain.runtime import RuntimeEndpointMixin
-from crunch.api._domain.score import ScoreEndpointMixin
-from crunch.api._domain.submission import SubmissionEndpointMixin
-from crunch.api._domain.submission_file import SubmissionFileEndpointMixin
-from crunch.api._domain.target import TargetEndpointMixin
-from crunch.api._domain.upload import UploadCollection, UploadEndpointMixin
-from crunch.api._domain.user import UserCollection, UserEndpointMixin
 from crunch.api._errors import ApiException, convert_error
 from crunch.api._pagination import PageRequest
-from crunch.api._resource import JsonValue
+from crunch.api._types import JsonValue
 from crunch.constants import API_KEY_ENV_VAR
 from crunch.utils import build_user_agent
 
 
-class EndpointClient(
-    requests.Session,
-    CompetitionEndpointMixin,
-    CrunchEndpointMixin,
-    DataReleaseEndpointMixin,
-    LeaderboardEndpointMixin,
-    LibraryEndpointMixin,
-    MetricEndpointMixin,
-    ModelEndpointMixin,
-    ModelFileEndpointMixin,
-    PhaseEndpointMixin,
-    PredictionEndpointMixin,
-    ProjectEndpointMixin,
-    QuickstarterEndpointMixin,
-    RoundEndpointMixin,
-    RuntimeEndpointMixin,
-    RunEndpointMixin,
-    RunnerRunEndpointMixin,
-    ScoreEndpointMixin,
-    SubmissionEndpointMixin,
-    SubmissionFileEndpointMixin,
-    TargetEndpointMixin,
-    UploadEndpointMixin,
-    UserEndpointMixin,
-):
+class EndpointClient(requests.Session):
 
     def __init__(
         self,
@@ -223,6 +177,71 @@ class EndpointClient(
 
         return response.text
 
+    def get_json(
+        self,
+        segments: Sequence[str | int],
+        *,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        return self._result(self.get(_format_path(segments), params=params), json=True)
+
+    def post_json(
+        self,
+        segments: Sequence[str | int],
+        *,
+        json: Any = None,
+    ) -> Any:
+        return self._result(self.post(_format_path(segments), json=json), json=True)
+
+    def put_json(
+        self,
+        segments: Sequence[str | int],
+        *,
+        json: Any = None,
+    ) -> Any:
+        return self._result(self.put(_format_path(segments), json=json), json=True)
+
+    def delete_json(
+        self,
+        segments: Sequence[str | int],
+        *,
+        json: Any = None,
+    ) -> Any:
+        return self._result(self.delete(_format_path(segments), json=json), json=True)
+
+    def call(
+        self,
+        method: Literal["GET", "POST", "PUT", "DELETE"],
+        segments: Sequence[str | int],
+        *,
+        json: Any = None,
+    ) -> None:
+        """For the endpoints that answer without a body."""
+
+        self._result(self.request(method, _format_path(segments), json=json))
+
+    def paginate_json(
+        self,
+        segments: Sequence[str | int],
+        *,
+        params: dict[str, Any] | None = None,
+        page_size: int | None = None,
+    ) -> Iterator[Any]:
+        path = _format_path(segments)
+        filters: dict[str, Any] = dict(params) if params is not None else {}
+
+        return self._paginated(
+            lambda page_request: self.get(
+                path,
+                params={
+                    **filters,
+                    "page": page_request.number,
+                    "size": page_request.size,
+                },
+            ),
+            page_size=page_size,
+        )
+
     def _paginated(
         self,
         requester: Callable[[PageRequest], requests.Response],
@@ -251,6 +270,15 @@ class EndpointClient(
             page_request = page_request.next()
 
 
+def _format_path(segments: Sequence[str | int]) -> str:
+    """`["v1", "competitions", 3]` -> `/v1/competitions/3`, each segment is quoted (aliases like `@me` are kept)."""
+
+    return "/" + "/".join(
+        urllib.parse.quote(str(segment), safe="@")
+        for segment in segments
+    )
+
+
 class Client:
 
     def __init__(
@@ -264,32 +292,32 @@ class Client:
 
     @property
     def competitions(self):
-        return CompetitionCollection(client=self)
+        from crunch.api._domain.competition import CompetitionCollection
+        return CompetitionCollection(self)
 
     @property
     def libraries(self):
-        return LibraryCollection(client=self)
+        from crunch.api._domain.library import LibraryCollection
+        return LibraryCollection(self)
 
     @property
     def uploads(self):
-        return UploadCollection(client=self)
+        from crunch.api._domain.upload import UploadCollection
+        return UploadCollection(self)
 
     @property
     def users(self):
-        return UserCollection(client=self)
+        from crunch.api._domain.user import UserCollection
+        return UserCollection(self)
 
     @property
     def project_tokens(self):
-        return ProjectTokenCollection(
-            competition=None,
-            client=self
-        )
+        from crunch.api._domain.project import ProjectTokenCollection
+        return ProjectTokenCollection(self)
 
     def get_runner_run(self, run_id: int):
-        return RunnerRun(
-            run_id,
-            client=self
-        )
+        from crunch.api._domain.runner import RunnerRun
+        return RunnerRun(run_id, self)
 
     @staticmethod
     def from_env(

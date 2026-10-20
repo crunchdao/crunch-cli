@@ -32,7 +32,7 @@ def runtime_list(
         has_one_requestable = False
 
         rows: list[Sequence[Any]] = []
-        for option in submission.runtime_options:
+        for option in submission.runtime_options.iter():
             rows.append(
                 (
                     *_to_runtime_definition_columns(option.definition),
@@ -57,7 +57,7 @@ def runtime_list(
     else:
         rows = list(map(
             _to_runtime_definition_columns,
-            project.competition.runtime_definitions.list(),
+            project.competition.runtime_definitions.iter(),
         ))
 
         ascii_table(
@@ -97,7 +97,7 @@ def runtime_request(
     option = next(
         (
             option
-            for option in submission.runtime_options
+            for option in submission.runtime_options.iter()
             if option.definition.name == runtime_option_name
         ),
         None

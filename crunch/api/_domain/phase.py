@@ -1,24 +1,19 @@
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
-    from crunch.api._domain.data_release import SizeVariant
+    from crunch.api._domain.data_release import DataRelease, SizeVariant
     from crunch.api._domain.round import Round
-    from crunch.api._identifiers import CompetitionIdentifierType, PhaseIdentifierType, RoundIdentifierType
-    from crunch.api._resource import JsonValue
+    from crunch.api._identifiers import PhaseIdentifierType
 
 
-class PhaseType(Enum):
+class PhaseType(ApiEnum):
 
     SUBMISSION = "SUBMISSION"
     OUT_OF_SAMPLE = "OUT_OF_SAMPLE"
-
-    def __repr__(self):
-        return self.name
 
     def slug(self):
         if self == PhaseType.SUBMISSION:
@@ -45,181 +40,82 @@ class PhaseType(Enum):
         return 1
 
     def _default_slug(self):
-        return str(self).lower().replace("_", "-")
+        return self.name.lower().replace("_", "-")
 
 
-class Phase(Model[int]):
+@dataclass
+class Phase(ApiModel):
+    id: int
+    type: PhaseType
+    start: datetime
+    end: datetime
 
-    def __init__(
-        self,
-        round: "Round",
-        attrs: dict[str, Any] | None = None,
-        client: "Client | None" = None,
-        collection: "PhaseCollection | None" = None
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._round = round
-
-    @property
-    def resource_identifier(self) -> str:
-        return self._attrs["type"]
-
-    @property
-    def round(self):
-        return self._round
-
-    @property
-    def start(self):
-        return datetime.fromisoformat(self._attrs["start"])
-
-    @property
-    def end(self):
-        return datetime.fromisoformat(self._attrs["end"])
-
-    @property
-    def type(self):
-        return PhaseType[self._attrs["type"]]
+    round = Parent["Round"]()
 
     @property
     def crunches(self):
         from crunch.api._domain.crunch import CrunchCollection
-
-        return CrunchCollection(
-            phase=self,
-            client=self._client
-        )
+        return CrunchCollection(self)
 
     def get_data_release(
         self,
         size_variant: "SizeVariant | None" = None,
-    ):
-        from crunch.api._domain.data_release import DataReleaseCollection
-
-        client = self._client
-        assert client is not None
-
-        attrs = client.api.get_submission_phase_data_release(
-            self.round.competition.resource_identifier,
-            self.round.resource_identifier,
-            size_variant,
-        )
-
+    ) -> "DataRelease":
         competition = self.round.competition
-        return DataReleaseCollection(
-            competition,
-            self._client,
-        ).prepare_model(attrs)
+
+        return competition.data_releases.from_dict(self.round.competition.client.api.get_json(
+            ["v2", "competitions", competition.name, "rounds", self.round.number, "phases", "submission", "data-release"],
+            params={
+                "sizeVariant": size_variant.name if size_variant is not None else None,
+            },
+        ))
 
 
-class PhaseCollection(Collection[Phase]):
+class PhaseCollection(ApiCollection[Phase]):
 
     model = Phase
 
-    def __init__(
-        self,
-        round: "Round",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, round: "Round"):
+        super().__init__(round.competition.client)
 
         self.round = round
 
-    def get(
-        self,
-        identifier: "PhaseIdentifierType"
-    ) -> Phase:
+    def _attach(self, phase: Phase) -> Phase:
+        phase.round = self.round
+        return phase
+
+    def get(self, /, identifier: "PhaseIdentifierType") -> Phase:
         if isinstance(identifier, PhaseType):
-            identifier = identifier.name
+            identifier_string = identifier.name
+        else:
+            identifier_string = identifier
 
-        return self.prepare_model(
-            self._checked_client.api.get_phase(
-                self.round.competition.resource_identifier,
-                self.round.resource_identifier,
-                identifier
-            )
-        )
+        return self.from_dict(self.client.api.get_json([
+            "v2", "competitions", self.round.competition.name, "rounds", self.round.number, "phases", identifier_string
+        ]))
 
-    def get_current(self):
+    def get_current(self) -> Phase:
         return self.get("@current")
 
-    @property
-    def current(self):
-        return self.get_current()
-
-    def get_submission(self):
+    def get_submission(self) -> Phase:
         return self.get(PhaseType.SUBMISSION)
 
-    @property
-    def submission(self):
-        return self.get_submission()
-
-    def get_out_of_sample(self):
+    def get_out_of_sample(self) -> Phase:
         return self.get(PhaseType.OUT_OF_SAMPLE)
 
     @property
-    def out_of_sample(self):
+    def current(self) -> Phase:
+        return self.get_current()
+
+    @property
+    def submission(self) -> Phase:
+        return self.get_submission()
+
+    @property
+    def out_of_sample(self) -> Phase:
         return self.get_out_of_sample()
 
-    def list(
-        self
-    ) -> list[Phase]:
-        return self.prepare_models(
-            self._checked_client.api.list_phases(
-                self.round.competition.id,
-                self.round.number
-            )
-        )
-
-    def prepare_model(self, attrs: "JsonValue | Phase", *args: Any) -> Phase:
-        return super().prepare_model(
-            attrs,
-            self.round,
-            *args
-        )
-
-
-class PhaseEndpointMixin(EndpointMixin):
-
-    def list_phases(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        round_identifier: "RoundIdentifierType",
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases"
-            ),
-            json=True
-        )
-
-    def get_phase(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        round_identifier: "RoundIdentifierType",
-        phase_identifier: "PhaseIdentifierType",
-    ):
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/{phase_identifier}"
-            ),
-            json=True
-        )
-
-    def get_submission_phase_data_release(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        round_identifier: "RoundIdentifierType",
-        size_variant: "SizeVariant | None" = None,
-    ):
-        params: dict[str, Any] = {}
-        if size_variant:
-            params["sizeVariant"] = size_variant.name
-
-        return self._result(
-            self.get(
-                f"/v2/competitions/{competition_identifier}/rounds/{round_identifier}/phases/submission/data-release",
-                params=params
-            ),
-            json=True
-        )
+    def list(self) -> list[Phase]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v2", "competitions", self.round.competition.id, "rounds", self.round.number, "phases"
+        ]))

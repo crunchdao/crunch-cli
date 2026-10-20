@@ -1,56 +1,16 @@
 from dataclasses import dataclass
-from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiModel, Parent
 from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
     from crunch.api._domain.competition import Competition
     from crunch.api._domain.target import Target
-    from crunch.api._identifiers import CompetitionIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
-
-
-class ScorerFunction(Enum):
-
-    BALANCED_ACCURACY = "BALANCED_ACCURACY"
-    DOT_PRODUCT = "DOT_PRODUCT"
-    F1 = "F1"
-    PRECISION = "PRECISION"
-    RANDOM = "RANDOM"
-    RECALL = "RECALL"
-    SPEARMAN = "SPEARMAN"
-
-    META__EXECUTION_TIME = "META__EXECUTION_TIME"
-
-    CUSTOM__MID_ONE__PROFIT_AND_LOSS_WITH_TRANSACTION_COST = "CUSTOM__MID_ONE__PROFIT_AND_LOSS_WITH_TRANSACTION_COST"
-    CUSTOM__BROAD__SCORING = "CUSTOM__BROAD__SCORING"
-
-    @property
-    def is_meta(self):
-        return self.name.startswith("META__")
-
-    def __repr__(self):
-        return self.name
-
-
-class ReducerFunction(Enum):
-
-    NONE = "NONE"
-    SUM = "SUM"
-    MEAN = "MEAN"
-    PRODUCT_PLUS_MINUS_1 = "PRODUCT_PLUS_MINUS_1"
-
-    def __repr__(self):
-        return self.name
 
 
 @dataclass(frozen=True)
 class Unit(JsonDataClassMixin):
-
     prefix: str | None
     scale: int
     suffix: str | None
@@ -63,149 +23,62 @@ class Unit(JsonDataClassMixin):
         return f"{prefix}{rounded_value}{suffix}"
 
 
-class Metric(Model[int]):
+@dataclass
+class Metric(ApiModel):
 
-    def __init__(
-        self,
-        competition: "Competition",
-        target: "Target | None" = None,
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "MetricCollection | None" = None,
-    ):
-        from crunch.api._domain.target import Target
+    id: int
+    name: str
+    display_name: str
+    unit: Unit
+    weight: int
+    score: bool
+    multiplier: float
 
-        super().__init__(attrs=attrs, client=client, collection=collection)
-
-        self._competition = competition
-        self._target = target or Target(competition, (attrs or {})["target"], client)
+    target = Parent["Target"]()
 
     @property
-    def resource_identifier(self) -> str:
-        return self.name
-
-    @property
-    def competition(self):
-        return self._competition
-
-    @property
-    def target(self):
-        return self._target
-
-    @property
-    def name(self) -> str:
-        return self._attrs["name"]
-
-    @property
-    def display_name(self) -> str:
-        return self._attrs["displayName"]
-
-    @property
-    def weight(self) -> int:
-        return self._attrs["weight"]
-
-    @property
-    def score(self) -> bool:
-        return self._attrs["score"]
-
-    @property
-    def multiplier(self) -> float:
-        return self._attrs["multiplier"]
-
-    @property
-    def scorer_function(self):
-        return ScorerFunction[self._attrs["scorerFunction"]]
-
-    @property
-    def reducer_function(self):
-        return ReducerFunction[self._attrs["reducerFunction"]]
-
-    @property
-    def unit(self) -> Unit:
-        return Unit.from_dict(self._attrs["unit"])
+    def competition(self) -> "Competition":
+        return self.target.competition
 
 
-class MetricCollection(Collection[Metric]):
+class MetricCollection(ApiCollection[Metric]):
 
     model = Metric
 
-    def __init__(
-        self,
-        competition: "Competition",
-        target: "Target | None",
-        client: "Client | None" = None,
-    ):
-        super().__init__(client)
+    def __init__(self, target: "Target"):
+        super().__init__(target.competition.client)
 
-        self.competition = competition
         self.target = target
 
-    @property
-    def _checked_target(self) -> "Target":
-        if self.target is None:
-            raise Exception("target unavailable")
+    def _attach(self, metric: Metric) -> Metric:
+        metric.target = self.target
+        return metric
 
-        return self.target
+    def get(self, /, name: str) -> Metric:
+        return self.from_dict(self.client.api.get_json(
+            ["v1", "competitions", self.target.competition.id, "targets", self.target.name, "metrics", name]
+        ))
 
-
-    def get(
-        self,
-        name: str
-    ) -> Metric:
-        return self.prepare_model(
-            self._checked_client.api.get_metric(
-                self.competition.id,
-                self._checked_target.name,
-                name
-            )
-        )
-
-    def list(
-        self
-    ) -> list[Metric]:
-        return self.prepare_models(
-            self._checked_client.api.list_metrics(
-                self.competition.id,
-                self.target.name if self.target else None,
-            )
-        )
-
-    def prepare_model(self, attrs: "JsonValue | Metric", *args: Any) -> Metric:
-        return super().prepare_model(
-            attrs,
-            self.competition,
-            self.target,
-            *args
-        )
+    def list(self) -> list[Metric]:
+        return self.from_dict_array(self.client.api.get_json(
+            ["v1", "competitions", self.target.competition.id, "targets", self.target.name, "metrics"]
+        ))
 
 
-class MetricEndpointMixin(EndpointMixin):
+class CompetitionMetricCollection(ApiCollection[Metric]):
 
-    def get_metric(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        target_name: str | None,
-        metric_name: str
-    ):
-        return self._result(
-            self.get(
-                f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics/{metric_name}"
-            ),
-            json=True
-        )
+    model = Metric
 
-    def list_metrics(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        target_name: str | None,
-    ) -> "JsonValue":
-        url = (
-            f"/v1/competitions/{competition_identifier}/targets/{target_name}/metrics"
-            if target_name is not None else
-            f"/v1/competitions/{competition_identifier}/metrics"
-        )
+    def __init__(self, competition: "Competition"):
+        super().__init__(competition.client)
 
-        return self._result(
-            self.get(url),
-            json=True
-        )
+        self.competition = competition
+
+    def from_dict(self, payload: Mapping[str, Any]) -> Metric:
+        target = self.competition.targets.from_dict(payload["target"])
+        return target.metrics.from_dict(payload)
+
+    def list(self) -> list[Metric]:
+        return self.from_dict_array(self.client.api.get_json(
+            ["v1", "competitions", self.competition.id, "metrics"]
+        ))

@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import time
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
@@ -93,6 +94,31 @@ def smart_call(
 def split_into_chunks(items: list[_T], chunk_size: int) -> Iterable[list[_T]]:
     for start_index in range(0, len(items), chunk_size):
         yield items[start_index:start_index + chunk_size]
+
+
+if sys.version_info >= (3, 11):
+    def parse_datetime(value: str) -> datetime.datetime:
+        return datetime.datetime.fromisoformat(value)
+
+else:
+    _DATETIME_FRACTION = re.compile(r"\.(\d+)")
+
+    def parse_datetime(value: str) -> datetime.datetime:
+        """
+        `datetime.fromisoformat` of python 3.10 only accepts 3 or 6 fraction digits and no `Z`,
+        but the API trims the trailing zeros of the fraction (`.3459`).
+        """
+
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+
+        value = _DATETIME_FRACTION.sub(
+            lambda match: "." + match.group(1).ljust(6, "0")[:6],
+            value,
+            count=1,
+        )
+
+        return datetime.datetime.fromisoformat(value)
 
 
 def cut_url(url: str):

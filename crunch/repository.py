@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import crunch.store as store
-from crunch.api import Auth, Client, Project, SizeVariant
+from crunch.api import Auth, Client, ProjectReference, SizeVariant
 from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY, PROJECT_FILE, TOKEN_FILE, UPLOAD_CACHE_FILE
 
 __all__ = [
@@ -181,7 +181,7 @@ class Repository:
         self,
         *,
         show_progress: bool = True,
-    ) -> tuple[Client, Project]:
+    ) -> tuple[Client, ProjectReference]:
         auth = (
             Auth.project_token(self._project_token)
             if self._project_token is not None
@@ -195,7 +195,7 @@ class Repository:
         )
 
         competition = client.competitions.get(self._project.competition_name)
-        project = competition.projects.get_reference(userId=self._project.user_id, name=self._project.project_name)
+        project = competition.projects.reference(self._project.user_id, self._project.project_name)
 
         return client, project
 

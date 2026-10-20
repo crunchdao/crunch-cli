@@ -12,6 +12,7 @@ def _get_data_urls(
 ) -> dict[str, downloader.PreparedDataFile]:
     data_release = round.phases.get_submission().get_data_release(size_variant=size_variant)
     data_files = data_release.data_files
+    assert data_files is not None, "the data release of a phase always has its data files"
 
     return downloader.prepare_all(data_directory_path, data_files)
 

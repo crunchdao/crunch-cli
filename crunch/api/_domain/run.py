@@ -1,30 +1,21 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict
 
-from crunch.api._resource import Collection, EndpointMixin
-from crunch.api._resource import Model as BaseModel
+from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
+from crunch.api._domain.prediction import Prediction
+from crunch.api._domain.submission import Submission
 
 if TYPE_CHECKING:
-    from crunch.api._client import Client
-    from crunch.api._domain.prediction import Prediction
-    from crunch.api._domain.project import Project
-    from crunch.api._domain.submission import Submission
-    from crunch.api._identifiers import CompetitionIdentifierType, ProjectIdentifierType, UserIdentifierType
-    from crunch.api._resource import JsonValue
-    from crunch.api._types import Attrs
+    from crunch.api._domain.project import ProjectReference, ProjectSelection
 
 
-class RunStatus(Enum):
-
+class RunStatus(ApiEnum):
     CREATED = "CREATED"
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     CLEANING = "CLEANING"
     COMPLETED = "COMPLETED"
-
-    def __repr__(self):
-        return self.name
 
 
 class RunLog(TypedDict):
@@ -35,303 +26,108 @@ class RunLog(TypedDict):
     createdAt: str  # TODO Move to camel_case
 
 
-class Run(BaseModel[int]):
+@dataclass
+class Run(ApiModel):
+    id: int
+    status: RunStatus
+    success: bool
+    terminated: bool
+    submission: Submission
+    created_at: datetime
+    prediction: Prediction | None = None
+    error_message: str | None = None
+    error_trace: str | None = None
+    exit_code: int | None = None
+    exit_reason: str | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    duration: timedelta | None = None
 
-    def __init__(
-        self,
-        project: "Project",
-        attrs: "Attrs | None" = None,
-        client: "Client | None" = None,
-        collection: "RunCollection | None" = None,
-    ):
-        super().__init__(attrs=attrs, client=client, collection=collection)
+    project = Parent["ProjectReference"]()
 
-        self._project = project
-
-    @property
-    def project(self):
-        return self._project
-
-    @property
-    def success(self) -> bool:
-        return self._attrs["success"]
-
-    @property
-    def terminated(self) -> bool:
-        return self._attrs["terminated"]
+    def reload(self) -> "Run":
+        return self._update_from(self.project.runs.get(self.id))
 
     @property
-    def error_message(self) -> str | None:
-        return self._attrs["errorMessage"]
+    def logs(self) -> list[RunLog]:
+        return self.project.client.api.get_json(["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs", self.id, "logs"])
 
-    @property
-    def error_trace(self) -> str | None:
-        return self._attrs["errorTrace"]
-
-    @property
-    def status(self) -> RunStatus | None:
-        return RunStatus(self._attrs["status"])
-
-    @property
-    def duration(self) -> timedelta | None:
-        value = self._attrs["duration"]
-        if value is None:
-            return None
-
-        return timedelta(seconds=value)
-
-    @property
-    def submission(self) -> "Submission":
-        from crunch.api._domain.submission import Submission
-
-        return Submission(self._project, self._attrs["submission"], self._client)
-
-    @property
-    def prediction(self) -> "Prediction | None":
-        from crunch.api._domain.prediction import Prediction
-
-        prediction_attrs = self._attrs["prediction"]
-        if prediction_attrs is None:
-            return None
-
-        return Prediction(self._project, prediction_attrs, self._client)
-
-    @property
-    def started_at(self) -> datetime | None:
-        value = self._attrs["startedAt"]
-        if value is None:
-            return None
-
-        return datetime.fromisoformat(value)
-
-    @property
-    def ended_at(self) -> datetime | None:
-        value = self._attrs["endedAt"]
-        if value is None:
-            return None
-
-        return datetime.fromisoformat(value)
-
-    @property
-    def exit_code(self) -> int | None:
-        return self._attrs["exitCode"]
-
-    @property
-    def exit_reason(self) -> str | None:
-        return self._attrs["exitReason"]
-
-    @property
-    def created_at(self) -> datetime:
-        return datetime.fromisoformat(self._attrs["createdAt"])
-
-    @property
-    def logs(self) -> list["RunLog"]:
-        return cast(list["RunLog"], self._checked_client.api.get_run_logs(
-            self._project.competition.id,
-            self._project.user_id,
-            self._project.name,
-            self.id
-        ))
-
-    def select(self):
+    def select(self) -> "ProjectSelection":
         from crunch.api._domain.project import ProjectSelection
 
-        return ProjectSelection(
-            self._project,
-            cast("Attrs", self._checked_client.api.select_run(
-                self._project.competition.id,
-                self._project.user_id,
-                self._project.name,
-                self.id
-            )),
-            client=self._client,
-        )
+        selection = ProjectSelection.from_dict(self.project.client.api.post_json(
+            ["v4", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "selection"],
+            json={
+                "runId": self.id
+            },
+        ))
 
-    def terminate(self):
-        self._attrs.update(
-            cast("Attrs", self._checked_client.api.terminate_run(
-                self._project.competition.id,
-                self._project.user_id,
-                self._project.name,
-                self.id
-            ))
-        )
+        selection.project = self.project
+        return selection
+
+    def terminate(self) -> "Run":
+        return self._update_from(self.project.runs.from_dict(self.project.client.api.delete_json(
+            ["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs", self.id],
+        )))
 
 
-class RunCollection(Collection[Run]):
+class RunCollection(ApiCollection[Run]):
 
     model = Run
 
-    def __init__(
-        self,
-        project: "Project",
-        client: "Client | None" = None
-    ):
-        super().__init__(client)
+    def __init__(self, project: "ProjectReference"):
+        super().__init__(project.client)
 
         self.project = project
 
+    def _attach(self, run: Run) -> Run:
+        run.project = self.project
+
+        run.submission.project = self.project
+        if run.submission.model is not None:
+            run.submission.model.project = self.project
+
+        if run.prediction is not None:
+            run.prediction.project = self.project
+
+        return run
+
     def get(
         self,
-        id: int
+        id: int,
     ) -> Run:
-        return self.prepare_model(
-            self._checked_client.api.get_run(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-                id
-            )
-        )
+        return self.from_dict(self.client.api.get_json(["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs", id]))
 
     def create(
         self,
         *,
-        submission: "Submission",
+        submission: Submission,
         train_frequency: int | None = None,
         force_first_train: bool | None = None,
         runtime_definition_name: str | None = None,
     ) -> Run:
-        return self.prepare_model(
-            self._checked_client.api.create_run(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-                submission.id,
-                train_frequency,
-                force_first_train,
-                runtime_definition_name,
-            )
-        )
+        return self.from_dict(self.client.api.post_json(
+            ["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs"],
+            json={
+                "submissionId": submission.id,
+                "trainFrequency": train_frequency,
+                "forceFirstTrain": force_first_train,
+                "runtimeDefinitionName": runtime_definition_name,
+            },
+        ))
 
     def list(
         self,
+        *,
         managed: bool | None = None,
-        submission: "Submission | None" = None,
-        submission_number: int | None = None
+        submission: "Submission | int | None" = None,
     ) -> list[Run]:
-        assert not ((submission is not None) and (submission_number is not None))
+        submission_number = submission if isinstance(submission, int) or submission is None else submission.number
 
-        return self.prepare_models(
-            self._checked_client.api.list_runs(
-                self.project.competition.id,
-                self.project.user_id,
-                self.project.name,
-                managed,
-                submission.number if submission is not None else submission_number,
-            )
-        )
-
-    def prepare_model(self, attrs: "JsonValue | Run", *args: Any) -> Run:
-        return super().prepare_model(
-            attrs,
-            self.project,
-            *args
-        )
-
-
-class RunEndpointMixin(EndpointMixin):
-
-    def create_run(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        submission_id: int,
-        train_frequency: int | None = None,
-        force_first_train: bool | None = None,
-        runtime_definition_name: str | None = None,
-    ):
-        return self._result(
-            self.post(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs",
-                json={
-                    "submissionId": submission_id,
-                    "trainFrequency": train_frequency,
-                    "forceFirstTrain": force_first_train,
-                    "runtimeDefinitionName": runtime_definition_name,
-                }
-            ),
-            json=True,
-        )
-
-    def list_runs(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        managed: bool | None,
-        submission_number: int | None
-    ):
-        params: dict[str, Any] = {}
-
-        if managed is not None:
-            params["managed"] = managed
-
-        if submission_number is not None:
-            params["submissionNumber"] = submission_number
-
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs",
-                params=params
-            ),
-            json=True
-        )
-
-    def get_run(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        run_id: int
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs/{run_id}"
-            ),
-            json=True
-        )
-
-    def get_run_logs(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        run_id: int
-    ):
-        return self._result(
-            self.get(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs/{run_id}/logs"
-            ),
-            json=True
-        )
-
-    def select_run(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        run_id: int
-    ):
-        return self._result(
-            self.post(
-                f"/v4/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/selection",
-                json={"runId": run_id}
-            ),
-            json=True
-        )
-
-    def terminate_run(
-        self,
-        competition_identifier: "CompetitionIdentifierType",
-        user_identifier: "UserIdentifierType",
-        project_identifier: "ProjectIdentifierType",
-        run_id: int
-    ):
-        return self._result(
-            self.delete(
-                f"/v3/competitions/{competition_identifier}/projects/{user_identifier}/{project_identifier}/runs/{run_id}"
-            ),
-            json=True
-        )
+        return self.from_dict_array(self.client.api.get_json(
+            ["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs"],
+            params={
+                "managed": managed,
+                "submissionNumber": submission_number,
+            },
+        ))

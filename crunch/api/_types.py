@@ -1,3 +1,3 @@
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
-Attrs: TypeAlias = dict[str, Any]
+JsonValue: TypeAlias = str | int | float | bool | None | dict[str, "JsonValue"] | list["JsonValue"]

@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from crunch import store
 from crunch.command._common import get_project
 from crunch.external.humanfriendly import format_size
@@ -25,9 +23,9 @@ def quota(
 
     print()
     print("compute quota:")
-    print(f"  available: {timedelta(seconds=compute.available)}")
-    print(f"  remaining: {timedelta(seconds=compute.remaining)}")
-    print(f"  used: {timedelta(seconds=compute.used)}")
+    print(f"  available: {compute.available}")
+    print(f"  remaining: {compute.remaining}")
+    print(f"  used: {compute.used}")
     print(f"  running: {'a run is still running' if compute.running else 'no run is currently running, one can be created'}")
 
     if store.show_tips:

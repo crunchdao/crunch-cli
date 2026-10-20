@@ -88,7 +88,7 @@ class _Inline:
     @cached_property
     def _competition(self) -> Competition:
         _, project = self._repository.create_client()
-        competition = project.competition.reload()  # pyright: ignore[reportUnknownMemberType]
+        competition = project.competition.reload()
 
         return competition
 

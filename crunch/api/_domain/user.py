@@ -1,70 +1,45 @@
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._base import ApiCollection, ApiModel, Parent
 
 if TYPE_CHECKING:
-    from crunch.api._identifiers import CompetitionIdentifierType
+    from crunch.api._client import Client
+    from crunch.api._identifiers import UserIdentifierType
 
 
-class User(Model[int]):
+@dataclass
+class User(ApiModel):
+    id: int
+    login: str
 
-    @property
-    def resource_identifier(self) -> str:
-        return self.login
+    client = Parent["Client"]()
 
-    @property
-    def login(self):
-        return self._attrs["login"]
+    def reload(self) -> "User":
+        return self._update_from(self.client.users.get(self.id))
 
 
-class UserCollection(Collection[User]):
+class UserCollection(ApiCollection[User]):
 
     model = User
 
-    def get(
-        self,
-        identifier: "CompetitionIdentifierType"
-    ) -> User:
-        return self.prepare_model(
-            self._checked_client.api.get_user(
-                identifier
-            )
-        )
+    def _attach(self, user: User) -> User:
+        user.client = self.client
+        return user
 
-    def get_me(self):
+    def get(self, /, identifier: "UserIdentifierType") -> User:
+        return self.from_dict(self.client.api.get_json([
+            "v2", "users", identifier
+        ]))
+
+    def get_me(self) -> User:
         return self.get("@me")
 
     @property
-    def me(self):
+    def me(self) -> User:
         return self.get_me()
 
-    def list(
-        self
-    ) -> list[User]:
-        return self.prepare_models(
-            self._checked_client.api.list_users()
-        )
-
-
-class UserEndpointMixin(EndpointMixin):
-
-    def list_users(
-        self
-    ):
-        return self._result(
-            self.get(
-                "/v2/users"
-            ),
-            json=True
-        )
-
-    def get_user(
-        self,
-        identifier: "CompetitionIdentifierType"
-    ):
-        return self._result(
-            self.get(
-                f"/v2/users/{identifier}"
-            ),
-            json=True
-        )
+    def list(self) -> list[User]:
+        return self.from_dict_array(self.client.api.get_json([
+            "v2", "users"
+        ]))

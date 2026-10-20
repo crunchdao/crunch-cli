@@ -56,7 +56,7 @@ def quickstarter_show(
     for author in quickstarter.authors:
         print(f"    - {author.name!r}", f"({author.link})" if author.link else "")
     print(f"  files:")
-    for file in quickstarter.files:
+    for file in quickstarter.files or []:
         print(f"    - {file.name}")
 
     if store.show_tips:
@@ -73,7 +73,7 @@ def quickstarter_apply(
 ):
     quickstarter = _get_quickstarter(repository, quickstarter_name)
 
-    files = quickstarter.files
+    files = quickstarter.files or []
 
     for file in files:
         if os.path.exists(file.name) and not overwrite:
