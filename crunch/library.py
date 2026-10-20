@@ -1,6 +1,5 @@
 import logging
 import os
-import warnings
 from collections import defaultdict
 from types import ModuleType
 from typing import Any, NamedTuple, overload
@@ -20,7 +19,6 @@ __all__ = [
     "extract_from_notebook_modules",
     "find_problematic",
     "scan",
-    "find_forbidden",  # deprecated
 ]
 
 
@@ -103,29 +101,6 @@ _Problems = NamedTuple(
         ("alias_collisions", list[_AliasCollision]),
     ],
 )
-
-
-def find_forbidden(
-    *,
-    packages: dict[RequirementLanguage, set[str]],
-    is_alias: bool,
-    whitelist: Whitelist | None = None,
-):
-    warnings.warn(
-        "find_forbidden(...) is deprecated, use find_problematic(...) instead",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    return {
-        language: problems.forbidden
-        for language, problems in find_problematic(
-            packages=packages,
-            is_alias=is_alias,
-            whitelist=whitelist,
-        ).items()
-        if len(problems.forbidden) > 0
-    }
 
 
 def find_problematic(

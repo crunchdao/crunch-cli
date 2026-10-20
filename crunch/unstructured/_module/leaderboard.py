@@ -134,7 +134,6 @@ class LeaderboardModule(ModuleWrapper):
             {
                 "target": target,
                 "metrics": metrics,
-                "target_and_metrics": [(target, metrics)],  # deprecated
                 "projects": projects,
                 "rank_pass": rank_pass,
             },
