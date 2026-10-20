@@ -130,15 +130,18 @@ class Leaderboard(ApiModel):
 
     def get_changes(
         self,
+        *,
         user_identifier: "UserIdentifierType",
         project_identifier: "ProjectIdentifierType | None" = None,
-        crunch: "Crunch | None" = None,
+        crunch: "Crunch | int | None" = None,
     ) -> LeaderboardChange:
+        crunch_id = crunch if isinstance(crunch, int) or crunch is None else crunch.id
+
         return self.competition.client.api.get_json(
             ["v3", "competitions", self.competition.name, "leaderboards", self.name, "changes", "users", user_identifier],
             params={
                 "projectIdentifier": project_identifier,
-                "crunchId": crunch.id if crunch is not None else None,
+                "crunchId": crunch_id,
             },
         )
 

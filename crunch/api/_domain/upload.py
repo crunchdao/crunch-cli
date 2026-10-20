@@ -67,6 +67,7 @@ class UploadChunk(ApiModel):
     def send(
         self,
         fd: BinaryIO,
+        *,
         max_retry: int = 10,
         byte_callback: Callable[[int], None] | None = None,
         retry_callback: Callable[[], None] | None = None,

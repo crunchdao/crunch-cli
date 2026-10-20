@@ -76,6 +76,11 @@ class ProjectReference:
         return RunCollection(self)
 
     @property
+    def models(self):
+        from crunch.api._domain.model import ModelCollection
+        return ModelCollection(self)
+
+    @property
     def selection(self) -> "ProjectSelection":
         selection = ProjectSelection.from_dict(self.client.api.get_json([
             "v4", "competitions", self.competition.id, "projects", self.user_id, self.name, "selection"
@@ -98,6 +103,7 @@ class ProjectReference:
 
     def clone(
         self,
+        *,
         submission_number: int | None,
         include_model: bool | None,
     ) -> dict[str, str]:

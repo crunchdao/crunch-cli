@@ -61,6 +61,9 @@ class Phase(ApiModel):
         self,
         size_variant: "SizeVariant | None" = None,
     ) -> "DataRelease":
+        if self.type != PhaseType.SUBMISSION:
+            raise ValueError(f"only the submission phase has a data release, not the {self.type.pretty()} phase")
+
         competition = self.round.competition
 
         return competition.data_releases.from_dict(self.round.competition.client.api.get_json(
