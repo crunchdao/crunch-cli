@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from dataclasses_json import Undefined, dataclass_json
-
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -49,9 +48,8 @@ class ReducerFunction(Enum):
         return self.name
 
 
-@dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass(frozen=True)
-class Unit:
+class Unit(JsonDataClassMixin):
 
     prefix: str | None
     scale: int
@@ -124,7 +122,7 @@ class Metric(Model[int]):
 
     @property
     def unit(self) -> Unit:
-        return Unit.from_dict(self._attrs["unit"])  # type: ignore[attr-defined]
+        return Unit.from_dict(self._attrs["unit"])
 
 
 class MetricCollection(Collection[Metric]):
@@ -134,13 +132,20 @@ class MetricCollection(Collection[Metric]):
     def __init__(
         self,
         competition: "Competition",
-        target: "Target",
+        target: "Target | None",
         client: "Client | None" = None,
     ):
         super().__init__(client)
 
         self.competition = competition
         self.target = target
+
+    @property
+    def _checked_target(self) -> "Target":
+        if self.target is None:
+            raise Exception("target unavailable")
+
+        return self.target
 
 
     def get(
@@ -150,7 +155,7 @@ class MetricCollection(Collection[Metric]):
         return self.prepare_model(
             self._checked_client.api.get_metric(
                 self.competition.id,
-                self.target.name,
+                self._checked_target.name,
                 name
             )
         )

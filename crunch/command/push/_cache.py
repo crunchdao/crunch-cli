@@ -6,10 +6,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, NewType, cast
 
 from mashumaro import field_options
-from mashumaro.config import BaseConfig
-from mashumaro.mixins.dict import DataClassDictMixin
 
 from crunch.api import ApiException, Client, Upload, UploadStatus
+from crunch.api._serialization import JsonDataClassMixin
 from crunch.constants import UPLOAD_CACHE_VERSION
 from crunch.repository import Repository
 
@@ -18,7 +17,7 @@ _EARLY_DELETE_THRESHOLD = timedelta(hours=3)
 
 
 @dataclass
-class KnownLocation(DataClassDictMixin):
+class KnownLocation(JsonDataClassMixin):
     path: str
     size: int
     modification_time: datetime
@@ -26,19 +25,12 @@ class KnownLocation(DataClassDictMixin):
     def fast_check(self, size: int, modification_time: datetime) -> bool:
         return self.size == size and self.modification_time == modification_time
 
-    class Config(BaseConfig):
-        lazy_compilation = True
-        serialize_by_alias = True
-        aliases = {
-            "modification_time": "modificationTime"
-        }
-
 
 Checksum = NewType("Checksum", str)
 
 
 @dataclass
-class UploadCacheEntry(DataClassDictMixin):
+class UploadCacheEntry(JsonDataClassMixin):
     checksum: Checksum
     upload_id: str
     expires_at: datetime
@@ -55,16 +47,6 @@ class UploadCacheEntry(DataClassDictMixin):
         for location in self.known_locations:
             if location.path == relative_path:
                 return location
-
-    class Config(BaseConfig):
-        lazy_compilation = True
-        serialize_by_alias = True
-        aliases = {
-            "upload_id": "uploadId",
-            "expires_at": "expiresAt",
-            "time_to_live": "timeToLive",
-            "known_locations": "knownLocations",
-        }
 
 
 class UploadCache(ABC):

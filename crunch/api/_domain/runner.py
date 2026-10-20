@@ -1,11 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal
-
-from dataclasses_json import LetterCase, Undefined, config, dataclass_json
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from crunch.api._resource import EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -17,60 +16,35 @@ class RunnerRunSpanStatus(Enum):
     FAILED = "FAILED"
 
 
-_datetime_config = config(
-    encoder=lambda value: value.isoformat(),
-    decoder=datetime.fromisoformat,
-)
-
-_status_config = config(
-    encoder=lambda value: value.value,
-    decoder=RunnerRunSpanStatus,
-)
-
-
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class RunnerRunSpan:
+class RunnerRunSpan(JsonDataClassMixin):
 
     id: int
     parent_id: int | None
     description: str
-    started_at: datetime = field(metadata=_datetime_config)
+    started_at: datetime
     attributes: dict[str, Any] | None
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class StartedRunnerRunSpan(RunnerRunSpan):
 
-    status: Literal[RunnerRunSpanStatus.STARTED] = field(
-        metadata=_status_config,
-        default=RunnerRunSpanStatus.STARTED
-    )
+    status: Literal[RunnerRunSpanStatus.STARTED] = RunnerRunSpanStatus.STARTED
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
 class EndedRunnerRunSpan(RunnerRunSpan):
 
-    status: Literal[RunnerRunSpanStatus.ENDED, RunnerRunSpanStatus.FAILED] = field(
-        metadata=_status_config,
-    )
-
-    ended_at: datetime = field(
-        metadata=_datetime_config,
-    )
+    status: Literal[RunnerRunSpanStatus.ENDED, RunnerRunSpanStatus.FAILED]
+    ended_at: datetime
 
     error: str | None
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class RunnerRunMetric:
+class RunnerRunMetric(JsonDataClassMixin):
 
-    timestamp: datetime = field(
-        metadata=_datetime_config,
-    )
+    timestamp: datetime
 
     cpu: float   # % 0–100
     ram: int   # bytes used
@@ -92,15 +66,15 @@ class RunnerRun(Model[int]):
 
     @property
     def code(self) -> dict[str, str]:
-        return self._checked_client.api.get_runner_run_code(
+        return cast(dict[str, str], self._checked_client.api.get_runner_run_code(
             self._run_id
-        )
+        ))
 
     @property
     def model(self) -> dict[str, str]:
-        return self._checked_client.api.get_runner_run_model(
+        return cast(dict[str, str], self._checked_client.api.get_runner_run_model(
             self._run_id
-        )
+        ))
 
     @property
     def data(self):
@@ -129,11 +103,11 @@ class RunnerRun(Model[int]):
         self._checked_client.api.report_runner_run_traces(
             self._run_id,
             spans=[
-                span.to_dict()  # type: ignore[attr-defined]
+                span.to_dict()
                 for span in spans
             ],
             metrics=[
-                metric.to_dict()  # type: ignore[attr-defined]
+                metric.to_dict()
                 for metric in metrics
             ],
         )

@@ -1,11 +1,10 @@
 click
 
 
-dataclasses_json>=0.6.0
 
 
 joblib
-mashumaro
+mashumaro>=3.10
 nvidia-ml-py
 pandas
 psutil

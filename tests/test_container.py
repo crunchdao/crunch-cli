@@ -1,4 +1,5 @@
 import unittest
+from typing import Any, Iterator
 
 from crunch.container import GeneratorWrapper
 
@@ -6,7 +7,7 @@ from crunch.container import GeneratorWrapper
 class GeneratorWrapperTest(unittest.TestCase):
 
     def test_yield_not_called_before_loop(self):
-        def consumer(stream: iter):
+        def consumer(stream: Iterator[Any]):
             next(stream)
 
         with self.assertRaises(RuntimeError) as context:
@@ -18,7 +19,7 @@ class GeneratorWrapperTest(unittest.TestCase):
         self.assertEqual(GeneratorWrapper.ERROR_YIELD_MUST_BE_CALLED_BEFORE, str(context.exception))
 
     def test_previous_value_not_yield(self):
-        def consumer(stream: iter):
+        def consumer(stream: Iterator[Any]):
             yield
 
             next(stream)
@@ -33,7 +34,7 @@ class GeneratorWrapperTest(unittest.TestCase):
         self.assertEqual(GeneratorWrapper.ERROR_PREVIOUS_VALUE_NOT_YIELD, str(context.exception))
 
     def test_no_yield(self):
-        def consumer(stream: iter):
+        def consumer(stream: Iterator[Any]):
             pass
 
         with self.assertRaises(RuntimeError) as context:
@@ -45,7 +46,7 @@ class GeneratorWrapperTest(unittest.TestCase):
         self.assertEqual(GeneratorWrapper.ERROR_YIELD_NOT_CALLED, str(context.exception))
 
     def test_first_yield_is_none(self):
-        def consumer(stream: iter):
+        def consumer(stream: Iterator[Any]):
             yield 42
 
         with self.assertRaises(ValueError) as context:
@@ -57,7 +58,7 @@ class GeneratorWrapperTest(unittest.TestCase):
         self.assertEqual(GeneratorWrapper.ERROR_FIRST_YIELD_MUST_BE_NONE, str(context.exception))
 
     def test_multiple_yield(self):
-        def consumer(stream: iter):
+        def consumer(stream: Iterator[Any]):
             yield
 
             next(stream)
@@ -74,7 +75,7 @@ class GeneratorWrapperTest(unittest.TestCase):
 
     def test_missing_yields(self):
         if True:
-            def consumer(stream: iter):
+            def consumer(stream: Iterator[Any]):
                 yield
 
                 next(stream)
@@ -92,7 +93,7 @@ class GeneratorWrapperTest(unittest.TestCase):
         self.assertTrue(f"{GeneratorWrapper.ERROR_MULTIPLE_YIELD} (2 / 3)", str(context.exception))
 
         if True:
-            def consumer(stream: iter):
+            def consumer(stream: Iterator[Any]):
                 yield
 
                 next(stream)
@@ -112,7 +113,7 @@ class GeneratorWrapperTest(unittest.TestCase):
             self.assertTrue(f"{GeneratorWrapper.ERROR_MULTIPLE_YIELD} (2 / 3)", str(context.exception))
 
     def test_working(self):
-        def consumer(stream: iter):
+        def consumer(stream: Iterator[Any]):
             yield
 
             for x in stream:

@@ -1,21 +1,15 @@
 import os
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any
 
 import requests
-from dataclasses_json import LetterCase, Undefined, dataclass_json
 
+from crunch.api._serialization import JsonDataClassMixin
 from crunch.constants import TEXT_FILE_EXTENSIONS
 
 
-@dataclass_json(
-    letter_case=LetterCase.CAMEL,  # type: ignore
-    undefined=Undefined.EXCLUDE,
-)
 @dataclass(frozen=True)
-class File:
-
+class File(JsonDataClassMixin):
     path: str
     uri: str | None
     size: int
@@ -38,16 +32,6 @@ class File:
 
         with open(self.uri) as fd:
             return fd.read()
-
-    @classmethod
-    def from_dict_array(
-        cls,
-        input: list[dict[str, Any]],
-    ) -> list['File']:
-        return [
-            cls.from_dict(x)  # type: ignore
-            for x in input
-        ]
 
     @classmethod
     def from_local(

@@ -60,9 +60,9 @@ def leaderboard_rank(
     target, metrics = _find_target(competition, target_name)
 
     projects: list[RankableProject] = (
-        _load_projects_from_api(competition, target, RankableProject.from_dict)  # type: ignore
+        _load_projects_from_api(competition, target, RankableProject.from_dict)
         if scores_from_api else
-        _load_projects_from_file(score_file_path, RankableProject.from_dict)  # type: ignore
+        _load_projects_from_file(score_file_path, RankableProject.from_dict)
     )
 
     if shuffle:
@@ -220,9 +220,9 @@ def reward_compute_bounties(
     target, metrics = _find_target(competition, target_name)
 
     projects: list[RewardableProject] = (
-        _load_projects_from_api(competition, target, RewardableProject.from_dict)  # type: ignore
+        _load_projects_from_api(competition, target, RewardableProject.from_dict)
         if scores_from_api else
-        _load_projects_from_file(score_file_path, RewardableProject.from_dict)  # type: ignore
+        _load_projects_from_file(score_file_path, RewardableProject.from_dict)
     )
 
     if shuffle:

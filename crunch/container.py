@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta
 from types import GeneratorType
-from typing import Any, Callable, Generator, Iterator
+from typing import Any, Callable, Generator, Iterator, cast
+
+
+def _identity(value: Any) -> Any:
+    return value
 
 
 class GeneratorWrapper:
@@ -14,19 +18,19 @@ class GeneratorWrapper:
 
     def __init__(
         self,
-        iterator: Iterator,
-        consumer_factory: Callable[[Iterator], Generator],
+        iterator: Iterator[Any],
+        consumer_factory: Callable[[Iterator[Any]], object],
         *,
         element_wrapper_factory: Callable[[Any], Any] | None = None,
         post_processor: Callable[[Any], Any] | None = None,
     ):
-        self.element_wrapper_factory = element_wrapper_factory or (lambda x: x)
-        self.post_processor = post_processor or (lambda x: x)
+        self.element_wrapper_factory = element_wrapper_factory or _identity
+        self.post_processor = post_processor or _identity
 
         self.ready = None
         self.consumed = True
 
-        def inner():
+        def inner() -> Iterator[Any]:
             for value in iterator:
                 if self.ready is None:
                     raise RuntimeError(self.ERROR_YIELD_MUST_BE_CALLED_BEFORE)
@@ -45,11 +49,12 @@ class GeneratorWrapper:
         if not isinstance(consumer, GeneratorType):
             raise RuntimeError(self.ERROR_YIELD_NOT_CALLED)
 
-        if next(consumer) is not None:
+        generator = cast(Generator[Any, Any, Any], consumer)
+        if next(generator) is not None:
             raise ValueError(self.ERROR_FIRST_YIELD_MUST_BE_NONE)
 
         self.ready = True
-        self.consumer = consumer
+        self.consumer = generator
 
     def collect(
         self,

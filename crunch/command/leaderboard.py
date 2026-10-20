@@ -21,28 +21,29 @@ def leaderboard(
         project_identifier=project.name,
     )
 
-    targets = changes["targets"]  # pyright: ignore[reportUnknownVariableType, reportArgumentType, reportCallIssue]
-    if not len(targets):  # pyright: ignore[reportUnknownArgumentType]
+    targets = changes["targets"]
+    if not len(targets):
         print("leaderboard: model is not appearing on the leaderboard")
         return
 
-    for index, target_changes in enumerate(targets):  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+    for index, target_changes in enumerate(targets):
         if index != 0:
             print()
 
         print(f"target: {target_changes['displayName']!r}")
 
-        rank_unit = Unit.from_dict(target_changes['rank']['unit'])  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType, reportArgumentType, reportCallIssue]
-        current_rank = target_changes['rewardRank']['current']  # pyright: ignore[reportUnknownVariableType]
-        print(f"  rank: {rank_unit.format_value(current_rank) if current_rank is not None else ('unranked')}")  # pyright: ignore[reportUnknownMemberType]
+        rank_unit = Unit.from_dict(target_changes['rank']['unit'])
+        current_rank = target_changes['rewardRank']['current']
+        print(f"  rank: {rank_unit.format_value(current_rank) if current_rank is not None else ('unranked')}")
 
-        for metric_name, metric_changes in target_changes['metrics'].items():  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-            metric = all_metrics.get(metric_name)  # pyright: ignore[reportUnknownArgumentType]
+        for metric_name, metric_changes in target_changes['metrics'].items():
+            metric = all_metrics.get(metric_name)
+            display_name = metric.display_name if metric is not None else metric_name
 
-            metric_unit = Unit.from_dict(metric_changes['unit'])  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
-            current_value = metric_changes['current']  # pyright: ignore[reportUnknownVariableType]
+            metric_unit = Unit.from_dict(metric_changes['unit'])
+            current_value = metric_changes['current']
 
-            print(f"  metric: {metric.display_name!r}: {metric_unit.format_value(current_value) if current_value is not None else ('unavailable')}")  # pyright: ignore[reportUnknownMemberType, reportOptionalMemberAccess]
+            print(f"  metric: {display_name!r}: {metric_unit.format_value(current_value) if current_value is not None else ('unavailable')}")
 
     if store.show_tips:
         print()

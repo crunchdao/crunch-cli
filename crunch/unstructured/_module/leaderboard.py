@@ -3,9 +3,8 @@ from enum import Enum
 from itertools import combinations
 from typing import Any, Callable
 
-from dataclasses_json import DataClassJsonMixin
-
 from crunch.api import Metric, Target
+from crunch.api._serialization import JsonDataClassMixin
 from crunch.unstructured._code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured._execute import call_function
 
@@ -20,7 +19,7 @@ __all__ = [
 
 
 @dataclass
-class RankableProjectMetric(DataClassJsonMixin):
+class RankableProjectMetric(JsonDataClassMixin):
     id: int
     score: float
 
@@ -30,7 +29,7 @@ def _rankable_project_factory() -> list[RankableProjectMetric]:
 
 
 @dataclass
-class RankableProject(DataClassJsonMixin):
+class RankableProject(JsonDataClassMixin):
     id: float | None
     group: str
     rewardable: bool
@@ -50,14 +49,14 @@ class RankPass(Enum):
 
 
 @dataclass
-class RankedProject(DataClassJsonMixin):
+class RankedProject(JsonDataClassMixin):
     id: int
     rank: int
     reward_rank: float | int | None
 
 
 @dataclass
-class ComparedSimilarity(DataClassJsonMixin):
+class ComparedSimilarity(JsonDataClassMixin):
     left_id: int
     right_id: int
     target_id: int

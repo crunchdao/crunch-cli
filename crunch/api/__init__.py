@@ -19,6 +19,9 @@ from crunch.api._domain.data_release import SplitKeyPythonType as SplitKeyPython
 from crunch.api._domain.enum_ import Language as Language
 from crunch.api._domain.enum_ import SplitKeyType as SplitKeyType
 from crunch.api._domain.leaderboard import Leaderboard as Leaderboard
+from crunch.api._domain.leaderboard import LeaderboardChange as LeaderboardChange
+from crunch.api._domain.leaderboard import LeaderboardChangeTarget as LeaderboardChangeTarget
+from crunch.api._domain.leaderboard import LeaderboardChangeValue as LeaderboardChangeValue
 from crunch.api._domain.library import Library as Library
 from crunch.api._domain.library import LibraryRequest as LibraryRequest
 from crunch.api._domain.library import LibraryRequestVerdict as LibraryRequestVerdict

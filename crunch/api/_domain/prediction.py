@@ -64,7 +64,7 @@ class Prediction(Model[int]):
         if unit_attrs is None:
             return None
 
-        return Unit.from_dict(unit_attrs)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType, reportAttributeAccessIssue]
+        return Unit.from_dict(unit_attrs)
 
     @property
     def scores(self):

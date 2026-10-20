@@ -1,16 +1,16 @@
-import dataclasses
 import enum
 import os
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Callable
+from typing import TYPE_CHECKING, BinaryIO, Callable, cast
 
-import dataclasses_json
 import requests
 from tqdm.auto import tqdm
 
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 from crunch.utils import split_into_chunks
 
 if TYPE_CHECKING:
@@ -37,12 +37,8 @@ class DeleteUploadResult(enum.Enum):
     NOT_FOUND = "NOT_FOUND"
 
 
-@dataclasses_json.dataclass_json(  # type: ignore[call-overload]
-    letter_case=dataclasses_json.LetterCase.CAMEL,
-    undefined=dataclasses_json.Undefined.EXCLUDE,
-)
-@dataclasses.dataclass(frozen=True)
-class PresignedUploadRequest:
+@dataclass(frozen=True)
+class PresignedUploadRequest(JsonDataClassMixin):
 
     method: str
     url: str
@@ -96,23 +92,21 @@ class Upload(Model[str]):
 
     def complete(self):
         self._attrs.update(
-            self._checked_client.api.complete_upload(
+            cast("Attrs", self._checked_client.api.complete_upload(
                 self.id,
-            )
+            ))
         )
 
     def abort(self):
         self._attrs.update(
-            self._checked_client.api.abort_upload(
+            cast("Attrs", self._checked_client.api.abort_upload(
                 self.id,
-            )
+            ))
         )
 
     def delete(self):
-        self._attrs.update(
-            self._checked_client.api.delete_upload(
-                self.id,
-            )
+        self._checked_client.api.delete_upload(
+            self.id,
         )
 
 
@@ -159,20 +153,20 @@ class UploadChunk(Model[int]):
 
     @property
     def request(self) -> PresignedUploadRequest:
-        return PresignedUploadRequest.from_dict(  # type: ignore[attr-defined]
-            self._checked_client.api.get_upload_chunk_request(
+        return PresignedUploadRequest.from_dict(
+            cast("Attrs", self._checked_client.api.get_upload_chunk_request(
                 self.upload.id,
                 self.number,
-            )
+            ))
         )
 
     def confirm(self, hash: str):
         self._attrs.update(
-            self._checked_client.api.confirm_upload_chunk(
+            cast("Attrs", self._checked_client.api.confirm_upload_chunk(
                 self.upload.id,
                 self.number,
                 hash,
-            )
+            ))
         )
 
     def send(
@@ -193,6 +187,7 @@ class UploadChunk(Model[int]):
             fd = BytesIO(buffer)
             seek_back_to = 0
 
+        response: requests.Response | None = None
         for retry in range(max_retry + 1):
             last = retry == max_retry
 
@@ -219,6 +214,9 @@ class UploadChunk(Model[int]):
 
                 if retry_callback is not None:
                     retry_callback()
+
+        # the last attempt either succeeds or raises
+        assert response is not None, "no upload attempt was made"
 
         provider = self.upload.provider
         if provider == UploadProvider.AWS_S3:
@@ -353,11 +351,12 @@ class UploadCollection(Collection[Upload]):
         results: dict[str, Upload | None] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
-            response = self._client.api.get_upload_batch(upload_ids_chunk)["uploads"]
+            response = cast(dict[str, dict[str, "Attrs | None"]], self._checked_client.api.get_upload_batch(upload_ids_chunk))
+            uploads = response["uploads"]
 
             for upload_id in upload_ids_chunk:
-                upload_data = response.get(upload_id)
-                
+                upload_data = uploads.get(upload_id)
+
                 results[upload_id] = (
                     self.prepare_model(upload_data)
                     if upload_data is not None
@@ -376,10 +375,11 @@ class UploadCollection(Collection[Upload]):
         results: dict[str, DeleteUploadResult] = {}
 
         for upload_ids_chunk in split_into_chunks(upload_ids, _MAXIMUM_BATCH_SIZE):
-            response = self._client.api.delete_upload_batch(upload_ids_chunk)["uploads"]
+            response = cast(dict[str, dict[str, str]], self._checked_client.api.delete_upload_batch(upload_ids_chunk))
+            uploads = response["uploads"]
 
             for upload_id in upload_ids_chunk:
-                results[upload_id] = DeleteUploadResult[response[upload_id]]
+                results[upload_id] = DeleteUploadResult[uploads[upload_id]]
 
         return results
 
@@ -472,8 +472,8 @@ class UploadEndpointMixin(EndpointMixin):
     def delete_upload(
         self,
         id: str
-    ):
-        return self._result(
+    ) -> None:
+        self._result(
             self.delete(
                 f"/v1/uploads/{id}",
                 json={},
@@ -482,7 +482,7 @@ class UploadEndpointMixin(EndpointMixin):
 
     def get_upload_batch(
         self,
-        upload_ids
+        upload_ids: list[str],
     ):
         return self._result(
             self.post(
@@ -496,7 +496,7 @@ class UploadEndpointMixin(EndpointMixin):
 
     def delete_upload_batch(
         self,
-        upload_ids
+        upload_ids: list[str],
     ):
         return self._result(
             self.post(

@@ -1,6 +1,6 @@
 import os
 import urllib.parse
-from typing import Any, Callable, Iterable, Iterator, cast
+from typing import Any, Callable, Iterable, Iterator, Literal, cast, overload
 
 import requests
 from tqdm.auto import tqdm
@@ -168,12 +168,40 @@ class EndpointClient(
             is_json,
         )
 
+    @overload
+    def _result(
+        self,
+        response: requests.Response,
+        json: Literal[True],
+        binary: Literal[False] = False,
+    ) -> JsonValue:
+        ...
+
+    @overload
+    def _result(
+        self,
+        response: requests.Response,
+        json: Literal[False] = False,
+        *,
+        binary: Literal[True],
+    ) -> bytes:
+        ...
+
+    @overload
+    def _result(
+        self,
+        response: requests.Response,
+        json: Literal[False] = False,
+        binary: Literal[False] = False,
+    ) -> str:
+        ...
+
     def _result(
         self,
         response: requests.Response,
         json: bool = False,
         binary: bool = False,
-    ):
+    ) -> JsonValue | bytes | str:
         assert not (json and binary)
 
         (
@@ -186,7 +214,7 @@ class EndpointClient(
                 raise ValueError(f"server did not return json: `{content_type}`: `{response.text}`")
 
             try:
-                return response.json()
+                return cast(JsonValue, response.json())
             except requests.exceptions.JSONDecodeError as json_error:
                 raise ValueError(f"could not parse json: `{response.text}`") from json_error
 
@@ -213,7 +241,7 @@ class EndpointClient(
             except requests.exceptions.JSONDecodeError as json_error:
                 raise ValueError(f"could not parse json: `{response.text}`") from json_error
 
-            content: list = json["content"]
+            content: list[JsonValue] = json["content"]
             for item in content:
                 yield item
 

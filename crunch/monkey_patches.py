@@ -1,31 +1,41 @@
 import functools
+import importlib
+import inspect
 import os
 import re
 import sys
 import traceback
+from typing import Any, Callable
 
 from . import constants
 
-_patchers = []
+_patchers: list[Callable[[], None]] = []
 
 SHOULD_PRINT_PREFIX_WHEN_POSSIBLE: str | None = None
 
 
-def _patcher(f):
+def _patcher(function: Callable[[], None]) -> Callable[[], None]:
     applied = False
 
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
+    @functools.wraps(function)
+    def wrapper() -> None:
         nonlocal applied
 
         if applied:
             return
 
         applied = True
-        return f(*args, **kwargs)
+        function()
 
     _patchers.append(wrapper)
     return wrapper
+
+
+def _try_import(module_name: str) -> Any | None:
+    try:
+        return importlib.import_module(module_name)
+    except ModuleNotFoundError:
+        return None
 
 
 def apply_all():
@@ -39,7 +49,7 @@ def io_no_tty():
 
     for io in [sys.stdin, sys.stdout, sys.stderr]:
         if io:
-            io.isatty = lambda: False
+            setattr(io, "isatty", lambda: False)
 
 
 TQDM_MININTERVAL = 10
@@ -49,9 +59,9 @@ TQDM_MININTERVAL = 10
 def tqdm_init():
     import tqdm
 
-    original = tqdm.tqdm.__init__
+    original: Callable[..., None] = getattr(tqdm.tqdm, "__init__")
 
-    def patched(*args, **kwargs):
+    def patched(*args: Any, **kwargs: Any) -> None:
         mininterval = kwargs.get("mininterval")
         if mininterval is None or not isinstance(mininterval, (int, float)) or mininterval < TQDM_MININTERVAL:
             kwargs = kwargs.copy()
@@ -59,14 +69,14 @@ def tqdm_init():
 
         return original(*args, **kwargs)
 
-    tqdm.tqdm.__init__ = patched
+    setattr(tqdm.tqdm, "__init__", patched)
 
 
 @_patcher
 def tqdm_display():
     import tqdm
 
-    def tqdm_display(self, msg=None, pos=None):
+    def tqdm_display(self: Any, msg: str | None = None, pos: int | None = None) -> None:
         if pos is None:
             pos = abs(self.pos)
 
@@ -78,12 +88,12 @@ def tqdm_display():
         else:
             print(f"[tqdm:{pos}] {msg}")
 
-    tqdm.tqdm.__init__ = functools.partialmethod(
-        tqdm.tqdm.__init__,
+    setattr(tqdm.tqdm, "__init__", functools.partialmethod(
+        getattr(tqdm.tqdm, "__init__"),
         bar_format='{l_bar}{r_bar}'
-    )
+    ))
 
-    tqdm.tqdm.display = tqdm_display
+    setattr(tqdm.tqdm, "display", tqdm_display)
 
 
 @_patcher
@@ -99,14 +109,14 @@ def tqdm_notebook():
 def pathlib_str_functions():
     import pathlib
 
-    functions = [
+    functions: list[Callable[..., bool]] = [
         str.startswith,
         str.endswith
     ]
 
-    def wrap(method):
+    def wrap(method: Callable[..., bool]) -> Callable[..., bool]:
         @functools.wraps(method)
-        def wrapped(self: pathlib.PurePath, *args, **kwargs):
+        def wrapped(self: pathlib.PurePath, *args: Any, **kwargs: Any) -> bool:
             return method(str(self), *args, **kwargs)
         return wrapped
 
@@ -120,12 +130,14 @@ def pathlib_str_functions():
 
 @_patcher
 def keras_model_verbosity():
-    try:
-        import keras.src.engine.training
-    except ModuleNotFoundError:
+    training = _try_import("keras.src.engine.training")
+    if training is None:
         return
 
-    keras.src.engine.training._get_verbosity = lambda verbose, distribute_strategy: 0 if verbose == 0 else 2
+    def get_verbosity(verbose: int, distribute_strategy: Any) -> int:
+        return 0 if verbose == 0 else 2
+
+    setattr(training, "_get_verbosity", get_verbosity)
 
 
 @_patcher
@@ -143,15 +155,14 @@ CATBOOST_TRAIN_DIR_KEY = "train_dir"
 
 @_patcher
 def catboost_info_directory():
-    try:
-        import catboost.core
-    except ModuleNotFoundError:
+    core = _try_import("catboost.core")
+    if core is None:
         return
 
-    _CatBoostBase = catboost.core._CatBoostBase
-    original = _CatBoostBase.__init__
+    catboost_base = getattr(core, "_CatBoostBase")
+    original: Callable[..., None] = catboost_base.__init__
 
-    def patched(self: _CatBoostBase, params):
+    def patched(self: Any, params: dict[str, Any] | None) -> None:
         train_dir = os.getenv(CATBOOST_TRAIN_DIR_ENVVAR)
 
         if train_dir is not None:
@@ -164,33 +175,32 @@ def catboost_info_directory():
 
         original(self, params)
 
-    _CatBoostBase.__init__ = patched
+    setattr(catboost_base, "__init__", patched)
 
 
 @_patcher
 def logging_file_handler():
     import logging
 
-    original = logging.FileHandler.__init__
+    original: Callable[..., None] = logging.FileHandler.__init__
 
-    def patched(self: logging.FileHandler, filename: str, *args, **kwargs):
+    def patched(self: logging.FileHandler, filename: str, *args: Any, **kwargs: Any) -> None:
         if not filename.startswith("/") and not os.access(filename, os.W_OK):
             filename = os.path.join("/tmp", filename)
             # print(f"[debug] redirect logging file to: {filename}", file=sys.stderr)
 
         original(self, filename, *args, **kwargs)
 
-    logging.FileHandler.__init__ = patched
+    setattr(logging.FileHandler, "__init__", patched)
 
 
 @_patcher
 def pycaret_internal_logging():
-    try:
-        import pycaret.internal.logging
-    except ModuleNotFoundError:
+    internal_logging = _try_import("pycaret.internal.logging")
+    if internal_logging is None:
         return
 
-    pycaret.internal.logging.LOGGER = pycaret.internal.logging.create_logger("/dev/stdout")
+    internal_logging.LOGGER = internal_logging.create_logger("/dev/stdout")
 
 
 def _should_redirect_main_to_user_code():
@@ -203,7 +213,7 @@ def _should_redirect_main_to_user_code():
     if constants.RUN_VIA_CLI:
         return True
 
-    for frame, _ in traceback.walk_stack(sys._getframe()):
+    for frame, _ in traceback.walk_stack(inspect.currentframe()):
         file_name = frame.f_code.co_filename
         if re.search(r"loky(?:\\|/)backend(?:\\|/)popen_", file_name):
             return True
@@ -223,10 +233,11 @@ def pickle_unpickler_find_class():
     import multiprocessing.reduction
     import pickle
 
-    original = pickle._Unpickler.find_class
-    should_redirect = None
+    python_unpickler = getattr(pickle, "_Unpickler")
+    original: Callable[..., Any] = python_unpickler.find_class
+    should_redirect: bool | None = None
 
-    def patched(self: pickle.Unpickler, module_name: str, global_name: str):
+    def patched(self: pickle.Unpickler, module_name: str, global_name: str) -> Any:
         nonlocal should_redirect
         if should_redirect is None:
             should_redirect = _should_redirect_main_to_user_code()
@@ -236,46 +247,46 @@ def pickle_unpickler_find_class():
 
         return original(self, module_name, global_name)
 
-    pickle._Unpickler.find_class = patched
-    multiprocessing.reduction.ForkingPickler.loads = pickle._loads
+    setattr(python_unpickler, "find_class", patched)
+    setattr(multiprocessing.reduction.ForkingPickler, "loads", getattr(pickle, "_loads"))
 
 
 @_patcher
 def joblib_parallel_initializer():
-    try:
-        import joblib
-        import joblib.externals.loky.initializers
-    except ModuleNotFoundError:
+    joblib = _try_import("joblib")
+    loky_initializers = _try_import("joblib.externals.loky.initializers")
+    if joblib is None or loky_initializers is None:
         return
 
-    original = joblib.Parallel.__init__
+    original: Callable[..., None] = joblib.Parallel.__init__
 
-    def patched(self, *args, **kwargs):
+    def patched(self: Any, *args: Any, **kwargs: Any) -> None:
         original(self, *args, **kwargs)
 
         prepare_for_process_initializer()
 
         # Pretty unstable as it relies on private variables
-        args = getattr(self, "_backend_args", None) or getattr(self, "_backend_kwargs", None) or {}
+        backend_arguments: dict[str, Any] = getattr(self, "_backend_args", None) or getattr(self, "_backend_kwargs", None) or {}
 
-        initializer = args.pop("initializer", None)
+        initializer = backend_arguments.pop("initializer", None)
         if initializer is None:
-            args["initializer"] = process_initializer
+            backend_arguments["initializer"] = process_initializer
         else:
-            initializer, initargs = joblib.externals.loky.initializers._chain_initializers([
+            chain_initializers: Callable[..., tuple[Any, Any]] = getattr(loky_initializers, "_chain_initializers")
+            initializer, initializer_arguments = chain_initializers([
                 (process_initializer, ()),
-                (initializer, args.pop("initargs", None) or ())
+                (initializer, backend_arguments.pop("initargs", None) or ())
             ])
 
-            args["initargs"] = initargs
-            args["initializer"] = initializer
+            backend_arguments["initargs"] = initializer_arguments
+            backend_arguments["initializer"] = initializer
 
-    joblib.Parallel.__init__ = patched
+    setattr(joblib.Parallel, "__init__", patched)
 
 
 def prepare_for_process_initializer(
-    module_name=constants.DEFAULT_USER_CODE_MODULE_NAME
-):
+    module_name: str = constants.DEFAULT_USER_CODE_MODULE_NAME
+) -> None:
     user_code_module = sys.modules.get(module_name)
 
     user_code_path = user_code_module.__file__ if user_code_module is not None else None
@@ -286,7 +297,7 @@ def prepare_for_process_initializer(
     os.environ[constants.MAIN_FILE_PATH_ENV_VAR] = user_code_path
 
 
-def process_initializer(*args, **kwargs):
+def process_initializer(*args: Any, **kwargs: Any) -> None:
     apply_all()
 
     user_code_module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR, constants.DEFAULT_USER_CODE_MODULE_NAME)

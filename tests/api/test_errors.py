@@ -28,6 +28,7 @@ class ErrorsTest(unittest.TestCase):
             api.CrunchNotFoundException,
             type(error)
         )
+        assert isinstance(error, api.CrunchNotFoundException)
 
         self.assertEqual(
             api.PhaseType.SUBMISSION,

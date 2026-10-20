@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from crunch.api._resource import Collection, EndpointMixin, Model
 
@@ -64,9 +64,9 @@ class SubmissionFileCollection(Collection[SubmissionFile]):
     def list(
         self
     ) -> list[SubmissionFile]:
-        from_attrs = self.submission._attrs.get("files")
+        from_attrs = self.submission._attrs.get("files")  # pyright: ignore[reportPrivateUsage]
         if from_attrs:
-            return self.prepare_models(from_attrs)
+            return self.prepare_models(cast("JsonValue", from_attrs))
 
         return self.prepare_models(
             self._checked_client.api.list_submission_files(

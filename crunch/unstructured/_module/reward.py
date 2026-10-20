@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from dataclasses_json import DataClassJsonMixin
-
 from crunch.api import Metric, Target
+from crunch.api._serialization import JsonDataClassMixin
 from crunch.unstructured._code_loader import CodeLoader, ModuleWrapper, NoCodeFoundError
 from crunch.unstructured._execute import call_function
 
@@ -15,7 +14,7 @@ __all__ = [
 
 
 @dataclass
-class RewardableProjectMetric(DataClassJsonMixin):
+class RewardableProjectMetric(JsonDataClassMixin):
     id: int
     score: float
 
@@ -25,7 +24,7 @@ def _rewardable_project_factory() -> list[RewardableProjectMetric]:
 
 
 @dataclass
-class RewardableProject(DataClassJsonMixin):
+class RewardableProject(JsonDataClassMixin):
     id: float | None
     group: str
     rewardable: bool
@@ -40,7 +39,7 @@ class RewardableProject(DataClassJsonMixin):
 
 
 @dataclass
-class RewardedProject(DataClassJsonMixin):
+class RewardedProject(JsonDataClassMixin):
     id: int
     amount: float | int | None
 

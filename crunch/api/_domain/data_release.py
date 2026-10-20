@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, TypeAlias
 
-from dataclasses_json import LetterCase, Undefined, dataclass_json
-
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -23,9 +22,8 @@ class DataReleaseTargetResolution(Enum):
         return self.name
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class DataFile:
+class DataFile(JsonDataClassMixin):
 
     name: str
     url: str
@@ -58,22 +56,12 @@ class DataReleaseSplitReduced(Enum):
 SplitKeyPythonType: TypeAlias = str | int
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class DataReleaseSplit:
+class DataReleaseSplit(JsonDataClassMixin):
 
     key: SplitKeyPythonType
     group: DataReleaseSplitGroup
     reduced: DataReleaseSplitReduced | None = None
-
-    @staticmethod
-    def from_dict_array(
-        input: list[dict[str, Any]]
-    ) -> list["DataReleaseSplit"]:
-        return [
-            DataReleaseSplit.from_dict(x)  # type: ignore[attr-defined]
-            for x in input
-        ]
 
 
 class SizeVariant(Enum):
@@ -139,7 +127,7 @@ class DataRelease(Model[int]):
             files = self._attrs["dataFiles"]
 
         return {
-            key: DataFile.from_dict(value)  # type: ignore[attr-defined]
+            key: DataFile.from_dict(value)
             for key, value in files.items()
         }
 
@@ -150,7 +138,7 @@ class DataRelease(Model[int]):
             self.reload(include_splits=True)
             splits = self._attrs["splits"]
 
-        return list(DataReleaseSplit.from_dict_array(splits))
+        return DataReleaseSplit.from_dict_array(splits)
 
     def reload(
         self,
@@ -167,12 +155,19 @@ class DataReleaseCollection(Collection[DataRelease]):
 
     def __init__(
         self,
-        competition: "Competition",
+        competition: "Competition | None",
         client: "Client | None" = None
     ):
         super().__init__(client)
 
         self.competition = competition
+
+    @property
+    def _checked_competition(self) -> "Competition":
+        if self.competition is None:
+            raise Exception("competition unavailable")
+
+        return self.competition
 
     def get(
         self,
@@ -181,7 +176,7 @@ class DataReleaseCollection(Collection[DataRelease]):
     ) -> DataRelease:
         return self.prepare_model(
             self._checked_client.api.get_data_release(
-                self.competition.id,
+                self._checked_competition.id,
                 number,
                 include_splits=include_splits,
             )
@@ -192,7 +187,7 @@ class DataReleaseCollection(Collection[DataRelease]):
     ) -> list[DataRelease]:
         return self.prepare_models(
             self._checked_client.api.list_data_releases(
-                self.competition.id
+                self._checked_competition.id
             )
         )
 

@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from dataclasses_json import LetterCase, Undefined, dataclass_json
-
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -13,21 +12,10 @@ if TYPE_CHECKING:
     from crunch.api._types import Attrs
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class ScoreDetail:
-
+class ScoreDetail(JsonDataClassMixin):
     key: str | int
     value: float | None
-
-    @staticmethod
-    def from_dict_array(
-        input: list[dict[str, Any]]
-    ) -> list["ScoreDetail"]:
-        return [
-            ScoreDetail.from_dict(x)  # type: ignore[attr-defined]
-            for x in input
-        ]
 
 
 class Score(Model[int]):

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from crunch.api._identifiers import ProjectIdentifierType, UserIdentifierType
 from crunch.api._resource import Collection, EndpointMixin, Model
@@ -10,6 +10,29 @@ if TYPE_CHECKING:
     from crunch.api._identifiers import CompetitionIdentifierType, LeaderboardIdentifierType
     from crunch.api._resource import JsonValue
     from crunch.api._types import Attrs
+
+
+class LeaderboardChangeValue(TypedDict):
+    unit: dict[str, Any]
+    current: float | None
+    previous: float | None
+    change: float | None
+    changeDirection: Literal["RED", "GREEN"]
+
+
+class LeaderboardChangeTarget(TypedDict):
+    id: int
+    name: str
+    displayName: str
+    rank: LeaderboardChangeValue
+    rewardRank: LeaderboardChangeValue
+    mean: LeaderboardChangeValue
+    metrics: dict[str, LeaderboardChangeValue]
+
+
+class LeaderboardChange(TypedDict):
+    submitted: bool
+    targets: list[LeaderboardChangeTarget]
 
 
 class Leaderboard(Model[int]):
@@ -103,14 +126,14 @@ class Leaderboard(Model[int]):
         user_identifier: "UserIdentifierType",
         project_identifier: "ProjectIdentifierType | None" = None,
         crunch: "Crunch | None" = None,
-    ) -> list[dict[str, Any]]:  # TODO properly type!
-        return self._checked_client.api.get_leaderboard_changes(
+    ) -> LeaderboardChange:
+        return cast(LeaderboardChange, self._checked_client.api.get_leaderboard_changes(
             self._competition.resource_identifier,
             self.resource_identifier,
             user_identifier,
             project_identifier=project_identifier,
             crunch_id=crunch.id if crunch else None
-        )
+        ))
 
 
 class LeaderboardCollection(Collection[Leaderboard]):

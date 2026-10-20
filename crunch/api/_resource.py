@@ -75,7 +75,9 @@ class Model(Generic[ID]):
         if not isinstance(resource_identifier, (list, tuple)):
             resource_identifier = [resource_identifier]
 
-        new_model = self._checked_collection.get(
+        # every collection declares its own `get` signature
+        get = cast(Callable[..., "Model[Any]"], getattr(self._checked_collection, "get"))
+        new_model = get(
             *resource_identifier,
             *args,
             **kwargs
@@ -86,25 +88,25 @@ class Model(Generic[ID]):
 
     @classmethod
     def from_dict(
-        cls,
-        input: dict,
-        *args
-    ):
+        cls: type[M],
+        input: dict[str, Any],
+        *args: Any,
+    ) -> M:
         return cls(*args, attrs=input)
 
     @classmethod
     def from_dict_array(
-        cls,
-        input: list[dict],
-        *args
-    ):
+        cls: type[M],
+        input: list[dict[str, Any]],
+        *args: Any,
+    ) -> list[M]:
         return [
             cls.from_dict(x, *args)
             for x in input
         ]
 
 
-T = TypeVar('T', bound=Model)
+T = TypeVar('T', bound="Model[Any]")
 
 
 class Collection(Generic[T]):
@@ -165,7 +167,7 @@ class Collection(Generic[T]):
 
     def prepare_models(self, attrs_list: "JsonValue | T | Iterator[JsonValue | T]", *args: Any) -> builtins.list[T] | Iterator[T]:
         if isinstance(attrs_list, GeneratorType):
-            return self._prepare_models_with_yield(attrs_list, args)
+            return self._prepare_models_with_yield(cast(Iterator["JsonValue | T"], attrs_list), args)
 
         if isinstance(attrs_list, list):
             return [
@@ -175,11 +177,9 @@ class Collection(Generic[T]):
 
         raise Exception(f"can't create {self.model.__name__} list from {attrs_list}")
 
-    def _prepare_models_with_yield(self, attrs_list: Iterator["JsonValue | T"], args: Any):
+    def _prepare_models_with_yield(self, attrs_list: Iterator["JsonValue | T"], args: tuple[Any, ...]) -> Iterator[T]:
         for attrs in attrs_list:
             yield self.prepare_model(attrs, *args)
-
-        return GeneratorExit
 
 
 JsonValue: TypeAlias = str | int | float | bool | None | dict[str, "JsonValue"] | list["JsonValue"]
@@ -215,7 +215,8 @@ class EndpointMixin(ABC):
         self,
         response: requests.Response,
         json: Literal[False] = False,
-        binary: Literal[True] = True,
+        *,
+        binary: Literal[True],
     ) -> bytes:
         ...
 

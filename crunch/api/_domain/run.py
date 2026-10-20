@@ -126,12 +126,12 @@ class Run(BaseModel[int]):
 
     @property
     def logs(self) -> list["RunLog"]:
-        return self._checked_client.api.get_run_logs(
+        return cast(list["RunLog"], self._checked_client.api.get_run_logs(
             self._project.competition.id,
             self._project.user_id,
             self._project.name,
             self.id
-        )
+        ))
 
     def select(self):
         from crunch.api._domain.project import ProjectSelection
@@ -149,12 +149,12 @@ class Run(BaseModel[int]):
 
     def terminate(self):
         self._attrs.update(
-            self._checked_client.api.terminate_run(
+            cast("Attrs", self._checked_client.api.terminate_run(
                 self._project.competition.id,
                 self._project.user_id,
                 self._project.name,
                 self.id
-            )
+            ))
         )
 
 

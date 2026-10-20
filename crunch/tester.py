@@ -20,7 +20,7 @@ def install_logger():
 
     if not _logged_installed:
         import coloredlogs
-        coloredlogs.install(
+        coloredlogs.install(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             level=logging.INFO,
             logger=logger,
             fmt='%(asctime)s %(message)s',

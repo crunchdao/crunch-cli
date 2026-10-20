@@ -1,10 +1,9 @@
-import dataclasses
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-
-from dataclasses_json import dataclass_json, LetterCase, Undefined
 
 from crunch.api._domain.enum_ import Language
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -14,40 +13,18 @@ if TYPE_CHECKING:
     from crunch.api._types import Attrs
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
-@dataclasses.dataclass(frozen=True)
-class QuickstarterAuthor:
-
+@dataclass(frozen=True)
+class QuickstarterAuthor(JsonDataClassMixin):
     name: str
     link: str | None = None
 
-    @staticmethod
-    def from_dict_array(
-        input: list[dict[str, Any]],
-    ) -> list["QuickstarterAuthor"]:
-        return [
-            QuickstarterAuthor.from_dict(x)  # type: ignore
-            for x in input
-        ]
 
-
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
-@dataclasses.dataclass(frozen=True)
-class QuickstarterFile:
-
+@dataclass(frozen=True)
+class QuickstarterFile(JsonDataClassMixin):
     name: str
     url: str
     github_url: str
     colab_url: str | None = None
-
-    @staticmethod
-    def from_dict_array(
-        input: list[dict[str, Any]],
-    ) -> list["QuickstarterFile"]:
-        return [
-            QuickstarterFile.from_dict(x)  # type: ignore
-            for x in input
-        ]
 
 
 class Quickstarter(Model[int]):

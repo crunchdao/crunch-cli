@@ -3,9 +3,8 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
-from dataclasses_json import LetterCase, Undefined, dataclass_json
-
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -16,23 +15,20 @@ if TYPE_CHECKING:
     from crunch.api._types import Attrs
 
 
-@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
 @dataclass
-class FileLimit:
+class FileLimit(JsonDataClassMixin):
     total_size: int
 
 
-@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
 @dataclass
-class CountLimit:
+class CountLimit(JsonDataClassMixin):
     current: int
     maximum: int
     bypass: bool
 
 
-@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
 @dataclass
-class ProjectSubmitQuota:
+class ProjectSubmitQuota(JsonDataClassMixin):
     code_files: FileLimit
     model_files: FileLimit
     notebook_file: FileLimit
@@ -40,9 +36,8 @@ class ProjectSubmitQuota:
     submissions_per_day: CountLimit
 
 
-@dataclass_json(undefined=Undefined.EXCLUDE, letter_case=LetterCase.CAMEL)  # type: ignore[call-overload]
 @dataclass
-class ProjectComputeQuota:
+class ProjectComputeQuota(JsonDataClassMixin):
     available: int
     remaining: int
     used: int
@@ -115,22 +110,22 @@ class Project(Model[int]):
 
     @property
     def submit_quota(self) -> ProjectSubmitQuota:
-        return ProjectSubmitQuota.from_dict(  # type: ignore[attr-defined]
-            self._checked_client.api.get_project_submit_quota(
+        return ProjectSubmitQuota.from_dict(
+            cast("Attrs", self._checked_client.api.get_project_submit_quota(
                 self.competition.id,
                 self.user_id,
                 self.name,
-            )
+            ))
         )
 
     @property
     def compute_quota(self) -> ProjectComputeQuota:
-        return ProjectComputeQuota.from_dict(  # type: ignore[attr-defined]
-            self._checked_client.api.get_project_compute_quota(
+        return ProjectComputeQuota.from_dict(
+            cast("Attrs", self._checked_client.api.get_project_compute_quota(
                 self.competition.id,
                 self.user_id,
                 self.name,
-            )
+            ))
         )
 
     @property
@@ -338,7 +333,7 @@ class ProjectTokenCollection(Collection[ProjectToken]):
 
     def __init__(
         self,
-        competition: "Competition",
+        competition: "Competition | None",
         client: "Client | None" = None
     ):
         super().__init__(client)

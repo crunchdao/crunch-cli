@@ -423,7 +423,6 @@ def _create_usage_figure(metric_objects: list["RunnerRunMetric"]):
         "vram": "#f59e0b",
     }
 
-    metrics["timestamp"] = pandas.to_datetime(metrics["timestamp"])
     for column in ["ram", "disk", "vram"]:
         metrics[f"{column}_gb"] = metrics[column] / 1024 ** 3
 
@@ -551,7 +550,6 @@ def _create_usage_figure(metric_objects: list["RunnerRunMetric"]):
 
 
 def _create_timeline_figure(span_objects: list["LocalSpan"]):
-    import pandas
     import plotly.graph_objects as go
 
     from crunch.api._domain.runner import RunnerRunSpanStatus
@@ -561,6 +559,8 @@ def _create_timeline_figure(span_objects: list["LocalSpan"]):
         RunnerRunSpanStatus.ENDED: "#0da54f",
         RunnerRunSpanStatus.FAILED: "#ef4343",
     }
+
+    first_started_at = min((span.started_at for span in span_objects), default=None)
 
     span_dicts: list[dict[str, Any]] = []
     for span in span_objects:
@@ -577,22 +577,16 @@ def _create_timeline_figure(span_objects: list["LocalSpan"]):
             "id": str(span.id),
             "parent_id": str(span.parent_id) if span.parent_id is not None else "",
             "description": description,
-            "started_at": pandas.to_datetime(span.started_at),
-            "ended_at": pandas.to_datetime(span.ended_at) if span.ended_at is not None else None,
-            "duration": -1,
-            "offset": -1,
+            "duration": (span.ended_at - span.started_at).total_seconds() if span.ended_at is not None else float("nan"),
+            "offset": (span.started_at - first_started_at).total_seconds() if first_started_at is not None else 0.0,
             "status": span.status,
             "attributes": attributes,
             "error": span.error,
         })
 
-    spans = pandas.DataFrame(span_dicts)
-    spans["duration"] = (spans["ended_at"] - spans["started_at"]).dt.total_seconds()
-    spans["offset"] = (spans["started_at"] - spans["started_at"].min()).dt.total_seconds()
-
     figure = go.Figure()
 
-    for _, row in spans.iterrows():
+    for row in span_dicts:
         hovertemplate = (
             "%{customdata[0]}<br>"
             "Duration: %{customdata[1]}<br>"
@@ -621,7 +615,7 @@ def _create_timeline_figure(span_objects: list["LocalSpan"]):
         ))
 
     figure.update_layout(  # pyright: ignore[reportUnknownMemberType]
-        height=max(300, len(spans) * 40),
+        height=max(300, len(span_dicts) * 40),
         barmode="overlay",
         xaxis=dict(
             tickformat="%H:%M:%S",
@@ -629,7 +623,7 @@ def _create_timeline_figure(span_objects: list["LocalSpan"]):
         yaxis=dict(
             autorange="reversed",
             categoryorder="array",
-            categoryarray=spans["description"].tolist(),
+            categoryarray=[row["description"] for row in span_dicts],
         ),
         margin=dict(t=20, l=150, r=20, b=0),
         hoverlabel=dict(

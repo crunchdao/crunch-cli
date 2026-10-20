@@ -3,9 +3,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Iterator
 
-from dataclasses_json import LetterCase, Undefined, dataclass_json
-
 from crunch.api._resource import Collection, EndpointMixin, Model
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._client import Client
@@ -28,41 +27,31 @@ class RuntimeDefinitionStatus(Enum):
     DISABLED = "DISABLED"
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class RuntimeDefinitionPoweredBy:
-
+class RuntimeDefinitionPoweredBy(JsonDataClassMixin):
     text: str
     url: str
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class RuntimeDefinitionSpecificationSize:
-
+class RuntimeDefinitionSpecificationSize(JsonDataClassMixin):
     size: int
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class RuntimeDefinitionSpecificationCpu:
-
+class RuntimeDefinitionSpecificationCpu(JsonDataClassMixin):
     core_count: int
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class RuntimeDefinitionSpecificationGpu:
-
+class RuntimeDefinitionSpecificationGpu(JsonDataClassMixin):
     count: int | None
     model: str | None
     driver: str | None
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)  # type: ignore[call-overload]
 @dataclass(frozen=True)
-class RuntimeDefinitionSpecification:
-
+class RuntimeDefinitionSpecification(JsonDataClassMixin):
     memory: RuntimeDefinitionSpecificationSize
     cpu: RuntimeDefinitionSpecificationCpu
     gpu: RuntimeDefinitionSpecificationGpu
@@ -110,11 +99,11 @@ class RuntimeDefinition(Model[str]):
 
     @property
     def powered_by(self) -> RuntimeDefinitionPoweredBy:
-        return RuntimeDefinitionPoweredBy.from_dict(self._attrs["poweredBy"])  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+        return RuntimeDefinitionPoweredBy.from_dict(self._attrs["poweredBy"])
 
     @property
     def specification(self) -> RuntimeDefinitionSpecification:
-        return RuntimeDefinitionSpecification.from_dict(self._attrs["specification"])  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+        return RuntimeDefinitionSpecification.from_dict(self._attrs["specification"])
 
 
 class RuntimeDefinitionCollection(Collection[RuntimeDefinition]):

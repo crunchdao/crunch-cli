@@ -3,10 +3,9 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from dataclasses_json import DataClassJsonMixin
-
 from crunch.api._domain.phase import PhaseType
 from crunch.api._domain.project import ProjectTokenType
+from crunch.api._serialization import JsonDataClassMixin
 from crunch.api._web_url_formatter import WebUrlFormatter
 from crunch.external.humanfriendly import format_size
 from crunch.external.inflection import camelize, underscore
@@ -226,7 +225,7 @@ class DailySubmissionLimitExceededException(ApiException):
 
 
 @dataclass
-class ForbiddenRequirement(DataClassJsonMixin):
+class ForbiddenRequirement(JsonDataClassMixin):
     name: str
     language: str
 
@@ -241,7 +240,7 @@ class ForbiddenLibraryException(ApiException):
         super().__init__(message)
 
         self.requirements = [
-            ForbiddenRequirement.from_dict(item)  # pyright: ignore[reportUnknownMemberType]
+            ForbiddenRequirement.from_dict(item)
             for item in requirements
         ]
 
