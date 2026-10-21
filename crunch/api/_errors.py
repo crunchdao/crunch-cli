@@ -75,10 +75,12 @@ class AuthorizationDeniedException(ApiException):
         **kwargs: Any,
     ) -> None:
         print(f"You do not have permission to access this resource: {self.message}")
+        print(f"Make sure the credentials you are using is correct.")
 
         _print_contact()
 
 
+UnauthorizedException = AuthorizationDeniedException
 AccessDeniedException = AuthorizationDeniedException
 InsufficientAuthenticationException = AuthorizationDeniedException
 
