@@ -265,10 +265,10 @@ def download(
                     with tqdm(
                         initial=total_read,
                         total=file_length,
-                        unit='iB',
+                        unit='B',
                         unit_scale=True,
                         leave=False,
-                        disable=not progress_bar
+                        disable=None if progress_bar else True,
                     ) as progress:
                         for chunk in response.iter_content(chunk_size=1024 * 16):
                             chunk_size = len(chunk)

@@ -256,9 +256,8 @@ class UploadCollection(ApiCollection[Upload]):
             desc=f"uploading `{name}`",
             unit="B",
             unit_scale=True,
-            unit_divisor=1024,
             miniters=1,
-            disable=not progress_bar,
+            disable=None if progress_bar else True,
             leave=False,
         )
 
