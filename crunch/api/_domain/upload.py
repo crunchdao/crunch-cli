@@ -280,6 +280,8 @@ class UploadCollection(ApiCollection[Upload]):
                     byte_callback=progress.update,  # type: ignore
                     retry_callback=retry_callback,
                 )
+
+            upload.complete()
         except (Exception, KeyboardInterrupt) as error:
             try:
                 upload.abort()
@@ -289,8 +291,6 @@ class UploadCollection(ApiCollection[Upload]):
             raise error
         finally:
             progress.close()
-
-        upload.complete()
 
         return upload
 
