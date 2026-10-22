@@ -1,9 +1,8 @@
-import functools
 import json
 import os
 import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import click
 
@@ -15,7 +14,6 @@ from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguag
 from crunch.constants import REQUIREMENTS_TXT
 from crunch.notebook import NotebookSecretNotAccessibleError
 from crunch.repository import Repository, RepositoryError
-from crunch.runner.types import KwargsLike
 from crunch.unstructured.cli import organize_test_group
 
 from . import __version__, api, constants, store
@@ -380,31 +378,6 @@ def push(
             no_afterword=False,
             dry=dry,
         )
-
-
-def local_options(f: Callable[..., Any]) -> Callable[..., Any]:
-    options: list[Callable[..., Callable[..., Any]]] = [
-        click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code."),
-        click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored."),
-        click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop."),
-        click.option("--train-frequency", default=1, show_default=True, help="Train interval."),
-        click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check."),
-        click.option("--round-number", default="@current", help="Change round number to get the data from."),
-        click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`."),
-        click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check."),
-    ]
-
-    return functools.reduce(lambda f, option: option(f), options, f)
-
-
-@cli.command(help="Test your code locally.")
-@local_options
-@click.pass_context
-def test(
-    context: click.Context,
-    **kwargs: KwargsLike,
-):
-    context.forward(local, **kwargs)
 
 
 @cli.command(help="Download the data locally.")
@@ -880,13 +853,20 @@ def whitelist_request(
     )
 
 
-@cli.group(name="runner")
+@cli.group(name="runner", help="(internal use only)")
 def runner_group():
     pass
 
 
 @runner_group.command(help="Run your code locally.")
-@local_options
+@click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code.")
+@click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
+@click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
+@click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
+@click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
+@click.option("--round-number", default="@current", help="Change round number to get the data from.")
+@click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
+@click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check.")
 def local(
     main_file_path: str,
     model_directory_path: str,
@@ -1115,8 +1095,8 @@ def cloud_executor(
         fd.write(exit_content)
 
 
-@cli.group(name="organizer")
-@click.argument('competition_name')
+@cli.group(name="organizer", help="(internal use only)")
+@click.argument('competition-name')
 @click.pass_context
 def organize_group(
     context: click.Context,
@@ -1131,3 +1111,5 @@ def organize_group(
 
 
 organize_group.add_command(organize_test_group)
+
+cli.add_command(local, "test")
