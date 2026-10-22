@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Sequence
 import click
 
 from crunch.api import CompetitionFormat, CompetitionMode, CompetitionStatus, PhaseType, RoundIdentifierType
-from crunch.command.setup import SetupSubmissionNumberClickType, SetupSubmissionNumberType
 from crunch.command.init import API_KEY_CLONE_TOKEN, format_directory
+from crunch.command.setup import SetupSubmissionNumberClickType, SetupSubmissionNumberType
 from crunch.command.submission import SubmissionIdentifierClickType
 from crunch.command.whitelist import GpuRequirementClickType, ProgrammingLanguageClickType
 from crunch.constants import REQUIREMENTS_TXT
@@ -111,52 +111,6 @@ def ping():
         print("server is up!")
     except BaseException as exception:
         print(f"server is down? ({exception})")
-
-
-@cli.command(name="list", help="List all available competitions.")
-@click.option("--format", "format_raw", required=False, type=click.Choice([x.name for x in CompetitionFormat], case_sensitive=False), help="Filter competitions by their format.")
-@click.option("--mode", "mode_raw", required=False, type=click.Choice([x.name for x in CompetitionMode], case_sensitive=False), help="Filter competitions by their mode.")
-@click.option("--status", "status_raw", required=False, type=click.Choice([x.name for x in CompetitionStatus], case_sensitive=False), help="Filter competitions by their status.")
-@click.option("--continuous", required=False, type=bool, help="Filter continuous competitions.")
-@click.option("--external", required=False, type=bool, help="Filter external competitions.")
-@click.option("--featured", required=False, type=bool, help="Filter featured competitions.")
-@click.option("--organizer-name", required=False, type=str, help="Filter competitions by their organizer's name.")
-@click.option("--team-based", required=False, type=bool, help="Filter team based competitions.")
-def list_competitions(
-    format_raw: str | None,
-    status_raw: str | None,
-    mode_raw: str | None,
-    continuous: bool | None,
-    external: bool | None,
-    featured: bool | None,
-    organizer_name: str | None,
-    team_based: bool | None,
-):
-    format = CompetitionFormat[format_raw.upper()] if format_raw else None
-    mode = CompetitionMode[mode_raw.upper()] if mode_raw else None
-    status = CompetitionStatus[status_raw.upper()] if status_raw else None
-
-    client = api.Client.from_env()
-
-    competitions = list(client.competitions.iter(
-        format=format,
-        status=status,
-        mode=mode,
-        continuous=continuous,
-        external=external,
-        featured=featured,
-        organizer_name=organizer_name,
-        team_based=team_based,
-    ))
-
-    if not competitions:
-        print("No competitions found.")
-        return
-
-    print("Available competitions:")
-    for competition in competitions:
-        category = "external" if competition.external else competition.format.name.lower()
-        print(f"- {competition.name} ({category})")
 
 
 @cli.command(help="Initialize an empty workspace directory.")
@@ -488,6 +442,56 @@ def quota():
 
     quota(
         repository,
+    )
+
+
+@cli.group(name="competition", help="Manage competitions.")
+def competition_group():
+    pass
+
+
+@competition_group.command(name="list", help="List available competitions.")
+@click.option("--format", "format_raw", required=False, type=click.Choice([x.name for x in CompetitionFormat], case_sensitive=False), help="Filter competitions by their format.")
+@click.option("--mode", "mode_raw", required=False, type=click.Choice([x.name for x in CompetitionMode], case_sensitive=False), help="Filter competitions by their mode.")
+@click.option("--status", "status_raw", required=False, type=click.Choice([x.name for x in CompetitionStatus], case_sensitive=False), help="Filter competitions by their status.")
+@click.option("--continuous", required=False, type=bool, help="Filter continuous competitions.")
+@click.option("--external", required=False, type=bool, help="Filter external competitions.")
+@click.option("--featured", required=False, type=bool, help="Filter featured competitions.")
+@click.option("--organizer-name", required=False, type=str, help="Filter competitions by their organizer's name.")
+@click.option("--team-based", required=False, type=bool, help="Filter team based competitions.")
+def competition_list(
+    format_raw: str | None,
+    status_raw: str | None,
+    mode_raw: str | None,
+    continuous: bool | None,
+    external: bool | None,
+    featured: bool | None,
+    organizer_name: str | None,
+    team_based: bool | None,
+):
+    from crunch.command.competition import competition_list
+
+    competition_list(
+        format=CompetitionFormat[format_raw.upper()] if format_raw else None,
+        status=CompetitionStatus[status_raw.upper()] if status_raw else None,
+        mode=CompetitionMode[mode_raw.upper()] if mode_raw else None,
+        continuous=continuous,
+        external=external,
+        featured=featured,
+        organizer_name=organizer_name,
+        team_based=team_based,
+    )
+
+
+@competition_group.command(name="show", help="Show a competition.")
+@click.argument("competition-name", required=True)
+def competition_show(
+    competition_name: str,
+):
+    from crunch.command.competition import competition_show
+
+    competition_show(
+        competition_identifier=competition_name,
     )
 
 
@@ -1113,3 +1117,4 @@ def organize_group(
 organize_group.add_command(organize_test_group)
 
 cli.add_command(local, "test")
+cli.add_command(competition_list, "list")

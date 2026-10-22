@@ -30,6 +30,8 @@ class CompetitionMode(ApiEnum):
 class CompetitionStatus(ApiEnum):
     PENDING = "PENDING"
     OPEN = "OPEN"
+    LATE_SUBMISSIONS = "LATE_SUBMISSIONS"
+    SCORING = "SCORING"
     CLOSED = "CLOSED"
 
 
@@ -45,6 +47,7 @@ class Competition(ApiModel):
     format: CompetitionFormat
     mode: CompetitionMode
     split_key_type: SplitKeyType
+    url: str | None
     external: bool
     documentation_url: str | None
     notebook_url: str | None

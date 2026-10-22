@@ -2,7 +2,6 @@ import datetime
 import logging
 import os
 import re
-import shutil
 import sys
 import time
 from contextlib import contextmanager
@@ -293,6 +292,7 @@ def download(
         if os.path.exists(destination_file_path):
             os.unlink(destination_file_path)
 
+        import shutil
         shutil.move(
             source_file_path,
             destination_file_path
