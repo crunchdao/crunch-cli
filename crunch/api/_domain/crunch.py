@@ -13,6 +13,7 @@ class Crunch(ApiModel):
     id: int
     number: int
     published: bool
+    data_release_id: int | None
 
     phase = Parent["Phase"]()
 
