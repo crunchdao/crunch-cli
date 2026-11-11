@@ -662,7 +662,6 @@ class CannotParticipateException(ApiException):
         self,
         message: str,
         has_problem: bool,
-        is_verified: bool,
         is_restricted: bool,
         rule_accepted: bool,
         has_accepted_legal: bool,
@@ -670,7 +669,6 @@ class CannotParticipateException(ApiException):
         super().__init__(message)
 
         self.has_problem = has_problem
-        self.is_verified = is_verified
         self.is_restricted = is_restricted
         self.rule_accepted = rule_accepted
         self.has_accepted_legal = has_accepted_legal
@@ -684,9 +682,6 @@ class CannotParticipateException(ApiException):
 
         if self.has_problem:
             print("- Your account has a pending manual verification (check your email)")
-
-        if not self.is_verified:
-            print("- Your account is not verified yet")
 
         if self.is_restricted:
             print("- Your account is currently restricted")
@@ -704,7 +699,7 @@ class CannotParticipateException(ApiException):
             print("- You have not accepted the new Terms of Use and Privacy Policy.")
             self._show_url("Accept them (you should see a dialog)", WebUrlFormatter.from_env().account())
 
-        if not any([self.has_problem, not self.is_verified, self.is_restricted, not self.rule_accepted, not self.has_accepted_legal]):
+        if not any([self.has_problem, self.is_restricted, not self.rule_accepted, not self.has_accepted_legal]):
             print("- Unknown reason")
 
         _print_contact()
