@@ -14,6 +14,9 @@ class WebUrlFormatter:
     def account(self) -> str:
         return self._format("account")
 
+    def account_settings(self) -> str:
+        return self._format("account", "settings")
+
     def competition(self, competition_name: str) -> str:
         return self._format("competitions", competition_name)
 

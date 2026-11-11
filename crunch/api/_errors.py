@@ -665,6 +665,7 @@ class CannotParticipateException(ApiException):
         is_restricted: bool,
         rule_accepted: bool,
         has_accepted_legal: bool,
+        is_valid_country: bool,
     ):
         super().__init__(message)
 
@@ -672,6 +673,7 @@ class CannotParticipateException(ApiException):
         self.is_restricted = is_restricted
         self.rule_accepted = rule_accepted
         self.has_accepted_legal = has_accepted_legal
+        self.is_valid_country = is_valid_country
 
     def print_helper(
         self,
@@ -699,7 +701,11 @@ class CannotParticipateException(ApiException):
             print("- You have not accepted the new Terms of Use and Privacy Policy.")
             self._show_url("Accept them (you should see a dialog)", WebUrlFormatter.from_env().account())
 
-        if not any([self.has_problem, self.is_restricted, not self.rule_accepted, not self.has_accepted_legal]):
+        if not self.is_valid_country:
+            print("- There seems to be an issue with the country in your profile.")
+            self._show_url("Update it", WebUrlFormatter.from_env().account_settings())
+
+        if not any([self.has_problem, self.is_restricted, not self.rule_accepted, not self.has_accepted_legal, not self.is_valid_country]):
             print("- Unknown reason")
 
         _print_contact()
