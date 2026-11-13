@@ -552,9 +552,11 @@ def submission_group():
 @submission_group.command(name="list", help="List submissions.")
 @click.option("--limit", type=int, default=10)
 @click.option("--all", is_flag=True)
+@click.option("--original", is_flag=True, help="Show the original messages instead of the notes.")
 def submission_list(
     limit: int,
     all: bool,
+    original: bool,
 ):
     from crunch.command.submission import submission_list
 
@@ -563,6 +565,7 @@ def submission_list(
     submission_list(
         repository,
         limit=limit if not all else None,
+        original=original,
     )
 
 
@@ -578,6 +581,24 @@ def submission_show(
     submission_show(
         repository,
         submission_identifier=submission,
+    )
+
+
+@submission_group.command(name="update", help="Update a submission, its message is never changed.")
+@click.argument("submission", type=SubmissionIdentifierClickType(), required=True)
+@click.option("--note", help=f"Shown instead of the message, empty to show the original message again. (limited to {constants.SUBMISSION_MESSAGE_LENGTH} characters)")
+def submission_update(
+    submission: "SubmissionIdentifierType",
+    note: str | None,
+):
+    from crunch.command.submission import submission_update
+
+    repository = _open_repository()
+
+    submission_update(
+        repository,
+        submission_identifier=submission,
+        note=note,
     )
 
 

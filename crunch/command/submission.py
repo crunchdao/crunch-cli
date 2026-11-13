@@ -6,7 +6,7 @@ import click
 from crunch import store
 from crunch.api import EncryptedSubmissionException
 from crunch.command._common import get_project, get_submission, reformat_datetime
-from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY
+from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size
 from crunch.repository import Repository
 from crunch.utils import ascii_table, download, to_unix_path
@@ -39,23 +39,34 @@ class SubmissionIdentifierClickType(click.ParamType):  # pyright: ignore[reportM
         )
 
 
+NOTE_MARKER = "*"
+
+
 def submission_list(
     repository: Repository,
     *,
     limit: int | None,
+    original: bool,
 ):
     submissions = get_project(repository).submissions.list()
 
     reached_limit = limit is not None and len(submissions) > limit
 
+    has_note = False
     rows: list[Sequence[Any]] = []
     for submission in reversed(submissions):
         model = submission.model
 
+        if not original and submission.note:
+            message = f"{submission.note!r} {NOTE_MARKER}"
+            has_note = True
+        else:
+            message = repr(submission.message)
+
         rows.append(
             (
                 submission.number,
-                repr(submission.message),
+                message,
                 format_size(submission.total_size),
                 format_size(model.total_size) if model is not None else "(none)",
                 reformat_datetime(submission.created_at),
@@ -79,6 +90,33 @@ def submission_list(
         print()
         print(f"tips:")
         print(f"  - To show a submission details, use `crunch submission show <number>`.")
+        print(f"  - To change what is shown instead of a message, use `crunch submission update <number> --note <text>`.")
+
+        if has_note:
+            print(f"  - A `{NOTE_MARKER}` marks a note shown instead of the message, use `--original` to show the original messages.")
+
+
+def submission_update(
+    repository: Repository,
+    *,
+    submission_identifier: "SubmissionIdentifierType",
+    note: str | None,
+):
+    if note is None:
+        print("submission: nothing to update")
+        return
+
+    note = note.strip()
+    if len(note) > SUBMISSION_MESSAGE_LENGTH:
+        print(f"submission: note is too long ({len(note)}/{SUBMISSION_MESSAGE_LENGTH} characters)")
+        raise click.Abort()
+
+    project = get_project(repository)
+    submission = get_submission(project, submission_identifier)
+
+    project.submissions.update(submission.number, note=note or None)
+
+    print(f"submission: #{submission.number} updated")
 
 
 def submission_show(
@@ -93,6 +131,7 @@ def submission_show(
     print("submission:")
     print(f"  number: {submission.number}")
     print(f"  message: {submission.message!r}")
+    print(f"  note: {submission.note!r}" if submission.note else "  note: (none)")
     print(f"  size: {format_size(submission.total_size)}")
     print(f"  created at: {reformat_datetime(submission.created_at)}")
 

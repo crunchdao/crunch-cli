@@ -141,6 +141,14 @@ class EndpointClient(requests.Session):
     ) -> Any:
         return self._result(self.put(_format_path(segments), json=json), json=True)
 
+    def patch_json(
+        self,
+        segments: Sequence[str | int],
+        *,
+        json: Any = None,
+    ) -> Any:
+        return self._result(self.patch(_format_path(segments), json=json), json=True)
+
     def delete_json(
         self,
         segments: Sequence[str | int],

@@ -27,6 +27,7 @@ class Submission(ApiModel):
     total_size: int
     created_at: datetime
     model: Model | None = None
+    note: str | None = None
 
     project = Parent["ProjectReference"]()
 
@@ -80,6 +81,20 @@ class SubmissionCollection(ApiCollection[Submission]):
         return self.from_dict_array(self.client.api.get_json([
             "v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "submissions"
         ]))
+
+    def update(
+        self,
+        /,
+        identifier: "SubmissionIdentifierType",
+        *,
+        note: str | None,
+    ) -> Submission:
+        return self.from_dict(self.client.api.patch_json(
+            ["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "submissions", identifier],
+            json={
+                "note": note,
+            },
+        ))
 
     def create(
         self,
