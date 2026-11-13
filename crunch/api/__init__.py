@@ -44,6 +44,7 @@ from crunch.api._domain.quickstarter import QuickstarterFile as QuickstarterFile
 from crunch.api._domain.round import Round as Round
 from crunch.api._domain.run import Run as Run
 from crunch.api._domain.run import RunLog as RunLog
+from crunch.api._domain.run import RunLogs as RunLogs
 from crunch.api._domain.run import RunStatus as RunStatus
 from crunch.api._domain.runner import EndedRunnerRunSpan as EndedRunnerRunSpan
 from crunch.api._domain.runner import RunnerRun as RunnerRun

@@ -27,6 +27,12 @@ class RunLog(TypedDict):
 
 
 @dataclass
+class RunLogs:
+    entries: list[RunLog]
+    cursor: str | None
+
+
+@dataclass
 class Run(ApiModel):
     id: int
     status: RunStatus
@@ -51,6 +57,35 @@ class Run(ApiModel):
     @property
     def logs(self) -> list[RunLog]:
         return self.project.client.api.get_json(["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs", self.id, "logs"])
+
+    def get_logs(
+        self,
+        *,
+        cursor: str | None = None,
+    ) -> RunLogs:
+        response = self.project.client.api.get_json(
+            ["v4", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs", self.id, "logs"],
+            params={
+                "cursor": cursor
+            },
+        )
+
+        archive_url = response.get("archiveUrl")
+        if archive_url is not None:
+            import requests
+
+            archive_response = requests.get(archive_url)
+            archive_response.raise_for_status()
+
+            return RunLogs(
+                entries=archive_response.json(),
+                cursor=None,
+            )
+
+        return RunLogs(
+            entries=response["entries"],
+            cursor=response["cursor"],
+        )
 
     def select(self) -> "ProjectSelection":
         from crunch.api._domain.project import ProjectSelection

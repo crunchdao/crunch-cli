@@ -12,6 +12,8 @@ from crunch.repository import Repository
 from crunch.utils import ascii_table, parse_datetime
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from crunch.api import SubmissionIdentifierType
 
 
@@ -220,14 +222,28 @@ def run_logs(
     follow: bool,
     debug: bool,
 ):
+    FOLLOW_POLL_INTERVAL = 5
+    FOLLOW_TRIES_AFTER_COMPLETION = 2
+    UNORDERED_SERVICE_LINES = ("Created Task: ", "Changed status: PENDING", "Changed status: RUNNING")
+
     run = _get_run(repository, run_id)
 
     in_package_installer: str | None = None
+    latest_created_at: "datetime | None" = None
 
     def _print_log(log: RunLog, debug: bool):
-        nonlocal in_package_installer
+        nonlocal in_package_installer, latest_created_at
 
-        created_at = str(parse_datetime(log['createdAt']).replace(microsecond=0))
+        log_created_at = parse_datetime(log['createdAt'])
+        ordered = not (log["emitter"] == "service" and log["content"].startswith(UNORDERED_SERVICE_LINES))
+
+        # a log can arrive late, like when restored after the run started
+        out_of_order = ordered and latest_created_at is not None and log_created_at < latest_created_at
+        if ordered and not out_of_order:
+            latest_created_at = log_created_at
+
+        content_prefix = "(out of order) " if out_of_order else ""
+        created_at = str(log_created_at.replace(microsecond=0))
         emitter = log["emitter"]
         content = log["content"]
 
@@ -249,32 +265,35 @@ def run_logs(
             return
 
         if not in_package_installer:
-            print(f"{created_at} [{emitter},{'stderr' if log['error'] else 'stdout'}] {content}")
+            print(f"{created_at} [{emitter},{'stderr' if log['error'] else 'stdout'}] {content_prefix}{content}")
 
-    logs = run.logs
-    last_id = logs[-1]["id"] if logs else None
+    fetched_logs = run.get_logs()
+    printed_ids = {line["id"] for line in fetched_logs.entries}
 
+    logs = fetched_logs.entries
     if tail is not None:
         logs = logs[-tail:] if tail else []
 
     for line in logs:
         _print_log(line, debug)
 
-    if follow and _is_running(run):
-        tries = 2
-        while tries > 0:
-            new_logs = run.logs
-            new_last_id = max((line["id"] for line in new_logs), default=None)
+    cursor = fetched_logs.cursor
+    if follow and cursor is not None and _is_running(run):
+        tries = FOLLOW_TRIES_AFTER_COMPLETION
+        while tries > 0 and cursor is not None:
+            sleep(FOLLOW_POLL_INTERVAL)
 
-            if new_last_id != last_id:
-                for line in new_logs:
-                    if last_id is None or line["id"] > last_id:
-                        _print_log(line, debug)
-                last_id = new_last_id
+            fetched_logs = run.get_logs(cursor=cursor)
+            cursor = fetched_logs.cursor
 
-            sleep(10)
+            # once archived, every log is returned again
+            for line in fetched_logs.entries:
+                if line["id"] not in printed_ids:
+                    printed_ids.add(line["id"])
+                    _print_log(line, debug)
+
             if _is_running(run.reload()):
-                tries = 2
+                tries = FOLLOW_TRIES_AFTER_COMPLETION
             else:
                 tries -= 1
 
