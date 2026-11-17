@@ -22,6 +22,12 @@ class Library(ApiModel):
     aliases: list[str]
 
 
+@dataclass
+class LibraryInstallation(ApiModel):
+    constraints: list[str]
+    build_dependencies: dict[str, list[str]]
+
+
 class LibraryCollection(ApiCollection[Library]):
 
     model = Library
@@ -45,6 +51,14 @@ class LibraryCollection(ApiCollection[Library]):
             ["v2", "libraries"],
             params=filters,
             page_size=1000,
+        ))
+
+    def get_installation(
+        self,
+        language: Language,
+    ) -> LibraryInstallation:
+        return LibraryInstallation.from_dict(self.client.api.get_json(
+            ["v1", "libraries", language.name.lower(), "~", "installation"],
         ))
 
 

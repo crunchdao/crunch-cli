@@ -18,6 +18,7 @@ from crunch.api._domain.leaderboard import LeaderboardChange as LeaderboardChang
 from crunch.api._domain.leaderboard import LeaderboardChangeTarget as LeaderboardChangeTarget
 from crunch.api._domain.leaderboard import LeaderboardChangeValue as LeaderboardChangeValue
 from crunch.api._domain.library import Library as Library
+from crunch.api._domain.library import LibraryInstallation as LibraryInstallation
 from crunch.api._domain.library import LibraryRequest as LibraryRequest
 from crunch.api._domain.library import LibraryRequestVerdict as LibraryRequestVerdict
 from crunch.api._domain.metric import Metric as Metric

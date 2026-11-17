@@ -1,5 +1,5 @@
 click
-crunch-convert>=0.12.1
+crunch-convert>=0.14.0
 coloredlogs
 detect_agent
 mashumaro>=3.10
@@ -10,5 +10,4 @@ pyarrow
 python-dotenv
 retry
 requests
-requirements-parser>=0.11.0
 tqdm
