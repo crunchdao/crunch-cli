@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterator
 
@@ -24,8 +24,8 @@ class Library(ApiModel):
 
 @dataclass
 class LibraryInstallation(ApiModel):
-    constraints: list[str] = field(default_factory=list[str])
-    build_dependencies: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    constraints: list[str]
+    build_dependencies: dict[str, list[str]]
 
 
 class LibraryCollection(ApiCollection[Library]):

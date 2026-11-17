@@ -21,10 +21,11 @@ class PlanInstallationTest(unittest.TestCase):
 
         self.assertEqual(["torch"], batches[0].lines)
         self.assertTrue(batches[0].build_isolation)
-        self.assertEqual({"torch": ["torchsort", "warpgbm"]}, batches[0].needed_by)
+        self.assertEqual({}, batches[0].needs)
 
         self.assertEqual(["torchsort", "warpgbm"], batches[1].lines)
         self.assertFalse(batches[1].build_isolation)
+        self.assertEqual({"torchsort": ["torch"], "warpgbm": ["torch"]}, batches[1].needs)
 
     def test_user_version_and_specification_both_apply(self):
         batches = plan_installation(["Cython==0.29.36", "some-library"], {
@@ -53,6 +54,7 @@ class PlanInstallationTest(unittest.TestCase):
 
         self.assertEqual([["a"], ["b"], ["c"]], [batch.lines for batch in batches])
         self.assertEqual([True, False, False], [batch.build_isolation for batch in batches])
+        self.assertEqual([{}, {"b": ["a"]}, {"c": ["b"]}], [batch.needs for batch in batches])
 
     def test_invalid_lines_are_skipped(self):
         batches = plan_installation(["--extra-index-url https://example.com", "torchsort"], {

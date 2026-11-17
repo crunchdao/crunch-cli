@@ -335,8 +335,11 @@ class CloudRunner(Runner):
             self.log(f"build dependencies are cyclic, ignoring them: {error.args[1]}", error=True)
             batches = []
 
-        for batch in batches:
-            self._log_installation_batch(batch)
+        if batches:
+            self.log(f"some libraries need others to be built, installing them in {len(batches)} steps first")
+
+        for index, batch in enumerate(batches, start=1):
+            self._log_installation_batch(batch, index, len(batches))
 
             self.pip([
                 *([] if batch.build_isolation else ["--no-build-isolation"]),
@@ -349,16 +352,13 @@ class CloudRunner(Runner):
             *constraints_args,
         ])
 
-    def _log_installation_batch(self, batch: InstallationBatch):
-        if batch.build_isolation:
-            names = ", ".join(
-                f"{name} (needed by {', '.join(dependents)})"
-                for name, dependents in batch.needed_by.items()
-            )
+    def _log_installation_batch(self, batch: InstallationBatch, index: int, count: int):
+        names = ", ".join(
+            f"{name} (needs {', '.join(batch.needs[name])})" if name in batch.needs else name
+            for name in batch.names
+        )
 
-            self.log(f"installing build dependencies first: {names}")
-        else:
-            self.log(f"installing without build isolation: {', '.join(batch.lines)}")
+        self.log(f"step {index}/{count}: {names}")
 
     def _download_installation(self, language: Language) -> LibraryInstallation:
         @retry(tries=3, delay=2, backoff=2, logger=None)
@@ -397,9 +397,9 @@ class CloudRunner(Runner):
 
         # TODO Use decorator instead
         try:
-            for retry in range(0, self.max_retry + 1):
-                if retry != 0:
-                    retry_in = self.retry_seconds * retry
+            for attempt in range(0, self.max_retry + 1):
+                if attempt != 0:
+                    retry_in = self.retry_seconds * attempt
 
                     self.log(f"retrying in {retry_in} second(s)")
                     sleep(retry_in)

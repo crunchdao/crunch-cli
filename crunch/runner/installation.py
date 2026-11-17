@@ -1,6 +1,6 @@
 import graphlib
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from crunch_convert import RequirementLanguage
 from crunch_convert.requirements_txt import RequirementParseError, parse_from_line
@@ -8,10 +8,10 @@ from crunch_convert.requirements_txt import RequirementParseError, parse_from_li
 
 @dataclass
 class InstallationBatch:
+    names: list[str]
     lines: list[str]
     build_isolation: bool
-    needed_by: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
-    """For the logs: the names of the libraries that need each one of this batch."""
+    needs: dict[str, list[str]]
 
 
 def plan_installation(
@@ -19,10 +19,7 @@ def plan_installation(
     build_dependencies: dict[str, list[str]],
 ) -> list[InstallationBatch]:
     """
-    Order the requirements that need other libraries to be built.
-    The first batch contains the build dependencies, and the next ones the libraries that need them, without build isolation so that they can see them.
-    Everything else is not included and must be installed afterwards.
-
+    Order the requirements that need other libraries to be built, the others must be installed afterwards.
     Names are compared in lowercase, like the whitelist does.
 
     :raises graphlib.CycleError: if the build dependencies are cyclic
@@ -62,21 +59,21 @@ def plan_installation(
         names = sorted(sorter.get_ready())
 
         lines: list[str] = []
-        needed_by: defaultdict[str, list[str]] = defaultdict(list)
         for name in names:
             lines.extend(user_lines_by_name.get(name, []))
 
             for dependent_name, dependency_lines in dependency_lines_by_name.items():
                 if dependent_name in graph and name in dependency_lines:
                     lines.extend(dependency_lines[name])
-                    needed_by[name].append(dependent_name)
 
         batches.append(InstallationBatch(
-            lines=_deduplicate(lines) or names,
+            names=names,
+            lines=list(dict.fromkeys(lines)),
             build_isolation=not batches,
-            needed_by={
-                name: sorted(dependents)
-                for name, dependents in needed_by.items()
+            needs={
+                name: sorted(graph[name])
+                for name in names
+                if graph[name]
             },
         ))
 
@@ -103,7 +100,3 @@ def _group_by_name(lines: list[str]) -> dict[str, list[str]]:
         lines_by_name[requirement.name.lower()].append(str(requirement))
 
     return dict(lines_by_name)
-
-
-def _deduplicate(lines: list[str]) -> list[str]:
-    return list(dict.fromkeys(lines))
