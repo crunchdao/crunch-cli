@@ -1,7 +1,7 @@
+import graphlib
 import json
 import os
 import random
-import re
 import signal
 import stat
 import string
@@ -10,16 +10,19 @@ import sys
 from datetime import timedelta
 from multiprocessing import Lock
 from time import sleep
-from typing import Any, Callable, Generator, Iterable, Literal, TypeAlias
+from typing import Any, Callable, Generator, Literal, TypeAlias
 from urllib.parse import urljoin
 from uuid import uuid4
 
 import requests
+from crunch_convert import RequirementLanguage
+from crunch_convert.requirements_txt import parse_from_file
+from retry import retry
 
 import crunch.store as store
-import requirements as requirements_parser
-from crunch.api import Client, Competition, InvalidRunTokenException, Language, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
+from crunch.api import Client, Competition, InvalidRunTokenException, Language, LibraryInstallation, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
 from crunch.downloader import prepare_all, save_all
+from crunch.runner.installation import InstallationBatch, plan_installation
 from crunch.runner.runner import Runner
 from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
@@ -29,10 +32,6 @@ from crunch.utils import download
 
 UploadedFiles: TypeAlias = dict[str, Upload]
 LastModifications: TypeAlias = dict[str, int]
-
-PACKAGES_WITH_PRIORITY = [
-    "torch"
-]
 
 CONFLICTING_GPU_PACKAGES = [
     "nvidia_cublas_cu11"
@@ -292,7 +291,10 @@ class CloudRunner(Runner):
         self.bash("r-apt", ["apt-get", "-qq", "install", "r-base"])
 
         with open(requirements_r_txt_path, "r") as fd:
-            requirements = requirements_parser.parse(fd.read())
+            requirements = parse_from_file(
+                file_content=fd.read(),
+                language=RequirementLanguage.R,
+            )
 
         apt_names = [
             f"r-cran-{requirement.name}"
@@ -316,47 +318,58 @@ class CloudRunner(Runner):
             self.bash2(["rm", "-r", *user_site_library_paths])
 
     def _install_python_requirements(self, requirements_txt_path: str):
-        constraints_txt_path = self._download_constraints(Language.PYTHON)
-        constraints_args: Iterable[str] = ("-c", constraints_txt_path) if constraints_txt_path else []
+        installation = self._download_installation(Language.PYTHON)
 
-        priority_packages: list[str] = []
+        constraints_txt_path = os.path.join(self.context_directory, "python-constraints.txt")
+        with open(constraints_txt_path, "w") as fd:
+            fd.writelines(f"{line}\n" for line in installation.constraints)
+
+        constraints_args = ["-c", constraints_txt_path]
+
         with open(requirements_txt_path) as fd:
-            for line in fd:
-                line = line.strip()
+            requirement_lines = fd.read().splitlines()
 
-                package = re.search(r"^([\w-]+)", line, re.MULTILINE)
-                if package is None:
-                    continue
+        try:
+            batches = plan_installation(requirement_lines, installation.build_dependencies)
+        except graphlib.CycleError as error:
+            self.log(f"build dependencies are cyclic, ignoring them: {error.args[1]}", error=True)
+            batches = []
 
-                package = package.group(1)
-                if package in PACKAGES_WITH_PRIORITY:
-                    priority_packages.append(line)
+        for batch in batches:
+            self._log_installation_batch(batch)
 
-        if priority_packages:
             self.pip([
-                *priority_packages,
-                *constraints_args
+                *([] if batch.build_isolation else ["--no-build-isolation"]),
+                *batch.lines,
+                *constraints_args,
             ])
 
         self.pip([
-            *(["--no-build-isolation"] if priority_packages else []),
             "-r", requirements_txt_path,
-            *constraints_args
+            *constraints_args,
         ])
 
-    def _download_constraints(self, language: Language) -> str | None:
-        lower = language.name.lower()
-        txt_path = os.path.join(self.context_directory, f"{lower}-constraints.txt")
+    def _log_installation_batch(self, batch: InstallationBatch):
+        if batch.build_isolation:
+            names = ", ".join(
+                f"{name} (needed by {', '.join(dependents)})"
+                for name, dependents in batch.needed_by.items()
+            )
 
-        response = self.client.api.get(urljoin(store.api_base_url, f"/v1/libraries/{lower}/~/constraints"))
-        if not response.ok:
-            self.log(f"failed to download constraints: {response.status_code}: {response.text}", error=True)
-            return
+            self.log(f"installing build dependencies first: {names}")
+        else:
+            self.log(f"installing without build isolation: {', '.join(batch.lines)}")
 
-        with open(txt_path, "w") as fd:
-            fd.write(response.text)
+    def _download_installation(self, language: Language) -> LibraryInstallation:
+        @retry(tries=3, delay=2, backoff=2, logger=None)
+        def download():
+            return self.client.libraries.get_installation(language)
 
-        return txt_path
+        try:
+            return download()
+        except Exception as error:
+            self.log(f"failed to download the installation: {error}", error=True)
+            exit(1)
 
     def _install_crunch_cli(self):
         self.pip([

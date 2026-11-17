@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterator
 
@@ -20,6 +20,12 @@ class Library(ApiModel):
     standard: bool
     gpu_requirement: GpuRequirement
     aliases: list[str]
+
+
+@dataclass
+class LibraryInstallation(ApiModel):
+    constraints: list[str] = field(default_factory=list[str])
+    build_dependencies: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
 
 
 class LibraryCollection(ApiCollection[Library]):
@@ -45,6 +51,14 @@ class LibraryCollection(ApiCollection[Library]):
             ["v2", "libraries"],
             params=filters,
             page_size=1000,
+        ))
+
+    def get_installation(
+        self,
+        language: Language,
+    ) -> LibraryInstallation:
+        return LibraryInstallation.from_dict(self.client.api.get_json(
+            ["v1", "libraries", language.name.lower(), "~", "installation"],
         ))
 
 
