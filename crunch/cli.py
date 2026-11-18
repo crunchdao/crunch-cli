@@ -160,7 +160,7 @@ def init(
 @_token_option
 @click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scratch" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
-@click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
+@click.option("--no-model", is_flag=True, help="Do not download the model (or resources/ directory) of the cloned submission. (faster)")
 @click.option("--force", "-f", is_flag=True, help="Deleting the old directory (if any).")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
@@ -221,7 +221,7 @@ def setup(
 @cli.command(help="Setup a notebook workspace.")
 @click.option("--submission", "submission_number", required=False, type=SetupSubmissionNumberClickType(), default="latest", help='Submission number to clone. ("latest" if not specified, "scratch" to disable)')
 @click.option("--no-data", is_flag=True, help="Do not download the data. (faster)")
-@click.option("--no-model", is_flag=True, help="Do not download the model of the cloned submission.")
+@click.option("--no-model", is_flag=True, help="Do not download the model (or resources/ directory) of the cloned submission. (faster)")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--size", "data_size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), default=DATA_SIZE_VARIANTS[0], help="Use another data variant.")
 @click.argument("competition-name", required=True)
@@ -335,7 +335,7 @@ def push(
 
 
 @cli.command(help="Download the data locally.")
-@click.option("--round-number", default="@current")
+@click.option("--round-number", default="@current", show_default=True, help="Round to download the data of.")
 @click.option("--force", is_flag=True, help="Force the download of the data.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
 def download(
@@ -423,7 +423,7 @@ def status():
     )
 
 
-@cli.command(help="Show the project's rank on the leaderboard.")
+@cli.command(help="Show your best (not selected) model's rank on the leaderboard.")
 def leaderboard():
     from crunch.command.leaderboard import leaderboard
 
@@ -528,7 +528,7 @@ def quickstarter_show(
 
 @quickstarter_group.command(name="apply", help="Download a quickstarter locally.")
 @click.argument("quickstarter_name", required=True)
-@click.option("--overwrite", is_flag=True)
+@click.option("--overwrite", is_flag=True, help="Overwrite the local files that the quickstarter also has.")
 def quickstarter_apply(
     quickstarter_name: str,
     overwrite: bool,
@@ -550,8 +550,8 @@ def submission_group():
 
 
 @submission_group.command(name="list", help="List submissions.")
-@click.option("--limit", type=int, default=10)
-@click.option("--all", is_flag=True)
+@click.option("--limit", type=int, default=10, show_default=True, help="Maximum number of submissions to show.")
+@click.option("--all", is_flag=True, help="Show all submissions, ignoring --limit.")
 @click.option("--original", is_flag=True, help="Show the original messages instead of the notes.")
 def submission_list(
     limit: int,
@@ -632,7 +632,7 @@ def runtime_group():
 
 
 @runtime_group.command(name="list", help="List runtimes.")
-@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
+@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last", show_default=True, help="Submission to use: its number, or @last for the latest one.")
 def runtime_list(
     submission: "SubmissionIdentifierType",
 ):
@@ -648,8 +648,8 @@ def runtime_list(
 
 @runtime_group.command(name="request", help="Request a runtime option.")
 @click.argument("runtime", type=str, required=True)
-@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
-@click.option("--justification", type=str, required=True)
+@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last", show_default=True, help="Submission to use: its number, or @last for the latest one.")
+@click.option("--justification", type=str, required=True, help="Why the submission needs this runtime, reviewed by a human: point to something observed, like a run that ran out of memory or why you need a GPU.")
 def runtime_request(
     runtime: str,
     submission: "SubmissionIdentifierType",
@@ -673,10 +673,10 @@ def run_group():
 
 
 @run_group.command(name="create", help="Create a run.")
-@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last")
-@click.option("--train-frequency", type=int, required=False)
-@click.option("--force-first-train", type=bool, required=False)
-@click.option("--runtime", type=str, required=True)
+@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last", show_default=True, help="Submission to use: its number, or @last for the latest one.")
+@click.option("--train-frequency", type=int, required=False, help="Train interval. (0 if not specified; not available in every competition)")
+@click.option("--force-first-train", type=bool, required=False, help="Train at the first loop: true or false. (forced to true when the submission has no model; false if not specified; not available in every competition)")
+@click.option("--runtime", type=str, required=True, help="Runtime to run on, see `crunch runtime list`.")
 def run_create(
     submission: "SubmissionIdentifierType",
     train_frequency: int | None,
@@ -697,8 +697,8 @@ def run_create(
 
 
 @run_group.command(name="list", help="List runs.")
-@click.option("--limit", type=int, default=10)
-@click.option("--all", is_flag=True)
+@click.option("--limit", type=int, default=10, show_default=True, help="Maximum number of runs to show.")
+@click.option("--all", is_flag=True, help="Show all runs, ignoring --limit.")
 def run_list(
     limit: int,
     all: bool,
@@ -729,9 +729,9 @@ def run_show(
 
 
 @run_group.command(name="logs", help="Show the logs of a run.")
-@click.option("-t", "--tail", type=int, required=False)
-@click.option("--follow", is_flag=True)
-@click.option("--debug", is_flag=True)
+@click.option("-t", "--tail", type=int, required=False, help="Only show the last N lines.")
+@click.option("-f", "--follow", is_flag=True, help="Keep showing new lines until the run ends.")
+@click.option("--debug", is_flag=True, help="Also show the lines hidden by default, like the package installer output.")
 @click.argument("run_id", type=int, required=True)
 def run_logs(
     run_id: int,
@@ -752,15 +752,28 @@ def run_logs(
     )
 
 
-@run_group.command(name="wait", help="Wait for a run to complete. Exit code: 0 = succeeded, 1 = failed, 2 = timed out (still running), 3 = terminated.")
-@click.option("--timeout", type=int, required=False)
-@click.option("--poll-interval", type=int, default=10)
+@run_group.command(name="wait")
+@click.option("--timeout", type=int, required=False, help="Stop waiting after this many seconds, with exit code 4 if the run is still running. (wait until the end if not specified)")
+@click.option("--poll-interval", type=int, default=10, show_default=True, help="Seconds between two checks of the run.")
 @click.argument("run_id", type=int, required=True)
 def run_wait(
     run_id: int,
     timeout: int | None,
     poll_interval: int,
 ):
+    """
+    Wait for a run to complete.
+
+    \b
+    Exit code:
+      0 = succeeded
+      1 = general error (the run may still be running)
+      2 = cli usage error
+      3 = run failed (the run has ended with an error)
+      4 = timed out (the run is still running)
+      5 = terminated (the run was manually stopped)
+    """
+
     from crunch.command.run import run_wait
 
     repository = _open_repository()
@@ -807,15 +820,15 @@ def whitelist_group():
 
 
 @whitelist_group.command(name="search", help="Search whitelisted libraries.")
-@click.option("--language", type=ProgrammingLanguageClickType())
+@click.option("--language", type=ProgrammingLanguageClickType(), help="Only search the libraries of this programming language.")
+@click.option("--limit", type=int, default=10, show_default=True, help="Maximum number of libraries to show.")
+@click.option("--all", is_flag=True, help="Show all libraries, ignoring --limit.")
 @click.argument("query", type=str, required=True)
-@click.option("--limit", type=int, default=10)
-@click.option("--all", is_flag=True)
 def whitelist_search(
-    query: str,
     language: "RequirementLanguage | None",
     limit: int,
     all: bool,
+    query: str,
 ):
     from crunch.command.whitelist import whitelist_search
 
@@ -827,17 +840,13 @@ def whitelist_search(
 
 
 @whitelist_group.command(name="validate", help="Validate a requirements.txt file.")
-@click.option("--language", type=ProgrammingLanguageClickType())
+@click.option("--language", type=ProgrammingLanguageClickType(), default="PYTHON", help="Programming language of the requirements file.")
 @click.argument("requirements_txt_file_path", type=str, required=False)
 def whitelist_validate(
     requirements_txt_file_path: str | None,
-    language: "RequirementLanguage | None",
+    language: "RequirementLanguage",
 ):
     from crunch.command.whitelist import whitelist_validate
-
-    if language is None:
-        from crunch_convert import RequirementLanguage
-        language = RequirementLanguage.PYTHON
 
     if requirements_txt_file_path is None:
         requirements_txt_file_path = language.txt_file_name
@@ -849,11 +858,11 @@ def whitelist_validate(
 
 
 @whitelist_group.command(name="request", help="Request a library to be whitelisted.")
-@click.option("--name", type=str)
-@click.option("--alias", type=str)
-@click.option("--language", type=ProgrammingLanguageClickType())
-@click.option("--gpu", "gpu_requirement", type=GpuRequirementClickType())
-@click.option("--additional-details", type=str)
+@click.option("--name", type=str, help="Package name, as installed (e.g. scikit-learn).")
+@click.option("--alias", type=str, help="Name used to import it, when different from the package name (e.g. sklearn).")
+@click.option("--language", type=ProgrammingLanguageClickType(), default="PYTHON", help="Programming language of the library.")
+@click.option("--gpu", "gpu_requirement", type=GpuRequirementClickType(), help="Whether the library needs a GPU.")
+@click.option("--additional-details", type=str, help="Anything else the reviewers should know, like why it is needed.")
 def whitelist_request(
     name: str | None,
     alias: str | None,
