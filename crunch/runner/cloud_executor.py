@@ -79,7 +79,7 @@ class SandboxExecutor:
             print(f"[debug] fuse not yet triggered - test_path=`{test_path}`", file=sys.stderr)
         else:
             print("fuse never triggered", file=sys.stderr)
-            exit(1)
+            sys.exit(1)
 
     def start(self):
         self._ping(self.ping_urls)
@@ -96,7 +96,7 @@ class SandboxExecutor:
                 requests.get(url)
 
                 print(f"managed to have access to the internet: {url}", file=sys.stderr)
-                exit(1)
+                sys.exit(1)
             except requests.exceptions.RequestException:
                 pass
 

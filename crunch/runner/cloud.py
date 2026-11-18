@@ -170,7 +170,7 @@ class CloudRunner(Runner):
             model_file_urls = self.run.model
         except InvalidRunTokenException:
             self.log("invalid run token", error=True)
-            exit(1)
+            sys.exit(1)
 
         if "install r requirements":
             requirements_r_txt_name = "requirements.r.txt"
@@ -369,7 +369,7 @@ class CloudRunner(Runner):
             return download()
         except Exception as error:
             self.log(f"failed to download the installation: {error}", error=True)
-            exit(1)
+            sys.exit(1)
 
     def _install_crunch_cli(self):
         self.pip([
@@ -425,7 +425,7 @@ class CloudRunner(Runner):
                     break
                 except (ModelTooBigException, PredictionTooBigException) as exception:
                     self.log(f"failed to submit result: {exception}: {exception.size}/{exception.maximum_size} bytes", error=True)
-                    exit(1)
+                    sys.exit(1)
                 except Exception as exception:
                     self.log(f"failed to submit result: {exception}", error=True)
 
@@ -433,7 +433,7 @@ class CloudRunner(Runner):
                         self.log(exception.response.text, error=True)
             else:
                 self.log("max retry reached", error=True)
-                exit(1)
+                sys.exit(1)
         finally:
             self._delete_uploads(prediction_uploads)
             self._delete_uploads(model_uploads)
@@ -544,7 +544,7 @@ class CloudRunner(Runner):
         code = self.do_bash(arguments, env)
         if code != 0:
             self.log(f"command not exited correctly: {code}", error=True)
-            exit(code)
+            sys.exit(code)
 
     def bash2(
         self,
@@ -744,7 +744,7 @@ class CloudRunner(Runner):
             self.report_error_trace(trace_content)
 
             # the user code can exit with 0 after an error, the run must still fail
-            exit(exit_code or 1)
+            sys.exit(exit_code or 1)
 
         if os.path.exists(exit_file_path):
             with open(exit_file_path) as fd:
@@ -757,11 +757,11 @@ class CloudRunner(Runner):
             self.log("user code ended prematurely, likely running out of memory or silently calling exit", error=True)
 
             # an early `exit(0)` from the user code ends with 0, the run must still fail
-            exit(exit_code or 1)
+            sys.exit(exit_code or 1)
 
         if exit_code != 0:
             self.log(f"user code exited with code {exit_code}", error=True)
-            exit(exit_code)
+            sys.exit(exit_code)
 
     def _install_permission_fuse(self):
         self.change_data_permissions(can_access=True)

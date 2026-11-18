@@ -778,7 +778,7 @@ def run_wait(
 
     repository = _open_repository()
 
-    exit(run_wait(
+    sys.exit(run_wait(
         repository,
         run_id=run_id,
         timeout=timeout,
@@ -832,7 +832,7 @@ def whitelist_search(
 ):
     from crunch.command.whitelist import whitelist_search
 
-    exit(whitelist_search(
+    sys.exit(whitelist_search(
         query=query,
         language=language,
         limit=limit if not all else None,
@@ -851,7 +851,7 @@ def whitelist_validate(
     if requirements_txt_file_path is None:
         requirements_txt_file_path = language.txt_file_name
 
-    exit(whitelist_validate(
+    sys.exit(whitelist_validate(
         requirements_txt_file_path=requirements_txt_file_path,
         language=language,
     ))
