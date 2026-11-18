@@ -743,7 +743,8 @@ class CloudRunner(Runner):
 
             self.report_error_trace(trace_content)
 
-            exit(exit_code)
+            # the user code can exit with 0 after an error, the run must still fail
+            exit(exit_code or 1)
 
         if os.path.exists(exit_file_path):
             with open(exit_file_path) as fd:
@@ -754,7 +755,9 @@ class CloudRunner(Runner):
         if got_content != exit_content:
             self.log(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content[:len(exit_content) * 2]}`", error=True)
             self.log("user code ended prematurely, likely running out of memory or silently calling exit", error=True)
-            exit(exit_code)
+
+            # an early `exit(0)` from the user code ends with 0, the run must still fail
+            exit(exit_code or 1)
 
         if exit_code != 0:
             self.log(f"user code exited with code {exit_code}", error=True)
