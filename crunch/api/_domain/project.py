@@ -39,6 +39,7 @@ class ProjectComputeQuota(JsonDataClassMixin):
     remaining: timedelta
     used: timedelta
     running: bool
+    bypass: bool
 
 
 class ProjectReference:
