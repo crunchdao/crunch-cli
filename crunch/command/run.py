@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 import click
 
 from crunch import store
-from crunch.api import CurrentRoundNotFoundException, Prediction, ProjectReference, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, Score
+from crunch.api import CurrentRoundNotFoundException, InternalServerException, Prediction, ProjectReference, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, Score
 from crunch.command._common import get_project, get_submission, reformat_datetime
 from crunch.repository import Repository
 from crunch.utils import ascii_table, parse_datetime
@@ -310,11 +310,15 @@ def run_logs(
 
 
 class RunWaitExitCode(IntEnum):
+    """1 and 2 are left to errors and usage errors, as for every other command."""
 
     SUCCEEDED = 0
-    FAILED = 1
-    TIMED_OUT = 2
-    TERMINATED = 3
+    FAILED = 3
+    TIMED_OUT = 4
+    TERMINATED = 5
+
+
+WAIT_RETRIES = 3
 
 
 def run_wait(
@@ -331,7 +335,7 @@ def run_wait(
         print("wait: waiting for completion")
 
         start_time = current_time()
-        while _is_running(run.reload()):
+        while _is_still_running(run):
             sleep(poll_interval)
 
             if timeout is not None and (current_time() - start_time) > timeout:
@@ -351,9 +355,24 @@ def run_wait(
         if not timeout:
             print(f"  - To only wait for a certain amount of time, use `crunch run wait {run_id} --timeout <seconds>`.")
 
-        print(f"  - The exit code is the run status: {', '.join(f'{code.value} = {code.name}' for code in RunWaitExitCode)}.")
+        print(f"  - The exit code is the run status: {', '.join(f'{code.value} = {code.name}' for code in RunWaitExitCode)}, or 1 on an error.")
 
     return exit_code
+
+
+def _is_still_running(run: "Run") -> bool:
+    """Retries through network and server errors, a run can be waited for hours."""
+
+    from requests import RequestException
+
+    for _ in range(WAIT_RETRIES):
+        try:
+            return _is_running(run.reload())
+        except (RequestException, InternalServerException) as exception:
+            print(f"wait: could not check the run, retrying in 10 seconds: {exception}")
+            sleep(10)
+
+    return _is_running(run.reload())  # the last attempt lets its error through
 
 
 SELECTION_ORIGIN_STATUSES = {
