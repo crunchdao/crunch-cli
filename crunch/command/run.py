@@ -1,4 +1,6 @@
+import sys
 from enum import IntEnum
+from statistics import mean
 from time import sleep
 from time import time as current_time
 from typing import TYPE_CHECKING, Any, Sequence
@@ -6,10 +8,11 @@ from typing import TYPE_CHECKING, Any, Sequence
 import click
 
 from crunch import store
-from crunch.api import CurrentRoundNotFoundException, InternalServerException, Prediction, ProjectReference, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, Score
+from crunch.api import CurrentRoundNotFoundException, InternalServerException, Prediction, ProjectReference, ProjectSelection, ProjectSelectionOrigin, Run, RunLog, RunNotFoundException, RunNotSuccessfulException, RunStatus, RuntimeOptionStatus, RuntimeType, RunTraceSpan, RunTraceSpanStatus, Score
 from crunch.command._common import get_project, get_submission, reformat_datetime
+from crunch.external.humanfriendly import format_size
 from crunch.repository import Repository
-from crunch.utils import ascii_table, parse_datetime
+from crunch.utils import ascii_table, format_duration, parse_datetime, shorten
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -309,6 +312,93 @@ def run_logs(
             print(f"  - To follow the logs in real-time, use `crunch run logs {run.id} --follow`.")
 
 
+def run_traces(
+    repository: Repository,
+    *,
+    run_id: int,
+):
+    run = _get_run(repository, run_id)
+
+    traces = run.get_traces()
+    if not traces.spans:
+        print(f"run {run_id}: no traces (yet)")
+        return
+
+    metrics = traces.metrics
+    origin = min(span.started_at for span in traces.spans)
+
+    # name: (samples, how a step sums them up, format)
+    resources = {
+        "cpu": (metrics.cpu, "average", _format_percent),
+        "gpu": (metrics.gpu, "average", _format_percent),
+        "ram": (metrics.ram, "peak", _format_size),
+        "vram": (metrics.vram, "peak", _format_size),
+        "disk": (metrics.disk, "peak", _format_size),
+    }
+
+    if run.runtime_type != RuntimeType.GPU:
+        del resources["gpu"], resources["vram"]
+
+    maximums: dict[str, float] = {"cpu": 100, "gpu": 100}
+    limits: dict[str, str] = {}
+    if run.memory:
+        maximums["ram"] = memory = run.memory * 1024 * 1024
+        limits["ram"] = f"of {_format_size(memory)}"
+
+    step_resources = [name for name in resources if name != "disk"]
+    not_ended = "running" if _is_running(run) else "unfinished"
+
+    rows: list[Sequence[Any]] = []
+    for span, depth in _spans_depth_first(traces.spans):
+        inside = [
+            index
+            for index, timestamp in enumerate(metrics.timestamp)
+            if span.started_at <= timestamp and (span.ended_at is None or timestamp <= span.ended_at)
+        ]
+
+        row = [
+            "  " * depth + _span_name(span) + (" (failed)" if span.status == RunTraceSpanStatus.FAILED else ""),
+            format_duration(span.started_at - origin),
+            format_duration(span.ended_at - span.started_at) if span.ended_at else not_ended,
+        ]
+
+        for name in step_resources:
+            column, summary, format_value = resources[name]
+            values = _recorded(column, inside)
+            row.append(format_value((mean if summary == "average" else max)(values)) if values else "-")
+
+        rows.append(row)
+
+    print("spans:")
+    ascii_table(
+        headers=[
+            "step",
+            "start",
+            "duration",
+            *(
+                f"{name} {resources[name][1]}\n{limits[name]}" if name in limits else f"{name}\n{resources[name][1]}"
+                for name in step_resources
+            ),
+        ],
+        values=rows,
+    )
+
+    for span in traces.spans:
+        if span.status == RunTraceSpanStatus.FAILED:
+            print(f"\n{_span_name(span)}: {span.error or 'no error message'}")
+
+    sparklines = [
+        f"  {f'{name}:':<5}  {_sparkline(values, maximums.get(name))}  peak {format_value(max(values))} {limits.get(name, '')}".rstrip()
+        for name, (column, _, format_value) in resources.items()
+        if (values := _recorded(column))
+    ]
+
+    if sparklines:
+        print()
+        print("metrics:")
+        print("\n".join(sparklines))
+
+
 class RunWaitExitCode(IntEnum):
     """1 and 2 are left to errors and usage errors, as for every other command."""
 
@@ -546,3 +636,78 @@ def _to_enriched_status(run: Run):
         return "completed with errors"
 
     return str(status)
+
+
+def _spans_depth_first(spans: list[RunTraceSpan]) -> list[tuple[RunTraceSpan, int]]:
+    children: dict[int | None, list[RunTraceSpan]] = {}
+    for span in sorted(spans, key=lambda span: (span.started_at, span.id)):
+        children.setdefault(span.parent_id, []).append(span)
+
+    ordered: list[tuple[RunTraceSpan, int]] = []
+
+    def visit(parent_id: int | None, depth: int):
+        for span in children.get(parent_id, []):
+            ordered.append((span, depth))
+            visit(span.id, depth + 1)
+
+    visit(None, 0)
+    return ordered
+
+
+def _span_name(span: RunTraceSpan) -> str:
+    """The command (if any) instead of the description, then every other attribute as key=value."""
+
+    attributes = dict(span.attributes or {})
+    name = attributes.pop("command", None) or span.description
+
+    parameters: dict[str, Any] = attributes.pop("parameters", None) or {}
+    attributes = {**parameters, **attributes}  # an attribute wins over a parameter of the same name
+
+    details = [
+        f"{key}={shorten(str(value), 40)}"
+        for key, value in attributes.items()
+        if value is not None and value is not False
+    ]
+
+    if details:
+        name += f" ({', '.join(details)})"
+
+    return name
+
+
+def _recorded(column: list[Any] | None, indexes: list[int] | None = None) -> list[Any]:
+    """The samples of a column (all of them, or only those at `indexes`) that were recorded."""
+
+    if column is None:
+        return []
+
+    values = column if indexes is None else [column[index] for index in indexes]
+    return [value for value in values if value is not None]
+
+
+def _format_percent(value: float) -> str:
+    return f"{value:.0f}%"
+
+
+def _format_size(value: int) -> str:
+    return format_size(value, binary=True)
+
+
+def _sparkline(values: list[float], maximum: float | None = None) -> str:
+    """One character per sample, at most 60: each one the peak of its slice, scaled to `maximum` (or the highest peak)."""
+
+    levels = "▁▂▃▄▅▆▇█"
+    try:
+        levels.encode(sys.stdout.encoding or "ascii")
+    except (UnicodeEncodeError, LookupError):
+        levels = "_.-:=+*#"  # a console that cannot show the blocks, like cp1252 on Windows
+
+    width = min(len(values), 60)
+    peaks = [max(values[index * len(values) // width:(index + 1) * len(values) // width]) for index in range(width)]
+    top = maximum or max(peaks) or 1
+
+    # min(): the machine's ram can be larger than the run's limit...
+    return "".join(
+        levels[round(min(peak / top, 1) * (len(levels) - 1))]
+        for peak in peaks
+    )

@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
 from crunch.api._domain.prediction import Prediction
+from crunch.api._domain.runtime import RuntimeType
 from crunch.api._domain.submission import Submission
+from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._domain.project import ProjectReference, ProjectSelection
@@ -32,6 +34,42 @@ class RunLogs:
     cursor: str | None
 
 
+class RunTraceSpanStatus(ApiEnum):
+    STARTED = "STARTED"
+    ENDED = "ENDED"
+    FAILED = "FAILED"
+
+
+@dataclass
+class RunTraceSpan(JsonDataClassMixin):
+    id: int
+    parent_id: int | None
+    description: str
+    status: RunTraceSpanStatus
+    started_at: datetime
+    ended_at: datetime | None = None
+    attributes: dict[str, Any] | None = None
+    error: str | None = None
+
+
+@dataclass
+class RunTraceMetrics(JsonDataClassMixin):
+    """Resource usage samples, one column per resource: `cpu` and `gpu` in percent, `ram`, `disk` and `vram` in bytes."""
+
+    timestamp: list[datetime]
+    cpu: list[float | None]
+    ram: list[int | None]
+    disk: list[int | None]
+    gpu: list[float | None] | None = None
+    vram: list[int | None] | None = None
+
+
+@dataclass
+class RunTraces(JsonDataClassMixin):
+    spans: list[RunTraceSpan]
+    metrics: RunTraceMetrics
+
+
 @dataclass
 class Run(ApiModel):
     id: int
@@ -48,6 +86,11 @@ class Run(ApiModel):
     started_at: datetime | None = None
     ended_at: datetime | None = None
     duration: timedelta | None = None
+    runtime_type: RuntimeType | None = None
+    cpu: int | None = None
+    """In 1024ths of a core, known once the run started."""
+    memory: int | None = None
+    """In MiB, known once the run started."""
 
     project = Parent["ProjectReference"]()
 
@@ -86,6 +129,11 @@ class Run(ApiModel):
             entries=response["entries"],
             cursor=response["cursor"],
         )
+
+    def get_traces(self) -> RunTraces:
+        return RunTraces.from_dict(self.project.client.api.get_json(
+            ["v3", "competitions", self.project.competition.id, "projects", self.project.user_id, self.project.name, "runs", self.id, "traces"],
+        ))
 
     def select(self) -> "ProjectSelection":
         from crunch.api._domain.project import ProjectSelection

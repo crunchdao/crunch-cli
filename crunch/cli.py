@@ -752,6 +752,21 @@ def run_logs(
     )
 
 
+@run_group.command(name="traces", help="Show how long each step of a run took, and the resources it used.")
+@click.argument("run_id", type=int, required=True)
+def run_traces(
+    run_id: int,
+):
+    from crunch.command.run import run_traces
+
+    repository = _open_repository()
+
+    run_traces(
+        repository,
+        run_id=run_id,
+    )
+
+
 @run_group.command(name="wait")
 @click.option("--timeout", type=int, required=False, help="Stop waiting after this many seconds, with exit code 4 if the run is still running. (wait until the end if not specified)")
 @click.option("--poll-interval", type=int, default=10, show_default=True, help="Seconds between two checks of the run.")

@@ -47,6 +47,10 @@ from crunch.api._domain.run import Run as Run
 from crunch.api._domain.run import RunLog as RunLog
 from crunch.api._domain.run import RunLogs as RunLogs
 from crunch.api._domain.run import RunStatus as RunStatus
+from crunch.api._domain.run import RunTraceMetrics as RunTraceMetrics
+from crunch.api._domain.run import RunTraces as RunTraces
+from crunch.api._domain.run import RunTraceSpan as RunTraceSpan
+from crunch.api._domain.run import RunTraceSpanStatus as RunTraceSpanStatus
 from crunch.api._domain.runner import EndedRunnerRunSpan as EndedRunnerRunSpan
 from crunch.api._domain.runner import RunnerRun as RunnerRun
 from crunch.api._domain.runner import RunnerRunMetric as RunnerRunMetric

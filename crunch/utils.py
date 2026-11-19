@@ -1,10 +1,10 @@
-import datetime
 import logging
 import os
 import re
 import sys
 import time
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Generic, Iterable, Sequence, TypeVar, cast
 
@@ -96,13 +96,13 @@ def split_into_chunks(items: list[_T], chunk_size: int) -> Iterable[list[_T]]:
 
 
 if sys.version_info >= (3, 11):
-    def parse_datetime(value: str) -> datetime.datetime:
-        return datetime.datetime.fromisoformat(value)
+    def parse_datetime(value: str) -> datetime:
+        return datetime.fromisoformat(value)
 
 else:
     _DATETIME_FRACTION = re.compile(r"\.(\d+)")
 
-    def parse_datetime(value: str) -> datetime.datetime:
+    def parse_datetime(value: str) -> datetime:
         """
         `datetime.fromisoformat` of python 3.10 only accepts 3 or 6 fraction digits and no `Z`,
         but the API trims the trailing zeros of the fraction (`.3459`).
@@ -117,7 +117,7 @@ else:
             count=1,
         )
 
-        return datetime.datetime.fromisoformat(value)
+        return datetime.fromisoformat(value)
 
 
 def cut_url(url: str):
@@ -337,7 +337,7 @@ class Tracer:
         self,
         action: str,
     ):
-        start = datetime.datetime.now()
+        start = datetime.now()
         self._printer(f"{start} {self.padding} {action}")
 
         try:
@@ -350,7 +350,7 @@ class Tracer:
             import gc
             gc.collect()
 
-            end = datetime.datetime.now()
+            end = datetime.now()
             self._printer(f"{start} {self.padding} {action} took {end - start}")
 
 
@@ -427,6 +427,18 @@ def build_user_agent() -> str:
     os_name = platform.system()  # "Linux", "Darwin", "Windows"
 
     return f"crunch-cli/{crunch_version} (Python/{python_version}; {os_name})"
+
+
+def format_duration(duration: timedelta) -> str:
+    """Compact, like `1:08:15`: what `str()` gives, without the microseconds."""
+
+    return str(timedelta(seconds=int(duration.total_seconds())))
+
+
+def shorten(text: str, length: int) -> str:
+    """Cut to `length` characters, ending with `...` when cut. Unlike `textwrap.shorten`, it does not need spaces to cut."""
+
+    return text if len(text) <= length else text[:length - 3] + "..."
 
 
 def ascii_table(
