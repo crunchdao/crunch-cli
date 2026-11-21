@@ -5,6 +5,7 @@ from types import ModuleType
 from typing import Any, NamedTuple, overload
 
 import click
+import requests
 from crunch_convert import RequirementLanguage
 from crunch_convert.notebook import BadCellHandling, extract_from_cells
 from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist, MultipleLibraryAliasCandidateException, RequirementParseError, Whitelist, parse_from_file
@@ -203,21 +204,15 @@ def scan(
     requirements_r_file: str | None = None,
     logger: logging.Logger | None = None,
 ):
+    if logger is None:
+        logger = logging.getLogger()
+
     if module is not None:
         packages = extract_from_notebook_modules(
             module=module,
         )
 
-        problems_by_language = find_problematic(
-            packages=packages,
-            is_alias=True,
-        )
-
-        _log_problems(
-            problems_by_language=problems_by_language,
-            logger=logger,
-            is_alias=True,
-        )
+        is_alias = True
 
     else:
         if requirements_file is None:
@@ -237,16 +232,22 @@ def scan(
             ),
         }
 
+        is_alias = False
+
+    try:
         problems_by_language = find_problematic(
             packages=packages,
-            is_alias=False,
+            is_alias=is_alias,
         )
+    except requests.RequestException as error:
+        logger.warning(f"whitelist could not be reached, requirements not checked: {error}")
+        return
 
-        _log_problems(
-            problems_by_language=problems_by_language,
-            logger=logger,
-            is_alias=False,
-        )
+    _log_problems(
+        problems_by_language=problems_by_language,
+        logger=logger,
+        is_alias=is_alias,
+    )
 
 
 def _log_problems(

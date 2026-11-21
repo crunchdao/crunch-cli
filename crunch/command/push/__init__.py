@@ -138,6 +138,7 @@ def _upload_files(
     requirements_mode: RequirementsMode,
     upload_cache: UploadCache,
 ):
+    import requests
     from crunch_convert import RequirementLanguage, requirements_txt
 
     total_size: int = 0
@@ -255,10 +256,14 @@ def _upload_files(
 
         forbidden_names: list[str] = []
         for requirement in requirements:
-            library = whitelist.find_library(
-                language=requirement.language,
-                name=requirement.name,
-            )
+            try:
+                library = whitelist.find_library(
+                    language=requirement.language,
+                    name=requirement.name,
+                )
+            except requests.RequestException as error:
+                print(f"{language.txt_file_name}: whitelist could not be reached, requirements not checked: {error}", file=sys.stderr)
+                break
 
             if library is None:
                 forbidden_names.append(requirement.name)

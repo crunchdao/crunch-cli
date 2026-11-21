@@ -129,6 +129,7 @@ def whitelist_validate(
     requirements_txt_file_path: str,
     language: "RequirementLanguage",
 ):
+    import requests
     from crunch_convert.requirements_txt import CrunchHubWhitelist, RequirementParseError, parse_from_file
 
     with open(requirements_txt_file_path, encoding="utf-8") as fd:
@@ -150,7 +151,11 @@ def whitelist_validate(
     has_one_not_whitelisted = False
 
     for requirement in requirements:
-        library = whitelist.find_library(name=requirement.name, language=language)
+        try:
+            library = whitelist.find_library(name=requirement.name, language=language)
+        except requests.RequestException as error:
+            print(f"requirement: whitelist could not be reached, requirements not checked: {error}", file=sys.stderr)
+            break
 
         tail = "ok"
         if library is None:
