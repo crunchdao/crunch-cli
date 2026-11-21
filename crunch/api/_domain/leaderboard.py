@@ -42,6 +42,10 @@ class Leaderboard(ApiModel):
     # only in the detailed response, raw: used to build the dataframe
     targets: list[dict[str, Any]] | None = None
 
+    # only in the detailed response, raw: which columns and positions the web leaderboard shows
+    layout: dict[str, Any] | None = None
+    phase: dict[str, Any] | None = None
+
     # only in the detailed response, extracted from the `crunch` object
     crunch_id: int | None = None
 

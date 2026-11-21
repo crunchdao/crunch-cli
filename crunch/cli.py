@@ -426,15 +426,32 @@ def status():
     )
 
 
-@cli.command(help="Show your best (not selected) model's rank on the leaderboard.")
-def leaderboard():
-    from crunch.command.leaderboard import leaderboard
+@cli.command(help="Show your best (not selected) model's rank on the leaderboard, or other positions with --top, --around or --all.")
+@click.option("--top", type=click.IntRange(min=1), default=None, help="Show the first positions.")
+@click.option("--around", type=click.IntRange(min=0), default=None, help="Show the positions around yours, this many on each side.")
+@click.option("--all", "all_positions", is_flag=True, help="Show every position.")
+@click.option("--include-unrewarded", is_flag=True, help="With --top, --around or --all: also show the projects that are not rewarded (hidden by default when the competition's phase hides them on the web).")
+def leaderboard(
+    top: int | None,
+    around: int | None,
+    all_positions: bool,
+    include_unrewarded: bool,
+):
+    from crunch.command.leaderboard import leaderboard, leaderboard_positions
 
     repository = _open_repository()
 
-    leaderboard(
-        repository,
-    )
+    if top is None and around is None and not all_positions:
+        leaderboard(
+            repository,
+        )
+    else:
+        leaderboard_positions(
+            repository,
+            top=None if all_positions else top,
+            around=None if all_positions else around,
+            include_unrewarded=include_unrewarded,
+        )
 
 
 @cli.command(help="Show the project's quota.")
