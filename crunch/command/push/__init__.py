@@ -122,7 +122,7 @@ def list_code_files(
     )
 
     if excluded_patterns:
-        # As if written in a `.gitignore` of that directory: they only apply to what is below it.
+        # read as a `.gitignore` in the directory the command was run from: only the files below it can match
         is_excluded = _build_rules(
             excluded_patterns,
             to_unix_path(excluded_patterns_directory_path or submission_directory_path)

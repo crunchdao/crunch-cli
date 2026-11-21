@@ -11,7 +11,7 @@ def _workspace(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> str:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("content")
 
-    # `crunch push` runs from the project's root: the paths are resolved from the current directory.
+    # the ignore rules resolve the paths from the current directory, and `crunch push` runs from the project's root
     monkeypatch.chdir(tmp_path)
     return str(tmp_path)
 
@@ -28,7 +28,7 @@ def test_patterns_from_the_root(tmp_path: pathlib.Path, monkeypatch: pytest.Monk
 
     files = list_code_files(root, "resources_v2", ["resources/", "resources_*/", "catboost_info/", "*.pt", "/models/"], root)
 
-    # `*.pt` matches at any depth, `/models/` only at the root.
+    # `*.pt` matches at any depth, `/models/` only at the root
     assert sorted(files) == ["main.py", "requirements.txt", "sub/main.py", "sub/models/a.bin"]
 
 
@@ -37,6 +37,6 @@ def test_patterns_are_relative_to_the_call_directory(tmp_path: pathlib.Path, mon
 
     files = list_code_files(root, "resources_v2", ["models/", "*.pt", "*.joblib"], str(tmp_path / "sub"))
 
-    # As a `.gitignore` in `sub/`: only what is below it, never `models/` nor the `.joblib` and `.pt` files above.
+    # as a `.gitignore` in `sub/`: only what is below it, not `models/` nor the `.joblib` and `.pt` files outside it
     assert "sub/models/a.bin" not in files and "sub/weights.pt" not in files
     assert {"models/b.bin", "resources/model.joblib", "resources_sub6/bundle.pt", "sub/main.py"} <= set(files)
