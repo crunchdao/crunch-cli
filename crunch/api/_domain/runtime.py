@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
 from crunch.api._base import ApiCollection, ApiEnum, ApiModel, Parent
 from crunch.api._serialization import JsonDataClassMixin
 
 if TYPE_CHECKING:
     from crunch.api._domain.competition import Competition
+    from crunch.api._domain.project import ProjectReference
     from crunch.api._domain.submission import Submission
 
 
@@ -100,28 +101,38 @@ class RuntimeOption(ApiModel):
     recommended: bool
     status: RuntimeOptionStatus
 
-    submission = Parent["Submission"]()
+    project = Parent["ProjectReference"]()
 
 
 class RuntimeOptionCollection(ApiCollection[RuntimeOption]):
 
     model = RuntimeOption
 
-    def __init__(self, submission: "Submission"):
-        super().__init__(submission.project.client)
+    def __init__(
+        self,
+        project: "ProjectReference",
+        submission: "Submission | None" = None,
+    ):
+        super().__init__(project.client)
 
+        self.project = project
         self.submission = submission
 
     def _attach(self, option: RuntimeOption) -> RuntimeOption:
-        option.submission = self.submission
-        option.definition.competition = self.submission.project.competition
+        option.project = self.project
+        option.definition.competition = self.project.competition
         return option
 
     def iter(self) -> Iterator[RuntimeOption]:
-        project = self.submission.project
+        project = self.project
+
+        params: dict[str, Any] = {}
+        if self.submission is not None:
+            params["submissionNumber"] = self.submission.number
 
         return self.from_dict_iterator(self.client.api.paginate_json(
-            ["v3", "competitions", project.competition.id, "projects", project.user_id, project.name, "submissions", self.submission.number, "runtime-options"],
+            ["v3", "competitions", project.competition.id, "projects", project.user_id, project.name, "runtime-options"],
+            params=params,
             page_size=1000,
         ))
 
