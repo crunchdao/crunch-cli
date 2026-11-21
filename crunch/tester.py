@@ -44,6 +44,7 @@ def run(
     has_gpu: bool = False,
     no_determinism_check: bool | None = True,
     trace_exporter: "LocalTraceExporter | None" = None,
+    prediction_directory_path: str | None = None,
 ):
     monkey_patches.pickle_unpickler_find_class()
     monkey_patches.joblib_parallel_initializer()
@@ -57,7 +58,7 @@ def run(
         user_module,
         runner_module,
         model_directory_path,
-        repository.prediction_directory_path,
+        prediction_directory_path or repository.prediction_directory_path,
         force_first_train,
         train_frequency,
         round_number,
