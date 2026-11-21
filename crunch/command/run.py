@@ -202,9 +202,15 @@ def run_show(
         print(f"  id: {prediction.id}")
         print(f"  status: {_to_prediction_status(prediction)}")
 
-        print(f"  scores:")
-        for score in prediction.scores.list():
-            print(f"    {_format_score_value(score)}")
+        scores = prediction.scores.list()
+        if scores:
+            print(f"  scores:")
+            for score in scores:
+                print(f"    {_format_score_value(score)}")
+        elif prediction.valid is None or (prediction.valid and prediction.success is None):
+            print(f"  scores: (not yet: the prediction is {_to_prediction_status(prediction)}, run this command again in a minute)")
+        else:
+            print(f"  scores: (none)")
 
     if store.show_tips:
         print()
