@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 import click
 
 from crunch import store
-from crunch.api import NeverSubmittedException, RuntimeOptionStatus, SubmissionNotFoundException
+from crunch.api import RuntimeOptionStatus
 from crunch.command._common import get_project, get_submission
 from crunch.repository import Repository
 from crunch.utils import ascii_table
@@ -16,59 +16,46 @@ if TYPE_CHECKING:
 def runtime_list(
     repository: Repository,
     *,
-    submission_identifier: "SubmissionIdentifierType",
+    submission_identifier: "SubmissionIdentifierType | None",
 ):
     project = get_project(repository)
 
-    try:
-        submission = project.submissions.get(submission_identifier)
-    except NeverSubmittedException:
-        submission = None
-    except SubmissionNotFoundException:
-        print(f"submission: not found: {submission_identifier}")
-        raise click.Abort()
-
-    if submission is not None:
-        has_one_requestable = False
-
-        rows: list[Sequence[Any]] = []
-        for option in submission.runtime_options.iter():
-            rows.append(
-                (
-                    *_to_runtime_definition_columns(option.definition),
-                    f"{option.status.name}",
-                )
-            )
-
-            if option.status == RuntimeOptionStatus.REQUESTABLE:
-                has_one_requestable = True
-
-        print("runtimes:")
-        ascii_table(
-            headers=["name", "display name", "ram", "cpu", "gpu", "status"],
-            values=rows
-        )
-
-        if store.show_tips and has_one_requestable:
-            print()
-            print("tips:")
-            print("  - Request a runtime option with `crunch runtime request <name> --justification <reason>`.")
-
+    if submission_identifier is not None:
+        submission = get_submission(project, submission_identifier)
+        runtime_options = submission.runtime_options
     else:
-        rows = list(map(
-            _to_runtime_definition_columns,
-            project.competition.runtime_definitions.iter(),
-        ))
+        submission = None
+        runtime_options = project.runtime_options
 
-        ascii_table(
-            headers=["name", "display name", "ram", "cpu", "gpu"],
-            values=rows
+    has_one_requestable = False
+
+    rows: list[Sequence[Any]] = []
+    for option in runtime_options.iter():
+        rows.append(
+            (
+                *_to_runtime_definition_columns(option.definition),
+                f"{option.status.name}",
+            )
         )
 
-        if store.show_tips:
-            print()
-            print("tips:")
-            print("  - You will only know eligibility for runtime options after submitting once.")
+        if option.status == RuntimeOptionStatus.REQUESTABLE:
+            has_one_requestable = True
+
+    print("runtimes:")
+    ascii_table(
+        headers=["name", "display name", "ram", "cpu", "gpu", "status"],
+        values=rows
+    )
+
+    if store.show_tips and (submission is None or has_one_requestable):
+        print()
+        print("tips:")
+
+        if submission is None:
+            print("  - The statuses are those of the project, add `--submission <number>` to get those of a submission, which also depend on its GPU requirement.")
+
+        if has_one_requestable:
+            print("  - Request a runtime option with `crunch runtime request <name> --justification <reason>`.")
 
 
 def _to_runtime_definition_columns(definition: "RuntimeDefinition") -> Sequence[Any]:

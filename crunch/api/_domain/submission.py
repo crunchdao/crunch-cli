@@ -47,7 +47,7 @@ class Submission(ApiModel):
     @property
     def runtime_options(self):
         from crunch.api._domain.runtime import RuntimeOptionCollection
-        return RuntimeOptionCollection(self)
+        return RuntimeOptionCollection(self.project, self)
 
     @property
     def runtime_access_requests(self):

@@ -77,6 +77,11 @@ class ProjectReference:
         return RunCollection(self)
 
     @property
+    def runtime_options(self):
+        from crunch.api._domain.runtime import RuntimeOptionCollection
+        return RuntimeOptionCollection(self)
+
+    @property
     def models(self):
         from crunch.api._domain.model import ModelCollection
         return ModelCollection(self)

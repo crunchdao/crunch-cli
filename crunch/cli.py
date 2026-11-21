@@ -632,9 +632,9 @@ def runtime_group():
 
 
 @runtime_group.command(name="list", help="List runtimes.")
-@click.option("--submission", type=SubmissionIdentifierClickType(), default="@last", show_default=True, help="Submission to use: its number, or @last for the latest one.")
+@click.option("--submission", type=SubmissionIdentifierClickType(), required=False, help="Submission whose statuses to show, which also depend on its GPU requirement: its number, or @last for the latest one. Without it, the statuses are those of the project.")
 def runtime_list(
-    submission: "SubmissionIdentifierType",
+    submission: "SubmissionIdentifierType | None",
 ):
     from crunch.command.runtime import runtime_list
 
