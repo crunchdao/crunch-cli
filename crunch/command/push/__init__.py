@@ -29,6 +29,25 @@ class RequirementsMode(Enum):
     FREEZE = auto()
 
 
+def _build_rules(
+    patterns: list[str],
+    base_path: str,
+) -> Callable[[str], bool]:
+    from crunch.external import gitignorefile
+
+    rules: list[gitignorefile._IgnoreRule] = []  # type: ignore
+    for line in patterns:
+        line = line.rstrip("\r\n")
+        rule = gitignorefile._rule_from_pattern(line)  # type: ignore
+        if rule:
+            rules.append(rule)
+
+    return gitignorefile._IgnoreRules(  # type: ignore
+        rules=rules,
+        base_path=base_path,
+    ).match
+
+
 def _build_gitignore(
     directory_path: str,
     ignored_paths: list[str],
@@ -36,17 +55,7 @@ def _build_gitignore(
 ) -> Callable[[str], tuple[bool, bool]]:
     from crunch.external import gitignorefile
 
-    rules: list[gitignorefile._IgnoreRule] = []  # type: ignore
-    for line in ignored_paths:
-        line = line.rstrip("\r\n")
-        rule = gitignorefile._rule_from_pattern(line)  # type: ignore
-        if rule:
-            rules.append(rule)
-
-    ignored_files = gitignorefile._IgnoreRules(  # type: ignore
-        rules=rules,
-        base_path=directory_path,
-    )
+    ignored_files = _build_rules(ignored_paths, directory_path)
 
     parts_depth = 2 if use_parent_gitignore else 1
     parts = tuple(gitignorefile._path_split(directory_path))[:-parts_depth]  # type: ignore
@@ -55,7 +64,7 @@ def _build_gitignore(
     git_ignores._Cache__gitignores[parts] = []  # type: ignore
 
     return lambda name: (
-        ignored_files.match(name),  # type: ignore
+        ignored_files(name),
         git_ignores(name)
     )
 
@@ -98,10 +107,12 @@ def _list_files(
 def list_code_files(
     submission_directory_path: str,
     model_directory_relative_path: str,
+    excluded_patterns: list[str] | None = None,
+    excluded_patterns_directory_path: str | None = None,
 ):
     is_in_colab = os.getenv(COLAB_DETECTION_ENV_VAR) is not None
 
-    return _list_files(
+    files = _list_files(
         submission_directory_path,
         [
             *IGNORED_CODE_FILES,
@@ -109,6 +120,21 @@ def list_code_files(
             to_unix_path(f"/{model_directory_relative_path}/"),
         ],
     )
+
+    if excluded_patterns:
+        # read as a `.gitignore` in the directory the command was run from: only the files below it can match
+        is_excluded = _build_rules(
+            excluded_patterns,
+            to_unix_path(excluded_patterns_directory_path or submission_directory_path)
+        )
+
+        files = {
+            name: path
+            for name, path in files.items()
+            if not is_excluded(name)
+        }
+
+    return files
 
 
 def list_model_files(
@@ -354,6 +380,8 @@ def push(
     no_afterword: bool,
     dry: Literal[True],
     fallback_submitter_imprint: str | None = None,
+    excluded_patterns: list[str] | None = None,
+    excluded_patterns_directory_path: str | None = None,
 ) -> None:
     ...
 
@@ -369,6 +397,8 @@ def push(
     no_afterword: bool,
     dry: Literal[False],
     fallback_submitter_imprint: str | None = None,
+    excluded_patterns: list[str] | None = None,
+    excluded_patterns_directory_path: str | None = None,
 ) -> Submission:
     ...
 
@@ -383,6 +413,8 @@ def push(
     no_afterword: bool,
     dry: bool,
     fallback_submitter_imprint: str | None = None,
+    excluded_patterns: list[str] | None = None,
+    excluded_patterns_directory_path: str | None = None,
 ) -> Submission | None:
     message_length = len(message)
     if message_length > SUBMISSION_MESSAGE_LENGTH:
@@ -391,7 +423,7 @@ def push(
 
     submission_directory_path = repository.root_directory_path
 
-    found_code_files = list_code_files(submission_directory_path, model_directory_relative_path)
+    found_code_files = list_code_files(submission_directory_path, model_directory_relative_path, excluded_patterns, excluded_patterns_directory_path)
     if REQUIREMENTS_TXT not in found_code_files:
         print(f"warning: no {REQUIREMENTS_TXT} found, the cloud environment pre-installed packages might change, include one to ensure consistent dependencies")
         raise click.Abort()
