@@ -491,7 +491,7 @@ def _print_success(
     submission: Submission,
 ):
     print("\n---")
-    print(f"submission #{submission.number} succesfully uploaded!")
+    print(f"submission #{submission.number} successfully uploaded!")
     print()
 
     project = submission.project
