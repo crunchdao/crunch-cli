@@ -18,6 +18,10 @@ from crunch.utils import to_unix_path
 from ._cache import FileUploadCache, NoUploadCache, UploadCache, to_modification_time
 
 
+# How to push the requirements without freezing them, named by the message that says they were frozen.
+DEFAULT_FREEZE_OPT_OUT_HINT = "--no-pip-freeze"
+
+
 class RequirementsMode(Enum):
     # ignore while processing the resources/ directory
     IGNORE = auto()
@@ -163,6 +167,7 @@ def _upload_files(
     preferred_chunk_size: int,
     requirements_mode: RequirementsMode,
     upload_cache: UploadCache,
+    freeze_opt_out_hint: str = DEFAULT_FREEZE_OPT_OUT_HINT,
 ):
     import requests
     from crunch_convert import RequirementLanguage, requirements_txt
@@ -360,6 +365,8 @@ def _upload_files(
             if has_frozen:
                 found_files.pop(language.original_txt_file_name, None)
 
+                print(f"{language.txt_file_name}: pinned to the installed versions in the submission, which the cloud run uses (your file is sent as {language.original_txt_file_name}, and stays unchanged locally); use {freeze_opt_out_hint} to push your file as it is")
+
     for name, absolute_path in found_files.items():
         handle_file(
             name=name,
@@ -380,6 +387,7 @@ def push(
     no_afterword: bool,
     dry: Literal[True],
     fallback_submitter_imprint: str | None = None,
+    freeze_opt_out_hint: str = DEFAULT_FREEZE_OPT_OUT_HINT,
     excluded_patterns: list[str] | None = None,
     excluded_patterns_directory_path: str | None = None,
 ) -> None:
@@ -397,6 +405,7 @@ def push(
     no_afterword: bool,
     dry: Literal[False],
     fallback_submitter_imprint: str | None = None,
+    freeze_opt_out_hint: str = DEFAULT_FREEZE_OPT_OUT_HINT,
     excluded_patterns: list[str] | None = None,
     excluded_patterns_directory_path: str | None = None,
 ) -> Submission:
@@ -413,6 +422,7 @@ def push(
     no_afterword: bool,
     dry: bool,
     fallback_submitter_imprint: str | None = None,
+    freeze_opt_out_hint: str = DEFAULT_FREEZE_OPT_OUT_HINT,
     excluded_patterns: list[str] | None = None,
     excluded_patterns_directory_path: str | None = None,
 ) -> Submission | None:
@@ -453,6 +463,7 @@ def push(
             preferred_chunk_size=preferred_chunk_size,
             requirements_mode=RequirementsMode.FREEZE if include_installed_packages_version else RequirementsMode.INCLUDE,
             upload_cache=upload_cache,
+            freeze_opt_out_hint=freeze_opt_out_hint,
         )
 
         _upload_files(
