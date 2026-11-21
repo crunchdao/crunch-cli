@@ -306,19 +306,22 @@ def convert_if_necessary(
 
 
 @cli.command(help="Send the new submission of your code.")
-@click.option("-m", "--message", prompt=True, default="", help=f"Specify the change of your code. (like a commit message, limited to {constants.SUBMISSION_MESSAGE_LENGTH} characters)")
+@click.option("-m", "--message", default=None, help=f"Specify the change of your code. (like a commit message, limited to {constants.SUBMISSION_MESSAGE_LENGTH} characters)")
 @click.option("--main-file", "main_file_path", default=constants.DEFAULT_MAIN_FILE_PATH, show_default=True, help="Entrypoint of your code.")
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--no-pip-freeze", is_flag=True, help="Do not do a `pip freeze` to know preferred packages version.")
 @click.option("--dry", is_flag=True, help="Prepare file but do not really create the submission.")
 def push(
-    message: str,
+    message: str | None,
     main_file_path: str,
     model_directory_path: str,
     no_pip_freeze: bool,
     dry: bool,
 ):
     from crunch.command.push import push
+
+    if message is None:
+        message = "" if dry else str(click.prompt("Message (empty for none)", default="", show_default=False))
 
     repository = _open_repository()
 
