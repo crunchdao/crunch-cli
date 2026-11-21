@@ -49,6 +49,7 @@ def test(
     round_number: RoundIdentifierType,
     has_gpu: bool,
     no_determinism_check: bool | None,
+    prediction_directory_path: str | None = None,
 ):
     _, project = repository.create_client()
     competition = project.competition.reload()
@@ -72,4 +73,5 @@ def test(
         has_gpu,
         no_determinism_check,
         trace_exporter=None,
+        prediction_directory_path=prediction_directory_path,
     )

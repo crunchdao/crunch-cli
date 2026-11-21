@@ -936,6 +936,7 @@ def runner_group():
 @click.option("--round-number", default="@current", help="Change round number to get the data from.")
 @click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
 @click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check.")
+@click.option("--prediction-directory", "prediction_directory_path", help="Directory (relative) to write the predictions to. (Allows running several tests side by side.)")
 def local(
     main_file_path: str,
     model_directory_path: str,
@@ -945,10 +946,14 @@ def local(
     round_number: RoundIdentifierType,
     has_gpu: bool,
     no_determinism_check: bool | None,
+    prediction_directory_path: str | None,
 ):
     from crunch.command.test import test
 
     from . import library, tester
+
+    if prediction_directory_path is not None:
+        prediction_directory_path = os.path.abspath(prediction_directory_path)
 
     repository = _open_repository()
     tester.install_logger()
@@ -971,6 +976,7 @@ def local(
             round_number,
             has_gpu,
             no_determinism_check,
+            prediction_directory_path,
         )
 
 
