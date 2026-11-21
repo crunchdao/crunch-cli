@@ -18,7 +18,6 @@ from crunch.utils import to_unix_path
 from ._cache import FileUploadCache, NoUploadCache, UploadCache, to_modification_time
 
 
-# How to push the requirements without freezing them, named by the message that says they were frozen.
 DEFAULT_FREEZE_OPT_OUT_HINT = "--no-pip-freeze"
 
 
