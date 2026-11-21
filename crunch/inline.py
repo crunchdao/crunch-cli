@@ -324,6 +324,7 @@ class _Inline:
                 no_afterword=True,
                 dry=False,
                 fallback_submitter_imprint=f"human/notebook/{self._notebook_environment.name}",
+                freeze_opt_out_hint="`include_installed_packages_version=False`",
             )
         except ApiException as error:
             print("\n---")
