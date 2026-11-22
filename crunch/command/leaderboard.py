@@ -116,6 +116,9 @@ def leaderboard_positions(
             if any(map(is_own, [head, *members])
         )), None)
         if around is not None and own_index is None:
+            if top is None:
+                print("  (your project is not on this leaderboard: use --top or --all to see positions)")
+                continue
             print("  (your project is not on this leaderboard: --around is ignored)")
 
         target_metrics: list[dict[str, Any]] = target.get("metrics") or []
