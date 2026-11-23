@@ -11,7 +11,7 @@ import sys
 from datetime import timedelta
 from multiprocessing import Lock
 from time import sleep
-from typing import Any, Callable, Generator, Literal, TypeAlias
+from typing import Any, Callable, Generator, TypeAlias
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -120,6 +120,7 @@ class CloudRunner(Runner):
                 gpu_presence=GpuPresence.AVAILABLE if gpu else GpuPresence.UNAVAILABLE,
                 metrics_delay=60,
             ),
+            logger=_create_logger(log_secret),
             determinism_check_enabled=determinism_check_enabled,
         )
 
@@ -154,9 +155,6 @@ class CloudRunner(Runner):
 
         self._error_reported_fuse = Lock()
 
-        self.logger = logging.Logger("crunch.runner.cloud")
-        self.logger.addHandler(_RunnerLogHandler(self))
-
     def initialize(self):
         os.makedirs(self.data_directory, exist_ok=True)
         os.makedirs(self.scoring_directory, exist_ok=True)
@@ -172,7 +170,7 @@ class CloudRunner(Runner):
             code_file_urls = self.run.code
             model_file_urls = self.run.model
         except InvalidRunTokenException:
-            self.log("invalid run token", error=True)
+            self.logger.error("invalid run token")
             sys.exit(1)
 
         if "install r requirements":
@@ -209,7 +207,7 @@ class CloudRunner(Runner):
                 with self._span("installing python requirements"):
                     self._install_python_requirements(requirements_txt_path)
             else:
-                self.log("no requirements.txt found")
+                self.logger.info("no requirements.txt found")
 
         with self._span("installing crunch-cli"):
             self._install_crunch_cli()
@@ -273,12 +271,12 @@ class CloudRunner(Runner):
 
         if isinstance(loader, LocalCodeLoader):
             self.runner_dot_py_file_path = os.path.realpath(loader.path)
-            self.log(f"loading runner script from: {self.runner_dot_py_file_path}")
+            self.logger.info(f"loading runner script from: {self.runner_dot_py_file_path}")
         else:
             source_code = loader.load()
 
             self.runner_dot_py_file_path = os.path.join(self.scoring_directory, "runner.py")
-            self.log(f"loading runner script from: {self.runner_dot_py_file_path} (downloaded from {source_code.location})")
+            self.logger.info(f"loading runner script from: {self.runner_dot_py_file_path} (downloaded from {source_code.location})")
 
             with open(self.runner_dot_py_file_path, "w") as fd:
                 fd.write(source_code.content)
@@ -307,10 +305,10 @@ class CloudRunner(Runner):
         ]
 
         if len(apt_names):
-            self.log("installing r cran packages...")
+            self.logger.info("installing r cran packages...")
             self.bash("r-apt", ["apt-get", "-qq", "install", *apt_names])
         else:
-            self.log("no r cran packages to install")
+            self.logger.info("no r cran packages to install")
 
         # remove warning about empty directory
         user_site_library_paths = [
@@ -337,11 +335,11 @@ class CloudRunner(Runner):
         try:
             batches = plan_installation(requirement_lines, installation.build_dependencies)
         except graphlib.CycleError as error:
-            self.log(f"build dependencies are cyclic, ignoring them: {error.args[1]}", error=True)
+            self.logger.error(f"build dependencies are cyclic, ignoring them: {error.args[1]}")
             batches = []
 
         if batches:
-            self.log(f"some libraries need others to be built, installing them in {len(batches)} steps first")
+            self.logger.info(f"some libraries need others to be built, installing them in {len(batches)} steps first")
 
         for index, batch in enumerate(batches, start=1):
             self._log_installation_batch(batch, index, len(batches))
@@ -363,7 +361,7 @@ class CloudRunner(Runner):
             for name in batch.names
         )
 
-        self.log(f"step {index}/{count}: {names}")
+        self.logger.info(f"step {index}/{count}: {names}")
 
     def _download_installation(self, language: Language) -> LibraryInstallation:
         @retry(tries=3, delay=2, backoff=2, logger=None)
@@ -373,7 +371,7 @@ class CloudRunner(Runner):
         try:
             return download()
         except Exception as error:
-            self.log(f"failed to download the installation: {error}", error=True)
+            self.logger.error(f"failed to download the installation: {error}")
             sys.exit(1)
 
     def _install_crunch_cli(self):
@@ -406,7 +404,7 @@ class CloudRunner(Runner):
                 if attempt != 0:
                     retry_in = self.retry_seconds * attempt
 
-                    self.log(f"retrying in {retry_in} second(s)")
+                    self.logger.info(f"retrying in {retry_in} second(s)")
                     sleep(retry_in)
 
                 try:
@@ -426,18 +424,18 @@ class CloudRunner(Runner):
                         },
                     )
 
-                    self.log("result submitted")
+                    self.logger.info("result submitted")
                     break
                 except (ModelTooBigException, PredictionTooBigException) as exception:
-                    self.log(f"failed to submit result: {exception}: {exception.size}/{exception.maximum_size} bytes", error=True)
+                    self.logger.error(f"failed to submit result: {exception}: {exception.size}/{exception.maximum_size} bytes")
                     sys.exit(1)
                 except Exception as exception:
-                    self.log(f"failed to submit result: {exception}", error=True)
+                    self.logger.error(f"failed to submit result: {exception}")
 
                     if isinstance(exception, requests.HTTPError):
-                        self.log(exception.response.text, error=True)
+                        self.logger.error(exception.response.text)
             else:
-                self.log("max retry reached", error=True)
+                self.logger.error("max retry reached")
                 sys.exit(1)
         finally:
             self._delete_uploads(prediction_uploads)
@@ -491,24 +489,7 @@ class CloudRunner(Runner):
             try:
                 upload.delete()
             except Exception as exception:
-                self.log(f"[debug] failed to delete upload {upload.id}: {exception}", error=True)
-
-    def log(
-        self,
-        message: str,
-        *,
-        important: bool = False,
-        error: bool = False,
-    ) -> Literal[True]:
-        file = sys.stderr if error else sys.stdout
-        prefix = f"<runner/{file.name[4:-1]}>"
-
-        if self.log_secret:
-            print(f"[{self.log_secret}] {prefix} {message}", file=file)
-        else:
-            print(f"{prefix} {message}", file=file)
-
-        return True
+                self.logger.error(f"[debug] failed to delete upload {upload.id}: {exception}")
 
     def do_bash(
         self,
@@ -524,7 +505,7 @@ class CloudRunner(Runner):
                 elif key in env:
                     del env[key]
 
-        self.log(f"executing command: {' '.join(arguments)}")
+        self.logger.info(f"executing command: {' '.join(arguments)}")
         process = subprocess.Popen(
             arguments,
             env=env,
@@ -548,7 +529,7 @@ class CloudRunner(Runner):
 
         code = self.do_bash(arguments, env)
         if code != 0:
-            self.log(f"command not exited correctly: {code}", error=True)
+            self.logger.error(f"command not exited correctly: {code}")
             sys.exit(code)
 
     def bash2(
@@ -758,14 +739,14 @@ class CloudRunner(Runner):
             got_content = "(missing)"
 
         if got_content != exit_content:
-            self.log(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content[:len(exit_content) * 2]}`", error=True)
-            self.log("user code ended prematurely, likely running out of memory or silently calling exit", error=True)
+            self.logger.error(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content[:len(exit_content) * 2]}`")
+            self.logger.error("user code ended prematurely, likely running out of memory or silently calling exit")
 
             # an early `exit(0)` from the user code ends with 0, the run must still fail
             sys.exit(exit_code or 1)
 
         if exit_code != 0:
-            self.log(f"user code exited with code {exit_code}", error=True)
+            self.logger.error(f"user code exited with code {exit_code}")
             sys.exit(exit_code)
 
     def _install_permission_fuse(self):
@@ -776,7 +757,7 @@ class CloudRunner(Runner):
 
             self.change_data_permissions(can_access=False)
 
-            self.log("[debug] fuse triggered")
+            self.logger.info("[debug] fuse triggered")
 
         signal.signal(FUSE_SIGNAL, on_signal)
 
@@ -808,18 +789,15 @@ class CloudRunner(Runner):
 
     def report_error_trace(self, trace_content: str):
         if not self._error_reported_fuse.acquire(block=False):
-            self.log("[debug] error trace not reported (already reported by another process)")
+            self.logger.info("[debug] error trace not reported (already reported by another process)")
             return
 
         try:
             self.run.report_error(trace=trace_content)
 
-            self.log("[debug] error trace reported")
+            self.logger.info("[debug] error trace reported")
         except BaseException as ignored:
-            self.log(
-                f"[debug] ignored exception when reporting error trace: {type(ignored).__name__}({ignored})",
-                error=True
-            )
+            self.logger.error(f"[debug] ignored exception when reporting error trace: {type(ignored).__name__}({ignored})")
 
 
 def _download_files(
@@ -849,18 +827,31 @@ def _download_files(
     }
 
 
+def _create_logger(log_secret: str) -> logging.Logger:
+    logger = logging.Logger("crunch.runner.cloud")
+    logger.addHandler(_RunnerLogHandler(log_secret))
+
+    return logger
+
+
 class _RunnerLogHandler(logging.Handler):
 
-    def __init__(self, runner: CloudRunner):
+    def __init__(self, log_secret: str):
         super().__init__()
 
-        self._runner = runner
+        self._secret_prefix = f"[{log_secret}] " if log_secret else ""
 
     def emit(self, record: logging.LogRecord):
-        self._runner.log(
-            self.format(record),
-            error=record.levelno >= logging.ERROR,
-        )
+        try:
+            if record.levelno >= logging.ERROR:
+                stream, stream_name = sys.stderr, "err"
+            else:
+                stream, stream_name = sys.stdout, "out"
+
+            stream.write(f"{self._secret_prefix}<runner/{stream_name}> {self.format(record)}\n")
+            stream.flush()
+        except Exception:
+            self.handleError(record)
 
 
 def _find_files(
@@ -989,18 +980,9 @@ class CloudRunnerContext(RunnerContext):
     def report_determinism(self, deterministic: bool):
         self.runner.deterministic = deterministic
 
-    def log(
-        self,
-        message: str,
-        *,
-        important: bool = False,
-        error: bool = False,
-    ) -> Literal[True]:
-        return self.runner.log(
-            message,
-            important=important,
-            error=error,
-        )
+    @property
+    def logger(self):
+        return self.runner.logger
 
     def execute(
         self,
@@ -1013,7 +995,7 @@ class CloudRunnerContext(RunnerContext):
         install_data_fuse: bool = True,
         log_limits: tuple[int, int] = DEFAULT_LOG_LIMITS,
     ) -> None:
-        self.log(f"executing - command={command}")
+        self.logger.info(f"executing - command={command}")
 
         span_attributes = to_execute_span_attributes(command, parameters, span_hidden_parameters, span_attributes)
         with self.runner._span(f"execute", attributes=span_attributes, skip=not trace):  # pyright: ignore[reportPrivateUsage]

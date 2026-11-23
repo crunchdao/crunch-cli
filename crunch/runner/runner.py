@@ -1,6 +1,7 @@
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from crunch.api import CompetitionFormat
 
@@ -17,10 +18,12 @@ class Runner(ABC):
         *,
         competition_format: CompetitionFormat,
         tracer: "RunnerTracer",
+        logger: logging.Logger,
         determinism_check_enabled: bool = False,
     ):
         self.competition_format = competition_format
         self.tracer = tracer
+        self.logger = logger
 
         self.determinism_check_enabled = determinism_check_enabled
         self.deterministic = True if determinism_check_enabled else None
@@ -30,7 +33,7 @@ class Runner(ABC):
 
         with self.tracer:
             self.setup()
-            self.log("started")
+            self.logger.info("started")
 
             self.initialize()
 
@@ -41,13 +44,13 @@ class Runner(ABC):
 
             if self.determinism_check_enabled:
                 if self.deterministic:
-                    self.log(f"determinism check: passed")
+                    self.logger.info("determinism check: passed")
                 else:
-                    self.log(f"determinism check: failed", error=True)
+                    self.logger.error("determinism check: failed")
 
             self.finalize()
 
-            self.log("ended")
+            self.logger.info("ended")
             self.teardown()
 
     @abstractmethod
@@ -66,16 +69,6 @@ class Runner(ABC):
         ...
 
     def teardown(self):
-        ...
-
-    @abstractmethod
-    def log(
-        self,
-        message: str,
-        *,
-        important: bool = False,
-        error: bool = False,
-    ) -> Literal[True]:
         ...
 
     def _span(self, description: str, attributes: dict[str, Any] | None = None, skip: bool = False):
