@@ -224,7 +224,7 @@ def _should_redirect_main_to_user_code():
 
 def _redirect_main_to_user_code(module_name: str) -> str:
     """
-    Only when the user's code can be found: in a notebook, the user's code is the real `__main__`.
+    Redirects only when the user's code can be found: in a notebook, the user's code is the real `__main__`.
     """
 
     if module_name != "__main__" or not _should_redirect_main_to_user_code():
@@ -332,11 +332,9 @@ def process_initializer(*args: Any, **kwargs: Any) -> None:
     user_code_module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR, constants.DEFAULT_USER_CODE_MODULE_NAME)
     main_file_path = os.environ.get(constants.USER_CODE_MAIN_FILE_PATH_ENV_VAR, constants.DEFAULT_MAIN_FILE_PATH)
 
-    if not user_code_module_name in sys.modules:
+    if user_code_module_name not in sys.modules:
         from .command.test import load_user_code
-        module = load_user_code(main_file_path, user_code_module_name)
-
-        sys.modules[user_code_module_name] = module
+        load_user_code(main_file_path, user_code_module_name)
 
 
 @_patcher
