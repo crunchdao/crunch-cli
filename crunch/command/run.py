@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from statistics import mean
 from time import sleep
@@ -15,8 +16,6 @@ from crunch.repository import Repository
 from crunch.utils import ascii_table, format_duration, parse_datetime, shorten
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from crunch.api import SubmissionIdentifierType
 
 
@@ -132,7 +131,7 @@ def run_list(
                 run.id,
                 _to_enriched_status(run),
                 run.submission.number,
-                run.duration or "unknown",
+                _format_run_duration(run) or "unknown",
                 reformat_datetime(run.created_at),
                 _format_primary_score(run.prediction),
                 _to_selection_status(run, selection),
@@ -175,10 +174,15 @@ def run_show(
     print(f"  status: {_to_enriched_status(run)}")
     print(f"  selection: {_to_selection_status(run, selection)}")
     print(f"  created at: {reformat_datetime(run.created_at)}")
-    print(f"  started at: {reformat_datetime(run.started_at)}")
-    print(f"  ended at: {reformat_datetime(run.ended_at)}")
-    print(f"  duration: {run.duration or '(unknown)'}")
-    print(f"  exit code: {run.exit_code}", f"(likely {run.exit_reason})" if run.exit_reason else "")
+    print(f"  started at: {reformat_datetime(run.started_at, default='(not started)')}")
+    print(f"  ended at: {reformat_datetime(run.ended_at, default='(not ended)')}")
+    print(f"  duration: {_format_run_duration(run) or '(unknown)'}")
+
+    if run.status == RunStatus.COMPLETED:
+        print(f"  exit code: {run.exit_code}", f"(likely {run.exit_reason})" if run.exit_reason else "")
+    else:
+        print("  exit code: (none yet)")
+
     print(f"  error message: {repr(run.error_message) if run.error_message else '(none)'}")
 
     error_trace = run.error_trace
@@ -617,6 +621,17 @@ def _to_prediction_status(prediction: Prediction | None):
         return "failed"
 
     return "successful"
+
+
+def _format_run_duration(run: Run) -> str | None:
+    if run.duration:
+        return str(run.duration)
+
+    if run.started_at is not None and run.status != RunStatus.COMPLETED:
+        elapsed = datetime.now(tz=timezone.utc).replace(tzinfo=None) - run.started_at
+        return f"~{format_duration(max(elapsed, timedelta()))}"
+
+    return None
 
 
 def _to_enriched_status(run: Run):
