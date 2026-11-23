@@ -2,10 +2,9 @@ import logging
 import os
 import re
 import sys
-import time
+import warnings
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Generic, Iterable, Sequence, TypeVar, cast
 
 if TYPE_CHECKING:
@@ -121,91 +120,13 @@ else:
 
 
 def cut_url(url: str):
-    try:
-        url = url[:url.index("?")]
-    except ValueError:
-        pass
+    """Deprecated, use `crunch.download.cut_url` instead."""
 
-    if url.startswith("http://") or url.startswith("https://"):
-        return url.replace("//", "", 1)
+    from crunch.download import cut_url
 
-    return url
+    _warn_deprecated("cut_url", "cut_url")
 
-
-# copied from requests.models.Response.raise_for_status
-def _safely_raise_for_status(self: "requests.Response"):
-    """Raises :class:`HTTPError`, if one occurred."""
-
-    import requests
-
-    http_error_msg = ""
-    if isinstance(self.reason, bytes):
-        # We attempt to decode utf-8 first because some servers
-        # choose to localize their reason strings. If the string
-        # isn't utf-8, we fall back to iso-8859-1 for all other
-        # encodings. (See PR #3538)
-        try:
-            reason = self.reason.decode("utf-8")
-        except UnicodeDecodeError:
-            reason = self.reason.decode("iso-8859-1")
-    else:
-        reason = self.reason
-
-    url = self.url
-    url = re.sub(r"(X-(Amz|Goog)-[A-Za-z]+=)[^&]*", r"\1(hidden)", url)
-
-    if 400 <= self.status_code < 500:
-        http_error_msg = (
-            f"{self.status_code} Client Error: {reason} for url: {url}"
-        )
-
-    elif 500 <= self.status_code < 600:
-        http_error_msg = (
-            f"{self.status_code} Server Error: {reason} for url: {url}"
-        )
-
-    if http_error_msg:
-        raise requests.HTTPError(http_error_msg, response=self)
-
-
-def _download_head(
-    session: "requests.Session",
-    url: str,
-    path: str,
-    log: bool,
-    print: Callable[[str], None],
-):
-    logged = False
-    response: requests.Response | None = None
-
-    try:
-        response = session.get(url, stream=True)
-        _safely_raise_for_status(response)
-
-        file_length = response.headers.get("Content-Length", None)
-        file_length = int(file_length) if file_length is not None else None
-
-        if log:
-            if file_length is not None:
-                file_length_str = f"{file_length} bytes"
-            else:
-                file_length_str = "unknown length"
-
-            print(f"{path}: download from {cut_url(url)} ({file_length_str})")
-            logged = True
-
-        accept_ranges = response.headers.get("Accept-Ranges", None)
-        accept_ranges = "bytes" == accept_ranges
-
-        return file_length, accept_ranges, response
-    except:
-        if log and not logged:
-            print(f"downloading {path} from {cut_url(url)}")
-
-        if response is not None:  # type: ignore
-            response.close()
-
-        raise
+    return cut_url(url)
 
 
 def download(
@@ -217,86 +138,30 @@ def download(
     max_retry: int = 10,
     session: "requests.Session | None" = None,
 ):
-    import requests
-    from tqdm.auto import tqdm
+    """Deprecated, use `crunch.download.download_file` instead."""
 
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    from crunch.download import download_file
+    from crunch.downloader import _to_logger
 
-    if session is None:
-        session = requests.Session()
+    _warn_deprecated("download", "download_file")
 
-    session.headers["Accept-Encoding"] = "identity"  # GitHub provide the range on the gzip-encoded response instead of re-encoding it
+    download_file(
+        url,
+        path,
+        logger=_to_logger(print),
+        verbose=log,
+        progress_bar=progress_bar,
+        max_retry=max_retry,
+        session=session,
+    )
 
-    file_length, accept_ranges, response = _download_head(session, url, path, log, print)
 
-    if not accept_ranges:
-        max_retry = 0
-
-    total_read = 0
-
-    file_name = os.path.basename(path)
-
-    with TemporaryDirectory(
-        prefix=f"{file_name}.",
-        dir=os.path.dirname(path),
-    ) as temporary_directory_path:
-        source_file_path = os.path.join(temporary_directory_path, file_name)
-        destination_file_path = path
-
-        with open(source_file_path, 'wb') as fd:
-            for retry in range(max_retry + 1):
-                last = retry == max_retry
-
-                headers = {
-                    "Range": f"bytes={total_read}-",
-                } if retry else {}
-
-                try:
-                    response = response or session.get(
-                        url,
-                        stream=True,
-                        headers=headers,
-                        timeout=30,
-                    )
-
-                    _safely_raise_for_status(response)
-
-                    with tqdm(
-                        initial=total_read,
-                        total=file_length,
-                        unit='B',
-                        unit_scale=True,
-                        leave=False,
-                        disable=None if progress_bar else True,
-                    ) as progress:
-                        for chunk in response.iter_content(chunk_size=1024 * 16):
-                            chunk_size = len(chunk)
-                            total_read += chunk_size
-
-                            progress.update(chunk_size)
-                            fd.write(chunk)
-
-                    break
-                except requests.exceptions.ConnectionError as error:
-                    if last:
-                        raise
-
-                    print(f"retrying {retry + 1}/{max_retry} at {total_read} bytes because of {error.__class__.__name__}: {str(error) or '(no message)'}")
-                    time.sleep(1)
-                finally:
-                    if response is not None:
-                        response.close()
-
-                    response = None
-
-        if os.path.exists(destination_file_path):
-            os.unlink(destination_file_path)
-
-        import shutil
-        shutil.move(
-            source_file_path,
-            destination_file_path
-        )
+def _warn_deprecated(name: str, replacement: str):
+    warnings.warn(
+        f"`crunch.utils.{name}` is deprecated and will be removed in the next major version, use `crunch.download.{replacement}` instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 class Tracer:

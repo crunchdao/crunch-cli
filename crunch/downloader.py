@@ -1,21 +1,28 @@
+import logging
 import os
-import shutil
-import subprocess
-import zipfile
+import warnings
 from dataclasses import dataclass
-from tempfile import TemporaryDirectory
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
-import click
+from crunch.api import DataFile
+from crunch.download import _delete_other_uncompressed_markers, _download_data_file, _to_uncompressed_marker_path
 
-from crunch.api import DataFile, DataFiles
-from crunch.constants import MACOS_HIDDEN_FILES
-from crunch.utils import cut_url
-from crunch.utils import download as _download
+if TYPE_CHECKING:
+    from crunch.api import DataFiles
+
+__all__ = [
+    "PreparedDataFile",
+    "prepare_all",
+    "prepare_one",
+    "save_one",
+    "save_all",
+    "delete_other_uncompressed_markers",
+]
 
 
 @dataclass
 class PreparedDataFile:
+    """Deprecated, use `crunch.download.download_data_files` instead."""
 
     path: str
     url: str
@@ -29,64 +36,32 @@ class PreparedDataFile:
 
     @property
     def uncompressed_marker_path(self):
-        file_name = os.path.basename(self.path)
-        parent_directory_path = os.path.dirname(self.path)
-
-        return os.path.join(
-            parent_directory_path,
-            f".{file_name}.uncompressed"
-        )
-
-
-def delete_other_uncompressed_markers(
-    data_directory_path: str,
-    data_files: list[PreparedDataFile],
-):
-    expected_markers = {
-        data_file.uncompressed_marker_path
-        for data_file in data_files
-    }
-
-    found_markers: set[str] = set()
-    for root, _, files in os.walk(data_directory_path, topdown=False):
-        for file in files:
-            if file.startswith(".") and file.endswith(".uncompressed"):
-                path = os.path.join(root, file)
-
-                found_markers.add(path)
-
-    useless_markers = found_markers - expected_markers
-    for marker in useless_markers:
-        os.unlink(marker)
+        return _to_uncompressed_marker_path(self.path)
 
 
 def prepare_all(
     data_directory_path: str,
-    data_files: DataFiles,
+    data_files: "DataFiles",
 ):
+    """Deprecated, use `crunch.download.download_data_files` instead."""
+
+    _warn_deprecated("prepare_all", "download_data_files")
+
     return {
-        key: prepare_one(data_directory_path, value)
+        key: _prepare(data_directory_path, value)
         for key, value in data_files.items()
     }
 
 
 def prepare_one(
     data_directory_path: str,
-    data_file: DataFile,
+    data_file: "DataFile",
 ):
-    url = data_file.url
-    path = os.path.join(
-        data_directory_path,
-        data_file.name
-    )
+    """Deprecated, use `crunch.download.download_data_files` instead."""
 
-    return PreparedDataFile(
-        path,
-        url,
-        data_file.size,
-        data_file.signed,
-        data_file.compressed,
-    )
+    _warn_deprecated("prepare_one", "download_data_files")
+
+    return _prepare(data_directory_path, data_file)
 
 
 def save_one(
@@ -95,78 +70,21 @@ def save_one(
     print: Callable[[Any], None] = print,
     progress_bar: bool = True,
 ):
+    """Deprecated, use `crunch.download.download_data_files` instead."""
+
+    _warn_deprecated("save_one", "download_data_files")
+
     if data_file is None:
         return
 
-    file_size = data_file.size
-    file_path = data_file.path
-    file_name = os.path.basename(file_path)
-    parent_directory_path = os.path.dirname(file_path)
-
-    uncompressed_marker = data_file.uncompressed_marker_path
-
-    local_size = _read_size(file_path, uncompressed_marker)
-
-    def download():
-        file_length_str = f" ({file_size} bytes)" if data_file.has_size else ""
-        print(f"{file_path}: download from {cut_url(data_file.url)}" + file_length_str)
-
-        if not data_file.has_size:
-            print(f"{file_path}: skip, not given by server")
-            return None
-
-        if not force and local_size == file_size:
-            print(f"{file_path}: already exists, file length match")
-            return False
-
-        if not data_file.signed:
-            print(f"{file_path}: signature missing, cannot download file without being authenticated")
-            raise click.Abort()
-
-        _download(data_file.url, file_path, log=False, progress_bar=progress_bar)
-        return True
-
-    has_new_content = download()
-    if has_new_content is None:
-        return
-
-    if not data_file.compressed:
-        return
-
-    if os.path.exists(uncompressed_marker):
-        if has_new_content:
-            os.unlink(uncompressed_marker)
-        elif not force:
-            print(f"{file_path}: already uncompressed, marker is present")
-            return
-
-    with TemporaryDirectory(
-        prefix=f"{file_name}.",
-        dir=parent_directory_path
-    ) as temporary_directory_path:
-        print(f"{file_path}: uncompress into {temporary_directory_path}")
-        _uncompress(file_path, temporary_directory_path)
-
-        for name in os.listdir(temporary_directory_path):
-            if name in MACOS_HIDDEN_FILES:
-                continue
-
-            source_path = os.path.join(temporary_directory_path, name)
-            destination_path = os.path.join(parent_directory_path, name)
-
-            if os.path.exists(destination_path):
-                if os.path.isdir(destination_path):
-                    shutil.rmtree(destination_path)
-                else:
-                    os.unlink(destination_path)
-
-            shutil.move(source_path, parent_directory_path)
-
-    with open(uncompressed_marker, 'w') as fd:
-        # TODO Should include name of unzipped files as well for later cleanup
-        fd.write(str(file_size))
-
-    os.unlink(file_path)
+    _download_data_file(
+        _to_data_file(data_file),
+        data_file.path,
+        force=force,
+        logger=_to_logger(print),
+        verbose=True,
+        progress_bar=progress_bar,
+    )
 
 
 def save_all(
@@ -175,8 +93,21 @@ def save_all(
     print: Callable[[str], Any] = print,
     progress_bar: bool = True,
 ):
+    """Deprecated, use `crunch.download.download_data_files` instead."""
+
+    _warn_deprecated("save_all", "download_data_files")
+
+    logger = _to_logger(print)
+
     for data_file in data_files.values():
-        save_one(data_file, force, print, progress_bar)
+        _download_data_file(
+            _to_data_file(data_file),
+            data_file.path,
+            force=force,
+            logger=logger,
+            verbose=True,
+            progress_bar=progress_bar,
+        )
 
     return {
         key: value.path
@@ -185,44 +116,67 @@ def save_all(
     }
 
 
-def _read_size(
-    file_path: str,
-    marker_file_path: str
+def delete_other_uncompressed_markers(
+    data_directory_path: str,
+    data_files: list[PreparedDataFile],
 ):
-    try:
-        with open(marker_file_path, "r") as fd:
-            content = fd.read()
+    """Deprecated, use `crunch.download.download_data_files` with `delete_other_uncompressed_markers=True` instead."""
 
-        return int(content)
-    except (FileNotFoundError, ValueError):
-        pass
+    _warn_deprecated("delete_other_uncompressed_markers", "download_data_files")
 
-    try:
-        stat = os.stat(file_path)
-
-        return stat.st_size
-    except FileNotFoundError:
-        pass
-
-    return None
+    _delete_other_uncompressed_markers(
+        data_directory_path,
+        expected_marker_paths={
+            data_file.uncompressed_marker_path
+            for data_file in data_files
+        },
+    )
 
 
-def _uncompress(
-    zip_file_path: str,
-    output_directory_path: str,
+def _prepare(
+    data_directory_path: str,
+    data_file: "DataFile",
 ):
-    unzip = shutil.which("unzip")
+    return PreparedDataFile(
+        os.path.join(data_directory_path, data_file.name),
+        data_file.url,
+        data_file.size,
+        data_file.signed,
+        data_file.compressed,
+    )
 
-    if unzip:
-        return_code = subprocess.call([
-            unzip,
-            "-q",
-            "-d", output_directory_path,
-            zip_file_path
-        ])
 
-        if return_code != 0:
-            raise zipfile.BadZipFile(f"unzip failed with code: {return_code}")
-    else:
-        with zipfile.ZipFile(zip_file_path, "r") as zipfd:
-            zipfd.extractall(output_directory_path)
+def _to_data_file(prepared_data_file: PreparedDataFile):
+    return DataFile(
+        name=os.path.basename(prepared_data_file.path),
+        url=prepared_data_file.url,
+        size=prepared_data_file.size,
+        signed=prepared_data_file.signed,
+        compressed=prepared_data_file.compressed,
+    )
+
+
+def _warn_deprecated(name: str, replacement: str):
+    warnings.warn(
+        f"`crunch.downloader.{name}` is deprecated and will be removed in the next major version, use `crunch.download.{replacement}` instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+class _PrintHandler(logging.Handler):
+
+    def __init__(self, print: Callable[[str], Any]):
+        super().__init__()
+
+        self._print = print
+
+    def emit(self, record: logging.LogRecord):
+        self._print(self.format(record))
+
+
+def _to_logger(print: Callable[[str], Any]) -> logging.Logger:
+    logger = logging.Logger("crunch.downloader")
+    logger.addHandler(_PrintHandler(print))
+
+    return logger

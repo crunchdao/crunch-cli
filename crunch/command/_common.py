@@ -1,3 +1,5 @@
+import logging
+import sys
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -9,6 +11,17 @@ from crunch.repository import Repository
 
 if TYPE_CHECKING:
     from crunch.api import Project, SubmissionIdentifierType
+
+
+def get_cli_logger() -> logging.Logger:
+    logger = logging.getLogger("crunch.cli")
+
+    if not logger.handlers:
+        logger.addHandler(logging.StreamHandler(sys.stdout))
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+
+    return logger
 
 
 def get_project(repository: Repository):

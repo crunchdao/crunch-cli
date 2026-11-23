@@ -346,10 +346,12 @@ def push(
 @click.option("--round-number", default="@current", show_default=True, help="Round to download the data of.")
 @click.option("--force", is_flag=True, help="Force the download of the data.")
 @click.option("--size-variant", "size_variant_raw", type=click.Choice(DATA_SIZE_VARIANTS), required=False, help="Use alternative version of the data.")
+@click.option("--verbose", is_flag=True, help="Show the details of each file, like where it is downloaded from.")
 def download(
     round_number: "RoundIdentifierType",
     force: bool,
     size_variant_raw: str | None,
+    verbose: bool,
 ):
     from crunch.command.download import download, download_no_data_available
 
@@ -367,6 +369,7 @@ def download(
             round_number,
             force,
             size_variant,
+            verbose=verbose,
         )
     except (api.CrunchNotFoundException, api.MissingPhaseDataException):
         download_no_data_available()

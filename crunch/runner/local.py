@@ -110,6 +110,7 @@ class LocalRunner(Runner):
             ) = download(
                 self.repository,
                 round_number=self.round_number,
+                logger=self.logger,
             )
         except (CrunchNotFoundException, MissingPhaseDataException):
             download_no_data_available()

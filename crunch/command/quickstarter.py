@@ -5,9 +5,10 @@ import click
 
 from crunch import store
 from crunch.api import Quickstarter, QuickstarterNotFoundException
-from crunch.command._common import get_project
+from crunch.command._common import get_cli_logger, get_project
+from crunch.download import download_files
 from crunch.repository import Repository
-from crunch.utils import ascii_table, download
+from crunch.utils import ascii_table
 
 
 def quickstarter_list(
@@ -81,9 +82,15 @@ def quickstarter_apply(
             print("apply: `--overwrite` to overwrite them.")
             raise click.Abort()
 
-    for file in files:
-        path = os.path.join(".", file.name)  # useful?
-        download(file.url, path)
+    download_files(
+        {
+            file.name: file.url
+            for file in files
+        },
+        logger=get_cli_logger(),
+    )
+
+    print(f"apply: {len(files)} file(s) downloaded")
 
     if store.show_tips and quickstarter.notebook:
         print()

@@ -1,5 +1,6 @@
 import graphlib
 import json
+import logging
 import os
 import random
 import signal
@@ -21,14 +22,13 @@ from retry import retry
 
 import crunch.store as store
 from crunch.api import Client, Competition, InvalidRunTokenException, Language, LibraryInstallation, ModelTooBigException, PhaseType, PredictionTooBigException, RunnerRun, Upload
-from crunch.downloader import prepare_all, save_all
+from crunch.download import download_data_files, download_file, download_files
 from crunch.runner.installation import InstallationBatch, plan_installation
 from crunch.runner.runner import Runner
 from crunch.runner.tracing import GpuPresence, RemoteTraceExporter, RunnerTracer, to_execute_span_attributes
 from crunch.runner.types import KwargsLike
 from crunch.runner.unstructured import DEFAULT_LOG_LIMITS, RunnerContext
 from crunch.unstructured import LocalCodeLoader, RunnerModule, deduce_code_loader
-from crunch.utils import download
 
 UploadedFiles: TypeAlias = dict[str, Upload]
 LastModifications: TypeAlias = dict[str, int]
@@ -154,6 +154,9 @@ class CloudRunner(Runner):
 
         self._error_reported_fuse = Lock()
 
+        self.logger = logging.Logger("crunch.runner.cloud")
+        self.logger.addHandler(_RunnerLogHandler(self))
+
     def initialize(self):
         os.makedirs(self.data_directory, exist_ok=True)
         os.makedirs(self.scoring_directory, exist_ok=True)
@@ -178,10 +181,11 @@ class CloudRunner(Runner):
             if requirements_r_txt_url is not None:
                 requirements_r_txt_path = os.path.join(self.context_directory, requirements_r_txt_name)
 
-                download(
+                download_file(
                     requirements_r_txt_url,
                     requirements_r_txt_path,
-                    print=self.log,
+                    logger=self.logger,
+                    verbose=True,
                     progress_bar=False,
                 )
 
@@ -194,10 +198,11 @@ class CloudRunner(Runner):
             if requirements_txt_url is not None:
                 requirements_txt_path = os.path.join(self.context_directory, requirements_txt_name)
 
-                download(
+                download_file(
                     requirements_txt_url,
                     requirements_txt_path,
-                    print=self.log,
+                    logger=self.logger,
+                    verbose=True,
                     progress_bar=False,
                 )
 
@@ -220,7 +225,7 @@ class CloudRunner(Runner):
             _download_files(
                 file_urls=code_file_urls,
                 directory_path=self.code_directory,
-                print=self.log,
+                logger=self.logger,
             )
 
         with self._span("downloading model"):
@@ -231,7 +236,7 @@ class CloudRunner(Runner):
             self.pre_model_files_modification = _download_files(
                 file_urls=model_file_urls,
                 directory_path=self.model_directory_path,
-                print=self.log,
+                logger=self.logger,
             )
 
             self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
@@ -792,13 +797,12 @@ class CloudRunner(Runner):
         data_files = data_release.data_files
         assert data_files is not None, "the data release of a run always has its data files"
 
-        save_all(
-            prepare_all(
-                self.data_directory,
-                data_files,
-            ),
-            False,
-            print=self.log,
+        download_data_files(
+            self.data_directory,
+            data_files,
+            force=False,
+            logger=self.logger,
+            verbose=True,
             progress_bar=False,
         )
 
@@ -822,23 +826,41 @@ def _download_files(
     *,
     file_urls: dict[str, str],
     directory_path: str,
-    print: Callable[[str], Any],
+    logger: logging.Logger,
 ) -> LastModifications:
-    pre_modifications: LastModifications = {}
+    paths = {
+        relative_path: os.path.join(directory_path, relative_path)
+        for relative_path in file_urls.keys()
+    }
 
-    for relative_path, url in file_urls.items():
-        path = os.path.join(directory_path, relative_path)
-        download(
-            url,
-            path,
-            print=print,
-            progress_bar=False,
+    download_files(
+        {
+            paths[relative_path]: url
+            for relative_path, url in file_urls.items()
+        },
+        logger=logger,
+        verbose=True,
+        progress_bar=False,
+    )
+
+    return {
+        relative_path: os.stat(path).st_mtime_ns
+        for relative_path, path in paths.items()
+    }
+
+
+class _RunnerLogHandler(logging.Handler):
+
+    def __init__(self, runner: CloudRunner):
+        super().__init__()
+
+        self._runner = runner
+
+    def emit(self, record: logging.LogRecord):
+        self._runner.log(
+            self.format(record),
+            error=record.levelno >= logging.ERROR,
         )
-
-        stat = os.stat(path)
-        pre_modifications[relative_path] = stat.st_mtime_ns
-
-    return pre_modifications
 
 
 def _find_files(

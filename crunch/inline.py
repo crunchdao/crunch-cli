@@ -94,6 +94,7 @@ class _Inline:
         self,
         round_number: RoundIdentifierType = "@current",
         force: bool = False,
+        verbose: bool = False,
         **kwargs: KwargsLike,
     ) -> tuple["pandas.DataFrame | None", "pandas.DataFrame | None", "pandas.DataFrame | None"]:
         from crunch.command.download import download, download_no_data_available
@@ -109,6 +110,8 @@ class _Inline:
                 self._repository,
                 round_number=round_number,
                 force=force,
+                logger=self.logger,
+                verbose=verbose,
             )
         except (CrunchNotFoundException, MissingPhaseDataException):
             download_no_data_available()
