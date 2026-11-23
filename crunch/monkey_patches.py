@@ -207,10 +207,11 @@ def _should_redirect_main_to_user_code():
     """
     Determine if the __main__ module should be redirected to user_code:
     - If the code is run via the CLI
+    - If the process, or one of its parents, loaded the user's code
     - If the code is run in a loky child process
     """
 
-    if constants.RUN_VIA_CLI:
+    if constants.RUN_VIA_CLI or os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR):
         return True
 
     for frame, _ in traceback.walk_stack(inspect.currentframe()):
@@ -221,34 +222,62 @@ def _should_redirect_main_to_user_code():
     return False
 
 
+def _redirect_main_to_user_code(module_name: str) -> str:
+    """
+    Redirects only when the user's code can be found: in a notebook, the user's code is the real `__main__`.
+    """
+
+    if module_name != "__main__" or not _should_redirect_main_to_user_code():
+        return module_name
+
+    import importlib.util
+
+    user_code_module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR) or constants.DEFAULT_USER_CODE_MODULE_NAME
+    if user_code_module_name in sys.modules or importlib.util.find_spec(user_code_module_name) is not None:
+        return user_code_module_name
+
+    return module_name
+
+
 @_patcher
 def pickle_unpickler_find_class():
     """
-    This is based on the assumption that the Python version of the `pickle` module is being used.
-    The C version cannot be monkey patched. It's too bad; (it would have been nice)[https://github.com/python/cpython/blob/5ab66a882d1b5e44ec50b25df116ab209d65863f/Modules/_pickle.c#L5197].
+    Code trained outside of crunch, like in a notebook or with `python main.py`, is pickled as `__main__.<name>`: it is looked up in the user's code instead.
 
-    Both `pandas` and `joblib` use the Python version of the `pickle` module.
+    `pickle.Unpickler`, `pickle.load` and `pickle.loads` are replaced by a subclass of the C unpickler, which stays as fast since only `find_class` runs in Python.
+    The Python unpickler, that `pandas` and `joblib` use, is patched as well.
     """
 
+    import io
     import multiprocessing.reduction
     import pickle
 
+    class Unpickler(pickle.Unpickler):
+
+        def find_class(self, module_name: str, global_name: str) -> Any:
+            return super().find_class(_redirect_main_to_user_code(module_name), global_name)
+
+    def load(file: Any, *, fix_imports: bool = True, encoding: str = "ASCII", errors: str = "strict", buffers: Any = None) -> Any:
+        return Unpickler(file, fix_imports=fix_imports, encoding=encoding, errors=errors, buffers=buffers).load()
+
+    def loads(data: Any, /, *, fix_imports: bool = True, encoding: str = "ASCII", errors: str = "strict", buffers: Any = None) -> Any:
+        if isinstance(data, str):
+            raise TypeError("Can't load pickle from unicode string")
+
+        return Unpickler(io.BytesIO(data), fix_imports=fix_imports, encoding=encoding, errors=errors, buffers=buffers).load()
+
     python_unpickler = getattr(pickle, "_Unpickler")
-    original: Callable[..., Any] = python_unpickler.find_class
-    should_redirect: bool | None = None
+    original_python_find_class: Callable[..., Any] = python_unpickler.find_class
 
-    def patched(self: pickle.Unpickler, module_name: str, global_name: str) -> Any:
-        nonlocal should_redirect
-        if should_redirect is None:
-            should_redirect = _should_redirect_main_to_user_code()
+    def python_find_class(self: Any, module_name: str, global_name: str) -> Any:
+        return original_python_find_class(self, _redirect_main_to_user_code(module_name), global_name)
 
-        if should_redirect and module_name == "__main__":
-            module_name = constants.DEFAULT_USER_CODE_MODULE_NAME
+    setattr(python_unpickler, "find_class", python_find_class)
 
-        return original(self, module_name, global_name)
-
-    setattr(python_unpickler, "find_class", patched)
-    setattr(multiprocessing.reduction.ForkingPickler, "loads", getattr(pickle, "_loads"))
+    setattr(pickle, "Unpickler", Unpickler)
+    setattr(pickle, "load", load)
+    setattr(pickle, "loads", loads)
+    setattr(multiprocessing.reduction.ForkingPickler, "loads", staticmethod(loads))
 
 
 @_patcher
@@ -290,21 +319,58 @@ def prepare_for_process_initializer(
     user_code_module = sys.modules.get(module_name)
 
     user_code_path = user_code_module.__file__ if user_code_module is not None else None
-    user_code_path = user_code_path or os.environ.get(constants.MAIN_FILE_PATH_ENV_VAR)
+    user_code_path = user_code_path or os.environ.get(constants.USER_CODE_MAIN_FILE_PATH_ENV_VAR)
     user_code_path = user_code_path or os.path.join(os.getcwd(), constants.DEFAULT_MAIN_FILE_PATH)
 
     os.environ[constants.USER_CODE_MODULE_NAME_ENV_VAR] = module_name
-    os.environ[constants.MAIN_FILE_PATH_ENV_VAR] = user_code_path
+    os.environ[constants.USER_CODE_MAIN_FILE_PATH_ENV_VAR] = user_code_path
 
 
 def process_initializer(*args: Any, **kwargs: Any) -> None:
     apply_all()
 
     user_code_module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR, constants.DEFAULT_USER_CODE_MODULE_NAME)
-    main_file_path = os.environ.get(constants.MAIN_FILE_PATH_ENV_VAR, constants.DEFAULT_MAIN_FILE_PATH)
+    main_file_path = os.environ.get(constants.USER_CODE_MAIN_FILE_PATH_ENV_VAR, constants.DEFAULT_MAIN_FILE_PATH)
 
-    if not user_code_module_name in sys.modules:
+    if user_code_module_name not in sys.modules:
         from .command.test import load_user_code
-        module = load_user_code(main_file_path, user_code_module_name)
+        load_user_code(main_file_path, user_code_module_name)
 
-        sys.modules[user_code_module_name] = module
+
+@_patcher
+def user_code_finder():
+    """
+    A process started with `spawn` or `forkserver` does not inherit the user's code, and imports it again to unpickle one of its functions.
+    Registers a finder that loads it from the main file that the parent process exported with `prepare_for_process_initializer`.
+    """
+
+    module_name = os.environ.get(constants.USER_CODE_MODULE_NAME_ENV_VAR)
+    main_file_path = os.environ.get(constants.USER_CODE_MAIN_FILE_PATH_ENV_VAR)
+    if not module_name or not main_file_path:
+        return
+
+    sys.meta_path.append(_UserCodeFinder(module_name, os.path.abspath(main_file_path)))
+
+
+class _UserCodeFinder:
+
+    def __init__(self, module_name: str, main_file_path: str):
+        self._module_name = module_name
+        self._main_file_path = main_file_path
+
+    def find_spec(self, fullname: str, path: Any = None, target: Any = None):
+        if fullname != self._module_name or not os.path.isfile(self._main_file_path):
+            return None
+
+        import importlib.util
+
+        return importlib.util.spec_from_file_location(fullname, self._main_file_path)
+
+
+def apply_for_user_code_child_process():
+    """
+    Applied at startup by `crunch-monkeypatch.pth` in a child process of the user's code.
+    """
+
+    user_code_finder()
+    pickle_unpickler_find_class()

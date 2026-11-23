@@ -2,6 +2,7 @@ import os
 import sys
 from typing import TYPE_CHECKING
 
+import crunch.monkey_patches as monkey_patches
 import crunch.tester as tester
 from crunch.api import CompetitionFormat, RoundIdentifierType
 from crunch.constants import DEFAULT_USER_CODE_MODULE_NAME
@@ -28,6 +29,10 @@ def load_user_code(
     initial_pid = getpid()
 
     sys.modules[module_name] = module
+
+    monkey_patches.pickle_unpickler_find_class()
+    monkey_patches.prepare_for_process_initializer(module_name)
+
     try:
         spec.loader.exec_module(module)  # pyright: ignore[reportOptionalMemberAccess]
     except:
