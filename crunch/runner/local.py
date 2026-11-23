@@ -43,6 +43,7 @@ class LocalRunner(Runner):
             competition_format=competition.format,
             tracer=RunnerTracer(
                 trace_exporter or VoidTraceExporter(),
+                logger=logger,
                 metrics_delay=3,
             ),
             logger=logger,

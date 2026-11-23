@@ -27,11 +27,15 @@ def extract_from_requirements(
     *,
     language: RequirementLanguage = RequirementLanguage.PYTHON,
     file_path: str,
+    logger: logging.Logger | None = None,
 ) -> set[str]:
     """
     Extracts package names from a requirements file.
     Does nothing if the file does not exist.
     """
+
+    if logger is None:
+        logger = logging.getLogger()
 
     if not os.path.exists(file_path):
         return set()
@@ -45,7 +49,7 @@ def extract_from_requirements(
             file_content=file_content,
         )
     except RequirementParseError as error:
-        print(f"{language.txt_file_name}: {error}")
+        logger.error(f"{language.txt_file_name}: {error}")
         raise click.Abort()
 
     return {
@@ -225,10 +229,12 @@ def scan(
             RequirementLanguage.PYTHON: extract_from_requirements(
                 language=RequirementLanguage.PYTHON,
                 file_path=requirements_file,
+                logger=logger,
             ),
             RequirementLanguage.R: extract_from_requirements(
                 language=RequirementLanguage.R,
                 file_path=requirements_r_file,
+                logger=logger,
             ),
         }
 

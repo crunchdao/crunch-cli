@@ -1,10 +1,37 @@
 import io
 import logging
+import os
 import sys
+import tempfile
 import unittest
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+from crunch.api._domain.runner import RunnerRunMetric
+from crunch.runner.tracing import RunnerTracer, TraceExporter
+
+
+class _FailingTraceExporter(TraceExporter):
+
+    def push(self, spans: Any, metrics: Any):
+        raise ConnectionError("unreachable")
+
+
+class RunnerTracerLoggerTest(unittest.TestCase):
+
+    def test_dropped_batch_is_logged(self):
+        logger = logging.Logger("test_runner_logger")
+        tracer = RunnerTracer(_FailingTraceExporter(), logger=logger, batch_delay=0)
+
+        tracer.emit(RunnerRunMetric(timestamp=datetime.now(), cpu=0, ram=0, disk=0, gpu=None, vram=None))
+        tracer._stop_event.set()  # pyright: ignore[reportPrivateUsage]
+
+        with self.assertLogs(logger) as logs:
+            tracer._worker_loop()  # pyright: ignore[reportPrivateUsage]
+
+        self.assertEqual(["ERROR:test_runner_logger:dropped 0 spans and 1 metrics: ConnectionError(unreachable)"], logs.output)
 
 
 class _FlushCountingStream(io.StringIO):
@@ -74,6 +101,39 @@ class CloudRunnerLoggerTest(unittest.TestCase):
 
         self.assertEqual("[secret] <runner/out> looping\n[secret] <runner/out> from the logger\n", stdout.getvalue())
         self.assertEqual("[secret] <runner/err> failed\n", stderr.getvalue())
+
+    def test_upload_files(self):
+        from crunch.runner.cloud import _upload_files
+
+        logger = logging.Logger("test_runner_logger")
+        client = MagicMock()
+
+        with tempfile.TemporaryDirectory() as directory:
+            with open(os.path.join(directory, "prediction.parquet"), "wb") as fd:
+                fd.write(b"x" * 10)
+
+            uploads: dict[str, Any] = {}
+
+            with self.assertLogs(logger) as logs:
+                has_changed = _upload_files(
+                    category="prediction",
+                    directory_path=directory,
+                    uploads=uploads,
+                    client=client,
+                    logger=logger,
+                )
+
+        self.assertTrue(has_changed)
+        self.assertEqual({"prediction.parquet"}, set(uploads.keys()))
+        self.assertIs(logger, client.uploads.send_from_file.call_args.kwargs["logger"])
+        self.assertEqual(
+            [
+                "INFO:test_runner_logger:prediction: found file name=`prediction.parquet` size=10",
+                "INFO:test_runner_logger:prediction: done walking files.len=1 total_size=10",
+                "INFO:test_runner_logger:prediction: uploading name=`prediction.parquet`",
+            ],
+            logs.output,
+        )
 
     def test_context_log_levels(self):
         from crunch.runner.cloud import CloudRunnerContext

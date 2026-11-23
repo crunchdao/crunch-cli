@@ -10,6 +10,7 @@ import click
 
 from crunch import store
 from crunch.api import Client, ForbiddenLibraryException, Submission, SubmissionType, Upload, UploadStatus, WebUrlFormatter
+from crunch.command._common import get_cli_logger
 from crunch.constants import COLAB_DETECTION_ENV_VAR, COLAB_IGNORED_CODE_FILES, IGNORED_CODE_FILES, IGNORED_MODEL_FILES, REQUIREMENTS_TXT, SUBMISSION_MESSAGE_LENGTH
 from crunch.external.humanfriendly import format_size, format_timespan
 from crunch.repository import Repository
@@ -256,6 +257,7 @@ def _upload_files(
             size=size,
             preferred_chunk_size=preferred_chunk_size,
             progress_bar=True,
+            logger=get_cli_logger(),
         )
 
         return upload

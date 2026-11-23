@@ -11,7 +11,7 @@ import sys
 from datetime import timedelta
 from multiprocessing import Lock
 from time import sleep
-from typing import Any, Callable, Generator, TypeAlias
+from typing import Any, Generator, TypeAlias
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -113,14 +113,17 @@ class CloudRunner(Runner):
         max_retry: int,
         retry_seconds: int
     ):
+        logger = _create_logger(log_secret)
+
         super().__init__(
             competition_format=competition.format,
             tracer=RunnerTracer(
                 RemoteTraceExporter(run),
+                logger=logger,
                 gpu_presence=GpuPresence.AVAILABLE if gpu else GpuPresence.UNAVAILABLE,
                 metrics_delay=60,
             ),
-            logger=_create_logger(log_secret),
+            logger=logger,
             determinism_check_enabled=determinism_check_enabled,
         )
 
@@ -454,7 +457,7 @@ class CloudRunner(Runner):
             directory_path=self.prediction_directory_path,
             uploads=uploads,
             client=self.client,
-            log=self.log,  # type: ignore
+            logger=self.logger,
         )
 
     def _upload_model_files(
@@ -473,7 +476,7 @@ class CloudRunner(Runner):
             directory_path=self.model_directory_path,
             uploads=uploads,
             client=self.client,
-            log=self.log,  # type: ignore
+            logger=self.logger,
             pre_modifications=self.pre_model_files_modification,
         )
 
@@ -878,7 +881,7 @@ def _upload_files(
     directory_path: str,
     uploads: UploadedFiles,
     client: Client,
-    log: Callable[[str], None],
+    logger: logging.Logger,
     pre_modifications: LastModifications | None = None,
 ) -> bool:
     """
@@ -898,7 +901,7 @@ def _upload_files(
         stat = os.stat(file_path)
         file_size = stat.st_size
 
-        log(f"{category}: found file name=`{file_name}` size={file_size}")
+        logger.info(f"{category}: found file name=`{file_name}` size={file_size}")
 
         files.append((file_path, file_name))
         post_modifications[file_name] = stat.st_mtime_ns
@@ -906,23 +909,24 @@ def _upload_files(
 
     if pre_modifications is not None:
         has_changed = pre_modifications != post_modifications
-        log(f"{category}: done walking files.len={len(files)} total_size={total_size} has_changed={has_changed}")
+        logger.info(f"{category}: done walking files.len={len(files)} total_size={total_size} has_changed={has_changed}")
 
         if not has_changed:
             return False
     else:
-        log(f"{category}: done walking files.len={len(files)} total_size={total_size}")
+        logger.info(f"{category}: done walking files.len={len(files)} total_size={total_size}")
 
     for file_path, file_name in files:
         if file_name in uploads:
-            log(f"{category}: reusing upload name=`{file_name}`")
+            logger.info(f"{category}: reusing upload name=`{file_name}`")
             continue
 
-        log(f"{category}: uploading name=`{file_name}`")
+        logger.info(f"{category}: uploading name=`{file_name}`")
         uploads[file_name] = client.uploads.send_from_file(
             path=file_path,
             name=file_name,
-            max_retry=3
+            max_retry=3,
+            logger=logger,
         )
 
     return True
