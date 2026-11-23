@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
     from crunch.api._client import Client
 
 _MAXIMUM_BATCH_SIZE = 100
+
+_logger = logging.getLogger(__name__)
 
 
 class UploadStatus(ApiEnum):
@@ -71,6 +74,7 @@ class UploadChunk(ApiModel):
         max_retry: int = 10,
         byte_callback: Callable[[int], None] | None = None,
         retry_callback: Callable[[], None] | None = None,
+        logger: logging.Logger = _logger,
     ):
         import requests
 
@@ -107,7 +111,7 @@ class UploadChunk(ApiModel):
                 if last:
                     raise
 
-                print(f"retrying {retry + 1}/{max_retry} because of {error.__class__.__name__}: {str(error) or '(no message)'}")
+                logger.warning(f"retrying {retry + 1}/{max_retry} because of {error.__class__.__name__}: {str(error) or '(no message)'}")
                 time.sleep(1)
 
                 if retry_callback is not None:
@@ -218,6 +222,7 @@ class UploadCollection(ApiCollection[Upload]):
         preferred_chunk_size: int | None = None,
         progress_bar: bool = False,
         max_retry: int = 10,
+        logger: logging.Logger = _logger,
     ) -> Upload:
         if size is None:
             size = os.path.getsize(path)
@@ -230,6 +235,7 @@ class UploadCollection(ApiCollection[Upload]):
                 preferred_chunk_size=preferred_chunk_size,
                 progress_bar=progress_bar,
                 max_retry=max_retry,
+                logger=logger,
             )
 
     def send_from_io(
@@ -241,6 +247,7 @@ class UploadCollection(ApiCollection[Upload]):
         preferred_chunk_size: int | None = None,
         progress_bar: bool = False,
         max_retry: int = 10,
+        logger: logging.Logger = _logger,
     ) -> Upload:
         from tqdm.auto import tqdm
 
@@ -278,6 +285,7 @@ class UploadCollection(ApiCollection[Upload]):
                     max_retry=max_retry,
                     byte_callback=progress.update,  # type: ignore
                     retry_callback=retry_callback,
+                    logger=logger,
                 )
 
             upload.complete()

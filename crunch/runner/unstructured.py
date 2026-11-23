@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from types import ModuleType
@@ -84,7 +85,13 @@ class RunnerContext(ABC):
     def report_determinism(self, deterministic: bool) -> None:
         pass  # pragma: no cover
 
+    @property
     @abstractmethod
+    def logger(self) -> logging.Logger:
+        """
+        Logger of the runner, to use instead of `log`.
+        """
+
     def log(
         self,
         message: str,
@@ -92,7 +99,18 @@ class RunnerContext(ABC):
         important: bool = False,
         error: bool = False,
     ) -> Literal[True]:
-        pass  # pragma: no cover
+        """
+        Kept for the existing competitions: new ones must use `logger` instead.
+        """
+
+        if error:
+            self.logger.error(message)
+        elif important:
+            self.logger.warning(message)
+        else:
+            self.logger.info(message)
+
+        return True
 
     @abstractmethod
     def execute(

@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -43,8 +43,10 @@ class LocalRunner(Runner):
             competition_format=competition.format,
             tracer=RunnerTracer(
                 trace_exporter or VoidTraceExporter(),
+                logger=logger,
                 metrics_delay=3,
             ),
+            logger=logger,
             determinism_check_enabled=determinism_check_enabled,
         )
 
@@ -57,7 +59,6 @@ class LocalRunner(Runner):
         self.train_frequency = train_frequency
         self.round_number: RoundIdentifierType = round_number
         self.has_gpu = has_gpu
-        self.logger = logger
 
     def start(self):
         memory_before = get_process_memory()
@@ -66,25 +67,20 @@ class LocalRunner(Runner):
         try:
             return super().start()
         finally:
-            self.log("")
+            self.logger.info("")
 
-            self.log(
-                "duration - time=%s" % (
-                    time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
-                ),
-                important=True,
-            )
+            now_time = time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
+            self.logger.info("duration - time={%s}" % (now_time))
 
             memory_after = get_process_memory()
             memory_consumed = memory_after - memory_before
 
-            self.log(
+            self.logger.info(
                 'memory - before="%s" after="%s" consumed=%s' % (
                     format_size(memory_before),
                     format_size(memory_after),
                     f'"{format_size(memory_consumed)}"' if memory_consumed > 0 else "unknown"
                 ),
-                important=True,
             )
 
     def setup(self):
@@ -92,9 +88,9 @@ class LocalRunner(Runner):
         monkey_patches.display_add()
 
     def initialize(self):
-        self.log("running local test")
-        self.log("internet access isn't restricted, no check will be done", important=True)
-        self.log("")
+        self.logger.info("running local test")
+        self.logger.warning("internet access isn't restricted, no check will be done")
+        self.logger.info("")
 
         os.makedirs(self.model_directory_path, exist_ok=True)
         os.makedirs(self.prediction_directory_path, exist_ok=True)
@@ -118,7 +114,7 @@ class LocalRunner(Runner):
 
     def start_unstructured(self) -> None:
         if self.runner_module is None:
-            self.log("no runner is available for this competition", error=True)
+            self.logger.error("no runner is available for this competition")
             raise click.Abort()
 
         context = LocalRunnerContext(self)
@@ -132,28 +128,10 @@ class LocalRunner(Runner):
                 tracer=self.tracer,
             )
 
-        self.log(f"save prediction - path={os.path.relpath(self.prediction_directory_path)}{os.sep}", important=True)
+        self.logger.info(f"save prediction - path={os.path.relpath(self.prediction_directory_path)}{os.sep}")
 
     def finalize(self):
         pass
-
-    def log(
-        self,
-        message: str,
-        *,
-        important: bool = False,
-        error: bool = False,
-    ):
-        if error:
-            self.logger.error(message)
-        elif important:
-            self.logger.warning(message)
-        else:
-            self.logger.info(message)
-
-        self.logger.handlers[0].flush()
-
-        return True
 
 
 class LocalRunnerContext(RunnerContext):
@@ -200,18 +178,9 @@ class LocalRunnerContext(RunnerContext):
     def report_determinism(self, deterministic: bool):
         self.runner.deterministic = deterministic
 
-    def log(
-        self,
-        message: str,
-        *,
-        important: bool = False,
-        error: bool = False,
-    ) -> Literal[True]:
-        return self.runner.log(
-            message,
-            important=important,
-            error=error,
-        )
+    @property
+    def logger(self):
+        return self.runner.logger
 
     def execute(
         self,
@@ -224,7 +193,7 @@ class LocalRunnerContext(RunnerContext):
         install_data_fuse: bool = True,  # unavailable locally
         log_limits: tuple[int, int] = (0, 0),  # unavailable locally
     ) -> None:
-        self.log(f"executing - command={command}")
+        self.logger.info(f"executing - command={command}")
 
         user_module = LocalUserModule(self.runner)
         executor_context = LocalRunnerExecutorContext(self.runner)
@@ -242,7 +211,7 @@ class LocalRunnerContext(RunnerContext):
 
             handler = handlers.get(command)
             if handler is None:
-                self.log(f"command not found: {command}", error=True)
+                self.logger.error(f"command not found: {command}")
                 return None
 
             smart_call(

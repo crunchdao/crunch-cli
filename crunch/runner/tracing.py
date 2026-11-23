@@ -1,4 +1,4 @@
-import sys
+import logging
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -108,11 +108,13 @@ class RunnerTracer:
         self,
         exporter: TraceExporter,
         *,
+        logger: logging.Logger,
         gpu_presence: GpuPresence = GpuPresence.AUTO_DETECT,
         batch_delay: int = 5,
         metrics_delay: int = 10,
     ):
         self.exporter = exporter
+        self.logger = logger
         self.gpu_presence = gpu_presence
         self.batch_delay = batch_delay
         self.metrics_delay = metrics_delay
@@ -162,7 +164,7 @@ class RunnerTracer:
             try:
                 self.exporter.push(spans=spans, metrics=metrics)
             except Exception as exception:
-                print(f"dropped {len(spans)} spans and {len(metrics)} metrics: {exception.__class__.__name__}({exception})", file=sys.stderr)
+                self.logger.error(f"dropped {len(spans)} spans and {len(metrics)} metrics: {exception.__class__.__name__}({exception})")
             finally:
                 for _ in range(len(batch)):
                     self._queue.task_done()
@@ -178,7 +180,7 @@ class RunnerTracer:
                 gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # pyright: ignore[reportUnknownMemberType]
             except pynvml.NVMLError as error:
                 if self.gpu_presence == GpuPresence.AVAILABLE:
-                    print(f"[pynvml] failed to initialize: {error}", file=sys.stderr)
+                    self.logger.error(f"[pynvml] failed to initialize: {error}")
 
                 gpu_handle = None
 
