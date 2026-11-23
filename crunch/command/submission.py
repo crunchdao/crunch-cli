@@ -5,11 +5,12 @@ import click
 
 from crunch import store
 from crunch.api import EncryptedSubmissionException
-from crunch.command._common import get_project, get_submission, reformat_datetime
+from crunch.command._common import get_cli_logger, get_project, get_submission, reformat_datetime
 from crunch.constants import DOT_CRUNCH_DIRECTORY, DOT_DATA_DIRECTORY, DOT_PREDICTION_DIRECTORY, SUBMISSION_MESSAGE_LENGTH
+from crunch.download import download_files
 from crunch.external.humanfriendly import format_size
 from crunch.repository import Repository
-from crunch.utils import ascii_table, download, to_unix_path
+from crunch.utils import ascii_table, to_unix_path
 
 if TYPE_CHECKING:
     from crunch.api import SubmissionIdentifierType
@@ -225,8 +226,7 @@ def submission_checkout(
             if path in selected_paths
         }
 
-    for path, url in urls.items():
-        download(url, path)
+    download_files(urls, logger=get_cli_logger())
 
     print(f"checkout: {len(urls)} file(s) restored from submission #{submission.number}")
 

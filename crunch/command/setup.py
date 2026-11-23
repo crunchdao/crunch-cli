@@ -3,9 +3,10 @@ from typing import Any, Literal, TypeAlias
 import click
 
 import crunch.api as api
+from crunch.command._common import get_cli_logger
 from crunch.command.init import init
+from crunch.download import download_files
 from crunch.repository import Repository
-from crunch.utils import download
 
 SetupSubmissionNumberType: TypeAlias = int | Literal["latest", "scratch"]
 
@@ -71,8 +72,10 @@ def setup(
             include_model=not no_model,
         )
 
-        for path, url in urls.items():
-            download(url, path)
+        submission_name = "the latest submission" if submission_number == "latest" else f"submission #{submission_number}"
+        print(f"setup: restoring {len(urls)} file(s) from {submission_name}")
+
+        download_files(urls, logger=get_cli_logger())
 
     except api.NeverSubmittedException:
         print(f"setup: you appear to have never submitted code before")
