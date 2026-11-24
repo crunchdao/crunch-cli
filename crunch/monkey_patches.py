@@ -5,30 +5,144 @@ import os
 import re
 import sys
 import traceback
-from typing import Any, Callable
+from typing import Any, Callable, ClassVar
 
 from . import constants
-
-_patchers: list[Callable[[], None]] = []
 
 SHOULD_PRINT_PREFIX_WHEN_POSSIBLE: str | None = None
 
 
-def _patcher(function: Callable[[], None]) -> Callable[[], None]:
-    applied = False
+class Patch:
 
-    @functools.wraps(function)
-    def wrapper() -> None:
-        nonlocal applied
+    _registered: ClassVar[list["Patch"]] = []
 
-        if applied:
+    def __init__(self, function: Callable[[], None], module_name: str | None):
+        functools.update_wrapper(self, function)
+
+        self._function = function
+        self.module_name = module_name
+        self._applied = False
+
+    def __call__(self) -> None:
+        if self._applied:
             return
 
-        applied = True
-        function()
+        if self.module_name is None or self.module_name in sys.modules:
+            self.apply()
+        else:
+            _get_post_import_finder().watch(self.module_name, self)
 
-    _patchers.append(wrapper)
-    return wrapper
+    def apply(self) -> None:
+        if self._applied:
+            return
+
+        self._applied = True
+        self._function()
+
+    @classmethod
+    def register(cls, module_name: str | None = None) -> Callable[[Callable[[], None]], "Patch"]:
+        """
+        Without `module_name`, the patch is applied by `apply_all()`.
+        With it, the patch is applied right after the first import of the module, or right away if it is already imported, so that `apply_all()` does not import it.
+        """
+
+        def decorator(function: Callable[[], None]) -> "Patch":
+            patch = cls(function, module_name)
+            cls._registered.append(patch)
+
+            return patch
+
+        return decorator
+
+    @classmethod
+    def apply_all(cls) -> None:
+        for patch in cls._registered:
+            patch()
+
+
+class _PostImportFinder:
+    """
+    Only handles the watched modules: it finds them with the other finders, and wraps their loader to apply the patches after the module runs.
+    """
+
+    def __init__(self):
+        self._patches_by_module_name: dict[str, list[Patch]] = {}
+
+    def watch(self, module_name: str, patch: Patch) -> None:
+        self._patches_by_module_name.setdefault(module_name, []).append(patch)
+
+    def take(self, module_name: str) -> list[Patch]:
+        return self._patches_by_module_name.pop(module_name, [])
+
+    def find_spec(self, fullname: str, path: Any = None, target: Any = None) -> Any:
+        """
+        The patches stay watched until the module runs: `importlib.util.find_spec` also comes here, to only check that a module is installed.
+        """
+
+        if fullname not in self._patches_by_module_name:
+            return None
+
+        spec = self._find_spec_with_other_finders(fullname, path, target)
+        if spec is None or spec.loader is None or not hasattr(spec.loader, "exec_module"):
+            return spec
+
+        spec.loader = _PatchingLoader(spec.loader, fullname, self)
+        return spec
+
+    def _find_spec_with_other_finders(self, fullname: str, path: Any, target: Any) -> Any:
+        for finder in sys.meta_path:
+            if finder is self:
+                continue
+
+            find_spec = getattr(finder, "find_spec", None)
+            if find_spec is None:
+                continue
+
+            spec = find_spec(fullname, path, target)
+            if spec is not None:
+                return spec
+
+        return None
+
+
+class _PatchingLoader:
+    """
+    Puts the real loader back on the module before running it, so that the module looks imported normally, then applies the patches.
+    """
+
+    def __init__(self, loader: Any, module_name: str, finder: _PostImportFinder):
+        self._loader = loader
+        self._module_name = module_name
+        self._finder = finder
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._loader, name)
+
+    def exec_module(self, module: Any) -> None:
+        module.__loader__ = self._loader
+        if module.__spec__ is not None:
+            module.__spec__.loader = self._loader
+
+        self._loader.exec_module(module)
+
+        for patch in self._finder.take(self._module_name):
+            try:
+                patch.apply()
+            except Exception as error:
+                print(f"crunch: could not apply the `{patch.__name__}` patch: {error.__class__.__name__}: {error}", file=sys.stderr)
+
+
+_post_import_finder: _PostImportFinder | None = None
+
+
+def _get_post_import_finder() -> _PostImportFinder:
+    global _post_import_finder
+
+    if _post_import_finder is None:
+        _post_import_finder = _PostImportFinder()
+        sys.meta_path.insert(0, _post_import_finder)
+
+    return _post_import_finder
 
 
 def _try_import(module_name: str) -> Any | None:
@@ -38,12 +152,10 @@ def _try_import(module_name: str) -> Any | None:
         return None
 
 
-def apply_all():
-    for patcher in _patchers:
-        patcher()
+apply_all = Patch.apply_all
 
 
-@_patcher
+@Patch.register()
 def io_no_tty():
     import sys
 
@@ -55,7 +167,7 @@ def io_no_tty():
 TQDM_MININTERVAL = 10
 
 
-@_patcher
+@Patch.register("tqdm")
 def tqdm_init():
     import tqdm
 
@@ -72,7 +184,7 @@ def tqdm_init():
     setattr(tqdm.tqdm, "__init__", patched)
 
 
-@_patcher
+@Patch.register("tqdm")
 def tqdm_display():
     import tqdm
 
@@ -96,7 +208,7 @@ def tqdm_display():
     setattr(tqdm.tqdm, "display", tqdm_display)
 
 
-@_patcher
+@Patch.register("tqdm.notebook")
 def tqdm_notebook():
     from tqdm.notebook import tqdm as tqdm_notebook
 
@@ -105,7 +217,7 @@ def tqdm_notebook():
             delattr(tqdm_notebook, key)
 
 
-@_patcher
+@Patch.register()
 def pathlib_str_functions():
     import pathlib
 
@@ -128,11 +240,9 @@ def pathlib_str_functions():
         )
 
 
-@_patcher
+@Patch.register("keras.src.engine.training")
 def keras_model_verbosity():
-    training = _try_import("keras.src.engine.training")
-    if training is None:
-        return
+    training = importlib.import_module("keras.src.engine.training")
 
     def get_verbosity(verbose: int, distribute_strategy: Any) -> int:
         return 0 if verbose == 0 else 2
@@ -140,7 +250,7 @@ def keras_model_verbosity():
     setattr(training, "_get_verbosity", get_verbosity)
 
 
-@_patcher
+@Patch.register()
 def display_add():
     import builtins
 
@@ -153,11 +263,9 @@ CATBOOST_TRAIN_DIR_ENVVAR = "CATBOOST_TRAIN_DIR"
 CATBOOST_TRAIN_DIR_KEY = "train_dir"
 
 
-@_patcher
+@Patch.register("catboost.core")
 def catboost_info_directory():
-    core = _try_import("catboost.core")
-    if core is None:
-        return
+    core = importlib.import_module("catboost.core")
 
     catboost_base = getattr(core, "_CatBoostBase")
     original: Callable[..., None] = catboost_base.__init__
@@ -178,7 +286,7 @@ def catboost_info_directory():
     setattr(catboost_base, "__init__", patched)
 
 
-@_patcher
+@Patch.register()
 def logging_file_handler():
     import logging
 
@@ -194,11 +302,9 @@ def logging_file_handler():
     setattr(logging.FileHandler, "__init__", patched)
 
 
-@_patcher
+@Patch.register("pycaret.internal.logging")
 def pycaret_internal_logging():
-    internal_logging = _try_import("pycaret.internal.logging")
-    if internal_logging is None:
-        return
+    internal_logging = importlib.import_module("pycaret.internal.logging")
 
     internal_logging.LOGGER = internal_logging.create_logger("/dev/stdout")
 
@@ -239,7 +345,7 @@ def _redirect_main_to_user_code(module_name: str) -> str:
     return module_name
 
 
-@_patcher
+@Patch.register()
 def pickle_unpickler_find_class():
     """
     Code trained outside of crunch, like in a notebook or with `python main.py`, is pickled as `__main__.<name>`: it is looked up in the user's code instead.
@@ -280,11 +386,12 @@ def pickle_unpickler_find_class():
     setattr(multiprocessing.reduction.ForkingPickler, "loads", staticmethod(loads))
 
 
-@_patcher
+@Patch.register("joblib")
 def joblib_parallel_initializer():
-    joblib = _try_import("joblib")
+    joblib = importlib.import_module("joblib")
+
     loky_initializers = _try_import("joblib.externals.loky.initializers")
-    if joblib is None or loky_initializers is None:
+    if loky_initializers is None:
         return
 
     original: Callable[..., None] = joblib.Parallel.__init__
@@ -337,7 +444,7 @@ def process_initializer(*args: Any, **kwargs: Any) -> None:
         load_user_code(main_file_path, user_code_module_name)
 
 
-@_patcher
+@Patch.register()
 def user_code_finder():
     """
     A process started with `spawn` or `forkserver` does not inherit the user's code, and imports it again to unpickle one of its functions.
