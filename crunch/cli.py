@@ -940,7 +940,7 @@ def runner_group():
 @click.option("--model-directory", "model_directory_path", default=constants.DEFAULT_MODEL_DIRECTORY, show_default=True, help="Directory where your model is stored.")
 @click.option("--no-force-first-train", is_flag=True, help="Do not force the train at the first loop.")
 @click.option("--train-frequency", default=1, show_default=True, help="Train interval.")
-@click.option("--skip-library-check", is_flag=True, help="Skip forbidden library check.")
+@click.option("--skip-library-check", is_flag=True, help="Skip the forbidden library check and the imports missing from the requirements.txt.")
 @click.option("--round-number", default="@current", help="Change round number to get the data from.")
 @click.option("--gpu", "has_gpu", is_flag=True, help="Set `has_gpu` parameter to `True`.")
 @click.option("--no-determinism-check", is_flag=True, help="Disable the determinism check.")
@@ -985,6 +985,7 @@ def local(
             has_gpu,
             no_determinism_check,
             prediction_directory_path,
+            check_imports=not skip_library_check,
         )
 
 

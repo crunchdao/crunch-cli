@@ -1,5 +1,7 @@
 import unittest
 
+from crunch_convert import RequirementLanguage
+
 import crunch.api as api
 
 
@@ -30,7 +32,7 @@ class WebUrlFormatterTest(unittest.TestCase):
     def test_whitelisted_libraries(self):
         self.assertEqual(
             "https://hub.crunchdao.com/competitions/adialab/resources/whitelisted-libraries?requestName=torch&requestLanguage=PYTHON",
-            self.formatter.whitelisted_libraries("adialab", request_name="torch", request_language="PYTHON"),
+            self.formatter.whitelisted_libraries("adialab", request_name="torch", request_language=RequirementLanguage.PYTHON),
         )
 
         self.assertEqual(

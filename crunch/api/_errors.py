@@ -251,6 +251,8 @@ class ForbiddenLibraryException(ApiException):
         competition_name: str | None = None,
         **kwargs: Any,
     ) -> None:
+        from crunch_convert import RequirementLanguage
+
         print("Forbidden packages has been found and the server is unable to accept your work.")
 
         if competition_name is None:
@@ -263,7 +265,9 @@ class ForbiddenLibraryException(ApiException):
             print(f"- {requirement.name}")
 
             if competition_name is not None:
-                url = web_url_formatter.whitelisted_libraries(competition_name, request_name=requirement.name, request_language=requirement.language)
+                request_language = RequirementLanguage.__members__.get(requirement.language)
+
+                url = web_url_formatter.whitelisted_libraries(competition_name, request_name=requirement.name, request_language=request_language)
                 print(f"  >> Request to whitelist: {url}")
 
         _print_contact("the package should be allowed")
