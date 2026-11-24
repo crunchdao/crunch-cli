@@ -1,94 +1,17 @@
 import logging
-import os
-from collections import defaultdict
 from types import ModuleType
-from typing import Any, NamedTuple, overload
+from typing import NamedTuple, overload
 
 import click
 import requests
 from crunch_convert import RequirementLanguage
-from crunch_convert.notebook import BadCellHandling, extract_from_cells
-from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist, MultipleLibraryAliasCandidateException, RequirementParseError, Whitelist, parse_from_file
+from crunch_convert.requirements_txt import CachedWhitelist, CrunchHubWhitelist, MultipleLibraryAliasCandidateException, RequirementParseError, Whitelist
 
 import crunch.store as store
 from crunch.api import WebUrlFormatter
 from crunch.constants import REQUIREMENTS_R_TXT, REQUIREMENTS_TXT
+from crunch.library._requirements import extract_from_notebook_modules, extract_from_requirements
 from crunch.repository import Repository
-
-__all__ = [
-    "extract_from_requirements",
-    "extract_from_notebook_modules",
-    "find_problematic",
-    "scan",
-]
-
-
-def extract_from_requirements(
-    *,
-    language: RequirementLanguage = RequirementLanguage.PYTHON,
-    file_path: str,
-    logger: logging.Logger | None = None,
-) -> set[str]:
-    """
-    Extracts package names from a requirements file.
-    Does nothing if the file does not exist.
-    """
-
-    if logger is None:
-        logger = logging.getLogger()
-
-    if not os.path.exists(file_path):
-        return set()
-
-    with open(file_path, "r") as fd:
-        file_content = fd.read()
-
-    try:
-        requirements = parse_from_file(
-            language=language,
-            file_content=file_content,
-        )
-    except RequirementParseError as error:
-        logger.error(f"{language.txt_file_name}: {error}")
-        raise click.Abort()
-
-    return {
-        requirement.name
-        for requirement in requirements
-        if requirement.language == language
-    }
-
-
-def extract_from_notebook_modules(
-    *,
-    module: ModuleType
-) -> dict[RequirementLanguage, set[str]]:
-    """
-    Extracts package names from a Jupyter notebook module.
-    """
-
-    cells = getattr(module, "In", [])
-    cells: list[dict[str, Any]] = [
-        {
-            "metadata": {},
-            "cell_type": "code",
-            "source": cell if isinstance(cell, list) else str(cell).split("\n")
-        }
-        for cell in cells
-    ]
-
-    flatten = extract_from_cells(
-        cells,
-        print=None,
-        validate=False,
-        bad_cell_handling=BadCellHandling.IGNORE,
-    )
-
-    packages: dict[RequirementLanguage, set[str]] = defaultdict(set)
-    for requirement in flatten.requirements:
-        packages[requirement.language].add(requirement.alias)
-
-    return packages
 
 
 _AliasCollision = NamedTuple(
@@ -225,18 +148,16 @@ def scan(
         if requirements_r_file is None:
             requirements_r_file = REQUIREMENTS_R_TXT
 
-        packages = {
-            RequirementLanguage.PYTHON: extract_from_requirements(
-                language=RequirementLanguage.PYTHON,
-                file_path=requirements_file,
-                logger=logger,
-            ),
-            RequirementLanguage.R: extract_from_requirements(
-                language=RequirementLanguage.R,
-                file_path=requirements_r_file,
-                logger=logger,
-            ),
-        }
+        packages: dict[RequirementLanguage, set[str]] = {}
+        for language, file_path in [(RequirementLanguage.PYTHON, requirements_file), (RequirementLanguage.R, requirements_r_file)]:
+            try:
+                packages[language] = extract_from_requirements(
+                    language=language,
+                    file_path=file_path,
+                )
+            except RequirementParseError as error:
+                logger.error(f"{language.txt_file_name}: {error}")
+                raise click.Abort()
 
         is_alias = False
 
@@ -286,7 +207,7 @@ def _log_problems(
                     competition_name,
                     request_name=None if is_alias else package,
                     request_alias=package if is_alias else None,
-                    request_language=language.name,
+                    request_language=language,
                 )
                 logger.error(f"  -> request to whitelist: {url}")
 

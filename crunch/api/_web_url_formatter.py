@@ -1,6 +1,10 @@
 import urllib.parse
+from typing import TYPE_CHECKING
 
 import crunch.store as store
+
+if TYPE_CHECKING:
+    from crunch_convert import RequirementLanguage
 
 
 class WebUrlFormatter:
@@ -44,14 +48,14 @@ class WebUrlFormatter:
         *,
         request_name: str | None = None,
         request_alias: str | None = None,
-        request_language: str | None = None,
+        request_language: "RequirementLanguage | None" = None,
     ) -> str:
         return self._format(
             "competitions", competition_name, "resources", "whitelisted-libraries",
             query={
                 "requestName": request_name,
                 "requestAlias": request_alias,
-                "requestLanguage": request_language,
+                "requestLanguage": request_language.name if request_language is not None else None,
             },
         )
 

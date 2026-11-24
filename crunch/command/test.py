@@ -1,3 +1,4 @@
+import contextlib
 import os
 import sys
 from typing import TYPE_CHECKING
@@ -5,7 +6,7 @@ from typing import TYPE_CHECKING
 import crunch.monkey_patches as monkey_patches
 import crunch.tester as tester
 from crunch.api import CompetitionFormat, RoundIdentifierType
-from crunch.constants import DEFAULT_USER_CODE_MODULE_NAME
+from crunch.constants import DEFAULT_USER_CODE_MODULE_NAME, REQUIREMENTS_TXT
 from crunch.unstructured import RunnerModule, deduce_code_loader
 
 if TYPE_CHECKING:
@@ -55,7 +56,10 @@ def test(
     has_gpu: bool,
     no_determinism_check: bool | None,
     prediction_directory_path: str | None = None,
+    check_imports: bool = True,
 ):
+    from crunch import library
+
     _, project = repository.create_client()
     competition = project.competition.reload()
 
@@ -64,19 +68,38 @@ def test(
         loader = deduce_code_loader(competition_name=competition.name, file_name="runner")
         runner_module = RunnerModule.load(loader)
 
-    module = load_user_code(main_file_path)
+    project_directory_path = os.getcwd()
+    import_recorder = library.ImportRecorder(project_directory_path)
 
-    tester.run(
-        repository,
-        module,
-        runner_module,
-        model_directory_path,
-        force_first_train,
-        train_frequency,
-        round_number,
-        competition,
-        has_gpu,
-        no_determinism_check,
-        trace_exporter=None,
-        prediction_directory_path=prediction_directory_path,
-    )
+    try:
+        with import_recorder if check_imports else contextlib.nullcontext():
+            module = load_user_code(main_file_path)
+
+            tester.run(
+                repository,
+                module,
+                runner_module,
+                model_directory_path,
+                force_first_train,
+                train_frequency,
+                round_number,
+                competition,
+                has_gpu,
+                no_determinism_check,
+                trace_exporter=None,
+                prediction_directory_path=prediction_directory_path,
+            )
+    except KeyboardInterrupt:
+        check_imports = False
+        raise
+    finally:
+        if check_imports:
+            try:
+                library.scan_imports(
+                    imports=import_recorder.imports,
+                    project_directory_path=project_directory_path,
+                    competition_name=competition.name,
+                    logger=tester.logger,
+                )
+            except Exception as error:
+                tester.logger.warning(f"could not check the imports against {REQUIREMENTS_TXT}: {error}")
