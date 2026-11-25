@@ -107,5 +107,21 @@ def test_skipped_positions_are_marked_before_and_after(capsys: pytest.CaptureFix
     assert [line[0] if len(line) == 1 else line[-4] for line in lines[2:]] == ["...", "user3", "me", "user5", "..."]
 
 
+def test_around_without_own_position_explains_how_to_see_standings(capsys: pytest.CaptureFixture[str]):
+    lines = _render(capsys, [_position(1, 1.0, "alice", "one", 90.0)], around=1)
+
+    assert len(lines) == 1
+    assert {"--top", "--all"}.issubset(lines[0])
+
+
+def test_top_still_shows_positions_when_around_has_no_anchor(capsys: pytest.CaptureFixture[str]):
+    positions = [_position(1, 1.0, "alice", "one", 90.0), _position(2, 2.0, "bob", "two", 80.0)]
+
+    lines = _render(capsys, positions, around=1, top=1)
+
+    assert any("alice" in line for line in lines)
+    assert not any("bob" in line for line in lines)
+
+
 def test_nobody_ranked_yet(capsys: pytest.CaptureFixture[str]):
     assert _render(capsys, []) == [["(nobody", "is", "ranked", "yet)"]]
