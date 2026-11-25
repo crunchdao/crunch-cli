@@ -99,9 +99,6 @@ class _Inline:
     ) -> tuple["pandas.DataFrame | None", "pandas.DataFrame | None", "pandas.DataFrame | None"]:
         from crunch.command.download import download, download_no_data_available
 
-        if self._competition.format == CompetitionFormat.STREAM:
-            self.load_streams()
-
         try:
             (
                 data_directory_path,
@@ -131,12 +128,6 @@ class _Inline:
 
         else:
             raise NotImplementedError(f"{competition_format.name} competition format is not supported anymore")
-
-    def load_streams(
-        self,
-        **kwargs: KwargsLike,
-    ) -> None:
-        raise NotImplementedError("STREAM competition format is not supported anymore")
 
     def test(
         self,
