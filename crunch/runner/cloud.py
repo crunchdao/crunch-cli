@@ -206,9 +206,6 @@ class CloudRunner(Runner):
         self.sandbox_path = self._locate("sandbox")
         self.prefix_path = self._locate("prefix")
 
-        # without a handler, PID 1 ignores SIGTERM
-        signal.signal(signal.SIGTERM, lambda signum, frame: os._exit(128 + signum))
-
         timeout = self.timeout
         if timeout is not None:
             def exit_on_timeout():
@@ -664,8 +661,6 @@ class CloudRunner(Runner):
                         self.logger.error(f"could not stop the processes left by the user code: exit code {exit_code}")
                         sys.exit(1)
 
-                    _collect_zombie_children()
-
                     for _, file_name, reason in _find_files(self.prediction_directory_path):
                         if reason is not None:
                             self.logger.error(f"unsafe file left by the user code in the prediction directory: `{file_name}` {reason}")
@@ -979,21 +974,6 @@ def _read_end(file_path: str, max_size: int) -> str:
         return f"(cut to its last {max_size} bytes)\n{content}"
 
     return content
-
-
-def _collect_zombie_children():
-    """
-    As PID 1, the runner is the parent of the orphans killed by `sandbox clean`, and the only one able to collect them.
-    """
-
-    while True:
-        try:
-            pid, _ = os.waitpid(-1, os.WNOHANG)
-        except ChildProcessError:
-            return  # no child left
-
-        if pid == 0:
-            return  # the children left are alive
 
 
 def _raise(error: OSError) -> None:

@@ -1,5 +1,4 @@
 import os
-import signal
 import subprocess
 import sys
 import tempfile
@@ -228,42 +227,6 @@ class ReadSecretTest(unittest.TestCase):
 
 
 @unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
-class CollectZombieChildrenTest(unittest.TestCase):
-
-    def test_collected(self):
-        from crunch.runner.cloud import _collect_zombie_children
-
-        ended_pid = os.fork()
-        if ended_pid == 0:
-            os._exit(0)
-
-        alive_pid = os.fork()
-        if alive_pid == 0:
-            time.sleep(10)
-            os._exit(0)
-
-        try:
-            # until its parent collects it, an ended child stays a zombie
-            for _ in range(100):
-                with open(f"/proc/{ended_pid}/stat") as fd:
-                    if fd.read().rsplit(")", 1)[1].split()[0] == "Z":
-                        break
-
-                time.sleep(0.01)
-
-            _collect_zombie_children()
-
-            with self.assertRaises(ChildProcessError):
-                os.waitpid(ended_pid, os.WNOHANG)
-
-            # still running, not waited for
-            self.assertEqual((0, 0), os.waitpid(alive_pid, os.WNOHANG))
-        finally:
-            os.kill(alive_pid, signal.SIGKILL)
-            os.waitpid(alive_pid, 0)
-
-
-@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
 class CloudCommandSecretsTest(unittest.TestCase):
 
     def _run(self, **environment: str):
@@ -458,16 +421,6 @@ class SetupTest(unittest.TestCase):
         _, stderr = process.communicate(timeout=10)
         self.assertEqual(1, process.returncode, stderr)
         self.assertIn("command not found: prefix", stderr)
-
-    def test_sigterm(self):
-        process = self._run_setup(None)
-        assert process.stdout is not None
-        process.stdout.readline()
-
-        process.send_signal(signal.SIGTERM)
-
-        _, stderr = process.communicate(timeout=10)
-        self.assertEqual(128 + signal.SIGTERM, process.returncode, stderr)
 
     def test_timeout_logged_with_the_secret(self):
         process = self._run_setup(1)
