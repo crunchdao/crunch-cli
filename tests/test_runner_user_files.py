@@ -264,6 +264,41 @@ class CollectZombieChildrenTest(unittest.TestCase):
 
 
 @unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class CloudCommandSecretsTest(unittest.TestCase):
+
+    def _run(self, **environment: str):
+        return subprocess.run(
+            [sys.executable, "-m", "crunch", "runner", "cloud", "--competition-name", "test", "--run-id", "1"],
+            env={
+                **{key: value for key, value in os.environ.items() if key not in ("RUN_TOKEN", "LOG_SECRET", "RUN_TOKEN_FILE", "LOG_SECRET_FILE")},
+                "CRUNCH_INSIDE_RUNNER": "true",
+                **environment,
+            },
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def test_no_run_token(self):
+        result = self._run(LOG_SECRET="secret")
+
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertEqual("[secret] <runner/err> no run token\n", result.stderr)
+
+    def test_no_log_secret(self):
+        result = self._run(RUN_TOKEN="token")
+
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertEqual("no log secret\n", result.stderr)
+
+    def test_missing_file(self):
+        result = self._run(LOG_SECRET="secret", RUN_TOKEN_FILE="/nonexistent/run-token")
+
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertIn("[secret] <runner/err> [Errno 2] No such file or directory", result.stderr)
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
 class ForkedRunsTest(unittest.TestCase):
     """
     A competition's runner can start the runs from forked processes, like the parallel inference of structural-break-real-time.
@@ -367,10 +402,10 @@ class SetupTest(unittest.TestCase):
             [
                 sys.executable, "-c",
                 "import time\n"
-                "from crunch.runner.cloud import CloudRunner, _create_logger\n"
+                "from crunch.runner.cloud import CloudRunner, create_logger\n"
                 "runner = CloudRunner.__new__(CloudRunner)\n"
                 f"runner.timeout = {timeout}\n"
-                "runner.logger = _create_logger('secret')\n"
+                "runner.logger = create_logger('secret')\n"
                 "runner.setup()\n"
                 "print(runner.sandbox_path, runner.prefix_path, flush=True)\n"
                 "time.sleep(30)\n",

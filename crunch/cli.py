@@ -1051,17 +1051,22 @@ def cloud(
         print("not in a runner")
         raise click.Abort()
 
-    from .runner.cloud import SECRET_ENVIRONMENT_VARIABLE_NAMES, read_secret
+    from .runner.cloud import SECRET_ENVIRONMENT_VARIABLE_NAMES, create_logger, read_secret
 
     for name in SECRET_ENVIRONMENT_VARIABLE_NAMES:
         os.environ.pop(name, None)
 
     try:
-        run_token = read_secret("run token", run_token, run_token_file)
         log_secret = read_secret("log secret", log_secret, log_secret_file)
-    except ValueError as error:
-        print(error)
-        raise click.Abort()
+    except (ValueError, OSError) as error:
+        print(error, file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        run_token = read_secret("run token", run_token, run_token_file)
+    except (ValueError, OSError) as error:
+        create_logger(log_secret).error(str(error))
+        sys.exit(1)
 
     phase_type = PhaseType[phase_type_string]
 

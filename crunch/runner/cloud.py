@@ -150,7 +150,7 @@ class CloudRunner(Runner):
         max_retry: int,
         retry_seconds: int
     ):
-        logger = _create_logger(log_secret)
+        logger = create_logger(log_secret)
 
         super().__init__(
             competition_format=competition.format,
@@ -897,7 +897,7 @@ def _download_files(
     }
 
 
-def _create_logger(log_secret: str) -> logging.Logger:
+def create_logger(log_secret: str) -> logging.Logger:
     logger = logging.Logger("crunch.runner.cloud")
     logger.addHandler(_RunnerLogHandler(log_secret))
 
