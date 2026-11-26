@@ -3,13 +3,14 @@ import json
 import logging
 import os
 import random
+import shutil
 import signal
 import stat
 import string
 import subprocess
 import sys
 from datetime import timedelta
-from multiprocessing import Lock
+from threading import Lock
 from time import sleep
 from typing import Any, Generator, TypeAlias
 from urllib.parse import urljoin
@@ -93,6 +94,8 @@ R_SITE_LIBRARY_PATHS = [
 class CloudRunner(Runner):
 
     has_model: bool
+    sandbox_path: str
+    prefix_path: str
 
     def __init__(
         self,
@@ -166,6 +169,21 @@ class CloudRunner(Runner):
         self.retry_seconds = retry_seconds
 
         self._error_reported_fuse = Lock()
+
+        self._active_sandbox_count = 0
+        self._active_sandbox_count_lock = Lock()
+
+    def setup(self):
+        self.sandbox_path = self._locate("sandbox")
+        self.prefix_path = self._locate("prefix")
+
+    def _locate(self, command: str) -> str:
+        path = shutil.which(command)
+        if path is None:
+            self.logger.error(f"command not found: {command}")
+            sys.exit(1)
+
+        return path
 
     def initialize(self):
         os.makedirs(self.data_directory, exist_ok=True)
@@ -250,6 +268,9 @@ class CloudRunner(Runner):
             )
 
             self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
+
+            # no user code ran yet: no link of the user can be there
+            self.bash2([self.sandbox_path, "grant", "--directory", self.model_directory_path])
 
         if "prepare prediction directory...":
             os.makedirs(self.prediction_directory_path, exist_ok=True)
@@ -533,7 +554,7 @@ class CloudRunner(Runner):
         env: dict[str, str | None] | None = None
     ):
         arguments = [
-            "prefix",
+            self.prefix_path,
             prefix,
             "--",
             *arguments
@@ -615,6 +636,37 @@ class CloudRunner(Runner):
         prefix_head: int = DEFAULT_LOG_LIMITS[0],
         prefix_tail: int = DEFAULT_LOG_LIMITS[1],
     ) -> None:
+        """
+        The user's code can leave processes behind, which would read what the runner does next, such as the data opened by the fuse.
+        They are killed when the last of the runs active together ends: the runs can be parallel, and they are all the same user.
+        """
+
+        with self._active_sandbox_count_lock:
+            self._active_sandbox_count += 1
+
+        try:
+            self._sandbox(train, command, parameters, install_data_fuse, prefix_head, prefix_tail)
+        finally:
+            with self._active_sandbox_count_lock:
+                self._active_sandbox_count -= 1
+
+                if self._active_sandbox_count == 0:
+                    exit_code = self.do_bash([self.sandbox_path, "clean"])
+                    if exit_code != 0:
+                        self.logger.error(f"could not stop the processes left by the user code: exit code {exit_code}")
+                        sys.exit(1)
+
+                    _collect_zombie_children()
+
+    def _sandbox(
+        self,
+        train: bool,
+        command: str,
+        parameters: KwargsLike,
+        install_data_fuse: bool,
+        prefix_head: int,
+        prefix_tail: int,
+    ) -> None:
         (
             trace_file_path,
             exit_file_path,
@@ -684,11 +736,11 @@ class CloudRunner(Runner):
 
         exit_code = self.do_bash(
             [
-                "sandbox",
-                "--chown-directory", self.model_directory_path,
-                "--filter-non-unix-socket-syscall",
+                self.sandbox_path, "run",
+                "--network-restriction=unix-socket-only",
+                *(f"--forbid-environment-variable={name}" for name in SECRET_ENVIRONMENT_VARIABLE_NAMES),
                 "--",
-                "prefix", f"--head={prefix_head}", f"--tail={prefix_tail}", "user-code",
+                self.prefix_path, f"--head={prefix_head}", f"--tail={prefix_tail}", "user-code",
                 "--",
                 "python3", "-u",
                 "-m", "crunch", "runner", "cloud-executor",
@@ -891,6 +943,21 @@ def read_secret(
         raise ValueError(f"no {name}")
 
     return value
+
+
+def _collect_zombie_children():
+    """
+    As PID 1, the runner is the parent of the orphans killed by `sandbox clean`, and the only one able to collect them.
+    """
+
+    while True:
+        try:
+            pid, _ = os.waitpid(-1, os.WNOHANG)
+        except ChildProcessError:
+            return  # no child left
+
+        if pid == 0:
+            return  # the children left are alive
 
 
 def _find_files(
