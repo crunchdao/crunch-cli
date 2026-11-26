@@ -620,7 +620,14 @@ class CloudRunner(Runner):
 
     def change_data_permissions(self, *, can_access: bool):
         if can_access:
-            _change_content_modes(self.data_directory, lambda mode, is_directory: mode | MODE_READ_ALL)
+            def change(mode: int, is_directory: bool) -> int:
+                if is_directory:
+                    # the directories also get their traverse permission back, which the fuse removed
+                    return MODE_READ_AND_EXECUTE_ALL
+
+                return MODE_READ_ALL
+
+            _change_content_modes(self.data_directory, change)
         else:
             _change_content_modes(self.data_directory, MODE_READ_ONLY_FOR_OWNER)
 

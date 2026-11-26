@@ -115,6 +115,20 @@ class DirectoryContentTest(unittest.TestCase):
         self.assertEqual([0o400, 0o400, 0o640], [self._mode(path) for path in self.files])
         self.assertEqual(0o750, self._mode(self.outside))
 
+    @unittest.skipIf(sys.platform == "win32" or os.geteuid() != 0, "needs root")
+    def test_data_permissions_given_back_after_the_fuse(self):
+        from crunch.runner.cloud import CloudRunner
+
+        runner = CloudRunner.__new__(CloudRunner)
+        runner.data_directory = self.root
+
+        runner.change_data_permissions(can_access=False)
+        runner.change_data_permissions(can_access=True)
+
+        self.assertEqual(0o555, self._mode(os.path.join(self.root, "sub")))
+        self.assertEqual([0o444, 0o444, 0o640], [self._mode(path) for path in self.files])
+        self.assertEqual(0o750, self._mode(self.outside))
+
     def test_delete_content(self):
         from crunch.runner.cloud import _delete_content
 
