@@ -74,6 +74,15 @@ SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
 """
 FUSE_SIGNAL: signal.Signals = signal.SIGCONT  # pyright: ignore[reportUnknownVariableType, reportAttributeAccessIssue, reportUnknownMemberType]
 
+"""
+Removed from the runner's environment when it starts: the sandbox refuses to run if one is still there.
+"""
+SECRET_ENVIRONMENT_VARIABLE_NAMES = [
+    "RUN_ID",
+    "RUN_TOKEN",
+    "LOG_SECRET",
+]
+
 
 R_SITE_LIBRARY_PATHS = [
     "/usr/lib/R/site-library",
@@ -855,6 +864,33 @@ class _RunnerLogHandler(logging.Handler):
             stream.flush()
         except Exception:
             self.handleError(record)
+
+
+def read_secret(
+    name: str,
+    value: str | None,
+    file_path: str | None,
+) -> str:
+    """
+    The value is given directly for the local development, or in a file by the entrypoint, which is deleted once read.
+
+    Raises:
+        ValueError: If both or none are given, or if the secret is empty.
+    """
+
+    if value is not None and file_path is not None:
+        raise ValueError(f"the {name} is given both directly and in a file")
+
+    if file_path is not None:
+        with open(file_path) as fd:
+            value = fd.read()
+
+        os.unlink(file_path)
+
+    if not value:
+        raise ValueError(f"no {name}")
+
+    return value
 
 
 def _find_files(
