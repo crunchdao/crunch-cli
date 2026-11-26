@@ -230,6 +230,7 @@ class SetupTest(unittest.TestCase):
 
     def test_commands_located(self):
         process = self._run_setup(None)
+        assert process.stdout is not None
 
         self.assertEqual(f"{self.bin_directory}/sandbox {self.bin_directory}/prefix\n", process.stdout.readline())
 
@@ -247,6 +248,7 @@ class SetupTest(unittest.TestCase):
 
     def test_sigterm(self):
         process = self._run_setup(None)
+        assert process.stdout is not None
         process.stdout.readline()
 
         process.send_signal(signal.SIGTERM)
