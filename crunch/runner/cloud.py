@@ -61,6 +61,11 @@ Read and execute/traverse permissions for current user, current group and others
 MODE_READ_AND_EXECUTE_ALL = MODE_READ_ALL | MODE_EXECUTE_ALL
 
 """
+All permissions for current user, current group and others.
+"""
+MODE_READ_WRITE_AND_EXECUTE_ALL = MODE_READ_ALL | MODE_WRITE_ALL | MODE_EXECUTE_ALL
+
+"""
 Only read permission for the runner, nothing for the others.
 """
 MODE_READ_ONLY_FOR_OWNER = stat.S_IRUSR
@@ -679,6 +684,7 @@ class CloudRunner(Runner):
             trace_file_path,
             exit_file_path,
             exit_content,
+            matplotlib_directory_path,
         ) = self._prepare_sandbox()
 
         if install_data_fuse:
@@ -758,6 +764,7 @@ class CloudRunner(Runner):
             {
                 **self.venv_env,
                 "CRUNCH_AUTO_MONKEY_PATCH": "true",
+                "MPLCONFIGDIR": matplotlib_directory_path,
             }
         )
 
@@ -786,10 +793,15 @@ class CloudRunner(Runner):
 
         exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
+        matplotlib_directory_path = os.path.join(this_sandbox_directory_path, "matplotlib")
+        os.mkdir(matplotlib_directory_path)
+        os.chmod(matplotlib_directory_path, MODE_READ_WRITE_AND_EXECUTE_ALL)
+
         return (
             trace_file_path,
             exit_file_path,
             exit_content,
+            matplotlib_directory_path,
         )
 
     def _validate_sandbox_exit(
