@@ -82,11 +82,14 @@ MODE_WRITE_ONLY_FOR_OTHERS = stat.S_IRUSR | MODE_WRITE_ALL
 
 """
 Removed from the runner's environment when it starts: the sandbox refuses to run if one is still there.
+The `*_FILE` paths are read before the removal, so dropping them leaks neither the path nor the secret to the user code.
 """
 SECRET_ENVIRONMENT_VARIABLE_NAMES = [
     "RUN_ID",
     "RUN_TOKEN",
+    "RUN_TOKEN_FILE",
     "LOG_SECRET",
+    "LOG_SECRET_FILE",
 ]
 
 """
