@@ -891,6 +891,8 @@ def _download_files(
         progress_bar=False,
     )
 
+    logger.info(f"{directory_path}: {len(paths)} file(s) downloaded")
+
     return {
         relative_path: os.stat(path).st_mtime_ns
         for relative_path, path in paths.items()
