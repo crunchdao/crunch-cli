@@ -2,6 +2,7 @@ import errno
 import graphlib
 import json
 import logging
+import multiprocessing
 import os
 import random
 import shutil
@@ -11,7 +12,7 @@ import string
 import subprocess
 import sys
 from datetime import timedelta
-from threading import Lock, Timer
+from threading import Timer
 from time import sleep
 from typing import Any, Callable, Generator, TypeAlias
 from urllib.parse import urljoin
@@ -193,10 +194,8 @@ class CloudRunner(Runner):
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
 
-        self._error_reported_fuse = Lock()
-
-        self._active_sandbox_count = 0
-        self._active_sandbox_count_lock = Lock()
+        self._error_reported_fuse = multiprocessing.Lock()
+        self._active_sandbox_count = multiprocessing.Value("i", 0)
 
     def setup(self):
         self.sandbox_path = self._locate("sandbox")
@@ -645,16 +644,16 @@ class CloudRunner(Runner):
         They are killed when the last of the runs active together ends: the runs can be parallel, and they are all the same user.
         """
 
-        with self._active_sandbox_count_lock:
-            self._active_sandbox_count += 1
+        with self._active_sandbox_count.get_lock():
+            self._active_sandbox_count.value += 1
 
         try:
             self._sandbox(train, command, parameters, install_data_fuse, prefix_head, prefix_tail)
         finally:
-            with self._active_sandbox_count_lock:
-                self._active_sandbox_count -= 1
+            with self._active_sandbox_count.get_lock():
+                self._active_sandbox_count.value -= 1
 
-                if self._active_sandbox_count == 0:
+                if self._active_sandbox_count.value == 0:
                     exit_code = self.do_bash([self.sandbox_path, "clean"])
                     if exit_code != 0:
                         self.logger.error(f"could not stop the processes left by the user code: exit code {exit_code}")
@@ -859,7 +858,7 @@ class CloudRunner(Runner):
         )
 
     def report_error_trace(self, trace_content: str):
-        if not self._error_reported_fuse.acquire(blocking=False):
+        if not self._error_reported_fuse.acquire(block=False):
             self.logger.info("[debug] error trace not reported (already reported by another process)")
             return
 

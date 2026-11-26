@@ -5,6 +5,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 
 @unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
@@ -260,6 +261,81 @@ class CollectZombieChildrenTest(unittest.TestCase):
         finally:
             os.kill(alive_pid, signal.SIGKILL)
             os.waitpid(alive_pid, 0)
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class ForkedRunsTest(unittest.TestCase):
+    """
+    A competition's runner can start the runs from forked processes, like the parallel inference of structural-break-real-time.
+    """
+
+    def setUp(self):
+        import multiprocessing
+
+        from crunch.runner.cloud import CloudRunner
+
+        self._directory = tempfile.TemporaryDirectory()
+        self.calls_path = os.path.join(self._directory.name, "calls")
+        self.fork = multiprocessing.get_context("fork")
+
+        self.runner = CloudRunner.__new__(CloudRunner)
+        self.runner._active_sandbox_count = multiprocessing.Value("i", 0)
+        self.runner._error_reported_fuse = multiprocessing.Lock()
+        self.runner.sandbox_path = "sandbox"
+        self.runner.prediction_directory_path = os.path.join(self._directory.name, "prediction")
+        os.makedirs(self.runner.prediction_directory_path)
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def _record(self, line: str):
+        with open(self.calls_path, "a") as fd:
+            fd.write(f"{line}\n")
+
+    def _recorded(self):
+        with open(self.calls_path) as fd:
+            return fd.read().splitlines()
+
+    def _run_forked(self, target, count: int):
+        processes = [self.fork.Process(target=target, args=(index,)) for index in range(count)]
+        for process in processes:
+            process.start()
+
+        for process in processes:
+            process.join(timeout=30)
+
+        self.assertEqual([0] * count, [process.exitcode for process in processes])
+
+    def test_cleaned_once_after_the_last_run(self):
+        barrier = self.fork.Barrier(2)
+
+        def run(train, command, *arguments):
+            # both active before either ends
+            barrier.wait(timeout=10)
+            time.sleep(0.5 if command == "slow" else 0.1)
+            self._record(f"end {command}")
+
+        def do_bash(arguments, env_vars=None):
+            self._record(" ".join(arguments))
+            return 0
+
+        with mock.patch.object(self.runner, "_sandbox", run), mock.patch.object(self.runner, "do_bash", do_bash):
+            self._run_forked(lambda index: self.runner.sandbox(False, ["fast", "slow"][index]), 2)
+
+        self.assertEqual(["end fast", "end slow", "sandbox clean"], self._recorded())
+
+    def test_error_reported_once(self):
+        import logging
+
+        run = mock.Mock()
+        run.report_error.side_effect = lambda trace: self._record(f"reported {trace}")
+
+        self.runner.logger = logging.getLogger("test")
+
+        with mock.patch.object(self.runner, "run", run, create=True):
+            self._run_forked(lambda index: self.runner.report_error_trace(f"trace {index}"), 2)
+
+        self.assertEqual(1, len(self._recorded()))
 
 
 @unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
