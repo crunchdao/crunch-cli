@@ -147,3 +147,19 @@ class SetupTest(unittest.TestCase):
         _, stderr = process.communicate(timeout=10)
         self.assertEqual(1, process.returncode, stderr)
         self.assertIn("command not found: prefix", stderr)
+
+    def test_sigterm(self):
+        process = self._run_setup(None)
+        process.stdout.readline()
+
+        process.send_signal(signal.SIGTERM)
+
+        _, stderr = process.communicate(timeout=10)
+        self.assertEqual(128 + signal.SIGTERM, process.returncode, stderr)
+
+    def test_timeout_logged_with_the_secret(self):
+        process = self._run_setup(1)
+
+        _, stderr = process.communicate(timeout=10)
+        self.assertEqual(124, process.returncode, stderr)
+        self.assertIn("[secret] <runner/err> timeout of 1 seconds reached", stderr)

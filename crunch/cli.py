@@ -1006,6 +1006,7 @@ def local(
 @click.option("--run-token-file", envvar="RUN_TOKEN_FILE", default=None)
 @click.option("--log-secret", envvar="LOG_SECRET", default=None)
 @click.option("--log-secret-file", envvar="LOG_SECRET_FILE", default=None)
+@click.option("--timeout", envvar="TIMEOUT", type=int, default=None)
 @click.option("--train-frequency", envvar="TRAIN_FREQUENCY", type=int, default=0)
 @click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", type=bool, default=False)
 @click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", type=bool, default=False)
@@ -1033,6 +1034,7 @@ def cloud(
     run_token_file: str | None,
     log_secret: str | None,
     log_secret_file: str | None,
+    timeout: int | None,
     train_frequency: int,
     force_first_train: bool,
     determinism_check_enabled: bool,
@@ -1101,6 +1103,7 @@ def cloud(
         phase_type,
         chain_height,
         crunch_cli_commit_hash,
+        timeout,
         # ---
         max_retry,
         retry_seconds,

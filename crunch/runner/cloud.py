@@ -10,7 +10,7 @@ import string
 import subprocess
 import sys
 from datetime import timedelta
-from threading import Lock
+from threading import Lock, Timer
 from time import sleep
 from typing import Any, Generator, TypeAlias
 from urllib.parse import urljoin
@@ -84,6 +84,11 @@ SECRET_ENVIRONMENT_VARIABLE_NAMES = [
     "LOG_SECRET",
 ]
 
+"""
+The exit code of the runner when the run takes longer than its timeout.
+"""
+TIMEOUT_EXIT_CODE = 124
+
 
 R_SITE_LIBRARY_PATHS = [
     "/usr/lib/R/site-library",
@@ -121,6 +126,7 @@ class CloudRunner(Runner):
         phase_type: PhaseType,
         chain_height: int,
         crunch_cli_commit_hash: str,
+        timeout: int | None,
         # ---
         max_retry: int,
         retry_seconds: int
@@ -164,6 +170,7 @@ class CloudRunner(Runner):
         self.phase_type = phase_type
         self.chain_height = chain_height
         self.crunch_cli_commit_hash = crunch_cli_commit_hash
+        self.timeout = timeout
 
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
@@ -176,6 +183,19 @@ class CloudRunner(Runner):
     def setup(self):
         self.sandbox_path = self._locate("sandbox")
         self.prefix_path = self._locate("prefix")
+
+        # without a handler, PID 1 ignores SIGTERM
+        signal.signal(signal.SIGTERM, lambda signum, frame: os._exit(128 + signum))
+
+        timeout = self.timeout
+        if timeout is not None:
+            def exit_on_timeout():
+                self.logger.error(f"timeout of {timeout} seconds reached")
+                os._exit(TIMEOUT_EXIT_CODE)
+
+            timer = Timer(timeout, exit_on_timeout)
+            timer.daemon = True
+            timer.start()
 
     def _locate(self, command: str) -> str:
         path = shutil.which(command)
@@ -1049,12 +1069,11 @@ class CloudRunnerContext(RunnerContext):
 
     @property
     def timeout(self):
-        value = os.getenv("TIMEOUT")
-
-        if value is None:
+        timeout = self.runner.timeout
+        if timeout is None:
             return None
 
-        return timedelta(seconds=int(value))
+        return timedelta(seconds=timeout)
 
     @property
     def train_frequency(self):
