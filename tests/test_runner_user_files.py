@@ -299,6 +299,31 @@ class CloudCommandSecretsTest(unittest.TestCase):
 
 
 @unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class PrepareSandboxTest(unittest.TestCase):
+
+    def _mode(self, path: str):
+        return os.stat(path).st_mode & 0o7777
+
+    def test_modes(self):
+        from crunch.runner.cloud import CloudRunner
+
+        with tempfile.TemporaryDirectory() as directory:
+            runner = CloudRunner.__new__(CloudRunner)
+            runner.sandboxes_directory_path = directory
+
+            # the modes are set after the creation, which applies the umask
+            previous_umask = os.umask(0o077)
+            try:
+                trace_file_path, exit_file_path, _, matplotlib_directory_path = runner._prepare_sandbox()
+            finally:
+                os.umask(previous_umask)
+
+            self.assertEqual(0o711, self._mode(os.path.dirname(trace_file_path)))
+            self.assertEqual([0o622, 0o622], [self._mode(trace_file_path), self._mode(exit_file_path)])
+            self.assertEqual(0o777, self._mode(matplotlib_directory_path))
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
 class ForkedRunsTest(unittest.TestCase):
     """
     A competition's runner can start the runs from forked processes, like the parallel inference of structural-break-real-time.

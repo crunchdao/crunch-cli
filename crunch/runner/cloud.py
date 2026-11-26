@@ -787,9 +787,8 @@ class CloudRunner(Runner):
 
         # created by the runner: the user's code can only write them
         for file_path in (trace_file_path, exit_file_path):
-            fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, MODE_WRITE_ONLY_FOR_OTHERS)
-            os.fchmod(fd, MODE_WRITE_ONLY_FOR_OTHERS)
-            os.close(fd)
+            open(file_path, "w").close()
+            os.chmod(file_path, MODE_WRITE_ONLY_FOR_OTHERS)
 
         exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
