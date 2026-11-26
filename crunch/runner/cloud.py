@@ -1,3 +1,4 @@
+import errno
 import graphlib
 import json
 import logging
@@ -12,7 +13,7 @@ import sys
 from datetime import timedelta
 from threading import Lock, Timer
 from time import sleep
-from typing import Any, Generator, TypeAlias
+from typing import Any, Callable, Generator, TypeAlias
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -59,10 +60,14 @@ Read and execute/traverse permissions for current user, current group and others
 MODE_READ_AND_EXECUTE_ALL = MODE_READ_ALL | MODE_EXECUTE_ALL
 
 """
-group + other  = (null)
-user (runner)  = read
+Only read permission for the runner, nothing for the others.
 """
-CHMOD_RESET = "go=,u=r"
+MODE_READ_ONLY_FOR_OWNER = stat.S_IRUSR
+
+"""
+Read and write permissions for the others.
+"""
+MODE_READ_AND_WRITE_FOR_OTHERS = stat.S_IROTH | stat.S_IWOTH
 
 """
 SIGCONT is the only allowed signal.
@@ -301,15 +306,15 @@ class CloudRunner(Runner):
                 logger=self.logger,
             )
 
-            self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
+            _add_modes(self.model_directory_path, MODE_READ_AND_WRITE_FOR_OTHERS)
 
             # no user code ran yet: no link of the user can be there
             self.bash("sandbox", [self.sandbox_path, "grant", "--directory", self.model_directory_path])
 
         if "prepare prediction directory...":
             os.makedirs(self.prediction_directory_path, exist_ok=True)
-            self.delete_content(self.prediction_directory_path)
-            self.bash2(["chmod", "-R", "o+rw", self.prediction_directory_path])
+            _delete_content(self.prediction_directory_path)
+            _add_modes(self.prediction_directory_path, MODE_READ_AND_WRITE_FOR_OTHERS)
 
     def start_unstructured(self):
         if self.runner_module is None:
@@ -378,14 +383,9 @@ class CloudRunner(Runner):
             self.logger.info("no r cran packages to install")
 
         # remove warning about empty directory
-        user_site_library_paths = [
-            path
-            for path in R_SITE_LIBRARY_PATHS
-            if os.path.exists(path) and len(os.listdir(path)) == 0
-        ]
-
-        if len(user_site_library_paths):
-            self.bash2(["rm", "-r", *user_site_library_paths])
+        for path in R_SITE_LIBRARY_PATHS:
+            if os.path.exists(path) and len(os.listdir(path)) == 0:
+                os.rmdir(path)
 
     def _install_python_requirements(self, requirements_txt_path: str):
         installation = self._download_installation(Language.PYTHON)
@@ -599,12 +599,6 @@ class CloudRunner(Runner):
             self.logger.error(f"command not exited correctly: {code}")
             sys.exit(code)
 
-    def bash2(
-        self,
-        arguments: list[str],
-    ):
-        self.bash(arguments[0], arguments)
-
     def pip(
         self,
         arguments: list[str],
@@ -624,42 +618,11 @@ class CloudRunner(Runner):
             self.venv_env
         )
 
-    def recursive_bash(
-        self,
-        directory_path: str,
-        commands: list[str],
-    ):
-        self.bash(
-            f"recursive-{commands[0]}",
-            [
-                "find",
-                directory_path,
-                "-mindepth", "1",
-                "-maxdepth", "1",
-                "-exec", *commands, ";"
-            ]
-        )
-
-    def delete_content(
-        self,
-        directory_path: str,
-    ):
-        """
-        Deletes all content in the given directory.
-        """
-
-        self.recursive_bash(
-            directory_path,
-            ["rm", "-rf", "{}"],
-        )
-
     def change_data_permissions(self, *, can_access: bool):
-        mode = "a+r" if can_access else CHMOD_RESET
-
-        self.recursive_bash(
-            self.data_directory,
-            ["chmod", mode, "-R", "{}"],
-        )
+        if can_access:
+            _change_content_modes(self.data_directory, lambda mode, is_directory: mode | MODE_READ_ALL)
+        else:
+            _change_content_modes(self.data_directory, MODE_READ_ONLY_FOR_OWNER)
 
     def sandbox(
         self,
@@ -1014,6 +977,65 @@ def _collect_zombie_children():
             return  # the children left are alive
 
 
+def _raise(error: OSError) -> None:
+    raise error
+
+
+def _change_mode(path: str, change: int | Callable[[int, bool], int], directory_fd: int | None = None) -> None:
+    """
+    Changes the mode of the file or directory, unless it is a link: `change` is its new permissions, or a function of its current permissions and of whether it is a directory.
+    Through a file descriptor: Linux cannot change the mode of a path without following it, and a path could be swapped for a link between a check and the change.
+    """
+
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=directory_fd)
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            return
+
+        raise
+
+    try:
+        if callable(change):
+            file_status = os.fstat(fd)
+            change = change(stat.S_IMODE(file_status.st_mode), stat.S_ISDIR(file_status.st_mode))
+
+        os.fchmod(fd, change)
+    finally:
+        os.close(fd)
+
+
+def _change_content_modes(directory_path: str, change: int | Callable[[int, bool], int]) -> None:
+    """
+    Changes the mode of everything inside the given directory, without following the links.
+    A directory is changed before its content.
+    """
+
+    for _, directory_names, file_names, directory_fd in os.fwalk(directory_path, onerror=_raise):
+        for name in [*directory_names, *file_names]:
+            _change_mode(name, change, directory_fd)
+
+
+def _add_modes(directory_path: str, modes: int) -> None:
+    """
+    Adds the modes to the given directory and to everything inside, like `chmod -R`.
+    """
+
+    def add(mode: int, is_directory: bool) -> int:
+        return mode | modes
+
+    _change_mode(directory_path, add)
+    _change_content_modes(directory_path, add)
+
+
+def _delete_content(directory_path: str) -> None:
+    for entry in os.scandir(directory_path):
+        if entry.is_dir(follow_symlinks=False):
+            shutil.rmtree(entry.path)
+        else:
+            os.unlink(entry.path)
+
+
 def _check_user_file(file_status: os.stat_result) -> str | None:
     """
     The user's code writes these files, and the runner reads and uploads them as root: a link would make it use another file, such as the hidden data.
@@ -1041,7 +1063,7 @@ def _find_files(
     """
 
     root_length = len(directory_path) + 1
-    for root, directory_names, file_names in os.walk(directory_path):
+    for root, directory_names, file_names in os.walk(directory_path, onerror=_raise):
         relative = root[root_length:]
 
         for name in [*directory_names, *file_names]:

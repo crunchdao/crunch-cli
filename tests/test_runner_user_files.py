@@ -61,6 +61,69 @@ class FindFilesTest(unittest.TestCase):
         self.assertEqual([("pipe", "is not a regular file")], self._find())
 
 
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class DirectoryContentTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.root = os.path.join(self._directory.name, "data")
+        self.outside = os.path.join(self._directory.name, "outside")
+
+        os.makedirs(os.path.join(self.root, "sub"))
+        os.makedirs(self.outside)
+
+        self.files = [os.path.join(self.root, "x.parquet"), os.path.join(self.root, "sub", "y.parquet"), os.path.join(self.outside, "z.parquet")]
+        for path in self.files:
+            with open(path, "w") as fd:
+                fd.write("x")
+            os.chmod(path, 0o640)
+
+        for path in [self.root, os.path.join(self.root, "sub"), self.outside]:
+            os.chmod(path, 0o750)
+
+        os.symlink(self.files[2], os.path.join(self.root, "link-to-a-file"))
+        os.symlink(self.outside, os.path.join(self.root, "link-to-a-directory"))
+
+    def tearDown(self):
+        if os.path.isdir(os.path.join(self.root, "sub")):
+            os.chmod(os.path.join(self.root, "sub"), 0o700)
+
+        self._directory.cleanup()
+
+    def _mode(self, path: str):
+        return os.lstat(path).st_mode & 0o7777
+
+    def test_add_modes(self):
+        from crunch.runner.cloud import MODE_READ_AND_WRITE_FOR_OTHERS, _add_modes
+
+        _add_modes(self.root, MODE_READ_AND_WRITE_FOR_OTHERS)
+
+        self.assertEqual(0o756, self._mode(self.root))
+        self.assertEqual(0o756, self._mode(os.path.join(self.root, "sub")))
+        self.assertEqual([0o646, 0o646, 0o640], [self._mode(path) for path in self.files])
+        self.assertEqual(0o750, self._mode(self.outside))
+
+    # the runner is root: it still lists a directory after removing its own permissions on it
+    @unittest.skipIf(sys.platform == "win32" or os.geteuid() != 0, "needs root")
+    def test_change_content_modes(self):
+        from crunch.runner.cloud import MODE_READ_ONLY_FOR_OWNER, _change_content_modes
+
+        _change_content_modes(self.root, MODE_READ_ONLY_FOR_OWNER)
+
+        self.assertEqual(0o750, self._mode(self.root))
+        self.assertEqual(0o400, self._mode(os.path.join(self.root, "sub")))
+        self.assertEqual([0o400, 0o400, 0o640], [self._mode(path) for path in self.files])
+        self.assertEqual(0o750, self._mode(self.outside))
+
+    def test_delete_content(self):
+        from crunch.runner.cloud import _delete_content
+
+        _delete_content(self.root)
+
+        self.assertEqual([], os.listdir(self.root))
+        self.assertEqual(["z.parquet"], os.listdir(self.outside))
+
+
 class ReadEndTest(unittest.TestCase):
 
     def setUp(self):
