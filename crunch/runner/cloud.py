@@ -301,7 +301,7 @@ class CloudRunner(Runner):
             self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
 
             # no user code ran yet: no link of the user can be there
-            self.bash2([self.sandbox_path, "grant", "--directory", self.model_directory_path])
+            self.bash("sandbox", [self.sandbox_path, "grant", "--directory", self.model_directory_path])
 
         if "prepare prediction directory...":
             os.makedirs(self.prediction_directory_path, exist_ok=True)
