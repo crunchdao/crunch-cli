@@ -778,7 +778,8 @@ class CloudRunner(Runner):
                 "--",
                 self.prefix_path, f"--head={prefix_head}", f"--tail={prefix_tail}", "user-code",
                 "--",
-                "python3", "-u",
+                # isolated: neither the code directory nor the user site in `sys.path` before the executor loads the user's code
+                "python3", "-I", "-u",
                 "-m", "crunch", "runner", "cloud-executor",
                 *args
             ],
