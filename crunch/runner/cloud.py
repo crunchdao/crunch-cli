@@ -886,7 +886,7 @@ class CloudRunner(Runner):
         )
 
     def report_error_trace(self, trace_content: str):
-        if not self._error_reported_fuse.acquire(block=False):
+        if not self._error_reported_fuse.acquire(blocking=False):
             self.logger.info("[debug] error trace not reported (already reported by another process)")
             return
 
