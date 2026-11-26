@@ -54,11 +54,6 @@ Execute/traverse permissions for current user, current group and others.
 MODE_EXECUTE_ALL = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
 
 """
-Write and execute/traverse permissions for current user, current group and others.
-"""
-MODE_WRITE_AND_EXECUTE_ALL = MODE_WRITE_ALL | MODE_EXECUTE_ALL
-
-"""
 Read and execute/traverse permissions for current user, current group and others.
 """
 MODE_READ_AND_EXECUTE_ALL = MODE_READ_ALL | MODE_EXECUTE_ALL
@@ -76,6 +71,16 @@ SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
 FUSE_SIGNAL: signal.Signals = signal.SIGCONT  # pyright: ignore[reportUnknownVariableType, reportAttributeAccessIssue, reportUnknownMemberType]
 
 """
+All permissions for the runner, only execute/traverse for the others: they cannot list, add, rename or delete anything inside.
+"""
+MODE_TRAVERSE_ONLY_FOR_OTHERS = stat.S_IRWXU | MODE_EXECUTE_ALL
+
+"""
+Read and write permissions for the runner, only write for the others.
+"""
+MODE_WRITE_ONLY_FOR_OTHERS = stat.S_IRUSR | MODE_WRITE_ALL
+
+"""
 Removed from the runner's environment when it starts: the sandbox refuses to run if one is still there.
 """
 SECRET_ENVIRONMENT_VARIABLE_NAMES = [
@@ -88,6 +93,11 @@ SECRET_ENVIRONMENT_VARIABLE_NAMES = [
 The exit code of the runner when the run takes longer than its timeout.
 """
 TIMEOUT_EXIT_CODE = 124
+
+"""
+The size of the trace that the runner reads, in bytes: its end, which holds the exception.
+"""
+MAX_TRACE_SIZE = 64 * 1024
 
 
 R_SITE_LIBRARY_PATHS = [
@@ -212,7 +222,8 @@ class CloudRunner(Runner):
         os.makedirs(self.sandboxes_directory_path, exist_ok=True)
 
         os.chmod(self.data_directory, MODE_READ_AND_EXECUTE_ALL)
-        os.chmod(self.sandboxes_directory_path, MODE_WRITE_AND_EXECUTE_ALL)
+
+        os.chmod(self.sandboxes_directory_path, MODE_TRAVERSE_ONLY_FOR_OTHERS)
 
         self._download_runner()
 
@@ -678,6 +689,11 @@ class CloudRunner(Runner):
 
                     _collect_zombie_children()
 
+                    for _, file_name, reason in _find_files(self.prediction_directory_path):
+                        if reason is not None:
+                            self.logger.error(f"unsafe file left by the user code in the prediction directory: `{file_name}` {reason}")
+                            sys.exit(1)
+
     def _sandbox(
         self,
         train: bool,
@@ -784,10 +800,16 @@ class CloudRunner(Runner):
 
         this_sandbox_directory_path = os.path.join(self.sandboxes_directory_path, sandbox_id)
         os.makedirs(this_sandbox_directory_path)  # TODO delete?
-        os.chmod(this_sandbox_directory_path, MODE_WRITE_AND_EXECUTE_ALL)
+        os.chmod(this_sandbox_directory_path, MODE_TRAVERSE_ONLY_FOR_OTHERS)
 
         trace_file_path = os.path.join(this_sandbox_directory_path, f"trace.txt")
         exit_file_path = os.path.join(this_sandbox_directory_path, f"exit.txt")
+
+        # created by the runner: the user's code can only write them
+        for file_path in (trace_file_path, exit_file_path):
+            fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, MODE_WRITE_ONLY_FOR_OTHERS)
+            os.fchmod(fd, MODE_WRITE_ONLY_FOR_OTHERS)
+            os.close(fd)
 
         exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
 
@@ -804,26 +826,17 @@ class CloudRunner(Runner):
         exit_file_path: str,
         exit_content: str,
     ):
-        if os.path.exists(trace_file_path):
-            with open(trace_file_path) as fd:
-                trace_content = fd.read()
+        trace_content = _read_end(trace_file_path, MAX_TRACE_SIZE)
+        got_content = _read_end(exit_file_path, len(exit_content) * 2)
 
-            if not len(trace_content):
-                trace_content = "(no trace content)"
-
+        if trace_content:
             self.report_error_trace(trace_content)
 
             # the user code can exit with 0 after an error, the run must still fail
             sys.exit(exit_code or 1)
 
-        if os.path.exists(exit_file_path):
-            with open(exit_file_path) as fd:
-                got_content = fd.read()
-        else:
-            got_content = "(missing)"
-
         if got_content != exit_content:
-            self.logger.error(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content[:len(exit_content) * 2]}`")
+            self.logger.error(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content}`")
             self.logger.error("user code ended prematurely, likely running out of memory or silently calling exit")
 
             # an early `exit(0)` from the user code ends with 0, the run must still fail
@@ -965,6 +978,23 @@ def read_secret(
     return value
 
 
+def _read_end(file_path: str, max_size: int) -> str:
+    """
+    Reads at most the last `max_size` bytes of the file, marked as cut if it is longer.
+    """
+
+    with open(file_path, "rb") as fd:
+        size = fd.seek(0, os.SEEK_END)
+        fd.seek(max(0, size - max_size))
+
+        content = fd.read(max_size).decode("utf-8", errors="replace")
+
+    if size > max_size:
+        return f"(cut to its last {max_size} bytes)\n{content}"
+
+    return content
+
+
 def _collect_zombie_children():
     """
     As PID 1, the runner is the parent of the orphans killed by `sandbox clean`, and the only one able to collect them.
@@ -980,22 +1010,45 @@ def _collect_zombie_children():
             return  # the children left are alive
 
 
+def _check_user_file(file_status: os.stat_result) -> str | None:
+    """
+    The user's code writes these files, and the runner reads and uploads them as root: a link would make it use another file, such as the hidden data.
+    Returns why the file is unsafe, or None.
+    """
+
+    if stat.S_ISLNK(file_status.st_mode):
+        return "is a symbolic link"
+
+    if not stat.S_ISREG(file_status.st_mode):
+        return "is not a regular file"
+
+    if file_status.st_nlink != 1:
+        return "is a hard link"
+
+    return None
+
+
 def _find_files(
     directory_path: str,
-) -> Generator[tuple[str, str], None, None]:
+) -> Generator[tuple[str, str, str | None], None, None]:
     """
-    Recursively finds all files in the given directory and yields their absolute paths and relative names.
+    Recursively finds all files in the given directory and yields their absolute paths, relative names, and why they are unsafe, or None.
+    The directories that are symbolic links are yielded as unsafe files, not followed.
     """
 
     root_length = len(directory_path) + 1
-    for root, _, filenames in os.walk(directory_path):
+    for root, directory_names, file_names in os.walk(directory_path):
         relative = root[root_length:]
 
-        for filename in filenames:
-            file_path = os.path.join(root, filename)
-            file_name = os.path.join(relative, filename)
+        for name in [*directory_names, *file_names]:
+            file_path = os.path.join(root, name)
 
-            yield file_path, file_name
+            file_status = os.lstat(file_path)
+            if stat.S_ISDIR(file_status.st_mode):
+                continue
+
+            file_name = os.path.join(relative, name)
+            yield file_path, file_name, _check_user_file(file_status)
 
 
 def _upload_files(
@@ -1020,7 +1073,11 @@ def _upload_files(
     total_size = 0
     post_modifications: LastModifications = {}
 
-    for file_path, file_name in _find_files(directory_path):
+    for file_path, file_name, reason in _find_files(directory_path):
+        if reason is not None:
+            logger.warning(f"skipping `{file_name}`: {reason}")
+            continue
+
         stat = os.stat(file_path)
         file_size = stat.st_size
 

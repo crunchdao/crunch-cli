@@ -7,6 +7,103 @@ import time
 import unittest
 
 
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class FindFilesTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.root = os.path.join(self._directory.name, "model")
+        self.outside = os.path.join(self._directory.name, "data")
+        os.makedirs(self.root)
+        os.makedirs(self.outside)
+
+        self.hidden_file = os.path.join(self.outside, "hidden.parquet")
+        with open(self.hidden_file, "w") as fd:
+            fd.write("hidden")
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def _write(self, name: str):
+        with open(os.path.join(self.root, name), "w") as fd:
+            fd.write("x")
+
+    def _find(self):
+        from crunch.runner.cloud import _find_files
+
+        return sorted((name, reason) for _, name, reason in _find_files(self.root))
+
+    def test_regular_files(self):
+        self._write("model.pkl")
+        os.makedirs(os.path.join(self.root, "sub"))
+        self._write(os.path.join("sub", "weights.bin"))
+
+        self.assertEqual([("model.pkl", None), (os.path.join("sub", "weights.bin"), None)], self._find())
+
+    def test_symbolic_link_to_a_file(self):
+        os.symlink(self.hidden_file, os.path.join(self.root, "leak.parquet"))
+
+        self.assertEqual([("leak.parquet", "is a symbolic link")], self._find())
+
+    def test_symbolic_link_to_a_directory(self):
+        os.symlink(self.outside, os.path.join(self.root, "data"))
+
+        self.assertEqual([("data", "is a symbolic link")], self._find())
+
+    def test_hard_link(self):
+        os.link(self.hidden_file, os.path.join(self.root, "leak.parquet"))
+
+        self.assertEqual([("leak.parquet", "is a hard link")], self._find())
+
+    def test_fifo(self):
+        os.mkfifo(os.path.join(self.root, "pipe"))
+
+        self.assertEqual([("pipe", "is not a regular file")], self._find())
+
+
+class ReadEndTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.file_path = os.path.join(self._directory.name, "trace.txt")
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def _write(self, content: bytes):
+        with open(self.file_path, "wb") as fd:
+            fd.write(content)
+
+    def test_short(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"Traceback")
+
+        self.assertEqual("Traceback", _read_end(self.file_path, 16))
+
+    def test_empty(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"")
+
+        self.assertEqual("", _read_end(self.file_path, 16))
+
+    def test_cut_to_the_end(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"x" * 100 + b"ValueError: bad")
+
+        self.assertEqual("(cut to its last 15 bytes)\nValueError: bad", _read_end(self.file_path, 15))
+
+    def test_invalid_utf8(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"\xff\xfeerror")
+
+        replacement_character = "\N{REPLACEMENT CHARACTER}"
+        self.assertEqual(f"{replacement_character * 2}error", _read_end(self.file_path, 16))
+
+
 class ReadSecretTest(unittest.TestCase):
 
     def setUp(self):
