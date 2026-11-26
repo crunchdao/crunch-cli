@@ -62,21 +62,25 @@ class SandboxExecutor:
         if self.fuse_pid == 0:
             return  # fuse not installed
 
-        first_file_path = next(iter(os.listdir(self.data_directory_path)), None)
-        if not first_file_path:
-            return  # no data?
+        # every entry: the runner changes them one after the other, and a directory before its content
+        test_paths = [
+            os.path.join(self.data_directory_path, name)
+            for name in os.listdir(self.data_directory_path)
+        ]
 
-        test_path = os.path.join(self.data_directory_path, first_file_path)
+        if not test_paths:
+            return  # no data?
 
         os.kill(self.fuse_pid, self.fuse_signal_number)
 
         sleep(0.1)
         for _ in range(10):
-            if not os.access(test_path, os.R_OK):
+            readable_path = next((path for path in test_paths if os.access(path, os.R_OK)), None)
+            if readable_path is None:
                 break
 
             sleep(1)
-            print(f"[debug] fuse not yet triggered - test_path=`{test_path}`", file=sys.stderr)
+            print(f"[debug] fuse not yet triggered - test_path=`{readable_path}`", file=sys.stderr)
         else:
             print("fuse never triggered", file=sys.stderr)
             sys.exit(1)
