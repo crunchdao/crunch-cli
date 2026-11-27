@@ -1,0 +1,430 @@
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from unittest import mock
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class FindFilesTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.root = os.path.join(self._directory.name, "model")
+        self.outside = os.path.join(self._directory.name, "data")
+        os.makedirs(self.root)
+        os.makedirs(self.outside)
+
+        self.hidden_file = os.path.join(self.outside, "hidden.parquet")
+        with open(self.hidden_file, "w") as fd:
+            fd.write("hidden")
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def _write(self, name: str):
+        with open(os.path.join(self.root, name), "w") as fd:
+            fd.write("x")
+
+    def _find(self):
+        from crunch.runner.cloud import _find_files
+
+        return sorted((name, reason) for _, name, reason in _find_files(self.root))
+
+    def test_regular_files(self):
+        self._write("model.pkl")
+        os.makedirs(os.path.join(self.root, "sub"))
+        self._write(os.path.join("sub", "weights.bin"))
+
+        self.assertEqual([("model.pkl", None), (os.path.join("sub", "weights.bin"), None)], self._find())
+
+    def test_symbolic_link_to_a_file(self):
+        os.symlink(self.hidden_file, os.path.join(self.root, "leak.parquet"))
+
+        self.assertEqual([("leak.parquet", "is a symbolic link")], self._find())
+
+    def test_symbolic_link_to_a_directory(self):
+        os.symlink(self.outside, os.path.join(self.root, "data"))
+
+        self.assertEqual([("data", "is a symbolic link")], self._find())
+
+    def test_hard_link(self):
+        os.link(self.hidden_file, os.path.join(self.root, "leak.parquet"))
+
+        self.assertEqual([("leak.parquet", "is a hard link")], self._find())
+
+    def test_fifo(self):
+        os.mkfifo(os.path.join(self.root, "pipe"))
+
+        self.assertEqual([("pipe", "is not a regular file")], self._find())
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class DirectoryContentTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.root = os.path.join(self._directory.name, "data")
+        self.outside = os.path.join(self._directory.name, "outside")
+
+        os.makedirs(os.path.join(self.root, "sub"))
+        os.makedirs(self.outside)
+
+        self.files = [os.path.join(self.root, "x.parquet"), os.path.join(self.root, "sub", "y.parquet"), os.path.join(self.outside, "z.parquet")]
+        for path in self.files:
+            with open(path, "w") as fd:
+                fd.write("x")
+            os.chmod(path, 0o640)
+
+        for path in [self.root, os.path.join(self.root, "sub"), self.outside]:
+            os.chmod(path, 0o750)
+
+        os.symlink(self.files[2], os.path.join(self.root, "link-to-a-file"))
+        os.symlink(self.outside, os.path.join(self.root, "link-to-a-directory"))
+
+    def tearDown(self):
+        if os.path.isdir(os.path.join(self.root, "sub")):
+            os.chmod(os.path.join(self.root, "sub"), 0o700)
+
+        self._directory.cleanup()
+
+    def _mode(self, path: str):
+        return os.lstat(path).st_mode & 0o7777
+
+    def test_add_modes(self):
+        from crunch.runner.cloud import MODE_READ_AND_WRITE_FOR_OTHERS, _add_modes
+
+        _add_modes(self.root, MODE_READ_AND_WRITE_FOR_OTHERS)
+
+        self.assertEqual(0o756, self._mode(self.root))
+        self.assertEqual(0o756, self._mode(os.path.join(self.root, "sub")))
+        self.assertEqual([0o646, 0o646, 0o640], [self._mode(path) for path in self.files])
+        self.assertEqual(0o750, self._mode(self.outside))
+
+    # the runner is root: it still lists a directory after removing its own permissions on it
+    @unittest.skipIf(sys.platform == "win32" or os.geteuid() != 0, "needs root")
+    def test_change_content_modes(self):
+        from crunch.runner.cloud import MODE_READ_ONLY_FOR_OWNER, _change_content_modes
+
+        _change_content_modes(self.root, MODE_READ_ONLY_FOR_OWNER)
+
+        self.assertEqual(0o750, self._mode(self.root))
+        self.assertEqual(0o400, self._mode(os.path.join(self.root, "sub")))
+        self.assertEqual([0o400, 0o400, 0o640], [self._mode(path) for path in self.files])
+        self.assertEqual(0o750, self._mode(self.outside))
+
+    @unittest.skipIf(sys.platform == "win32" or os.geteuid() != 0, "needs root")
+    def test_data_permissions_given_back_after_the_fuse(self):
+        from crunch.runner.cloud import CloudRunner
+
+        runner = CloudRunner.__new__(CloudRunner)
+        runner.data_directory = self.root
+
+        runner.change_data_permissions(can_access=False)
+        runner.change_data_permissions(can_access=True)
+
+        self.assertEqual(0o555, self._mode(os.path.join(self.root, "sub")))
+        self.assertEqual([0o444, 0o444, 0o640], [self._mode(path) for path in self.files])
+        self.assertEqual(0o750, self._mode(self.outside))
+
+    def test_delete_content(self):
+        from crunch.runner.cloud import _delete_content
+
+        _delete_content(self.root)
+
+        self.assertEqual([], os.listdir(self.root))
+        self.assertEqual(["z.parquet"], os.listdir(self.outside))
+
+
+class ReadEndTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.file_path = os.path.join(self._directory.name, "trace.txt")
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def _write(self, content: bytes):
+        with open(self.file_path, "wb") as fd:
+            fd.write(content)
+
+    def test_short(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"Traceback")
+
+        self.assertEqual("Traceback", _read_end(self.file_path, 16))
+
+    def test_empty(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"")
+
+        self.assertEqual("", _read_end(self.file_path, 16))
+
+    def test_cut_to_the_end(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"x" * 100 + b"ValueError: bad")
+
+        self.assertEqual("(cut to its last 15 bytes)\nValueError: bad", _read_end(self.file_path, 15))
+
+    def test_invalid_utf8(self):
+        from crunch.runner.cloud import _read_end
+
+        self._write(b"\xff\xfeerror")
+
+        replacement_character = "\N{REPLACEMENT CHARACTER}"
+        self.assertEqual(f"{replacement_character * 2}error", _read_end(self.file_path, 16))
+
+
+class ReadSecretTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.file_path = os.path.join(self._directory.name, "secret")
+
+        with open(self.file_path, "w") as fd:
+            fd.write("from-file")
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def test_file_deleted_once_read(self):
+        from crunch.runner.cloud import read_secret
+
+        self.assertEqual("from-file", read_secret("secret", None, self.file_path))
+        self.assertFalse(os.path.exists(self.file_path))
+
+    def test_value(self):
+        from crunch.runner.cloud import read_secret
+
+        self.assertEqual("from-value", read_secret("secret", "from-value", None))
+
+    def test_both_given(self):
+        from crunch.runner.cloud import read_secret
+
+        with self.assertRaisesRegex(ValueError, "both"):
+            read_secret("secret", "from-value", self.file_path)
+
+    def test_empty_file(self):
+        from crunch.runner.cloud import read_secret
+
+        with open(self.file_path, "w"):
+            pass
+
+        with self.assertRaisesRegex(ValueError, "no secret"):
+            read_secret("secret", None, self.file_path)
+
+    def test_nothing_given(self):
+        from crunch.runner.cloud import read_secret
+
+        with self.assertRaisesRegex(ValueError, "no secret"):
+            read_secret("secret", None, None)
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class CloudCommandSecretsTest(unittest.TestCase):
+
+    def _run(self, **environment: str):
+        return subprocess.run(
+            [sys.executable, "-m", "crunch", "runner", "cloud", "--competition-name", "test", "--run-id", "1"],
+            env={
+                **{key: value for key, value in os.environ.items() if key not in ("RUN_TOKEN", "LOG_SECRET", "RUN_TOKEN_FILE", "LOG_SECRET_FILE")},
+                "CRUNCH_INSIDE_RUNNER": "true",
+                **environment,
+            },
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def test_no_run_token(self):
+        result = self._run(LOG_SECRET="secret")
+
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertEqual("[secret] <runner/err> no run token\n", result.stderr)
+
+    def test_no_log_secret(self):
+        result = self._run(RUN_TOKEN="token")
+
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertEqual("no log secret\n", result.stderr)
+
+    def test_missing_file(self):
+        result = self._run(LOG_SECRET="secret", RUN_TOKEN_FILE="/nonexistent/run-token")
+
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertIn("[secret] <runner/err> [Errno 2] No such file or directory", result.stderr)
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class PrepareSandboxTest(unittest.TestCase):
+
+    def _mode(self, path: str):
+        return os.stat(path).st_mode & 0o7777
+
+    def test_modes(self):
+        from crunch.runner.cloud import CloudRunner
+
+        with tempfile.TemporaryDirectory() as directory:
+            runner = CloudRunner.__new__(CloudRunner)
+            runner.sandboxes_directory_path = directory
+
+            # the modes are set after the creation, which applies the umask
+            previous_umask = os.umask(0o077)
+            try:
+                trace_file_path, exit_file_path, _, matplotlib_directory_path = runner._prepare_sandbox()
+            finally:
+                os.umask(previous_umask)
+
+            self.assertEqual(0o711, self._mode(os.path.dirname(trace_file_path)))
+            self.assertEqual([0o622, 0o622], [self._mode(trace_file_path), self._mode(exit_file_path)])
+            self.assertEqual(0o777, self._mode(matplotlib_directory_path))
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class ForkedRunsTest(unittest.TestCase):
+    """
+    A competition's runner can start the runs from forked processes, like the parallel inference of structural-break-real-time.
+    """
+
+    def setUp(self):
+        import multiprocessing
+
+        from crunch.runner.cloud import CloudRunner
+
+        self._directory = tempfile.TemporaryDirectory()
+        self.calls_path = os.path.join(self._directory.name, "calls")
+        self.fork = multiprocessing.get_context("fork")
+
+        self.runner = CloudRunner.__new__(CloudRunner)
+        self.runner._active_sandbox_count = multiprocessing.Value("i", 0)
+        self.runner._error_reported_fuse = multiprocessing.Lock()
+        self.runner.sandbox_path = "sandbox"
+        self.runner.prediction_directory_path = os.path.join(self._directory.name, "prediction")
+        os.makedirs(self.runner.prediction_directory_path)
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def _record(self, line: str):
+        with open(self.calls_path, "a") as fd:
+            fd.write(f"{line}\n")
+
+    def _recorded(self):
+        with open(self.calls_path) as fd:
+            return fd.read().splitlines()
+
+    def _run_forked(self, target, count: int):
+        processes = [self.fork.Process(target=target, args=(index,)) for index in range(count)]
+        for process in processes:
+            process.start()
+
+        for process in processes:
+            process.join(timeout=30)
+
+        self.assertEqual([0] * count, [process.exitcode for process in processes])
+
+    def test_cleaned_once_after_the_last_run(self):
+        barrier = self.fork.Barrier(2)
+
+        def run(train, command, *arguments):
+            # both active before either ends
+            barrier.wait(timeout=10)
+            time.sleep(0.5 if command == "slow" else 0.1)
+            self._record(f"end {command}")
+
+        def do_bash(arguments, env_vars=None):
+            self._record(" ".join(arguments))
+            return 0
+
+        with mock.patch.object(self.runner, "_sandbox", run), mock.patch.object(self.runner, "do_bash", do_bash):
+            self._run_forked(lambda index: self.runner.sandbox(False, ["fast", "slow"][index]), 2)
+
+        self.assertEqual(["end fast", "end slow", "sandbox clean"], self._recorded())
+
+    def test_error_reported_once(self):
+        import logging
+
+        run = mock.Mock()
+        run.report_error.side_effect = lambda trace: self._record(f"reported {trace}")
+
+        self.runner.logger = logging.getLogger("test")
+
+        with mock.patch.object(self.runner, "run", run, create=True):
+            self._run_forked(lambda index: self.runner.report_error_trace(f"trace {index}"), 2)
+
+        self.assertEqual(1, len(self._recorded()))
+
+
+@unittest.skipIf(sys.platform == "win32", "the cloud runner only runs on linux")
+class SetupTest(unittest.TestCase):
+
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.bin_directory = self._directory.name
+
+        for command in ["sandbox", "prefix"]:
+            self._create_command(command)
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def _create_command(self, command: str):
+        path = os.path.join(self.bin_directory, command)
+        with open(path, "w") as fd:
+            fd.write("#!/bin/sh\n")
+
+        os.chmod(path, 0o755)
+
+    def _run_setup(self, timeout: int | None):
+        """
+        Only `setup` of a runner, which then prints the commands it located and sleeps.
+        """
+
+        return subprocess.Popen(
+            [
+                sys.executable, "-c",
+                "import time\n"
+                "from crunch.runner.cloud import CloudRunner, create_logger\n"
+                "runner = CloudRunner.__new__(CloudRunner)\n"
+                f"runner.timeout = {timeout}\n"
+                "runner.logger = create_logger('secret')\n"
+                "runner.setup()\n"
+                "print(runner.sandbox_path, runner.prefix_path, flush=True)\n"
+                "time.sleep(30)\n",
+            ],
+            env={**os.environ, "PATH": self.bin_directory},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+    def test_commands_located(self):
+        process = self._run_setup(None)
+        assert process.stdout is not None
+
+        self.assertEqual(f"{self.bin_directory}/sandbox {self.bin_directory}/prefix\n", process.stdout.readline())
+
+        process.kill()
+        process.communicate(timeout=10)
+
+    def test_command_missing(self):
+        os.unlink(os.path.join(self.bin_directory, "prefix"))
+
+        process = self._run_setup(None)
+
+        _, stderr = process.communicate(timeout=10)
+        self.assertEqual(1, process.returncode, stderr)
+        self.assertIn("command not found: prefix", stderr)
+
+    def test_timeout_logged_with_the_secret(self):
+        process = self._run_setup(1)
+
+        _, stderr = process.communicate(timeout=10)
+        self.assertEqual(124, process.returncode, stderr)
+        self.assertIn("[secret] <runner/err> timeout of 1 seconds reached", stderr)

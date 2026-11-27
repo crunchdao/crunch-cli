@@ -1002,8 +1002,11 @@ def local(
 @click.option("--main-file", envvar=constants.MAIN_FILE_PATH_ENV_VAR, default=constants.DEFAULT_MAIN_FILE_PATH)
 # ---
 @click.option("--run-id", envvar="RUN_ID", required=True, type=int)
-@click.option("--run-token", envvar="RUN_TOKEN", required=True)
-@click.option("--log-secret", envvar="LOG_SECRET", default=None, type=str)
+@click.option("--run-token", envvar="RUN_TOKEN", default=None)
+@click.option("--run-token-file", envvar="RUN_TOKEN_FILE", default=None)
+@click.option("--log-secret", envvar="LOG_SECRET", default=None)
+@click.option("--log-secret-file", envvar="LOG_SECRET_FILE", default=None)
+@click.option("--timeout", envvar="TIMEOUT", type=int, default=None)
 @click.option("--train-frequency", envvar="TRAIN_FREQUENCY", type=int, default=0)
 @click.option("--force-first-train", envvar="FORCE_FIRST_TRAIN", type=bool, default=False)
 @click.option("--determinism-check", "determinism_check_enabled", envvar="DETERMINISM_CHECK", type=bool, default=False)
@@ -1027,8 +1030,11 @@ def cloud(
     main_file: str,
     # ---
     run_id: int,
-    run_token: str,
-    log_secret: str,
+    run_token: str | None,
+    run_token_file: str | None,
+    log_secret: str | None,
+    log_secret_file: str | None,
+    timeout: int | None,
     train_frequency: int,
     force_first_train: bool,
     determinism_check_enabled: bool,
@@ -1045,9 +1051,22 @@ def cloud(
         print("not in a runner")
         raise click.Abort()
 
-    os.unsetenv("RUN_ID")
-    os.unsetenv("RUN_TOKEN")
-    os.unsetenv("LOG_SECRET")
+    from .runner.cloud import SECRET_ENVIRONMENT_VARIABLE_NAMES, create_logger, read_secret
+
+    for name in SECRET_ENVIRONMENT_VARIABLE_NAMES:
+        os.environ.pop(name, None)
+
+    try:
+        log_secret = read_secret("log secret", log_secret, log_secret_file)
+    except (ValueError, OSError) as error:
+        print(error, file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        run_token = read_secret("run token", run_token, run_token_file)
+    except (ValueError, OSError) as error:
+        create_logger(log_secret).error(str(error))
+        sys.exit(1)
 
     phase_type = PhaseType[phase_type_string]
 
@@ -1089,6 +1108,7 @@ def cloud(
         phase_type,
         chain_height,
         crunch_cli_commit_hash,
+        timeout,
         # ---
         max_retry,
         retry_seconds,

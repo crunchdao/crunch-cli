@@ -1,17 +1,20 @@
+import errno
 import graphlib
 import json
 import logging
+import multiprocessing
 import os
 import random
+import shutil
 import signal
 import stat
 import string
 import subprocess
 import sys
 from datetime import timedelta
-from multiprocessing import Lock
+from threading import Timer
 from time import sleep
-from typing import Any, Generator, TypeAlias
+from typing import Any, Callable, Generator, TypeAlias
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -53,26 +56,62 @@ Execute/traverse permissions for current user, current group and others.
 MODE_EXECUTE_ALL = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
 
 """
-Write and execute/traverse permissions for current user, current group and others.
-"""
-MODE_WRITE_AND_EXECUTE_ALL = MODE_WRITE_ALL | MODE_EXECUTE_ALL
-
-"""
 Read and execute/traverse permissions for current user, current group and others.
 """
 MODE_READ_AND_EXECUTE_ALL = MODE_READ_ALL | MODE_EXECUTE_ALL
 
 """
-group + other  = (null)
-user (runner)  = read
+All permissions for current user, current group and others.
 """
-CHMOD_RESET = "go=,u=r"
+MODE_READ_WRITE_AND_EXECUTE_ALL = MODE_READ_ALL | MODE_WRITE_ALL | MODE_EXECUTE_ALL
+
+"""
+Only read permission for the runner, nothing for the others.
+"""
+MODE_READ_ONLY_FOR_OWNER = stat.S_IRUSR
+
+"""
+Read and write permissions for the others.
+"""
+MODE_READ_AND_WRITE_FOR_OTHERS = stat.S_IROTH | stat.S_IWOTH
 
 """
 SIGCONT is the only allowed signal.
 SIGUSR1 would not be transmitted because of the privileges drop of the sandbox.
 """
 FUSE_SIGNAL: signal.Signals = signal.SIGCONT  # pyright: ignore[reportUnknownVariableType, reportAttributeAccessIssue, reportUnknownMemberType]
+
+"""
+All permissions for the runner, only execute/traverse for the others: they cannot list, add, rename or delete anything inside.
+"""
+MODE_TRAVERSE_ONLY_FOR_OTHERS = stat.S_IRWXU | MODE_EXECUTE_ALL
+
+"""
+Read and write permissions for the runner, only write for the others.
+"""
+MODE_WRITE_ONLY_FOR_OTHERS = stat.S_IRUSR | MODE_WRITE_ALL
+
+"""
+Removed from the runner's environment when it starts: the sandbox refuses to run if one is still there.
+The `*_FILE` paths are read before the removal, so dropping them leaks neither the path nor the secret to the user code.
+"""
+SECRET_ENVIRONMENT_VARIABLE_NAMES = [
+    "RUN_ID",
+    "RUN_TOKEN",
+    "RUN_TOKEN_FILE",
+    "LOG_SECRET",
+    "LOG_SECRET_FILE",
+]
+
+"""
+The exit code of the runner when the run takes longer than its timeout.
+"""
+TIMEOUT_EXIT_CODE = 124
+
+"""
+The size of the trace that the runner reads, in bytes: its end, which holds the exception.
+"""
+MAX_TRACE_SIZE = 64 * 1024
 
 
 R_SITE_LIBRARY_PATHS = [
@@ -84,6 +123,8 @@ R_SITE_LIBRARY_PATHS = [
 class CloudRunner(Runner):
 
     has_model: bool
+    sandbox_path: str
+    prefix_path: str
 
     def __init__(
         self,
@@ -109,11 +150,12 @@ class CloudRunner(Runner):
         phase_type: PhaseType,
         chain_height: int,
         crunch_cli_commit_hash: str,
+        timeout: int | None,
         # ---
         max_retry: int,
         retry_seconds: int
     ):
-        logger = _create_logger(log_secret)
+        logger = create_logger(log_secret)
 
         super().__init__(
             competition_format=competition.format,
@@ -152,11 +194,35 @@ class CloudRunner(Runner):
         self.phase_type = phase_type
         self.chain_height = chain_height
         self.crunch_cli_commit_hash = crunch_cli_commit_hash
+        self.timeout = timeout
 
         self.max_retry = max_retry
         self.retry_seconds = retry_seconds
 
-        self._error_reported_fuse = Lock()
+        self._error_reported_fuse = multiprocessing.Lock()
+        self._active_sandbox_count = multiprocessing.Value("i", 0)
+
+    def setup(self):
+        self.sandbox_path = self._locate("sandbox")
+        self.prefix_path = self._locate("prefix")
+
+        timeout = self.timeout
+        if timeout is not None:
+            def exit_on_timeout():
+                self.logger.error(f"timeout of {timeout} seconds reached")
+                os._exit(TIMEOUT_EXIT_CODE)
+
+            timer = Timer(timeout, exit_on_timeout)
+            timer.daemon = True
+            timer.start()
+
+    def _locate(self, command: str) -> str:
+        path = shutil.which(command)
+        if path is None:
+            self.logger.error(f"command not found: {command}")
+            sys.exit(1)
+
+        return path
 
     def initialize(self):
         os.makedirs(self.data_directory, exist_ok=True)
@@ -165,7 +231,8 @@ class CloudRunner(Runner):
         os.makedirs(self.sandboxes_directory_path, exist_ok=True)
 
         os.chmod(self.data_directory, MODE_READ_AND_EXECUTE_ALL)
-        os.chmod(self.sandboxes_directory_path, MODE_WRITE_AND_EXECUTE_ALL)
+
+        os.chmod(self.sandboxes_directory_path, MODE_TRAVERSE_ONLY_FOR_OTHERS)
 
         self._download_runner()
 
@@ -240,12 +307,15 @@ class CloudRunner(Runner):
                 logger=self.logger,
             )
 
-            self.bash2(["chmod", "-R", "o+rw", self.model_directory_path])
+            _add_modes(self.model_directory_path, MODE_READ_AND_WRITE_FOR_OTHERS)
+
+            # no user code ran yet: no link of the user can be there
+            self.bash("sandbox", [self.sandbox_path, "grant", "--directory", self.model_directory_path])
 
         if "prepare prediction directory...":
             os.makedirs(self.prediction_directory_path, exist_ok=True)
-            self.delete_content(self.prediction_directory_path)
-            self.bash2(["chmod", "-R", "o+rw", self.prediction_directory_path])
+            _delete_content(self.prediction_directory_path)
+            _add_modes(self.prediction_directory_path, MODE_READ_AND_WRITE_FOR_OTHERS)
 
     def start_unstructured(self):
         if self.runner_module is None:
@@ -314,14 +384,9 @@ class CloudRunner(Runner):
             self.logger.info("no r cran packages to install")
 
         # remove warning about empty directory
-        user_site_library_paths = [
-            path
-            for path in R_SITE_LIBRARY_PATHS
-            if os.path.exists(path) and len(os.listdir(path)) == 0
-        ]
-
-        if len(user_site_library_paths):
-            self.bash2(["rm", "-r", *user_site_library_paths])
+        for path in R_SITE_LIBRARY_PATHS:
+            if os.path.exists(path) and len(os.listdir(path)) == 0:
+                os.rmdir(path)
 
     def _install_python_requirements(self, requirements_txt_path: str):
         installation = self._download_installation(Language.PYTHON)
@@ -524,7 +589,7 @@ class CloudRunner(Runner):
         env: dict[str, str | None] | None = None
     ):
         arguments = [
-            "prefix",
+            self.prefix_path,
             prefix,
             "--",
             *arguments
@@ -534,12 +599,6 @@ class CloudRunner(Runner):
         if code != 0:
             self.logger.error(f"command not exited correctly: {code}")
             sys.exit(code)
-
-    def bash2(
-        self,
-        arguments: list[str],
-    ):
-        self.bash(arguments[0], arguments)
 
     def pip(
         self,
@@ -560,42 +619,18 @@ class CloudRunner(Runner):
             self.venv_env
         )
 
-    def recursive_bash(
-        self,
-        directory_path: str,
-        commands: list[str],
-    ):
-        self.bash(
-            f"recursive-{commands[0]}",
-            [
-                "find",
-                directory_path,
-                "-mindepth", "1",
-                "-maxdepth", "1",
-                "-exec", *commands, ";"
-            ]
-        )
-
-    def delete_content(
-        self,
-        directory_path: str,
-    ):
-        """
-        Deletes all content in the given directory.
-        """
-
-        self.recursive_bash(
-            directory_path,
-            ["rm", "-rf", "{}"],
-        )
-
     def change_data_permissions(self, *, can_access: bool):
-        mode = "a+r" if can_access else CHMOD_RESET
+        if can_access:
+            def change(mode: int, is_directory: bool) -> int:
+                if is_directory:
+                    # the directories also get their traverse permission back, which the fuse removed
+                    return MODE_READ_AND_EXECUTE_ALL
 
-        self.recursive_bash(
-            self.data_directory,
-            ["chmod", mode, "-R", "{}"],
-        )
+                return MODE_READ_ALL
+
+            _change_content_modes(self.data_directory, change)
+        else:
+            _change_content_modes(self.data_directory, MODE_READ_ONLY_FOR_OWNER)
 
     def sandbox(
         self,
@@ -606,10 +641,45 @@ class CloudRunner(Runner):
         prefix_head: int = DEFAULT_LOG_LIMITS[0],
         prefix_tail: int = DEFAULT_LOG_LIMITS[1],
     ) -> None:
+        """
+        The user's code can leave processes behind, which would read what the runner does next, such as the data opened by the fuse.
+        They are killed when the last of the runs active together ends: the runs can be parallel, and they are all the same user.
+        """
+
+        with self._active_sandbox_count.get_lock():
+            self._active_sandbox_count.value += 1
+
+        try:
+            self._sandbox(train, command, parameters, install_data_fuse, prefix_head, prefix_tail)
+        finally:
+            with self._active_sandbox_count.get_lock():
+                self._active_sandbox_count.value -= 1
+
+                if self._active_sandbox_count.value == 0:
+                    exit_code = self.do_bash([self.sandbox_path, "clean"])
+                    if exit_code != 0:
+                        self.logger.error(f"could not stop the processes left by the user code: exit code {exit_code}")
+                        sys.exit(1)
+
+                    for _, file_name, reason in _find_files(self.prediction_directory_path):
+                        if reason is not None:
+                            self.logger.error(f"unsafe file left by the user code in the prediction directory: `{file_name}` {reason}")
+                            sys.exit(1)
+
+    def _sandbox(
+        self,
+        train: bool,
+        command: str,
+        parameters: KwargsLike,
+        install_data_fuse: bool,
+        prefix_head: int,
+        prefix_tail: int,
+    ) -> None:
         (
             trace_file_path,
             exit_file_path,
             exit_content,
+            matplotlib_directory_path,
         ) = self._prepare_sandbox()
 
         if install_data_fuse:
@@ -675,19 +745,21 @@ class CloudRunner(Runner):
 
         exit_code = self.do_bash(
             [
-                "sandbox",
-                "--chown-directory", self.model_directory_path,
-                "--filter-non-unix-socket-syscall",
+                self.sandbox_path, "run",
+                "--network-restriction=unix-socket-only",
+                *(f"--forbid-environment-variable={name}" for name in SECRET_ENVIRONMENT_VARIABLE_NAMES),
                 "--",
-                "prefix", f"--head={prefix_head}", f"--tail={prefix_tail}", "user-code",
+                self.prefix_path, f"--head={prefix_head}", f"--tail={prefix_tail}", "user-code",
                 "--",
-                "python3", "-u",
+                # isolated: neither the code directory nor the user site in `sys.path` before the executor loads the user's code
+                "python3", "-I", "-u",
                 "-m", "crunch", "runner", "cloud-executor",
                 *args
             ],
             {
                 **self.venv_env,
                 "CRUNCH_AUTO_MONKEY_PATCH": "true",
+                "MPLCONFIGDIR": matplotlib_directory_path,
             }
         )
 
@@ -703,17 +775,27 @@ class CloudRunner(Runner):
 
         this_sandbox_directory_path = os.path.join(self.sandboxes_directory_path, sandbox_id)
         os.makedirs(this_sandbox_directory_path)  # TODO delete?
-        os.chmod(this_sandbox_directory_path, MODE_WRITE_AND_EXECUTE_ALL)
+        os.chmod(this_sandbox_directory_path, MODE_TRAVERSE_ONLY_FOR_OTHERS)
 
         trace_file_path = os.path.join(this_sandbox_directory_path, f"trace.txt")
         exit_file_path = os.path.join(this_sandbox_directory_path, f"exit.txt")
 
+        # created by the runner: the user's code can only write them
+        for file_path in (trace_file_path, exit_file_path):
+            open(file_path, "w").close()
+            os.chmod(file_path, MODE_WRITE_ONLY_FOR_OTHERS)
+
         exit_content = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
+
+        matplotlib_directory_path = os.path.join(this_sandbox_directory_path, "matplotlib")
+        os.mkdir(matplotlib_directory_path)
+        os.chmod(matplotlib_directory_path, MODE_READ_WRITE_AND_EXECUTE_ALL)
 
         return (
             trace_file_path,
             exit_file_path,
             exit_content,
+            matplotlib_directory_path,
         )
 
     def _validate_sandbox_exit(
@@ -723,26 +805,17 @@ class CloudRunner(Runner):
         exit_file_path: str,
         exit_content: str,
     ):
-        if os.path.exists(trace_file_path):
-            with open(trace_file_path) as fd:
-                trace_content = fd.read()
+        trace_content = _read_end(trace_file_path, MAX_TRACE_SIZE)
+        got_content = _read_end(exit_file_path, len(exit_content) * 2)
 
-            if not len(trace_content):
-                trace_content = "(no trace content)"
-
+        if trace_content:
             self.report_error_trace(trace_content)
 
             # the user code can exit with 0 after an error, the run must still fail
             sys.exit(exit_code or 1)
 
-        if os.path.exists(exit_file_path):
-            with open(exit_file_path) as fd:
-                got_content = fd.read()
-        else:
-            got_content = "(missing)"
-
         if got_content != exit_content:
-            self.logger.error(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content[:len(exit_content) * 2]}`")
+            self.logger.error(f"[debug] failed exit check - expected=`{exit_content}` got=`{got_content}`")
             self.logger.error("user code ended prematurely, likely running out of memory or silently calling exit")
 
             # an early `exit(0)` from the user code ends with 0, the run must still fail
@@ -824,13 +897,15 @@ def _download_files(
         progress_bar=False,
     )
 
+    logger.info(f"{directory_path}: {len(paths)} file(s) downloaded")
+
     return {
         relative_path: os.stat(path).st_mtime_ns
         for relative_path, path in paths.items()
     }
 
 
-def _create_logger(log_secret: str) -> logging.Logger:
+def create_logger(log_secret: str) -> logging.Logger:
     logger = logging.Logger("crunch.runner.cloud")
     logger.addHandler(_RunnerLogHandler(log_secret))
 
@@ -857,22 +932,148 @@ class _RunnerLogHandler(logging.Handler):
             self.handleError(record)
 
 
+def read_secret(
+    name: str,
+    value: str | None,
+    file_path: str | None,
+) -> str:
+    """
+    The value is given directly for the local development, or in a file by the entrypoint, which is deleted once read.
+
+    Raises:
+        ValueError: If both or none are given, or if the secret is empty.
+    """
+
+    if value is not None and file_path is not None:
+        raise ValueError(f"the {name} is given both directly and in a file")
+
+    if file_path is not None:
+        with open(file_path) as fd:
+            value = fd.read()
+
+        os.unlink(file_path)
+
+    if not value:
+        raise ValueError(f"no {name}")
+
+    return value
+
+
+def _read_end(file_path: str, max_size: int) -> str:
+    """
+    Reads at most the last `max_size` bytes of the file, marked as cut if it is longer.
+    """
+
+    with open(file_path, "rb") as fd:
+        size = fd.seek(0, os.SEEK_END)
+        fd.seek(max(0, size - max_size))
+
+        content = fd.read(max_size).decode("utf-8", errors="replace")
+
+    if size > max_size:
+        return f"(cut to its last {max_size} bytes)\n{content}"
+
+    return content
+
+
+def _raise(error: OSError) -> None:
+    raise error
+
+
+def _change_mode(path: str, change: int | Callable[[int, bool], int], directory_fd: int | None = None) -> None:
+    """
+    Changes the mode of the file or directory, unless it is a link: `change` is its new permissions, or a function of its current permissions and of whether it is a directory.
+    Through a file descriptor: Linux cannot change the mode of a path without following it, and a path could be swapped for a link between a check and the change.
+    """
+
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=directory_fd)
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            return
+
+        raise
+
+    try:
+        if callable(change):
+            file_status = os.fstat(fd)
+            change = change(stat.S_IMODE(file_status.st_mode), stat.S_ISDIR(file_status.st_mode))
+
+        os.fchmod(fd, change)
+    finally:
+        os.close(fd)
+
+
+def _change_content_modes(directory_path: str, change: int | Callable[[int, bool], int]) -> None:
+    """
+    Changes the mode of everything inside the given directory, without following the links.
+    A directory is changed before its content.
+    """
+
+    for _, directory_names, file_names, directory_fd in os.fwalk(directory_path, onerror=_raise):
+        for name in [*directory_names, *file_names]:
+            _change_mode(name, change, directory_fd)
+
+
+def _add_modes(directory_path: str, modes: int) -> None:
+    """
+    Adds the modes to the given directory and to everything inside, like `chmod -R`.
+    """
+
+    def add(mode: int, is_directory: bool) -> int:
+        return mode | modes
+
+    _change_mode(directory_path, add)
+    _change_content_modes(directory_path, add)
+
+
+def _delete_content(directory_path: str) -> None:
+    for entry in os.scandir(directory_path):
+        if entry.is_dir(follow_symlinks=False):
+            shutil.rmtree(entry.path)
+        else:
+            os.unlink(entry.path)
+
+
+def _check_user_file(file_status: os.stat_result) -> str | None:
+    """
+    The user's code writes these files, and the runner reads and uploads them as root: a link would make it use another file, such as the hidden data.
+    Returns why the file is unsafe, or None.
+    """
+
+    if stat.S_ISLNK(file_status.st_mode):
+        return "is a symbolic link"
+
+    if not stat.S_ISREG(file_status.st_mode):
+        return "is not a regular file"
+
+    if file_status.st_nlink != 1:
+        return "is a hard link"
+
+    return None
+
+
 def _find_files(
     directory_path: str,
-) -> Generator[tuple[str, str], None, None]:
+) -> Generator[tuple[str, str, str | None], None, None]:
     """
-    Recursively finds all files in the given directory and yields their absolute paths and relative names.
+    Recursively finds all files in the given directory and yields their absolute paths, relative names, and why they are unsafe, or None.
+    The directories that are symbolic links are yielded as unsafe files, not followed.
     """
 
     root_length = len(directory_path) + 1
-    for root, _, filenames in os.walk(directory_path):
+    for root, directory_names, file_names in os.walk(directory_path, onerror=_raise):
         relative = root[root_length:]
 
-        for filename in filenames:
-            file_path = os.path.join(root, filename)
-            file_name = os.path.join(relative, filename)
+        for name in [*directory_names, *file_names]:
+            file_path = os.path.join(root, name)
 
-            yield file_path, file_name
+            file_status = os.lstat(file_path)
+            if stat.S_ISDIR(file_status.st_mode):
+                continue
+
+            file_name = os.path.join(relative, name)
+            yield file_path, file_name, _check_user_file(file_status)
 
 
 def _upload_files(
@@ -897,7 +1098,11 @@ def _upload_files(
     total_size = 0
     post_modifications: LastModifications = {}
 
-    for file_path, file_name in _find_files(directory_path):
+    for file_path, file_name, reason in _find_files(directory_path):
+        if reason is not None:
+            logger.warning(f"skipping `{file_name}`: {reason}")
+            continue
+
         stat = os.stat(file_path)
         file_size = stat.st_size
 
@@ -946,12 +1151,11 @@ class CloudRunnerContext(RunnerContext):
 
     @property
     def timeout(self):
-        value = os.getenv("TIMEOUT")
-
-        if value is None:
+        timeout = self.runner.timeout
+        if timeout is None:
             return None
 
-        return timedelta(seconds=int(value))
+        return timedelta(seconds=timeout)
 
     @property
     def train_frequency(self):

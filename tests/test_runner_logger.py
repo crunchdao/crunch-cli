@@ -50,12 +50,12 @@ class _FlushCountingStream(io.StringIO):
 class CloudRunnerLoggerTest(unittest.TestCase):
 
     def _log(self, log_secret: str):
-        from crunch.runner.cloud import _create_logger
+        from crunch.runner.cloud import create_logger
 
         stdout, stderr = _FlushCountingStream(), _FlushCountingStream()
 
         with patch.object(sys, "stdout", stdout), patch.object(sys, "stderr", stderr):
-            logger = _create_logger(log_secret)
+            logger = create_logger(log_secret)
             logger.info("started")
             logger.warning("retrying")
             logger.error("user code exited with code 1")
@@ -87,12 +87,12 @@ class CloudRunnerLoggerTest(unittest.TestCase):
             self._log("secret")
 
     def test_context_log(self):
-        from crunch.runner.cloud import CloudRunnerContext, _create_logger
+        from crunch.runner.cloud import CloudRunnerContext, create_logger
 
         stdout, stderr = _FlushCountingStream(), _FlushCountingStream()
 
         with patch.object(sys, "stdout", stdout), patch.object(sys, "stderr", stderr):
-            runner = SimpleNamespace(logger=_create_logger("secret"))
+            runner = SimpleNamespace(logger=create_logger("secret"))
             context = CloudRunnerContext(cast(Any, runner))
 
             self.assertTrue(context.log("looping", important=True))
