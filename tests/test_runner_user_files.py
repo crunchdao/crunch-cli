@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 from unittest import mock
 
@@ -331,12 +330,20 @@ class ForkedRunsTest(unittest.TestCase):
 
     def test_cleaned_once_after_the_last_run(self):
         barrier = self.fork.Barrier(2)
+        fast_ended = self.fork.Event()
 
         def run(train, command, *arguments):
             # both active before either ends
             barrier.wait(timeout=10)
-            time.sleep(0.5 if command == "slow" else 0.1)
+
+            # an order of events instead of different sleeps, which a busy machine does not respect
+            if command == "slow":
+                self.assertTrue(fast_ended.wait(timeout=10))
+
             self._record(f"end {command}")
+
+            if command == "fast":
+                fast_ended.set()
 
         def do_bash(arguments, env_vars=None):
             self._record(" ".join(arguments))
